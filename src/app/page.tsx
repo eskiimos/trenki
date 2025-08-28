@@ -1,103 +1,188 @@
-import Image from "next/image";
 
-export default function Home() {
+'use client';
+
+import { ChevronRight, Heart } from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
+
+// Компонент для короткого видео
+const ShortVideoPlayer = ({ src, title, index }: { src: string; title: string; index: number }) => {
+  const handleMouseEnter = (e: React.MouseEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget;
+    video.currentTime = 0;
+    video.play();
+  };
+
+  const handleMouseLeave = (e: React.MouseEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget;
+    video.pause();
+    video.currentTime = 0;
+  };
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <Link href={`/shorts?index=${index}`}>
+      <div className="flex-shrink-0 w-36 cursor-pointer">
+        <div className="bg-gray-200 rounded-lg overflow-hidden relative aspect-[9/16] hover:scale-105 transition-transform">
+          <video
+            className="w-full h-full object-cover"
+            src={src}
+            muted
+            loop
+            playsInline
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            poster=""
+          />
         </div>
+      </div>
+    </Link>
+  );
+};
+
+const HomePage = () => {
+  return (
+    <div className="bg-[#F3F4F6] min-h-screen text-[#303030]">
+      <Header />
+      <main className="p-4 space-y-8">
+        <HeroVideo />
+        <TrenkiSection />
+        <TrainingsSection />
+        <TrainersSection />
+        <PromoBanner />
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
-}
+};
+
+const Header = () => (
+  <header className="bg-white p-4 flex justify-between items-center text-[#303030]">
+    <div className="flex items-center space-x-3">
+      <div className="w-10 h-10 bg-gray-300 rounded-full relative">
+        <Image src="/logos/logo_akb.png" alt="Logo" layout="fill" className="rounded-full"/>
+      </div>
+      <div>
+        <h1 className="font-bold text-sm text-[#303030]">КОНСТАНТИН</h1>
+        <p className="text-xs text-[#303030] opacity-70">КОНСТАНТИНОПОЛЬСКИЙ</p>
+      </div>
+    </div>
+    <div className="text-right">
+      <p className="font-bold text-2xl text-[#303030]">88</p>
+      <p className="text-xs text-[#303030] opacity-70">вр</p>
+    </div>
+  </header>
+);
+
+const HeroVideo = () => (
+  <Link href="/video/onboarding">
+    <div className="bg-red-500 rounded-[3px] overflow-hidden relative h-[193px] w-full cursor-pointer hover:opacity-90 transition-opacity">
+      <Image src="/images/video_inbording.png" alt="Onboarding" layout="fill" className="object-cover" />
+      <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+        8:44
+      </div>
+    </div>
+  </Link>
+);
+
+const TrenkiSection = () => (
+  <section>
+    <div className="flex justify-between items-center mb-4">
+      <h2 className="font-bold text-lg text-[#303030]">ТРЕНЬКИ</h2>
+      <ChevronRight className="w-6 h-6 text-[#303030]" />
+    </div>
+    <div className="flex space-x-4 overflow-x-auto pb-4">
+      <ShortVideoPlayer src="/video/shots/short_1.mp4" title="КОРОТКАЯ ТРЕНИРОВКА 1" index={0} />
+      <ShortVideoPlayer src="/video/shots/short_2.mp4" title="КОРОТКАЯ ТРЕНИРОВКА 2" index={1} />
+      <ShortVideoPlayer src="/video/shots/short_3.mp4" title="КОРОТКАЯ ТРЕНИРОВКА 3" index={2} />
+      <ShortVideoPlayer src="/video/shots/short_4.mp4" title="КОРОТКАЯ ТРЕНИРОВКА 4" index={3} />
+    </div>
+  </section>
+);
+
+const TrenkiCard = ({ image, title }: { image: string, title: string }) => (
+  <div className="flex-shrink-0 w-36">
+    <div className="bg-gray-200 rounded-lg overflow-hidden relative aspect-[9/16]">
+        <Image src={image} alt={title} layout="fill" className="object-cover" />
+    </div>
+  </div>
+);
+
+const TrainingsSection = () => (
+    <section>
+        <div className="flex justify-between items-center mb-4">
+            <h2 className="font-bold text-lg text-[#303030]">ТРЕНИРОВКИ</h2>
+            <ChevronRight className="w-6 h-6 text-[#303030]" />
+        </div>
+        <div className="flex items-center mb-4">
+            <div className="w-8 h-8 bg-gray-300 rounded-full mr-3 relative">
+              <Image src="https://placehold.co/32x32/cbd5e0/1a202c?text=A" alt="Trainer avatar" layout="fill" className="rounded-full"/>
+            </div>
+            <span className="font-semibold text-sm mr-auto text-[#303030]">ИМЯ ТРЕНЕРА</span>
+            <Heart className="w-4 h-4 text-[#303030] mr-1" />
+            <span className="text-sm text-[#303030]">874</span>
+        </div>
+        <div className="flex space-x-4 overflow-x-auto pb-4">
+            <TrainingCard />
+            <TrainingCard />
+        </div>
+    </section>
+);
+
+const TrainingCard = () => (
+    <div className="flex-shrink-0 w-64">
+        <div className="bg-yellow-400 rounded-lg h-36 mb-3 relative overflow-hidden">
+            <Image src="https://placehold.co/256x144/facc15/1f2937?text=НАЗВАНИЕ" alt="Training" layout="fill" className="object-cover" />
+            <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                8:44
+            </div>
+        </div>
+        <div className="flex space-x-2">
+            <Chip text="ТИП ТРЕНИРОВКИ" />
+            <Chip text="УРОВЕНЬ" />
+            <Chip text="ОБОРУДОВАНИЕ" />
+        </div>
+    </div>
+);
+
+const Chip = ({ text }: { text: string }) => (
+    <span className="bg-gray-800 text-white text-xs font-semibold px-3 py-1 rounded-full">
+        {text}
+    </span>
+);
+
+
+const TrainersSection = () => (
+    <section>
+        <div className="flex justify-between items-center mb-4">
+            <h2 className="font-bold text-lg text-[#303030]">ТРЕНЕРЫ</h2>
+            <ChevronRight className="w-6 h-6 text-[#303030]" />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+            <TrainerCard name="МАРК КОВАЛЕВСКИЙ" role="ГЛАВНЫЙ ТРЕНЕР" spec="ТАКТИЧЕСКАЯ ПОДГО..." />
+            <TrainerCard name="КОНСТАНТИН КОНСТАНТИНОПО..." role="ГЛАВНЫЙ ТРЕНЕР" spec="ТАКТИЧЕСКАЯ ПОДГО..." />
+        </div>
+    </section>
+);
+
+const TrainerCard = ({ name, role, spec }: { name: string, role: string, spec: string }) => (
+    <div className="bg-white p-4 rounded-lg text-center">
+        <div className="w-20 h-20 bg-gray-300 rounded-full mx-auto mb-4 relative">
+          <Image src="https://placehold.co/80x80/e2e8f0/4a5568?text=M" alt={name} layout="fill" className="rounded-full"/>
+        </div>
+        <h3 className="font-bold text-[#303030]">{name}</h3>
+        <p className="text-xs text-[#303030] opacity-70">{role}</p>
+        <p className="text-xs text-[#303030] opacity-70">{spec}</p>
+    </div>
+);
+
+
+const PromoBanner = () => (
+    <div className="bg-red-500 rounded-lg overflow-hidden relative h-48">
+        <Image src="https://placehold.co/400x192/dc2626/ffffff?text=ЧТО-ТО+ОТ+МАРКА" alt="Promo" layout="fill" className="object-cover" />
+        <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+            8:44
+        </div>
+    </div>
+);
+
+
+export default HomePage;
