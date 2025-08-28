@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Trenki - Workout Social Network
 
-## Getting Started
+Социальная сеть для тренировок с функционалом коротких видео как TikTok/YouTube Shorts.
 
-First, run the development server:
+## 🚀 Функции
 
+- **Главная страница** с лентой тренировок и тренеров
+- **Полноэкранный видеоплеер** для длинных видео  
+- **TikTok/Shorts плеер** с swipe-навигацией
+- **Интерактивные превью** видео при наведении
+- **4 коротких видео** с плавными переходами
+- **Адаптивный дизайн** для мобильных устройств
+
+## 🛠️ Технологии
+
+- **Next.js 15.5.2** с App Router
+- **TypeScript** для типизации
+- **Tailwind CSS** для стилей
+- **Prisma** для работы с базой данных
+- **Lucide React** для иконок
+- **Google Fonts (Overpass)** для шрифтов
+
+## 📦 Установка
+
+1. Клонируйте репозиторий:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/eskiimos/trenki.git
+cd trenki
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Установите зависимости:
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Создайте файл окружения:
+```bash
+cp .env.example .env.local
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Запустите проект:
+```bash
+npm run dev
+```
 
-## Learn More
+## 🌐 Развертывание на Vercel
 
-To learn more about Next.js, take a look at the following resources:
+1. Подключите GitHub репозиторий к Vercel
+2. Настройте переменные окружения
+3. Разверните проект
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 📱 Использование
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Главная страница**: Просмотр ленты тренировок
+- **Клик на видео**: Переход к полноэкранному плееру
+- **Раздел "ТРЕНЬКИ"**: Короткие видео с hover-эффектами
+- **Swipe**: Навигация между короткими видео
 
-## Deploy on Vercel
+## 🎨 Дизайн
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Цветовая схема: `#303030` для основного текста
+- Шрифт: Overpass для поддержки кириллицы
+- Адаптивный дизайн для всех устройств
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📄 Лицензия
+
+MIT License
