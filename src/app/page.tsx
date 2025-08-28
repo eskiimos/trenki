@@ -98,14 +98,6 @@ const TrenkiSection = () => (
   </section>
 );
 
-const TrenkiCard = ({ image, title }: { image: string, title: string }) => (
-  <div className="flex-shrink-0 w-36">
-    <div className="bg-gray-200 rounded-lg overflow-hidden relative aspect-[9/16]">
-        <Image src={image} alt={title} layout="fill" className="object-cover" />
-    </div>
-  </div>
-);
-
 const TrainingsSection = () => (
     <section>
         <div className="flex justify-between items-center mb-4">

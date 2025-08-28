@@ -16,7 +16,7 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [showComments, setShowComments] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
+  // const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(true);
   const [showControls, setShowControls] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -116,7 +116,7 @@ export default function VideoPage({ params }: VideoPageProps) {
         clearTimeout(hideControlsTimeoutRef.current);
       }
     }
-  }, [isPlaying]);
+  }, [isPlaying, showControlsTemporarily]);
 
   // Очистка таймера при размонтировании
   useEffect(() => {
