@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Heart, MessageCircle, Share, MoreVertical, Volume2, VolumeX } from 'lucide-react';
 
-const ShortsPage = () => {
+const ShortsContent = () => {
   const searchParams = useSearchParams();
   const startIndex = parseInt(searchParams.get('index') || '0');
   
@@ -243,6 +243,14 @@ const ShortsPage = () => {
         />
       </div>
     </div>
+  );
+};
+
+const ShortsPage = () => {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen bg-black text-white">Загрузка...</div>}>
+      <ShortsContent />
+    </Suspense>
   );
 };
 
