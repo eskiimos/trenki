@@ -43,7 +43,7 @@ const HomePage = () => {
   return (
     <div className="bg-[#F3F4F6] min-h-screen text-[#303030]">
       <Header />
-      <main className="p-4 space-y-8">
+      <main className="p-4 space-y-8" style={{ paddingTop: '140px' }}>
         <HeroVideo />
         <TrenkiSection />
         <TrainingsSection />
