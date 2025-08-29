@@ -34,11 +34,21 @@ interface TelegramUpdate {
   callback_query?: TelegramCallbackQuery;
 }
 
+interface InlineKeyboard {
+  reply_markup: {
+    inline_keyboard: Array<Array<{
+      text: string;
+      web_app?: { url: string };
+      callback_data?: string;
+    }>>;
+  };
+}
+
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const WEB_APP_URL = process.env.WEB_APP_URL || 'https://trenki-mvp.vercel.app';
 
 // Функция отправки сообщения в Telegram
-async function sendMessage(chatId: number, text: string, replyMarkup?: Record<string, any>) {
+async function sendMessage(chatId: number, text: string, replyMarkup?: InlineKeyboard) {
   const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
   
   const body = {
@@ -58,7 +68,7 @@ async function sendMessage(chatId: number, text: string, replyMarkup?: Record<st
 }
 
 // Функция редактирования сообщения
-async function editMessage(chatId: number, messageId: number, text: string, replyMarkup?: Record<string, any>) {
+async function editMessage(chatId: number, messageId: number, text: string, replyMarkup?: InlineKeyboard) {
   const url = `https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`;
   
   const body = {
