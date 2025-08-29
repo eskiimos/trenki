@@ -20,6 +20,7 @@ const ShortsContent = () => {
     {
       id: 1,
       src: '/video/shots/short_1.mp4',
+      poster: '/images/preview_shorts/shorts_1.png',
       likes: 156,
       comments: 23,
       description: 'Быстрая тренировка на все группы мышц',
@@ -28,6 +29,7 @@ const ShortsContent = () => {
     {
       id: 2,
       src: '/video/shots/short_2.mp4',
+      poster: '/images/preview_shorts/shorts_2.png',
       likes: 289,
       comments: 41,
       description: 'Кардио тренировка для сжигания жира',
@@ -36,6 +38,7 @@ const ShortsContent = () => {
     {
       id: 3,
       src: '/video/shots/short_3.mp4',
+      poster: '/images/preview_shorts/shorts_3.png',
       likes: 203,
       comments: 18,
       description: 'Упражнения для укрепления кора',
@@ -44,6 +47,7 @@ const ShortsContent = () => {
     {
       id: 4,
       src: '/video/shots/short_4.mp4',
+      poster: '/images/preview_shorts/shorts_4.png',
       likes: 342,
       comments: 67,
       description: 'Растяжка после тренировки',
@@ -126,6 +130,7 @@ const ShortsContent = () => {
             ref={videoRef}
             className="w-full h-full object-cover"
             src={currentVideo.src}
+            poster={currentVideo.poster}
             autoPlay
             muted={isMuted}
             loop
