@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Play, Pause, Heart, MessageCircle, Share, MoreVertical, Volume2, VolumeX } from 'lucide-react';
 
@@ -46,21 +46,19 @@ export default function VideoPage({ params }: VideoPageProps) {
     showControlsTemporarily();
   };
 
-  const showControlsTemporarily = () => {
+    const showControlsTemporarily = useCallback(() => {
     setShowControls(true);
     
     // Очищаем предыдущий таймер
     if (hideControlsTimeoutRef.current) {
       clearTimeout(hideControlsTimeoutRef.current);
     }
-    
-    // Устанавливаем новый таймер на 3 секунды
+
+    // Скрываем через 3 секунды
     hideControlsTimeoutRef.current = setTimeout(() => {
-      if (isPlaying) {
-        setShowControls(false);
-      }
+      setShowControls(false);
     }, 3000);
-  };
+  }, []);
 
   const handleVideoInteraction = () => {
     showControlsTemporarily();

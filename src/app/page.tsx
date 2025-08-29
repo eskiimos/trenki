@@ -6,7 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 // Компонент для короткого видео
-const ShortVideoPlayer = ({ src, title, index }: { src: string; title: string; index: number }) => {
+const ShortVideoPlayer = ({ src, index }: { src: string; index: number }) => {
   const handleMouseEnter = (e: React.MouseEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
     video.currentTime = 0;
@@ -90,10 +90,10 @@ const TrenkiSection = () => (
       <ChevronRight className="w-6 h-6 text-[#303030]" />
     </div>
     <div className="flex space-x-4 overflow-x-auto pb-4">
-      <ShortVideoPlayer src="/video/shots/short_1.mp4" title="КОРОТКАЯ ТРЕНИРОВКА 1" index={0} />
-      <ShortVideoPlayer src="/video/shots/short_2.mp4" title="КОРОТКАЯ ТРЕНИРОВКА 2" index={1} />
-      <ShortVideoPlayer src="/video/shots/short_3.mp4" title="КОРОТКАЯ ТРЕНИРОВКА 3" index={2} />
-      <ShortVideoPlayer src="/video/shots/short_4.mp4" title="КОРОТКАЯ ТРЕНИРОВКА 4" index={3} />
+      <ShortVideoPlayer src="/video/shots/short_1.mp4" index={0} />
+      <ShortVideoPlayer src="/video/shots/short_2.mp4" index={1} />
+      <ShortVideoPlayer src="/video/shots/short_3.mp4" index={2} />
+      <ShortVideoPlayer src="/video/shots/short_4.mp4" index={3} />
     </div>
   </section>
 );
