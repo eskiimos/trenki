@@ -1,10 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Типы для Telegram API
+interface TelegramMessage {
+  message_id: number;
+  from: {
+    id: number;
+    first_name?: string;
+    last_name?: string;
+    username?: string;
+  };
+  chat: {
+    id: number;
+    type: string;
+  };
+  text?: string;
+}
+
+interface TelegramCallbackQuery {
+  id: string;
+  from: {
+    id: number;
+    first_name?: string;
+    last_name?: string;
+    username?: string;
+  };
+  message: TelegramMessage;
+  data?: string;
+}
+
+interface TelegramUpdate {
+  update_id: number;
+  message?: TelegramMessage;
+  callback_query?: TelegramCallbackQuery;
+}
+
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const WEB_APP_URL = process.env.WEB_APP_URL || 'https://trenki-mvp.vercel.app';
 
 // Функция отправки сообщения в Telegram
-async function sendMessage(chatId: number, text: string, replyMarkup?: any) {
+async function sendMessage(chatId: number, text: string, replyMarkup?: Record<string, any>) {
   const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
   
   const body = {
@@ -24,7 +58,7 @@ async function sendMessage(chatId: number, text: string, replyMarkup?: any) {
 }
 
 // Функция редактирования сообщения
-async function editMessage(chatId: number, messageId: number, text: string, replyMarkup?: any) {
+async function editMessage(chatId: number, messageId: number, text: string, replyMarkup?: Record<string, any>) {
   const url = `https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`;
   
   const body = {
@@ -59,7 +93,7 @@ async function answerCallbackQuery(callbackQueryId: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body: TelegramUpdate = await request.json();
     
     // Обработка обычных сообщений
     if (body.message) {
