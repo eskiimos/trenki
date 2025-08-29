@@ -109,9 +109,9 @@ const ShortsContent = () => {
   }, [currentVideoIndex, isTransitioning]);
 
   return (
-    <div className="fixed inset-0 bg-black z-50 flex" style={{ paddingTop: '140px' }}>
+    <div className="fixed inset-0 bg-black z-50 flex">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/50 to-transparent">
+      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/50 to-transparent" style={{ paddingTop: '80px' }}>
         <Link href="/" className="text-white hover:text-gray-300">
           <ArrowLeft size={24} />
         </Link>

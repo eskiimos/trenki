@@ -43,7 +43,7 @@ const HomePage = () => {
   return (
     <div className="bg-[#F3F4F6] min-h-screen text-[#303030]">
       <Header />
-      <main className="p-4 space-y-8" style={{ paddingTop: '140px' }}>
+      <main className="p-4 space-y-8">
         <HeroVideo />
         <TrenkiSection />
         <TrainingsSection />
@@ -55,7 +55,7 @@ const HomePage = () => {
 };
 
 const Header = () => (
-  <header className="bg-white p-4 flex justify-between items-center text-[#303030]">
+  <header className="bg-white p-4 flex justify-between items-center text-[#303030]" style={{ paddingTop: '80px' }}>
     <div className="flex items-center space-x-3">
       <div className="w-10 h-10 bg-gray-300 rounded-full relative">
         <Image src="/logos/logo_akb.png" alt="Logo" layout="fill" className="rounded-full"/>
