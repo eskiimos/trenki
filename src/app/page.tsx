@@ -1,12 +1,11 @@
 
 'use client';
 
-import { ChevronRight, Heart } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
 // Компонент для короткого видео
-const ShortVideoPlayer = ({ src, index, poster }: { src: string; index: number; poster: string }) => {
+const ShortVideoPlayer = ({ index, poster }: { index: number; poster: string }) => {
   return (
     <Link href={`/shorts?index=${index}`}>
       <div className="flex-shrink-0 w-36 cursor-pointer">
@@ -221,10 +220,10 @@ const HeroVideoSection = () => (
 const TrenkiSection = () => (
   <section style={{ paddingTop: '15px', paddingBottom: '15px' }}>
     <div className="flex space-x-4 overflow-x-auto pb-4 px-4">
-      <ShortVideoPlayer src="/video/shots/short_1.mp4" index={0} poster="/images/preview_shorts/shorts_1.png" />
-      <ShortVideoPlayer src="/video/shots/short_2.mp4" index={1} poster="/images/preview_shorts/shorts_2.png" />
-      <ShortVideoPlayer src="/video/shots/short_3.mp4" index={2} poster="/images/preview_shorts/shorts_3.png" />
-      <ShortVideoPlayer src="/video/shots/short_4.mp4" index={3} poster="/images/preview_shorts/shorts_4.png" />
+      <ShortVideoPlayer index={0} poster="/images/preview_shorts/shorts_1.png" />
+      <ShortVideoPlayer index={1} poster="/images/preview_shorts/shorts_2.png" />
+      <ShortVideoPlayer index={2} poster="/images/preview_shorts/shorts_3.png" />
+      <ShortVideoPlayer index={3} poster="/images/preview_shorts/shorts_4.png" />
     </div>
   </section>
 );
@@ -355,29 +354,6 @@ const TrainingsSection = () => (
         </div>
     </section>
 );
-
-const TrainingCard = () => (
-    <div className="flex-shrink-0 w-64">
-        <div className="bg-[#2d3448] rounded-lg h-36 mb-3 relative overflow-hidden border border-[#3d4759]">
-            <Image src="https://placehold.co/256x144/facc15/1f2937?text=НАЗВАНИЕ" alt="Training" layout="fill" className="object-cover" />
-            <div className="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
-                8:44
-            </div>
-        </div>
-        <div className="flex space-x-2">
-            <Chip text="ТИП ТРЕНИРОВКИ" />
-            <Chip text="УРОВЕНЬ" />
-            <Chip text="ОБОРУДОВАНИЕ" />
-        </div>
-    </div>
-);
-
-const Chip = ({ text }: { text: string }) => (
-    <span className="bg-[#2d3448] text-[#ccd6f6] text-xs font-semibold px-3 py-1 rounded-full border border-[#3d4759]">
-        {text}
-    </span>
-);
-
 
 const TrainersSection = () => (
     <section style={{ paddingBottom: '15px' }}>
@@ -693,18 +669,6 @@ const TrainersSection = () => (
         </div>
     </section>
 );
-
-const TrainerCard = ({ name, role, spec }: { name: string, role: string, spec: string }) => (
-    <div className="bg-[#1a1f3a] p-4 rounded-lg text-center border border-[#2d3448]">
-        <div className="w-20 h-20 bg-[#2d3448] rounded-full mx-auto mb-4 relative">
-          <Image src="https://placehold.co/80x80/e2e8f0/4a5568?text=M" alt={name} layout="fill" className="rounded-full"/>
-        </div>
-        <h3 className="font-bold text-white">{name}</h3>
-        <p className="text-xs text-[#8892b0]">{role}</p>
-        <p className="text-xs text-[#8892b0]">{spec}</p>
-    </div>
-);
-
 
 const PromoBannerSection = () => (
     <section className="px-4">
