@@ -7,31 +7,16 @@ import Link from 'next/link';
 
 // Компонент для короткого видео
 const ShortVideoPlayer = ({ src, index, poster }: { src: string; index: number; poster: string }) => {
-  const handleMouseEnter = (e: React.MouseEvent<HTMLVideoElement>) => {
-    const video = e.currentTarget;
-    video.currentTime = 0;
-    video.play();
-  };
-
-  const handleMouseLeave = (e: React.MouseEvent<HTMLVideoElement>) => {
-    const video = e.currentTarget;
-    video.pause();
-    video.currentTime = 0;
-  };
-
   return (
     <Link href={`/shorts?index=${index}`}>
       <div className="flex-shrink-0 w-36 cursor-pointer">
-        <div className="bg-gray-200 rounded-lg overflow-hidden relative aspect-[9/16] hover:scale-105 transition-transform">
-          <video
-            className="w-full h-full object-cover"
-            src={src}
-            muted
-            loop
-            playsInline
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
-            poster={poster}
+        <div className="bg-gray-200 rounded overflow-hidden relative aspect-[9/16]" style={{ borderRadius: '4px' }}>
+          <Image
+            src={poster}
+            alt={`Short video ${index + 1}`}
+            fill
+            className="object-cover"
+            sizes="144px"
           />
         </div>
       </div>
@@ -41,55 +26,201 @@ const ShortVideoPlayer = ({ src, index, poster }: { src: string; index: number; 
 
 const HomePage = () => {
   return (
-    <div className="bg-[#F3F4F6] min-h-screen text-[#303030]">
+    <div className="bg-[#060919] min-h-screen text-white pb-32">
       <Header />
-      <main className="p-4 space-y-8">
-        <HeroVideo />
-        <TrenkiSection />
-        <TrainingsSection />
-        <TrainersSection />
-        <PromoBanner />
-      </main>
+      
+      {/* Секция с короткими видео (треньки) */}
+      <TrenkiSection />
+      
+      {/* Основное обучающее видео */}
+      <HeroVideoSection />
+      
+      {/* Каталог тренировок */}
+      <TrainingsSection />
+      
+      {/* Список тренеров */} 
+      <TrainersSection />
+      
+      {/* Промо-баннер */}
+      <PromoBannerSection />
+      
+      {/* Нижнее меню */}
+      <BottomNavigation />
     </div>
   );
 };
 
 const Header = () => (
-  <header className="bg-white p-4 flex justify-between items-center text-[#303030]" style={{ paddingTop: '80px' }}>
-    <div className="flex items-center space-x-3">
-      <div className="w-10 h-10 bg-gray-300 rounded-full relative">
-        <Image src="/logos/logo_akb.png" alt="Logo" layout="fill" className="rounded-full"/>
+  <header style={{
+    width: '100%', 
+    paddingBottom: 24, 
+    paddingLeft: 16, 
+    paddingRight: 16, 
+    paddingTop: 80,
+    borderBottom: '1px #101530 solid', 
+    flexDirection: 'column', 
+    justifyContent: 'flex-start', 
+    alignItems: 'flex-start', 
+    gap: 12, 
+    display: 'flex'
+  }}>
+    <div style={{
+      width: '100%', 
+      justifyContent: 'flex-start', 
+      alignItems: 'center', 
+      gap: 4, 
+      display: 'flex'
+    }}>
+      <div style={{
+        width: 40, 
+        paddingTop: 4, 
+        paddingBottom: 4, 
+        overflow: 'hidden', 
+        borderRadius: 2, 
+        flexDirection: 'column', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        display: 'flex'
+      }}>
+        <div style={{
+          textAlign: 'center', 
+          color: '#F9F8FE', 
+          fontSize: 24, 
+          fontFamily: 'Overpass', 
+          fontWeight: '700', 
+          lineHeight: '24px'
+        }}>88</div>
+        <div style={{
+          textAlign: 'center', 
+          color: '#F9F8FE', 
+          fontSize: 12, 
+          fontFamily: 'Overpass', 
+          fontWeight: '700', 
+          lineHeight: '12px', 
+          letterSpacing: 0.50
+        }}>вр</div>
       </div>
-      <div>
-        <h1 className="font-bold text-sm text-[#303030]">КОНСТАНТИН</h1>
-        <p className="text-xs text-[#303030] opacity-70">КОНСТАНТИНОПОЛЬСКИЙ</p>
+      <div style={{
+        flex: '1 1 0', 
+        padding: 4, 
+        borderRadius: 2, 
+        flexDirection: 'column', 
+        justifyContent: 'flex-start', 
+        alignItems: 'flex-start', 
+        display: 'flex'
+      }}>
+        <div style={{
+          width: '100%', 
+          paddingTop: 4, 
+          paddingBottom: 4, 
+          justifyContent: 'flex-start', 
+          alignItems: 'center', 
+          gap: 10, 
+          display: 'flex'
+        }}>
+          <div style={{
+            flex: '1 1 0', 
+            color: '#F9F8FE', 
+            fontSize: 16, 
+            fontFamily: 'Overpass', 
+            fontWeight: '700', 
+            textTransform: 'uppercase', 
+            lineHeight: '16px', 
+            letterSpacing: 0.50
+          }}>Константин</div>
+        </div>
+        <div style={{
+          width: '100%', 
+          paddingTop: 4, 
+          paddingBottom: 4, 
+          justifyContent: 'flex-start', 
+          alignItems: 'center', 
+          gap: 10, 
+          display: 'flex'
+        }}>
+          <div style={{
+            flex: '1 1 0', 
+            color: '#F9F8FE', 
+            fontSize: 16, 
+            fontFamily: 'Overpass', 
+            fontWeight: '700', 
+            textTransform: 'uppercase', 
+            lineHeight: '16px', 
+            letterSpacing: 0.50
+          }}>Константинопольский</div>
+        </div>
       </div>
+      <Image 
+        src="/logos/logo_akb.png" 
+        alt="Avatar" 
+        width={48} 
+        height={48} 
+        style={{borderRadius: 1}}
+        className="object-cover"
+      />
     </div>
-    <div className="text-right">
-      <p className="font-bold text-2xl text-[#303030]">88</p>
-      <p className="text-xs text-[#303030] opacity-70">вр</p>
+    <div style={{
+      width: '100%', 
+      justifyContent: 'flex-start', 
+      alignItems: 'center', 
+      gap: 4, 
+      display: 'flex'
+    }}>
+      <Image 
+        src="/icons/ant-design-thunderbolt-filled.svg" 
+        alt="Потенциал" 
+        width={16} 
+        height={16} 
+        style={{ alignSelf: 'center' }}
+      />
+      <div style={{
+        color: '#F9F8FE', 
+        fontSize: 12, 
+        fontFamily: 'Overpass', 
+        fontStyle: 'italic', 
+        fontWeight: '800', 
+        textTransform: 'uppercase', 
+        lineHeight: '12px', 
+        letterSpacing: 0.50,
+        alignSelf: 'center'
+      }}>потенциал:</div>
+      <div style={{
+        flex: '1 1 0', 
+        height: 12, 
+        position: 'relative',
+        alignSelf: 'center'
+      }}>
+        <div style={{
+          color: '#A1FF4A', 
+          fontSize: 12, 
+          fontFamily: 'Overpass', 
+          fontStyle: 'italic', 
+          fontWeight: '800', 
+          textTransform: 'uppercase', 
+          lineHeight: '12px', 
+          letterSpacing: 0.50
+        }}>высокий</div>
+      </div>
     </div>
   </header>
 );
 
-const HeroVideo = () => (
-  <Link href="/video/onboarding">
-    <div className="bg-red-500 rounded-[3px] overflow-hidden relative h-[193px] w-full cursor-pointer hover:opacity-90 transition-opacity">
-      <Image src="/images/video_inbording.png" alt="Onboarding" layout="fill" className="object-cover" />
-      <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-        8:44
+const HeroVideoSection = () => (
+  <section className="px-4" style={{ paddingBottom: '15px' }}>
+    <Link href="/video/onboarding">
+      <div className="bg-red-500 overflow-hidden relative h-[193px] w-full cursor-pointer hover:opacity-90 transition-opacity" style={{ borderRadius: '4px' }}>
+        <Image src="/images/video_inbording.png" alt="Onboarding" layout="fill" className="object-cover" />
+        <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+          8:44
+        </div>
       </div>
-    </div>
-  </Link>
+    </Link>
+  </section>
 );
 
 const TrenkiSection = () => (
-  <section>
-    <div className="flex justify-between items-center mb-4">
-      <h2 className="font-bold text-lg text-[#303030]">ТРЕНЬКИ</h2>
-      <ChevronRight className="w-6 h-6 text-[#303030]" />
-    </div>
-    <div className="flex space-x-4 overflow-x-auto pb-4">
+  <section style={{ paddingTop: '15px', paddingBottom: '15px' }}>
+    <div className="flex space-x-4 overflow-x-auto pb-4 px-4">
       <ShortVideoPlayer src="/video/shots/short_1.mp4" index={0} poster="/images/preview_shorts/shorts_1.png" />
       <ShortVideoPlayer src="/video/shots/short_2.mp4" index={1} poster="/images/preview_shorts/shorts_2.png" />
       <ShortVideoPlayer src="/video/shots/short_3.mp4" index={2} poster="/images/preview_shorts/shorts_3.png" />
@@ -99,31 +230,137 @@ const TrenkiSection = () => (
 );
 
 const TrainingsSection = () => (
-    <section>
-        <div className="flex justify-between items-center mb-4">
-            <h2 className="font-bold text-lg text-[#303030]">ТРЕНИРОВКИ</h2>
-            <ChevronRight className="w-6 h-6 text-[#303030]" />
-        </div>
-        <div className="flex items-center mb-4">
-            <div className="w-8 h-8 bg-gray-300 rounded-full mr-3 relative">
-              <Image src="https://placehold.co/32x32/cbd5e0/1a202c?text=A" alt="Trainer avatar" layout="fill" className="rounded-full"/>
+    <section className="px-4" style={{ paddingBottom: '15px' }}>
+        <div style={{
+            width: '100%', 
+            height: '100%', 
+            paddingTop: 8, 
+            paddingBottom: 8, 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            gap: 8, 
+            display: 'inline-flex'
+        }}>
+            <div style={{
+                width: 152, 
+                height: 144, 
+                paddingLeft: 12, 
+                paddingRight: 12, 
+                paddingTop: 8, 
+                paddingBottom: 8, 
+                background: 'linear-gradient(180deg, rgba(161, 255, 74, 0) 0%, rgba(161, 255, 74, 0.50) 100%), #0A0B0F', 
+                overflow: 'hidden', 
+                borderRadius: 8, 
+                flexDirection: 'column', 
+                justifyContent: 'center', 
+                alignItems: 'flex-start', 
+                gap: 8, 
+                display: 'inline-flex'
+            }}>
+                <Image 
+                    src="/icons/ant-design-thunderbolt-filled.svg" 
+                    alt="Потенциал" 
+                    width={16} 
+                    height={16}
+                />
+                <div style={{alignSelf: 'stretch'}}>
+                    <span style={{
+                        color: '#F9F8FE', 
+                        fontSize: 14, 
+                        fontFamily: 'Overpass', 
+                        fontWeight: '700', 
+                        textTransform: 'uppercase', 
+                        lineHeight: '15.40px', 
+                        letterSpacing: 0.50
+                    }}>
+                        тренировки<br/>на <span style={{color: '#A1FF4A'}}>повышение</span> потенциала
+                    </span>
+                </div>
             </div>
-            <span className="font-semibold text-sm mr-auto text-[#303030]">ИМЯ ТРЕНЕРА</span>
-            <Heart className="w-4 h-4 text-[#303030] mr-1" />
-            <span className="text-sm text-[#303030]">874</span>
-        </div>
-        <div className="flex space-x-4 overflow-x-auto pb-4">
-            <TrainingCard />
-            <TrainingCard />
+            <div style={{
+                flex: '1 1 0', 
+                flexDirection: 'column', 
+                justifyContent: 'flex-start', 
+                alignItems: 'flex-start', 
+                gap: 4, 
+                display: 'inline-flex'
+            }}>
+                <div style={{
+                    alignSelf: 'stretch', 
+                    paddingLeft: 12, 
+                    paddingRight: 12, 
+                    paddingTop: 8, 
+                    paddingBottom: 8, 
+                    background: '#101530', 
+                    overflow: 'hidden', 
+                    borderRadius: 8, 
+                    flexDirection: 'column', 
+                    justifyContent: 'flex-start', 
+                    alignItems: 'flex-start', 
+                    gap: 8, 
+                    display: 'flex'
+                }}>
+                    <Image 
+                        src="/icons/ant-design-thunderbolt-filled_f.svg" 
+                        alt="Треньки" 
+                        width={16} 
+                        height={16}
+                    />
+                    <div style={{
+                        width: 159, 
+                        height: 30, 
+                        color: '#445CFF', 
+                        fontSize: 14, 
+                        fontFamily: 'Overpass', 
+                        fontWeight: '700', 
+                        textTransform: 'uppercase', 
+                        lineHeight: '15.40px', 
+                        letterSpacing: 0.50
+                    }}>треньки, советы профи и разборы</div>
+                </div>
+                <div style={{
+                    alignSelf: 'stretch', 
+                    paddingLeft: 12, 
+                    paddingRight: 12, 
+                    paddingTop: 8, 
+                    paddingBottom: 8, 
+                    background: '#445CFF', 
+                    overflow: 'hidden', 
+                    borderRadius: 8, 
+                    flexDirection: 'column', 
+                    justifyContent: 'flex-start', 
+                    alignItems: 'flex-start', 
+                    gap: 8, 
+                    display: 'flex'
+                }}>
+                    <Image 
+                        src="/icons/ant-design-thunderbolt-filled_dark.svg" 
+                        alt="ИИ-тренер" 
+                        width={16} 
+                        height={16}
+                    />
+                    <div style={{
+                        width: 159, 
+                        height: 30, 
+                        color: '#0A0B0F', 
+                        fontSize: 14, 
+                        fontFamily: 'Overpass', 
+                        fontWeight: '700', 
+                        textTransform: 'uppercase', 
+                        lineHeight: '15.40px', 
+                        letterSpacing: 0.50
+                    }}>ИИ-персональный тренер</div>
+                </div>
+            </div>
         </div>
     </section>
 );
 
 const TrainingCard = () => (
     <div className="flex-shrink-0 w-64">
-        <div className="bg-yellow-400 rounded-lg h-36 mb-3 relative overflow-hidden">
+        <div className="bg-[#2d3448] rounded-lg h-36 mb-3 relative overflow-hidden border border-[#3d4759]">
             <Image src="https://placehold.co/256x144/facc15/1f2937?text=НАЗВАНИЕ" alt="Training" layout="fill" className="object-cover" />
-            <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+            <div className="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
                 8:44
             </div>
         </div>
@@ -136,44 +373,379 @@ const TrainingCard = () => (
 );
 
 const Chip = ({ text }: { text: string }) => (
-    <span className="bg-gray-800 text-white text-xs font-semibold px-3 py-1 rounded-full">
+    <span className="bg-[#2d3448] text-[#ccd6f6] text-xs font-semibold px-3 py-1 rounded-full border border-[#3d4759]">
         {text}
     </span>
 );
 
 
 const TrainersSection = () => (
-    <section>
-        <div className="flex justify-between items-center mb-4">
-            <h2 className="font-bold text-lg text-[#303030]">ТРЕНЕРЫ</h2>
-            <ChevronRight className="w-6 h-6 text-[#303030]" />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-            <TrainerCard name="МАРК КОВАЛЕВСКИЙ" role="ГЛАВНЫЙ ТРЕНЕР" spec="ТАКТИЧЕСКАЯ ПОДГО..." />
-            <TrainerCard name="КОНСТАНТИН КОНСТАНТИНОПО..." role="ГЛАВНЫЙ ТРЕНЕР" spec="ТАКТИЧЕСКАЯ ПОДГО..." />
+    <section style={{ paddingBottom: '15px' }}>
+        <div style={{
+            width: '100%', 
+            height: '100%', 
+            paddingLeft: 16, 
+            paddingRight: 16, 
+            paddingTop: 24, 
+            paddingBottom: 24, 
+            background: 'linear-gradient(180deg, #101530 0%, #060919 100%)', 
+            borderRadius: 1, 
+            flexDirection: 'column', 
+            justifyContent: 'flex-start', 
+            alignItems: 'flex-start', 
+            gap: 16, 
+            display: 'inline-flex'
+        }}>
+            <div style={{
+                alignSelf: 'stretch', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                display: 'inline-flex'
+            }}>
+                <div style={{
+                    color: '#F9F8FE', 
+                    fontSize: 12, 
+                    fontFamily: 'Overpass', 
+                    fontWeight: '700', 
+                    textTransform: 'uppercase', 
+                    lineHeight: '14.40px', 
+                    letterSpacing: 0.50
+                }}>тренеры</div>
+                <div style={{
+                    width: 16, 
+                    height: 16, 
+                    position: 'relative', 
+                    overflow: 'hidden'
+                }}>
+                    <Link href="/trainers">
+                        <Image 
+                            src="/icons/arrow.svg" 
+                            alt="Стрелка" 
+                            width={16} 
+                            height={16}
+                        />
+                    </Link>
+                </div>
+            </div>
+            <div style={{
+                alignSelf: 'stretch', 
+                justifyContent: 'flex-start', 
+                alignItems: 'center', 
+                gap: 16, 
+                display: 'inline-flex'
+            }}>
+                {/* Карточка Марка */}
+                <div style={{
+                    width: '50%', 
+                    height: 202, 
+                    paddingBottom: 8, 
+                    background: '#060919', 
+                    overflow: 'hidden', 
+                    borderRadius: 8, 
+                    flexDirection: 'column', 
+                    justifyContent: 'flex-start', 
+                    alignItems: 'flex-start', 
+                    display: 'inline-flex'
+                }}>
+                    <div style={{
+                        width: '100%', 
+                        height: 112, 
+                        position: 'relative', 
+                        background: 'linear-gradient(180deg, rgba(87, 108, 255, 0) 0%, rgba(87, 108, 255, 0.50) 100%)', 
+                        overflow: 'hidden',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                    }}>
+                        <Image 
+                            src="/avatars/af9e5de293f8ce1c351f480e9af666a6453ed701.png" 
+                            alt="Марк" 
+                            width={100}
+                            height={100}
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover'
+                            }}
+                        />
+                        <div style={{
+                            width: 24, 
+                            height: 24, 
+                            left: 4, 
+                            top: 4, 
+                            position: 'absolute',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center'
+                        }}>
+                            <Image 
+                                src="/icons/star-6.svg" 
+                                alt="Звезда рейтинга" 
+                                width={24} 
+                                height={24}
+                                style={{ position: 'absolute' }}
+                            />
+                            <div style={{
+                                position: 'relative',
+                                zIndex: 1,
+                                justifyContent: 'center', 
+                                display: 'flex', 
+                                flexDirection: 'column', 
+                                color: '#A1FF4A', 
+                                fontSize: 10, 
+                                fontFamily: 'Overpass', 
+                                fontWeight: '400', 
+                                textTransform: 'uppercase', 
+                                lineHeight: '10px', 
+                                letterSpacing: 0.50
+                            }}>5</div>
+                        </div>
+                    </div>
+                    <div style={{
+                        alignSelf: 'stretch', 
+                        padding: 8, 
+                        flexDirection: 'column', 
+                        justifyContent: 'center', 
+                        alignItems: 'flex-start', 
+                        gap: 8, 
+                        display: 'flex'
+                    }}>
+                        <div style={{
+                            alignSelf: 'stretch', 
+                            color: '#445CFF', 
+                            fontSize: 14, 
+                            fontFamily: 'Overpass', 
+                            fontWeight: '700', 
+                            textTransform: 'uppercase', 
+                            lineHeight: '14px', 
+                            letterSpacing: 0.50,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                        }}>марк</div>
+                        <div style={{
+                            alignSelf: 'stretch', 
+                            color: '#445CFF', 
+                            fontSize: 14, 
+                            fontFamily: 'Overpass', 
+                            fontWeight: '700', 
+                            textTransform: 'uppercase', 
+                            lineHeight: '14px', 
+                            letterSpacing: 0.50,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                        }}>ковалевский</div>
+                    </div>
+                    <div style={{
+                        alignSelf: 'stretch', 
+                        padding: 8, 
+                        borderTop: '1px rgba(38, 37, 47, 0.50) solid', 
+                        justifyContent: 'flex-start', 
+                        alignItems: 'center', 
+                        gap: 10, 
+                        display: 'inline-flex'
+                    }}>
+                        <div style={{
+                            flex: '1 1 0', 
+                            justifyContent: 'center', 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            color: '#F9F8FE', 
+                            fontSize: 12, 
+                            fontFamily: 'Overpass', 
+                            fontWeight: '700', 
+                            textTransform: 'uppercase', 
+                            lineHeight: '12px', 
+                            letterSpacing: 0.50
+                        }}>Главный тренер</div>
+                    </div>
+                </div>
+                
+                {/* Карточка Константина */}
+                <div style={{
+                    width: '50%', 
+                    height: 202, 
+                    paddingBottom: 8, 
+                    background: '#060919', 
+                    overflow: 'hidden', 
+                    borderRadius: 8, 
+                    flexDirection: 'column', 
+                    justifyContent: 'flex-start', 
+                    alignItems: 'flex-start', 
+                    display: 'inline-flex'
+                }}>
+                    <div style={{
+                        width: '100%', 
+                        height: 112, 
+                        position: 'relative', 
+                        background: 'linear-gradient(180deg, rgba(87, 108, 255, 0) 0%, rgba(87, 108, 255, 0.50) 100%)', 
+                        overflow: 'hidden',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                    }}>
+                        <Image 
+                            src="/avatars/af9e5de293f8ce1c351f480e9af666a6453ed701.png" 
+                            alt="Константин" 
+                            width={100}
+                            height={100}
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover'
+                            }}
+                        />
+                        <div style={{
+                            width: 24, 
+                            height: 24, 
+                            left: 4, 
+                            top: 4, 
+                            position: 'absolute',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center'
+                        }}>
+                            <Image 
+                                src="/icons/star-6.svg" 
+                                alt="Звезда рейтинга" 
+                                width={24} 
+                                height={24}
+                                style={{ position: 'absolute' }}
+                            />
+                            <div style={{
+                                position: 'relative',
+                                zIndex: 1,
+                                justifyContent: 'center', 
+                                display: 'flex', 
+                                flexDirection: 'column', 
+                                color: '#A1FF4A', 
+                                fontSize: 10, 
+                                fontFamily: 'Overpass', 
+                                fontWeight: '400', 
+                                textTransform: 'uppercase', 
+                                lineHeight: '10px', 
+                                letterSpacing: 0.50
+                            }}>5</div>
+                        </div>
+                    </div>
+                    <div style={{
+                        alignSelf: 'stretch', 
+                        padding: 8, 
+                        flexDirection: 'column', 
+                        justifyContent: 'center', 
+                        alignItems: 'flex-start', 
+                        gap: 8, 
+                        display: 'flex'
+                    }}>
+                        <div style={{
+                            alignSelf: 'stretch', 
+                            color: '#445CFF', 
+                            fontSize: 14, 
+                            fontFamily: 'Overpass', 
+                            fontWeight: '700', 
+                            textTransform: 'uppercase', 
+                            lineHeight: '14px', 
+                            letterSpacing: 0.50,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                        }}>константин</div>
+                        <div style={{
+                            alignSelf: 'stretch', 
+                            color: '#445CFF', 
+                            fontSize: 14, 
+                            fontFamily: 'Overpass', 
+                            fontWeight: '700', 
+                            textTransform: 'uppercase', 
+                            lineHeight: '14px', 
+                            letterSpacing: 0.50,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                        }}>константинопольский</div>
+                    </div>
+                    <div style={{
+                        alignSelf: 'stretch', 
+                        padding: 8, 
+                        borderTop: '1px #26252F solid', 
+                        justifyContent: 'flex-start', 
+                        alignItems: 'center', 
+                        gap: 10, 
+                        display: 'inline-flex'
+                    }}>
+                        <div style={{
+                            flex: '1 1 0', 
+                            justifyContent: 'center', 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            color: '#F9F8FE', 
+                            fontSize: 12, 
+                            fontFamily: 'Overpass', 
+                            fontWeight: '700', 
+                            textTransform: 'uppercase', 
+                            lineHeight: '12px', 
+                            letterSpacing: 0.50
+                        }}>вратарский</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
 );
 
 const TrainerCard = ({ name, role, spec }: { name: string, role: string, spec: string }) => (
-    <div className="bg-white p-4 rounded-lg text-center">
-        <div className="w-20 h-20 bg-gray-300 rounded-full mx-auto mb-4 relative">
+    <div className="bg-[#1a1f3a] p-4 rounded-lg text-center border border-[#2d3448]">
+        <div className="w-20 h-20 bg-[#2d3448] rounded-full mx-auto mb-4 relative">
           <Image src="https://placehold.co/80x80/e2e8f0/4a5568?text=M" alt={name} layout="fill" className="rounded-full"/>
         </div>
-        <h3 className="font-bold text-[#303030]">{name}</h3>
-        <p className="text-xs text-[#303030] opacity-70">{role}</p>
-        <p className="text-xs text-[#303030] opacity-70">{spec}</p>
+        <h3 className="font-bold text-white">{name}</h3>
+        <p className="text-xs text-[#8892b0]">{role}</p>
+        <p className="text-xs text-[#8892b0]">{spec}</p>
     </div>
 );
 
 
-const PromoBanner = () => (
-    <div className="bg-red-500 rounded-lg overflow-hidden relative h-48">
-        <Image src="https://placehold.co/400x192/dc2626/ffffff?text=ЧТО-ТО+ОТ+МАРКА" alt="Promo" layout="fill" className="object-cover" />
-        <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-            8:44
+const PromoBannerSection = () => (
+    <section className="px-4">
+        <div className="bg-[#2d3448] rounded-lg overflow-hidden relative h-48 border border-[#3d4759]">
+            <Image src="/images/video_prew_2.png" alt="Promo" layout="fill" className="object-cover" />
+            <div className="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                8:44
+            </div>
         </div>
-    </div>
+    </section>
+);
+
+const BottomNavigation = () => (
+    <nav className="fixed bottom-0 left-0 right-0 bg-[#101530] border-t border-[#2d3448] px-4 py-3 z-50">
+        <div className="flex justify-around items-center max-w-md mx-auto">
+            <button className="flex flex-col items-center gap-1 p-2">
+                <Image src="/icons/ant-design-thunderbolt-filled.svg" alt="Главная" width={24} height={24} />
+                <span className="text-xs text-[#8892b0]">Главная</span>
+            </button>
+            
+            <button className="flex flex-col items-center gap-1 p-2">
+                <Image src="/icons/star-6.svg" alt="Рейтинг" width={24} height={24} />
+                <span className="text-xs text-[#8892b0]">Рейтинг</span>
+            </button>
+            
+            <button className="flex flex-col items-center gap-1 p-2">
+                <Image src="/icons/ant-design-thunderbolt-filled_f.svg" alt="Треньки" width={24} height={24} />
+                <span className="text-xs text-[#A1FF4A]">Треньки</span>
+            </button>
+            
+            <button className="flex flex-col items-center gap-1 p-2">
+                <Image src="/icons/ant-design-thunderbolt-filled_dark.svg" alt="Тренеры" width={24} height={24} />
+                <span className="text-xs text-[#8892b0]">Тренеры</span>
+            </button>
+            
+            <button className="flex flex-col items-center gap-1 p-2">
+                <Image src="/icons/arrow.svg" alt="Профиль" width={24} height={24} />
+                <span className="text-xs text-[#8892b0]">Профиль</span>
+            </button>
+        </div>
+    </nav>
 );
 
 

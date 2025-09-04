@@ -126,14 +126,14 @@ export default function VideoPage({ params }: VideoPageProps) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#101530]">
       {/* Header */}
-      <header className="flex items-center justify-between p-4 bg-white shadow-sm" style={{ paddingTop: '80px' }}>
-        <Link href="/" className="text-[#303030] hover:text-gray-700">
+      <header className="flex items-center justify-between p-4 bg-[#101530] shadow-sm border-b border-gray-700" style={{ paddingTop: '80px' }}>
+        <Link href="/" className="text-white hover:text-gray-300">
           <ArrowLeft size={24} />
         </Link>
-        <h1 className="text-lg font-semibold text-[#303030]">Видео</h1>
-        <button className="text-[#303030] hover:text-gray-700">
+        <h1 className="text-lg font-semibold text-white">Видео</h1>
+        <button className="text-white hover:text-gray-300">
           <MoreVertical size={24} />
         </button>
       </header>
@@ -199,11 +199,11 @@ export default function VideoPage({ params }: VideoPageProps) {
       </div>
 
       {/* Video Info */}
-      <div className="p-4 bg-white">
-        <h2 className="text-xl font-bold text-[#303030] mb-2">
+      <div className="p-4 bg-[#1a1f3a] border-b border-[#2d3448]">
+        <h2 className="text-xl font-bold text-white mb-2">
           {params.id === 'onboarding' ? 'Онбординг в тренажерный зал' : 'Видео тренировка'}
         </h2>
-        <p className="text-[#303030] text-sm mb-4">
+        <p className="text-[#ccd6f6] text-sm mb-4">
           {params.id === 'onboarding' 
             ? 'Первые шаги в тренажерном зале - как начать тренироваться правильно и безопасно'
             : 'Описание видео тренировки'
@@ -212,14 +212,14 @@ export default function VideoPage({ params }: VideoPageProps) {
 
         {/* Trainer Info */}
         <div className="flex items-center space-x-3 mb-4">
-          <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-            <span className="text-[#303030] font-semibold">М</span>
+          <div className="w-12 h-12 bg-[#2d3448] rounded-full flex items-center justify-center">
+            <span className="text-white font-semibold">М</span>
           </div>
           <div className="flex-1">
-            <h3 className="font-semibold text-[#303030]">Марк Петров</h3>
-            <p className="text-sm text-gray-600">Сертифицированный тренер</p>
+            <h3 className="font-semibold text-white">Марк Петров</h3>
+            <p className="text-sm text-[#8892b0]">Сертифицированный тренер</p>
           </div>
-          <button className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium">
+          <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
             Подписаться
           </button>
         </div>
@@ -229,7 +229,7 @@ export default function VideoPage({ params }: VideoPageProps) {
           <button
             onClick={toggleLike}
             className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
-              isLiked ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-[#303030]'
+              isLiked ? 'bg-red-600/20 text-red-400 border border-red-600/30' : 'bg-[#2d3448] text-[#ccd6f6] border border-[#3d4759]'
             }`}
           >
             <Heart size={20} className={isLiked ? 'fill-current' : ''} />
@@ -238,13 +238,13 @@ export default function VideoPage({ params }: VideoPageProps) {
           
           <button
             onClick={() => setShowComments(!showComments)}
-            className="flex items-center space-x-2 px-4 py-2 bg-gray-100 text-[#303030] rounded-lg"
+            className="flex items-center space-x-2 px-4 py-2 bg-[#2d3448] text-[#ccd6f6] rounded-lg border border-[#3d4759]"
           >
             <MessageCircle size={20} />
             <span className="text-sm font-medium">28</span>
           </button>
           
-          <button className="flex items-center space-x-2 px-4 py-2 bg-gray-100 text-[#303030] rounded-lg">
+          <button className="flex items-center space-x-2 px-4 py-2 bg-[#2d3448] text-[#ccd6f6] rounded-lg border border-[#3d4759]">
             <Share size={20} />
             <span className="text-sm font-medium">Поделиться</span>
           </button>
@@ -253,20 +253,20 @@ export default function VideoPage({ params }: VideoPageProps) {
 
       {/* Comments Section */}
       {showComments && (
-        <div className="bg-white border-t">
-          <div className="p-4 border-b">
-            <h3 className="font-semibold text-[#303030] mb-4">Комментарии</h3>
+        <div className="bg-[#1a1f3a] border-t border-[#2d3448]">
+          <div className="p-4 border-b border-[#2d3448]">
+            <h3 className="font-semibold text-white mb-4">Комментарии</h3>
             
             {/* Comment Input */}
             <div className="flex space-x-3 mb-4">
-              <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                <span className="text-[#303030] text-sm font-semibold">А</span>
+              <div className="w-8 h-8 bg-[#2d3448] rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-semibold">А</span>
               </div>
               <div className="flex-1">
                 <input
                   type="text"
                   placeholder="Добавить комментарий..."
-                  className="w-full p-3 border border-gray-300 rounded-lg text-[#303030] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-3 border border-[#3d4759] rounded-lg bg-[#2d3448] text-white placeholder-[#8892b0] focus:outline-none focus:ring-2 focus:ring-blue-600"
                 />
               </div>
             </div>
@@ -274,50 +274,50 @@ export default function VideoPage({ params }: VideoPageProps) {
             {/* Comments List */}
             <div className="space-y-4">
               <div className="flex space-x-3">
-                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                  <span className="text-[#303030] text-sm font-semibold">И</span>
+                <div className="w-8 h-8 bg-[#2d3448] rounded-full flex items-center justify-center">
+                  <span className="text-white text-sm font-semibold">И</span>
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-1">
-                    <span className="font-medium text-[#303030] text-sm">Иван Смирнов</span>
-                    <span className="text-gray-500 text-xs">2 часа назад</span>
+                    <span className="font-medium text-white text-sm">Иван Смирнов</span>
+                    <span className="text-[#8892b0] text-xs">2 часа назад</span>
                   </div>
-                  <p className="text-[#303030] text-sm">Отличное видео! Очень помогло разобраться с техникой упражнений.</p>
-                  <button className="text-blue-500 text-xs mt-1">Ответить</button>
+                  <p className="text-[#ccd6f6] text-sm">Отличное видео! Очень помогло разобраться с техникой упражнений.</p>
+                  <button className="text-blue-400 text-xs mt-1">Ответить</button>
                 </div>
               </div>
 
               <div className="flex space-x-3">
-                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                  <span className="text-[#303030] text-sm font-semibold">Е</span>
+                <div className="w-8 h-8 bg-[#2d3448] rounded-full flex items-center justify-center">
+                  <span className="text-white text-sm font-semibold">Е</span>
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-1">
-                    <span className="font-medium text-[#303030] text-sm">Елена Кузнецова</span>
-                    <span className="text-gray-500 text-xs">4 часа назад</span>
+                    <span className="font-medium text-white text-sm">Елена Кузнецова</span>
+                    <span className="text-[#8892b0] text-xs">4 часа назад</span>
                   </div>
-                  <p className="text-[#303030] text-sm">Спасибо за подробное объяснение! Теперь не боюсь идти в зал.</p>
-                  <button className="text-blue-500 text-xs mt-1">Ответить</button>
+                  <p className="text-[#ccd6f6] text-sm">Спасибо за подробное объяснение! Теперь не боюсь идти в зал.</p>
+                  <button className="text-blue-400 text-xs mt-1">Ответить</button>
                 </div>
               </div>
 
               <div className="flex space-x-3">
-                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                  <span className="text-[#303030] text-sm font-semibold">Д</span>
+                <div className="w-8 h-8 bg-[#2d3448] rounded-full flex items-center justify-center">
+                  <span className="text-white text-sm font-semibold">Д</span>
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-1">
-                    <span className="font-medium text-[#303030] text-sm">Дмитрий Волков</span>
-                    <span className="text-gray-500 text-xs">1 день назад</span>
+                    <span className="font-medium text-white text-sm">Дмитрий Волков</span>
+                    <span className="text-[#8892b0] text-xs">1 день назад</span>
                   </div>
-                  <p className="text-[#303030] text-sm">Когда следующее видео? Жду продолжения серии!</p>
-                  <button className="text-blue-500 text-xs mt-1">Ответить</button>
+                  <p className="text-[#ccd6f6] text-sm">Когда следующее видео? Жду продолжения серии!</p>
+                  <button className="text-blue-400 text-xs mt-1">Ответить</button>
                 </div>
               </div>
             </div>
 
             {/* Load More Comments */}
-            <button className="w-full mt-4 py-2 text-blue-500 text-sm font-medium">
+            <button className="w-full mt-4 py-2 text-blue-400 text-sm font-medium">
               Показать еще комментарии
             </button>
           </div>
