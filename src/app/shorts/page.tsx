@@ -109,9 +109,9 @@ const ShortsContent = () => {
   }, [currentVideoIndex, isTransitioning]);
 
   return (
-    <div className="fixed inset-0 bg-black z-50 flex">
+    <div className="fixed inset-0 bg-[#101530] z-50 flex">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/50 to-transparent" style={{ paddingTop: '80px' }}>
+      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-[#101530]/90 to-transparent" style={{ paddingTop: '80px' }}>
         <Link href="/" className="text-white hover:text-gray-300">
           <ArrowLeft size={24} />
         </Link>
@@ -151,8 +151,8 @@ const ShortsContent = () => {
               onClick={toggleLike}
               className="flex flex-col items-center space-y-1"
             >
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 ${
-                isLiked ? 'bg-red-500 scale-110' : 'bg-white/20 backdrop-blur-sm'
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 border ${
+                isLiked ? 'bg-red-500 scale-110 border-red-400' : 'bg-white/10 backdrop-blur-sm border-white/20'
               }`}>
                 <Heart 
                   size={24} 
@@ -166,7 +166,7 @@ const ShortsContent = () => {
 
             {/* Comment Button */}
             <button className="flex flex-col items-center space-y-1">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+              <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/20">
                 <MessageCircle size={24} className="text-white" />
               </div>
               <span className="text-white text-xs font-medium">{currentVideo.comments}</span>
@@ -174,7 +174,7 @@ const ShortsContent = () => {
 
             {/* Share Button */}
             <button className="flex flex-col items-center space-y-1">
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+              <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/20">
                 <Share size={24} className="text-white" />
               </div>
               <span className="text-white text-xs font-medium">Поделиться</span>
@@ -185,7 +185,7 @@ const ShortsContent = () => {
               onClick={toggleMute}
               className="flex flex-col items-center space-y-1"
             >
-              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+              <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/20">
                 {isMuted ? (
                   <VolumeX size={24} className="text-white" />
                 ) : (
@@ -198,17 +198,17 @@ const ShortsContent = () => {
           {/* Bottom Info */}
           <div className="absolute bottom-4 left-4 right-20 text-white">
             <div className="flex items-center space-x-3 mb-3">
-              <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
-                <span className="text-black font-semibold text-sm">
+              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center border border-white/30">
+                <span className="text-white font-semibold text-sm">
                   {currentVideo.author.charAt(0)}
                 </span>
               </div>
               <div>
-                <h3 className="font-semibold text-sm">{currentVideo.author}</h3>
-                <button className="text-xs text-blue-400">Подписаться</button>
+                <h3 className="font-semibold text-sm text-white">{currentVideo.author}</h3>
+                <button className="text-xs text-blue-300 hover:text-blue-200">Подписаться</button>
               </div>
             </div>
-            <p className="text-sm mb-2">{currentVideo.description}</p>
+            <p className="text-sm mb-2 text-gray-200">{currentVideo.description}</p>
           </div>
         </div>
       </div>
