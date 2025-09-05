@@ -7,7 +7,7 @@ const TrainersPage = () => {
   return (
     <div className="bg-[#101530] min-h-screen text-white">
       {/* Кнопка назад */}
-      <div className="p-4 pt-20">
+      <div className="p-4 pt-[90px]">
         <Link href="/" className="inline-block">
           <div className="w-8 h-8 flex items-center justify-center">
             <Image 

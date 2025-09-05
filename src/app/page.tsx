@@ -55,7 +55,7 @@ const Header = () => (
     paddingBottom: 24, 
     paddingLeft: 16, 
     paddingRight: 16, 
-    paddingTop: 80,
+    paddingTop: 90,
     borderBottom: '1px #101530 solid', 
     flexDirection: 'column', 
     justifyContent: 'flex-start', 
