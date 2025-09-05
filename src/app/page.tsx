@@ -704,10 +704,10 @@ const BottomNavigation = () => (
                 <span className="text-xs text-[#8892b0]">Тренеры</span>
             </button>
             
-            <button className="flex flex-col items-center gap-1 p-2">
+            <Link href="/profile" className="flex flex-col items-center gap-1 p-2">
                 <Image src="/icons/arrow.svg" alt="Профиль" width={24} height={24} />
                 <span className="text-xs text-[#8892b0]">Профиль</span>
-            </button>
+            </Link>
         </div>
     </nav>
 );
