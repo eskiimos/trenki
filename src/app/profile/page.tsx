@@ -7,7 +7,7 @@ const ProfilePage = () => {
   return (
     <div className="bg-[#101530] min-h-screen text-white">
       {/* Шапка с кнопкой назад */}
-      <div className="flex items-center p-4 pt-20">
+      <div className="flex items-center p-4 pt-[90px]">
         <div className="flex items-center gap-4">
           <Link href="/" className="inline-block">
             <div className="w-4 h-4 flex items-center justify-center">
