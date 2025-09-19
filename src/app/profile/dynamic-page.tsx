@@ -1,13 +1,72 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 
+interface Profile {
+  position?: string;
+  number?: number;
+  age?: number;
+  height?: number;
+  weight?: number;
+  strength: number;
+  endurance: number;
+  speed: number;
+  technique: number;
+  overall: number;
+  dailyProgress: number;
+  maxDailyGoal: number;
+}
+
+interface User {
+  firstName?: string;
+  lastName?: string;
+  profile?: Profile;
+}
+
 const ProfilePage = () => {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        // В реальном приложении telegramId получается из Telegram Web App
+        const telegramId = '123456789'; // Тестовый ID
+        const response = await fetch(`/api/profile?telegramId=${telegramId}`);
+        const data = await response.json();
+        
+        if (data.user) {
+          setUser(data.user);
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="bg-[#101530] min-h-screen text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-sm font-overpass">Загрузка профиля...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const profile = user?.profile;
+
   return (
     <div className="bg-[#101530] min-h-screen text-white">
       {/* Шапка с кнопкой назад */}
-      <div className="flex items-center p-4 pt-[100px]">
+      <div className="flex items-center p-4 pt-[90px]">
         <div className="flex items-center gap-4">
           <Link href="/" className="inline-block">
             <div className="w-4 h-4 flex items-center justify-center">
@@ -65,26 +124,53 @@ const ProfilePage = () => {
             
             {/* Имя */}
             <div className="text-white text-sm font-medium font-overpass leading-tight">
-              Евгений<br/>Евгеньев
+              {user?.firstName || 'Евгений'}<br/>
+              {user?.lastName || 'Евгеньев'}
             </div>
             
             {/* Позиция */}
             <div className="text-[#AEABBB] text-xs font-medium font-overpass">
-              11 | Нападающий
+              {profile?.number || 11} | {profile?.position || 'Нападающий'}
             </div>
             
             {/* Характеристики */}
             <div className="text-[#AEABBB] text-xs font-medium font-overpass">
-              10 лет | 134 см | 42 кг
+              {profile?.age || 10} лет | {profile?.height || 134} см | {profile?.weight || 42} кг
             </div>
             
             {/* Статистика */}
             <div className="flex flex-col gap-0.5 mt-2">
-              <StatBar label="сила" value="16" change="+7" isPositive={true} />
-              <StatBar label="выносливость" value="22" change="-4" isPositive={false} />
-              <StatBar label="скорость" value="55" change="+4" isPositive={true} />
-              <StatBar label="техника" value="22" change="-9" isPositive={false} />
-              <StatBar label="общее" value="22" change="-9" isPositive={false} isTotal={true} />
+              <StatBar 
+                label="сила" 
+                value={profile?.strength?.toString() || "16"} 
+                change="+7" 
+                isPositive={true} 
+              />
+              <StatBar 
+                label="выносливость" 
+                value={profile?.endurance?.toString() || "22"} 
+                change="-4" 
+                isPositive={false} 
+              />
+              <StatBar 
+                label="скорость" 
+                value={profile?.speed?.toString() || "55"} 
+                change="+4" 
+                isPositive={true} 
+              />
+              <StatBar 
+                label="техника" 
+                value={profile?.technique?.toString() || "22"} 
+                change="-9" 
+                isPositive={false} 
+              />
+              <StatBar 
+                label="общее" 
+                value={profile?.overall?.toString() || "22"} 
+                change="-9" 
+                isPositive={false} 
+                isTotal={true} 
+              />
             </div>
           </div>
         </div>
@@ -92,10 +178,15 @@ const ProfilePage = () => {
         {/* Прогресс */}
         <div className="flex items-center gap-2 mb-6">
           <div className="text-white text-xs font-medium font-overpass leading-tight">
-            Ежедневный<br/>прогресс 8/10
+            Ежедневный<br/>прогресс {profile?.dailyProgress || 8}/{profile?.maxDailyGoal || 10}
           </div>
           <div className="flex-1 h-2 bg-[#2d3448] rounded-full overflow-hidden">
-            <div className="w-4/5 h-full bg-gradient-to-r from-[#A1FF4A] to-[#7DFF8C] rounded-full"></div>
+            <div 
+              className="h-full bg-gradient-to-r from-[#A1FF4A] to-[#7DFF8C] rounded-full"
+              style={{
+                width: `${((profile?.dailyProgress || 8) / (profile?.maxDailyGoal || 10)) * 100}%`
+              }}
+            ></div>
           </div>
         </div>
 
@@ -128,9 +219,6 @@ const ProfilePage = () => {
           </div>
         </div>
       </div>
-      
-      {/* Тапбар */}
-      <BottomNavigation />
     </div>
   );
 };
@@ -184,38 +272,6 @@ const FAQItem = ({ question }: { question: string }) => (
       />
     </div>
   </div>
-);
-
-// Компонент тапбара
-const BottomNavigation = () => (
-    <nav className="fixed bottom-0 left-0 right-0 bg-[#101530] border-t border-[#2d3448] px-4 py-3 z-50">
-        <div className="flex justify-around items-center max-w-md mx-auto">
-            <Link href="/" className="flex flex-col items-center gap-1 p-2">
-                <Image src="/icons/tapbar/icon-type-home-active-no.svg" alt="Главная" width={28} height={28} />
-                <span className="text-xs text-[#8892b0]">Главная</span>
-            </Link>
-            
-            <button className="flex flex-col items-center gap-1 p-2">
-                <Image src="/icons/tapbar/icon-type-play-active-no.svg" alt="Видео" width={28} height={28} />
-                <span className="text-xs text-[#8892b0]">Видео</span>
-            </button>
-            
-            <button className="flex flex-col items-center gap-1 p-2">
-                <Image src="/icons/tapbar/icon-type-hockey-active-no.svg" alt="Треньки" width={28} height={28} />
-                <span className="text-xs text-[#8892b0]">Треньки</span>
-            </button>
-            
-            <button className="flex flex-col items-center gap-1 p-2">
-                <Image src="/icons/tapbar/icon-type-calendar-active-no.svg" alt="Расписание" width={28} height={28} />
-                <span className="text-xs text-[#8892b0]">Расписание</span>
-            </button>
-            
-            <button className="flex flex-col items-center gap-1 p-2">
-                <Image src="/icons/tapbar/icon-type-hockey-mask-active-yes.svg" alt="Профиль" width={28} height={28} />
-                <span className="text-xs text-[#445CFF]">Профиль</span>
-            </button>
-        </div>
-    </nav>
 );
 
 export default ProfilePage;

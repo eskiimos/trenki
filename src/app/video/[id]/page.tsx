@@ -128,7 +128,7 @@ export default function VideoPage({ params }: VideoPageProps) {
   return (
     <div className="min-h-screen bg-[#101530]">
       {/* Header */}
-      <header className="flex items-center justify-between p-4 bg-[#101530] shadow-sm border-b border-gray-700" style={{ paddingTop: '80px' }}>
+      <header className="flex items-center justify-between p-4 bg-[#101530] shadow-sm border-b border-gray-700" style={{ paddingTop: '90px' }}>
         <Link href="/" className="text-white hover:text-gray-300">
           <ArrowLeft size={24} />
         </Link>
