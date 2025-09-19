@@ -1,13 +1,25 @@
 {
-  "framework": "nextjs",
-  "buildCommand": "npm run build",
-  "installCommand": "npm install",
+  "version": 2,
+  "name": "trenki",
+  "scope": "eskiimos",
+  "builds": [
+    {
+      "src": "telegram-workout-app/package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "telegram-workout-app/$1"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
   "functions": {
-    "src/app/api/telegram/route.ts": {
+    "telegram-workout-app/src/app/api/telegram/route.ts": {
       "maxDuration": 10
     }
-  },
-  "env": {
-    "SKIP_ENV_VALIDATION": "true"
   }
 }
