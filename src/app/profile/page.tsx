@@ -190,29 +190,24 @@ const FAQItem = ({ question }: { question: string }) => (
 const BottomNavigation = () => (
     <nav className="fixed bottom-0 left-0 right-0 bg-[#101530] border-t border-[#2d3448] px-4 py-3 z-50">
         <div className="flex justify-around items-center max-w-md mx-auto">
-            <Link href="/" className="flex flex-col items-center gap-1 p-2">
+            <Link href="/" className="flex items-center justify-center p-2">
                 <Image src="/icons/tapbar/icon-type-home-active-no.svg" alt="Главная" width={28} height={28} />
-                <span className="text-xs text-[#8892b0]">Главная</span>
             </Link>
             
-            <button className="flex flex-col items-center gap-1 p-2">
+            <button className="flex items-center justify-center p-2">
                 <Image src="/icons/tapbar/icon-type-play-active-no.svg" alt="Видео" width={28} height={28} />
-                <span className="text-xs text-[#8892b0]">Видео</span>
             </button>
             
-            <button className="flex flex-col items-center gap-1 p-2">
+            <button className="flex items-center justify-center p-2">
                 <Image src="/icons/tapbar/icon-type-hockey-active-no.svg" alt="Треньки" width={28} height={28} />
-                <span className="text-xs text-[#8892b0]">Треньки</span>
             </button>
             
-            <button className="flex flex-col items-center gap-1 p-2">
+            <button className="flex items-center justify-center p-2">
                 <Image src="/icons/tapbar/icon-type-calendar-active-no.svg" alt="Расписание" width={28} height={28} />
-                <span className="text-xs text-[#8892b0]">Расписание</span>
             </button>
             
-            <button className="flex flex-col items-center gap-1 p-2">
+            <button className="flex items-center justify-center p-2">
                 <Image src="/icons/tapbar/icon-type-hockey-mask-active-yes.svg" alt="Профиль" width={28} height={28} />
-                <span className="text-xs text-[#445CFF]">Профиль</span>
             </button>
         </div>
     </nav>
