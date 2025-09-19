@@ -55,7 +55,7 @@ const Header = () => (
     paddingBottom: 24, 
     paddingLeft: 16, 
     paddingRight: 16, 
-    paddingTop: 90,
+    paddingTop: 100,
     borderBottom: '1px #101530 solid', 
     flexDirection: 'column', 
     justifyContent: 'flex-start', 
@@ -230,125 +230,38 @@ const TrenkiSection = () => (
 
 const TrainingsSection = () => (
     <section className="px-4" style={{ paddingBottom: '15px' }}>
-        <div style={{
-            width: '100%', 
-            height: '100%', 
-            paddingTop: 8, 
-            paddingBottom: 8, 
-            justifyContent: 'center', 
-            alignItems: 'center', 
-            gap: 8, 
-            display: 'inline-flex'
-        }}>
-            <div style={{
-                width: 152, 
-                height: 144, 
-                paddingLeft: 12, 
-                paddingRight: 12, 
-                paddingTop: 8, 
-                paddingBottom: 8, 
-                background: 'linear-gradient(180deg, rgba(161, 255, 74, 0) 0%, rgba(161, 255, 74, 0.50) 100%), #0A0B0F', 
-                overflow: 'hidden', 
-                borderRadius: 8, 
-                flexDirection: 'column', 
-                justifyContent: 'center', 
-                alignItems: 'flex-start', 
-                gap: 8, 
-                display: 'inline-flex'
-            }}>
+        <div style={{width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', gap: 8, display: 'inline-flex'}}>
+            <div style={{flex: '1 1 0', alignSelf: 'stretch', paddingLeft: 16, paddingRight: 16, paddingTop: 8, paddingBottom: 8, background: 'linear-gradient(180deg, rgba(87, 108, 255, 0) 0%, rgba(87, 108, 255, 0.50) 100%)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', gap: 8, display: 'inline-flex'}}>
                 <Image 
-                    src="/icons/ant-design-thunderbolt-filled.svg" 
-                    alt="Потенциал" 
+                    src="/icons/icon-cards.svg" 
+                    alt="ИИ тренер" 
                     width={16} 
                     height={16}
                 />
                 <div style={{alignSelf: 'stretch'}}>
-                    <span style={{
-                        color: '#F9F8FE', 
-                        fontSize: 14, 
-                        fontFamily: 'Overpass', 
-                        fontWeight: '700', 
-                        textTransform: 'uppercase', 
-                        lineHeight: '15.40px', 
-                        letterSpacing: 0.50
-                    }}>
-                        тренировки<br/>на <span style={{color: '#A1FF4A'}}>повышение</span> потенциала
-                    </span>
+                    <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>
+                        персональный <span style={{color: '#A1FF4A'}}>ИИ</span> тренер
+                    </div>
                 </div>
             </div>
-            <div style={{
-                flex: '1 1 0', 
-                flexDirection: 'column', 
-                justifyContent: 'flex-start', 
-                alignItems: 'flex-start', 
-                gap: 4, 
-                display: 'inline-flex'
-            }}>
-                <div style={{
-                    alignSelf: 'stretch', 
-                    paddingLeft: 12, 
-                    paddingRight: 12, 
-                    paddingTop: 8, 
-                    paddingBottom: 8, 
-                    background: '#101530', 
-                    overflow: 'hidden', 
-                    borderRadius: 8, 
-                    flexDirection: 'column', 
-                    justifyContent: 'flex-start', 
-                    alignItems: 'flex-start', 
-                    gap: 8, 
-                    display: 'flex'
-                }}>
+            <div style={{flex: '1 1 0', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 8, display: 'inline-flex'}}>
+                <div style={{alignSelf: 'stretch', paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 8, display: 'flex'}}>
                     <Image 
                         src="/icons/ant-design-thunderbolt-filled_f.svg" 
+                        alt="Потенциал" 
+                        width={16} 
+                        height={16}
+                    />
+                    <div style={{width: 146, color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>повышение потенциала</div>
+                </div>
+                <div style={{alignSelf: 'stretch', paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 8, display: 'flex'}}>
+                    <Image 
+                        src="/icons/icon-cards-kl.svg" 
                         alt="Треньки" 
                         width={16} 
                         height={16}
                     />
-                    <div style={{
-                        width: 159, 
-                        height: 30, 
-                        color: '#445CFF', 
-                        fontSize: 14, 
-                        fontFamily: 'Overpass', 
-                        fontWeight: '700', 
-                        textTransform: 'uppercase', 
-                        lineHeight: '15.40px', 
-                        letterSpacing: 0.50
-                    }}>треньки, советы профи и разборы</div>
-                </div>
-                <div style={{
-                    alignSelf: 'stretch', 
-                    paddingLeft: 12, 
-                    paddingRight: 12, 
-                    paddingTop: 8, 
-                    paddingBottom: 8, 
-                    background: '#445CFF', 
-                    overflow: 'hidden', 
-                    borderRadius: 8, 
-                    flexDirection: 'column', 
-                    justifyContent: 'flex-start', 
-                    alignItems: 'flex-start', 
-                    gap: 8, 
-                    display: 'flex'
-                }}>
-                    <Image 
-                        src="/icons/ant-design-thunderbolt-filled_dark.svg" 
-                        alt="ИИ-тренер" 
-                        width={16} 
-                        height={16}
-                    />
-                    <div style={{
-                        width: 159, 
-                        height: 30, 
-                        color: '#0A0B0F', 
-                        fontSize: 14, 
-                        fontFamily: 'Overpass', 
-                        fontWeight: '700', 
-                        textTransform: 'uppercase', 
-                        lineHeight: '15.40px', 
-                        letterSpacing: 0.50
-                    }}>ИИ-персональный тренер</div>
+                    <div style={{alignSelf: 'stretch', color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>треньки, советы профи, разборы</div>
                 </div>
             </div>
         </div>
@@ -685,27 +598,27 @@ const BottomNavigation = () => (
     <nav className="fixed bottom-0 left-0 right-0 bg-[#101530] border-t border-[#2d3448] px-4 py-3 z-50">
         <div className="flex justify-around items-center max-w-md mx-auto">
             <button className="flex flex-col items-center gap-1 p-2">
-                <Image src="/icons/ant-design-thunderbolt-filled.svg" alt="Главная" width={24} height={24} />
-                <span className="text-xs text-[#8892b0]">Главная</span>
+                <Image src="/icons/tapbar/icon-type-home-active-yes.svg" alt="Главная" width={28} height={28} />
+                <span className="text-xs text-[#445CFF]">Главная</span>
             </button>
             
             <button className="flex flex-col items-center gap-1 p-2">
-                <Image src="/icons/star-6.svg" alt="Рейтинг" width={24} height={24} />
-                <span className="text-xs text-[#8892b0]">Рейтинг</span>
+                <Image src="/icons/tapbar/icon-type-play-active-no.svg" alt="Видео" width={28} height={28} />
+                <span className="text-xs text-[#8892b0]">Видео</span>
             </button>
             
             <button className="flex flex-col items-center gap-1 p-2">
-                <Image src="/icons/ant-design-thunderbolt-filled_f.svg" alt="Треньки" width={24} height={24} />
-                <span className="text-xs text-[#A1FF4A]">Треньки</span>
+                <Image src="/icons/tapbar/icon-type-hockey-active-no.svg" alt="Треньки" width={28} height={28} />
+                <span className="text-xs text-[#8892b0]">Треньки</span>
             </button>
             
             <button className="flex flex-col items-center gap-1 p-2">
-                <Image src="/icons/ant-design-thunderbolt-filled_dark.svg" alt="Тренеры" width={24} height={24} />
-                <span className="text-xs text-[#8892b0]">Тренеры</span>
+                <Image src="/icons/tapbar/icon-type-calendar-active-no.svg" alt="Расписание" width={28} height={28} />
+                <span className="text-xs text-[#8892b0]">Расписание</span>
             </button>
             
             <Link href="/profile" className="flex flex-col items-center gap-1 p-2">
-                <Image src="/icons/arrow.svg" alt="Профиль" width={24} height={24} />
+                <Image src="/icons/tapbar/icon-type-hockey-mask-active-no.svg" alt="Профиль" width={28} height={28} />
                 <span className="text-xs text-[#8892b0]">Профиль</span>
             </Link>
         </div>

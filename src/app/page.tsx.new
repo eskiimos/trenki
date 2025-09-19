@@ -1,0 +1,373 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import TrainerCard from '@/components/TrainerCard';
+
+interface Profile {
+  position?: string;
+  number?: number;
+  age?: number;
+  height?: number;
+  weight?: number;
+  strength: number;
+  endurance: number;
+  speed: number;
+  technique: number;
+  overall: number;
+  dailyProgress: number;
+  maxDailyGoal: number;
+}
+
+interface User {
+  firstName?: string;
+  lastName?: string;
+  profile?: Profile;
+}
+
+// Компонент для короткого видео
+const ShortVideoPlayer = ({ index, poster }: { index: number; poster: string }) => {
+  return (
+    <Link href={`/shorts?index=${index}`}>
+      <div className="flex-shrink-0 w-36 cursor-pointer">
+        <div className="bg-gray-200 rounded overflow-hidden relative aspect-[9/16]" style={{ borderRadius: '4px' }}>
+          <Image
+            src={poster}
+            alt={`Short video ${index + 1}`}
+            fill
+            className="object-cover"
+            sizes="144px"
+          />
+        </div>
+      </div>
+    </Link>
+  );
+};
+
+const HomePage = () => {
+  return (
+    <div className="bg-[#060919] min-h-screen text-white pb-32">
+      <Header />
+      
+      {/* Секция с короткими видео (треньки) */}
+      <TrenkiSection />
+      
+      {/* Основное обучающее видео */}
+      <HeroVideoSection />
+      
+      {/* Каталог тренировок */}
+      <TrainingsSection />
+      
+      {/* Список тренеров */} 
+      <TrainersSection />
+      
+      {/* Промо-баннер */}
+      <PromoBannerSection />
+      
+      {/* Нижнее меню */}
+      <BottomNavigation />
+    </div>
+  );
+};
+
+const Header = () => {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        // В реальном приложении telegramId получается из Telegram Web App
+        const telegramId = '123456789'; // Тестовый ID
+        const response = await fetch(`/api/profile?telegramId=${telegramId}`);
+        const data = await response.json();
+        
+        if (data.user) {
+          setUser(data.user);
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  if (loading) {
+    return (
+      <header className="px-4 pt-4 pb-2">
+        <div className="animate-pulse flex space-x-4">
+          <div className="rounded-full bg-slate-700 h-10 w-10"></div>
+          <div className="flex-1 space-y-2 py-1">
+            <div className="h-2 bg-slate-700 rounded"></div>
+            <div className="h-2 bg-slate-700 rounded w-3/4"></div>
+          </div>
+        </div>
+      </header>
+    );
+  }
+
+  return (
+    <header className="px-4 pt-4 pb-2 flex justify-between items-center">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex justify-center items-center">
+          <span className="text-lg font-bold">
+            {user?.firstName ? user.firstName[0] : '?'}
+          </span>
+        </div>
+        <div>
+          <h1 className="text-sm font-medium">
+            {user?.firstName || 'Пользователь'} {user?.lastName || ''}
+          </h1>
+          <p className="text-xs text-gray-400">
+            {user?.profile?.position || 'Неизвестная позиция'} #{user?.profile?.number || '00'}
+          </p>
+        </div>
+      </div>
+      
+      <button className="w-8 h-8 flex justify-center items-center rounded-full">
+        <Image 
+          src="/icons/tabler_edit.svg" 
+          alt="Редактировать" 
+          width={20} 
+          height={20} 
+        />
+      </button>
+    </header>
+  );
+};
+
+// Секция с короткими видео
+const TrenkiSection = () => {
+  return (
+    <section className="mb-5">
+      <div className="px-4 flex justify-between items-center mb-2">
+        <h2 className="text-xs font-bold uppercase tracking-wider">треньки</h2>
+        <Link href="/shorts" className="w-4 h-4">
+          <Image src="/icons/arrow.svg" alt="Все треньки" width={16} height={16} />
+        </Link>
+      </div>
+      
+      <div className="pl-4 overflow-x-auto no-scrollbar flex gap-2">
+        {[1, 2, 3, 4].map((index) => (
+          <ShortVideoPlayer 
+            key={index} 
+            index={index - 1} 
+            poster={`/images/preview_shorts/shorts_${index}.png`} 
+          />
+        ))}
+      </div>
+    </section>
+  );
+};
+
+// Основное видео
+const HeroVideoSection = () => {
+  return (
+    <section className="px-4 mb-5">
+      <div className="bg-[#2d3448] rounded-lg overflow-hidden relative aspect-video border border-[#3d4759]">
+        <Image 
+          src="/images/video_inbording.png" 
+          alt="Главное видео" 
+          fill 
+          className="object-cover"
+        />
+        <div className="absolute inset-0 flex justify-center items-center">
+          <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex justify-center items-center">
+            <div className="w-12 h-12 bg-white rounded-full flex justify-center items-center">
+              <div className="w-0 h-0 border-t-8 border-t-transparent border-l-12 border-l-blue-600 border-b-8 border-b-transparent ml-1"></div>
+            </div>
+          </div>
+        </div>
+        <div className="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+          12:05
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// Секция с тренировками
+const TrainingsSection = () => {
+  return (
+    <section className="mb-5">
+      <div className="px-4 flex justify-between items-center mb-2">
+        <h2 className="text-xs font-bold uppercase tracking-wider">тренировки</h2>
+        <Link href="/video" className="w-4 h-4">
+          <Image src="/icons/arrow.svg" alt="Все тренировки" width={16} height={16} />
+        </Link>
+      </div>
+      
+      <div className="px-4 grid grid-cols-3 gap-2">
+        {['Силовые', 'Скорость', 'Техника', 'Выносливость', 'Нападающий', 'Вратарь'].map((category, index) => (
+          <div 
+            key={index} 
+            className="bg-[#101530] border border-[#1f2642] rounded text-center py-3 px-1"
+          >
+            <span className="text-xs uppercase">{category}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+// Секция с тренерами
+const TrainersSection = () => {
+  const [trainers, setTrainers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTrainers = async () => {
+      try {
+        const response = await fetch('/api/trainers');
+        const data = await response.json();
+        
+        if (data.trainers) {
+          setTrainers(data.trainers.slice(0, 2)); // Берем только первых 2 тренеров
+        }
+      } catch (error) {
+        console.error('Error fetching trainers:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTrainers();
+  }, []);
+
+  if (loading) {
+    return (
+      <section style={{ paddingBottom: '15px' }}>
+        <div style={{
+          width: '100%', 
+          height: '100%', 
+          paddingLeft: 16, 
+          paddingRight: 16, 
+          paddingTop: 24, 
+          paddingBottom: 24, 
+          background: 'linear-gradient(180deg, #101530 0%, #060919 100%)', 
+          borderRadius: 1, 
+          flexDirection: 'column', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          gap: 16, 
+          display: 'inline-flex'
+        }}>
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section style={{ paddingBottom: '15px' }}>
+        <div style={{
+            width: '100%', 
+            height: '100%', 
+            paddingLeft: 16, 
+            paddingRight: 16, 
+            paddingTop: 24, 
+            paddingBottom: 24, 
+            background: 'linear-gradient(180deg, #101530 0%, #060919 100%)', 
+            borderRadius: 1, 
+            flexDirection: 'column', 
+            justifyContent: 'flex-start', 
+            alignItems: 'flex-start', 
+            gap: 16, 
+            display: 'inline-flex'
+        }}>
+            <div style={{
+                alignSelf: 'stretch', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                display: 'inline-flex'
+            }}>
+                <div style={{
+                    color: '#F9F8FE', 
+                    fontSize: 12, 
+                    fontFamily: 'Overpass', 
+                    fontWeight: '700', 
+                    textTransform: 'uppercase', 
+                    lineHeight: '14.40px', 
+                    letterSpacing: 0.50
+                }}>тренеры</div>
+                <div style={{
+                    width: 16, 
+                    height: 16, 
+                    position: 'relative', 
+                    overflow: 'hidden'
+                }}>
+                    <Link href="/trainers">
+                        <Image 
+                            src="/icons/arrow.svg" 
+                            alt="Стрелка" 
+                            width={16} 
+                            height={16}
+                        />
+                    </Link>
+                </div>
+            </div>
+            <div style={{
+                alignSelf: 'stretch', 
+                justifyContent: 'flex-start', 
+                alignItems: 'center', 
+                gap: 16, 
+                display: 'inline-flex'
+            }}>
+                {trainers.map((trainer) => (
+                  <TrainerCard key={trainer.id} trainer={trainer} />
+                ))}
+            </div>
+        </div>
+    </section>
+);
+
+// Промо-баннер
+const PromoBannerSection = () => (
+    <section className="px-4">
+        <div className="bg-[#2d3448] rounded-lg overflow-hidden relative h-48 border border-[#3d4759]">
+            <Image src="/images/video_prew_2.png" alt="Promo" layout="fill" className="object-cover" />
+            <div className="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                8:44
+            </div>
+        </div>
+    </section>
+);
+
+// Нижнее меню
+const BottomNavigation = () => (
+    <nav className="fixed bottom-0 left-0 right-0 bg-[#101530] border-t border-[#2d3448] px-4 py-3 z-50">
+        <div className="flex justify-around items-center max-w-md mx-auto">
+            <button className="flex flex-col items-center gap-1 p-2">
+                <Image src="/icons/ant-design-thunderbolt-filled.svg" alt="Главная" width={24} height={24} />
+                <span className="text-xs text-[#8892b0]">Главная</span>
+            </button>
+            
+            <button className="flex flex-col items-center gap-1 p-2">
+                <Image src="/icons/star-6.svg" alt="Рейтинг" width={24} height={24} />
+                <span className="text-xs text-[#8892b0]">Рейтинг</span>
+            </button>
+            
+            <button className="flex flex-col items-center gap-1 p-2">
+                <Image src="/icons/ant-design-thunderbolt-filled_f.svg" alt="Треньки" width={24} height={24} />
+                <span className="text-xs text-[#A1FF4A]">Треньки</span>
+            </button>
+            
+            <button className="flex flex-col items-center gap-1 p-2">
+                <Image src="/icons/ant-design-thunderbolt-filled_dark.svg" alt="Тренеры" width={24} height={24} />
+                <span className="text-xs text-[#8892b0]">Тренеры</span>
+            </button>
+            
+            <Link href="/profile" className="flex flex-col items-center gap-1 p-2">
+                <Image src="/icons/arrow.svg" alt="Профиль" width={24} height={24} />
+                <span className="text-xs text-[#8892b0]">Профиль</span>
+            </Link>
+        </div>
+    </nav>
+);
+
+export default HomePage;

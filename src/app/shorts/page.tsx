@@ -111,7 +111,7 @@ const ShortsContent = () => {
   return (
     <div className="fixed inset-0 bg-[#101530] z-50 flex">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-[#101530]/90 to-transparent" style={{ paddingTop: '80px' }}>
+      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-[#101530]/90 to-transparent" style={{ paddingTop: '90px' }}>
         <Link href="/" className="text-white hover:text-gray-300">
           <ArrowLeft size={24} />
         </Link>
