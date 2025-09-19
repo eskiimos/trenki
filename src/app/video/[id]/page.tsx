@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { ArrowLeft, Play, Pause, Heart, MessageCircle, Share, MoreVertical, Volume2, VolumeX } from 'lucide-react';
 
 interface VideoPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default function VideoPage({ params }: VideoPageProps) {
@@ -18,6 +18,16 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [duration, setDuration] = useState(0);
   // const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(true);
+  const [videoId, setVideoId] = useState<string>('');
+
+  // Получаем params асинхронно
+  useEffect(() => {
+    const getParams = async () => {
+      const resolvedParams = await params;
+      setVideoId(resolvedParams.id);
+    };
+    getParams();
+  }, [params]);
   const [showControls, setShowControls] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -201,10 +211,10 @@ export default function VideoPage({ params }: VideoPageProps) {
       {/* Video Info */}
       <div className="p-4 bg-[#1a1f3a] border-b border-[#2d3448]">
         <h2 className="text-xl font-bold text-white mb-2">
-          {params.id === 'onboarding' ? 'Онбординг в тренажерный зал' : 'Видео тренировка'}
+          {videoId === 'onboarding' ? 'Онбординг в тренажерный зал' : 'Видео тренировка'}
         </h2>
         <p className="text-[#ccd6f6] text-sm mb-4">
-          {params.id === 'onboarding' 
+          {videoId === 'onboarding' 
             ? 'Первые шаги в тренажерном зале - как начать тренироваться правильно и безопасно'
             : 'Описание видео тренировки'
           }

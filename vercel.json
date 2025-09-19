@@ -1,8 +1,13 @@
 {
   "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
   "functions": {
     "src/app/api/telegram/route.ts": {
       "maxDuration": 10
     }
+  },
+  "env": {
+    "SKIP_ENV_VALIDATION": "true"
   }
 }
