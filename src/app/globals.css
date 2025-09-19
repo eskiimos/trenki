@@ -10,10 +10,43 @@
   --text-light: #ccd6f6;
 }
 
+/* Мобильная оптимизация */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-overpass), 'Overpass', Arial, Helvetica, sans-serif;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  max-width: 428px;
+  margin: 0 auto;
+  position: relative;
+  min-height: 100vh;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Контейнер для мобильной версии */
+.mobile-container {
+  max-width: 428px;
+  margin: 0 auto;
+  position: relative;
+  min-height: 100vh;
+  background: var(--background);
+}
+
+/* Запрет горизонтального скролла */
+html, body {
+  overflow-x: hidden;
 }
 
 /* Скрытие горизонтального скроллбара */
@@ -26,4 +59,28 @@ body {
   display: none; /* Safari and Chrome */
 }
 
-/* Убираем темную тему, так как у нас теперь своя темная схема */
+/* Адаптация для больших экранов */
+@media (min-width: 429px) {
+  body {
+    max-width: 428px;
+    margin: 0 auto;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  }
+  
+  html {
+    background: #000;
+  }
+}
+
+/* Убираем системные стили браузера для input, button и других элементов */
+input, button, textarea, select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Убираем синюю подсветку в Safari */
+input:focus, button:focus, textarea:focus, select:focus {
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
