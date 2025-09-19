@@ -1,5 +1,19 @@
+import Image from 'next/image';
+import { useState, useEffect } from 'react';
+
+// Интерфейс для тренера
+interface Trainer {
+  id: number;
+  name: string;
+  avatar?: string;
+  avatarUrl?: string;
+  rating?: number;
+  specialization?: string;
+  category?: string;
+}
+
 // Компонент карточки тренера для главной страницы
-const TrainerCard = ({ trainer }: { trainer: any }) => (
+const TrainerCard = ({ trainer }: { trainer: Trainer }) => (
   <div style={{
     width: '50%', 
     height: 202, 
@@ -74,14 +88,14 @@ const TrainerCard = ({ trainer }: { trainer: any }) => (
           textTransform: 'uppercase', 
           lineHeight: '12px', 
           letterSpacing: 0.50
-        }}>{trainer.category.toLowerCase()}</div>
+        }}>{trainer.category?.toLowerCase() || 'фитнес'}</div>
       </div>
     </div>
   </div>
 );
 
 const TrainersSection = () => {
-  const [trainers, setTrainers] = useState<any[]>([]);
+  const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -181,3 +195,5 @@ const TrainersSection = () => {
     </section>
   );
 };
+
+export { TrainerCard, TrainersSection };
