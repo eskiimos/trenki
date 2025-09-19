@@ -1,0 +1,29 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Russo+One&display=swap');
+
+:root {
+  --background: #060919;
+  --foreground: #ffffff;
+  --secondary: #1a1f3a;
+  --accent: #2d3448;
+  --text-muted: #8892b0;
+  --text-light: #ccd6f6;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-overpass), 'Overpass', Arial, Helvetica, sans-serif;
+}
+
+/* Скрытие горизонтального скроллбара */
+.overflow-x-auto {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+.overflow-x-auto::-webkit-scrollbar {
+  display: none; /* Safari and Chrome */
+}
+
+/* Убираем темную тему, так как у нас теперь своя темная схема */
