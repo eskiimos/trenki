@@ -35,6 +35,15 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Специальные стили для layout */
+.mobile-layout {
+  font-family: var(--font-overpass), 'Overpass', Arial, sans-serif;
+  max-width: 428px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background-color: #0a0e1a;
+}
+
 /* Контейнер для мобильной версии */
 .mobile-container {
   max-width: 428px;
@@ -83,4 +92,20 @@ input, button, textarea, select {
 input:focus, button:focus, textarea:focus, select:focus {
   outline: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Skeleton анимация */
+@keyframes skeleton-loading {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-loading {
+  background: linear-gradient(90deg, #2d3448 25%, #3d4458 50%, #2d3448 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
 }

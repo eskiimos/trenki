@@ -70,9 +70,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    console.log('POST /api/profile - Received body:', body);
+    
     const { telegramId, firstName, lastName, username, profile } = body;
 
     if (!telegramId) {
+      console.log('POST /api/profile - Missing telegramId');
       return NextResponse.json({ error: 'telegramId required' }, { status: 400 });
     }
 

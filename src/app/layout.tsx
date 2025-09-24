@@ -36,18 +36,9 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <script src="https://telegram.org/js/telegram-web-app.js" async></script>
       </head>
-      <body 
-        className={`${overpass.variable} antialiased`} 
-        style={{ 
-          fontFamily: 'var(--font-overpass), Overpass, Arial, sans-serif',
-          maxWidth: '428px',
-          margin: '0 auto',
-          minHeight: '100vh',
-          backgroundColor: '#0a0e1a'
-        }}
-      >
+      <body className={`${overpass.variable} antialiased mobile-layout`}>
         <TelegramProvider>
-          <div style={{ maxWidth: '428px', margin: '0 auto', position: 'relative' }}>
+          <div className="mobile-container">
             {children}
           </div>
         </TelegramProvider>

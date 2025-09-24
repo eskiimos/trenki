@@ -2,8 +2,86 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { useTelegram } from '../../hooks/useTelegram';
+import { ProfileSkeleton } from '../../components/Skeleton';
 
 const ProfilePage = () => {
+  const { user } = useTelegram();
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    
+    const fetchUserProfile = async () => {
+      if (!user?.id || cancelled) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const telegramId = user?.id?.toString() || user?.username || 'testuser';
+        console.log('Profile page: fetching profile for', telegramId);
+        
+        // Запрос к API для получения полного профиля пользователя
+        const response = await fetch(`/api/profile?telegramId=${telegramId}`);
+        
+        if (!response.ok || cancelled) {
+          throw new Error('Ошибка загрузки профиля');
+        }
+
+        const data = await response.json();
+        
+        if (!cancelled) {
+          setUserProfile(data.user);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Ошибка загрузки профиля:', error);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    // Проверяем, есть ли уже данные профиля для этого пользователя
+    if (user?.id && !userProfile) {
+      fetchUserProfile();
+    } else if (user?.id && userProfile) {
+      setIsLoading(false);
+    }
+
+    // Cleanup функция для предотвращения race conditions
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]); // Зависимость только от ID пользователя
+
+  // Определяем отображаемые данные
+  const displayName = userProfile?.firstName || user?.first_name || 'Игрок';
+  const displayLastName = userProfile?.lastName || user?.last_name || '';
+  
+  // Мапинг позиций
+  const positionMap: Record<string, string> = {
+    'GOALTENDER': 'Вратарь',
+    'DEFENSEMAN': 'Защитник',
+    'LEFT_WING': 'Левый крайний',
+    'CENTER': 'Центральный нападающий',
+    'RIGHT_WING': 'Правый крайний'
+  };
+
+  const displayPosition = userProfile?.profile?.position ? 
+    positionMap[userProfile.profile.position] || userProfile.profile.position :
+    'Позиция не указана';
+
+  // Показываем скелетон во время загрузки
+  if (isLoading) {
+    return <ProfileSkeleton />;
+  }
+
   return (
     <div className="bg-[#101530] min-h-screen text-white">
       {/* Шапка с кнопкой назад */}
@@ -45,14 +123,14 @@ const ProfilePage = () => {
             <div className="flex justify-between items-start">
               <div className="w-14 h-14 rounded bg-gradient-to-b from-[#445CFF]/20 to-[#445CFF]/60 overflow-hidden p-1">
                 <Image 
-                  src="/logos/logo_akb.png"
-                  alt="Логотип" 
+                  src="/trenki_app.jpeg"
+                  alt="Логотип клуба" 
                   width={56} 
                   height={56} 
                   className="w-full h-full object-contain"
                 />
               </div>
-              <div className="w-6 h-6 flex items-center justify-center">
+              <Link href="/profile/edit" className="w-6 h-6 flex items-center justify-center hover:opacity-80 transition-opacity">
                 <Image 
                   src="/icons/tabler_edit.svg"
                   alt="Редактировать" 
@@ -60,44 +138,57 @@ const ProfilePage = () => {
                   height={24} 
                   className="w-full h-full"
                 />
-              </div>
+              </Link>
             </div>
             
             {/* Имя */}
             <div className="text-white text-sm font-medium font-overpass leading-tight">
-              Евгений<br/>Евгеньев
+              {isLoading ? 'Загрузка...' : (
+                <>
+                  {displayName}
+                  {displayLastName && <><br/>{displayLastName}</>}
+                </>
+              )}
             </div>
             
             {/* Позиция */}
             <div className="text-[#AEABBB] text-xs font-medium font-overpass">
-              11 | Нападающий
+              {userProfile?.profile?.number || '--'} | {displayPosition}
             </div>
             
             {/* Характеристики */}
             <div className="text-[#AEABBB] text-xs font-medium font-overpass">
-              10 лет | 134 см | 42 кг
+              {userProfile?.profile?.age || '--'} лет | {userProfile?.profile?.height || '--'} см | {userProfile?.profile?.weight || '--'} кг
             </div>
             
-            {/* Статистика */}
-            <div className="flex flex-col gap-0.5 mt-2">
-              <StatBar label="сила" value="16" change="+7" isPositive={true} />
-              <StatBar label="выносливость" value="22" change="-4" isPositive={false} />
-              <StatBar label="скорость" value="55" change="+4" isPositive={true} />
-              <StatBar label="техника" value="22" change="-9" isPositive={false} />
-              <StatBar label="общее" value="22" change="-9" isPositive={false} isTotal={true} />
-            </div>
+            {/* Статистика - скрыта, будет доступна в платной версии */}
+            {/* <div className="flex flex-col gap-0.5 mt-2">
+              <StatBar label="сила" value={userProfile?.profile?.strength?.toString() || '0'} change="+7" isPositive={true} />
+              <StatBar label="выносливость" value={userProfile?.profile?.endurance?.toString() || '0'} change="-4" isPositive={false} />
+              <StatBar label="скорость" value={userProfile?.profile?.speed?.toString() || '0'} change="+4" isPositive={true} />
+              <StatBar label="техника" value={userProfile?.profile?.technique?.toString() || '0'} change="-9" isPositive={false} />
+              <StatBar label="катание" value={userProfile?.profile?.skating?.toString() || '0'} change="+2" isPositive={true} />
+              <StatBar label="броски" value={userProfile?.profile?.shooting?.toString() || '0'} change="+5" isPositive={true} />
+              <StatBar label="передачи" value={userProfile?.profile?.passing?.toString() || '0'} change="+3" isPositive={true} />
+              <StatBar label="общее" value={userProfile?.profile?.overall?.toString() || '0'} change="-9" isPositive={false} isTotal={true} />
+            </div> */}
           </div>
         </div>
 
-        {/* Прогресс */}
-        <div className="flex items-center gap-2 mb-6">
+        {/* Ежедневный прогресс - скрыт, будет доступен в платной версии */}
+        {/* <div className="flex items-center gap-2 mb-6">
           <div className="text-white text-xs font-medium font-overpass leading-tight">
-            Ежедневный<br/>прогресс 8/10
+            Ежедневный<br/>прогресс {userProfile?.profile?.dailyProgress || 0}/{userProfile?.profile?.maxDailyGoal || 10}
           </div>
           <div className="flex-1 h-2 bg-[#2d3448] rounded-full overflow-hidden">
-            <div className="w-4/5 h-full bg-gradient-to-r from-[#A1FF4A] to-[#7DFF8C] rounded-full"></div>
+            <div 
+              className="h-full bg-gradient-to-r from-[#A1FF4A] to-[#7DFF8C] rounded-full transition-all duration-300"
+              style={{ 
+                width: `${Math.min(100, ((userProfile?.profile?.dailyProgress || 0) / (userProfile?.profile?.maxDailyGoal || 10)) * 100)}%` 
+              }}
+            ></div>
           </div>
-        </div>
+        </div> */}
 
         {/* Меню разделы */}
         <div className="space-y-4">

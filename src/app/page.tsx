@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useTelegram } from '../hooks/useTelegram';
+import { apiCache } from '../lib/cache';
 
 // Компонент для короткого видео
 const ShortVideoPlayer = ({ index, poster }: { index: number; poster: string }) => {
@@ -60,21 +61,64 @@ const Header = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+    
     const fetchUserProfile = async () => {
-      if (!user?.id) {
+      if (!user?.id || cancelled) {
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('Header: attempting to fetch user status for', user.id);
+
+      // Проверяем кеш перед запросом
+      const cacheKey = `user-status-${user.id}`;
+      const cachedData = apiCache.get(cacheKey);
+      
+      if (cachedData && !cancelled) {
+        console.log('Header: using cached data for user status');
+        
+        if (cachedData.hasCompleteProfile && cachedData.user.profile) {
+          // Определяем отображаемую позицию
+          const positionMap: Record<string, string> = {
+            'GOALTENDER': 'ВР',
+            'DEFENSEMAN': 'ЗАЩ',
+            'LEFT_WING': 'ЛК',
+            'CENTER': 'Ц',
+            'RIGHT_WING': 'ПК'
+          };
+
+          setUserProfile({
+            overall: cachedData.user.profile.overall,
+            number: cachedData.user.profile.number,
+            position: positionMap[cachedData.user.profile.position] || cachedData.user.profile.position,
+            firstName: cachedData.user.firstName,
+            lastName: cachedData.user.lastName,
+            potential: 'высокий' // Можно вычислить на основе overall
+          });
+        } else {
+          setUserProfile(null);
+        }
         setIsLoading(false);
         return;
       }
 
       try {
+        console.log('Header: making API request to /api/user/status');
         // Запрос к API для проверки статуса профиля
         const response = await fetch(`/api/user/status?telegramId=${user.id}`);
         
-        if (!response.ok) {
+        if (!response.ok || cancelled) {
           throw new Error('Ошибка загрузки профиля');
         }
 
         const data = await response.json();
+        
+        if (cancelled) return;
+        
+        // Сохраняем в кеш
+        apiCache.set(cacheKey, data);
+        console.log('Header: cached user status data');
         
         if (data.hasCompleteProfile && data.user.profile) {
           // Определяем отображаемую позицию
@@ -87,6 +131,7 @@ const Header = () => {
           };
 
           setUserProfile({
+            overall: data.user.profile.overall,
             number: data.user.profile.number,
             position: positionMap[data.user.profile.position] || data.user.profile.position,
             firstName: data.user.firstName,
@@ -97,15 +142,29 @@ const Header = () => {
           setUserProfile(null);
         }
       } catch (error) {
-        console.error('Ошибка загрузки профиля:', error);
-        setUserProfile(null);
+        if (!cancelled) {
+          console.error('Header: error loading profile:', error);
+          setUserProfile(null);
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
-    fetchUserProfile();
-  }, [user]);
+    // Загружаем данные только если их еще нет
+    if (user?.id && !userProfile) {
+      fetchUserProfile();
+    } else if (user?.id && userProfile) {
+      setIsLoading(false);
+    }
+    
+    // Cleanup функция
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]); // Зависимость только от ID пользователя
 
   // Показываем только имя из Telegram при первом запуске
   const displayName = user?.first_name || 'Игрок';
