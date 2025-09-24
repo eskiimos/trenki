@@ -1,8 +1,6 @@
 {
-  "framework": "nextjs",
-  "buildCommand": "cd telegram-workout-app && npm run build",
+  "buildCommand": "cd telegram-workout-app && npm ci && npm run build",
   "devCommand": "cd telegram-workout-app && npm run dev", 
-  "installCommand": "cd telegram-workout-app && npm install",
-  "outputDirectory": "telegram-workout-app/.next",
-  "rootDirectory": "telegram-workout-app"
+  "installCommand": "cd telegram-workout-app && npm ci",
+  "outputDirectory": "telegram-workout-app/.next"
 }
