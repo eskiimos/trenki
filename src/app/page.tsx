@@ -217,9 +217,10 @@ const Header = () => {
             </div>
           )}
         </div>
+        {/* Логотип клуба - в будущем пользователь сможет загрузить свой логотип */}
         <Image 
-          src="/logos/logo_akb.png" 
-          alt="Avatar" 
+          src="/trenki_app.jpeg" 
+          alt="Логотип клуба" 
           width={48} 
           height={48} 
           style={{borderRadius: 1}}
