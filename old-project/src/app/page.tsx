@@ -3,8 +3,6 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { useTelegram } from '../hooks/useTelegram';
 
 // Компонент для короткого видео
 const ShortVideoPlayer = ({ index, poster }: { index: number; poster: string }) => {
@@ -26,9 +24,6 @@ const ShortVideoPlayer = ({ index, poster }: { index: number; poster: string }) 
 };
 
 const HomePage = () => {
-  // Инициализируем Telegram WebApp
-  useTelegram();
-  
   return (
     <div className="bg-[#060919] min-h-screen text-white pb-32">
       <Header />
@@ -54,228 +49,160 @@ const HomePage = () => {
   );
 };
 
-const Header = () => {
-  const { user } = useTelegram();
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      if (!user?.id) {
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        // Запрос к API для проверки статуса профиля
-        const response = await fetch(`/api/user/status?telegramId=${user.id}`);
-        
-        if (!response.ok) {
-          throw new Error('Ошибка загрузки профиля');
-        }
-
-        const data = await response.json();
-        
-        if (data.hasCompleteProfile && data.user.profile) {
-          // Определяем отображаемую позицию
-          const positionMap: Record<string, string> = {
-            'GOALTENDER': 'ВР',
-            'DEFENSEMAN': 'ЗАЩ',
-            'LEFT_WING': 'ЛК',
-            'CENTER': 'Ц',
-            'RIGHT_WING': 'ПК'
-          };
-
-          setUserProfile({
-            number: data.user.profile.number,
-            position: positionMap[data.user.profile.position] || data.user.profile.position,
-            firstName: data.user.firstName,
-            lastName: data.user.lastName,
-            potential: 'высокий' // Можно вычислить на основе overall
-          });
-        } else {
-          setUserProfile(null);
-        }
-      } catch (error) {
-        console.error('Ошибка загрузки профиля:', error);
-        setUserProfile(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchUserProfile();
-  }, [user]);
-
-  // Показываем только имя из Telegram при первом запуске
-  const displayName = user?.first_name || 'Игрок';
-  const displayLastName = user?.last_name || '';
-
-  return (
-    <header style={{
+const Header = () => (
+  <header style={{
+    width: '100%', 
+    paddingBottom: 24, 
+    paddingLeft: 16, 
+    paddingRight: 16, 
+    paddingTop: 100,
+    borderBottom: '1px #101530 solid', 
+    flexDirection: 'column', 
+    justifyContent: 'flex-start', 
+    alignItems: 'flex-start', 
+    gap: 12, 
+    display: 'flex'
+  }}>
+    <div style={{
       width: '100%', 
-      paddingBottom: 24, 
-      paddingLeft: 16, 
-      paddingRight: 16, 
-      paddingTop: 100,
-      borderBottom: '1px #101530 solid', 
-      flexDirection: 'column', 
       justifyContent: 'flex-start', 
-      alignItems: 'flex-start', 
-      gap: 12, 
+      alignItems: 'center', 
+      gap: 4, 
       display: 'flex'
     }}>
       <div style={{
-        width: '100%', 
-        justifyContent: 'flex-start', 
+        width: 40, 
+        paddingTop: 4, 
+        paddingBottom: 4, 
+        overflow: 'hidden', 
+        borderRadius: 2, 
+        flexDirection: 'column', 
+        justifyContent: 'space-between', 
         alignItems: 'center', 
-        gap: 4, 
         display: 'flex'
       }}>
-        {/* Показываем номер и позицию только если профиль заполнен */}
-        {userProfile && (
-          <div style={{
-            width: 40, 
-            paddingTop: 4, 
-            paddingBottom: 4, 
-            overflow: 'hidden', 
-            borderRadius: 2, 
-            flexDirection: 'column', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            display: 'flex'
-          }}>
-            <div style={{
-              textAlign: 'center', 
-              color: '#F9F8FE', 
-              fontSize: 24, 
-              fontFamily: 'Overpass', 
-              fontWeight: '700', 
-              lineHeight: '24px'
-            }}>{userProfile.number}</div>
-            <div style={{
-              textAlign: 'center', 
-              color: '#F9F8FE', 
-              fontSize: 12, 
-              fontFamily: 'Overpass', 
-              fontWeight: '700', 
-              lineHeight: '12px', 
-              letterSpacing: 0.50
-            }}>{userProfile.position}</div>
-          </div>
-        )}
-        
         <div style={{
-          flex: '1 1 0', 
-          padding: 4, 
-          borderRadius: 2, 
-          flexDirection: 'column', 
-          justifyContent: 'flex-start', 
-          alignItems: 'flex-start', 
-          display: 'flex'
-        }}>
-          <div style={{
-            width: '100%', 
-            paddingTop: 4, 
-            paddingBottom: 4, 
-            justifyContent: 'flex-start', 
-            alignItems: 'center', 
-            gap: 10, 
-            display: 'flex'
-          }}>
-            <div style={{
-              flex: '1 1 0', 
-              color: '#F9F8FE', 
-              fontSize: 16, 
-              fontFamily: 'Overpass', 
-              fontWeight: '700', 
-              textTransform: 'uppercase', 
-              lineHeight: '16px', 
-              letterSpacing: 0.50
-            }}>{displayName}</div>
-          </div>
-          {displayLastName && (
-            <div style={{
-              width: '100%', 
-              paddingTop: 4, 
-              paddingBottom: 4, 
-              justifyContent: 'flex-start', 
-              alignItems: 'center', 
-              gap: 10, 
-              display: 'flex'
-            }}>
-              <div style={{
-                flex: '1 1 0', 
-                color: '#F9F8FE', 
-                fontSize: 16, 
-                fontFamily: 'Overpass', 
-                fontWeight: '700', 
-                textTransform: 'uppercase', 
-                lineHeight: '16px', 
-                letterSpacing: 0.50
-              }}>{displayLastName}</div>
-            </div>
-          )}
-        </div>
-        <Image 
-          src="/logos/logo_akb.png" 
-          alt="Avatar" 
-          width={48} 
-          height={48} 
-          style={{borderRadius: 1}}
-          className="object-cover"
-        />
+          textAlign: 'center', 
+          color: '#F9F8FE', 
+          fontSize: 24, 
+          fontFamily: 'Overpass', 
+          fontWeight: '700', 
+          lineHeight: '24px'
+        }}>88</div>
+        <div style={{
+          textAlign: 'center', 
+          color: '#F9F8FE', 
+          fontSize: 12, 
+          fontFamily: 'Overpass', 
+          fontWeight: '700', 
+          lineHeight: '12px', 
+          letterSpacing: 0.50
+        }}>вр</div>
       </div>
-      
-      {/* Показываем потенциал только если профиль заполнен */}
-      {userProfile && (
+      <div style={{
+        flex: '1 1 0', 
+        padding: 4, 
+        borderRadius: 2, 
+        flexDirection: 'column', 
+        justifyContent: 'flex-start', 
+        alignItems: 'flex-start', 
+        display: 'flex'
+      }}>
         <div style={{
           width: '100%', 
+          paddingTop: 4, 
+          paddingBottom: 4, 
           justifyContent: 'flex-start', 
           alignItems: 'center', 
-          gap: 4, 
+          gap: 10, 
           display: 'flex'
         }}>
-          <Image 
-            src="/icons/ant-design-thunderbolt-filled.svg" 
-            alt="Потенциал" 
-            width={16} 
-            height={16} 
-            style={{ alignSelf: 'center' }}
-          />
-          <div style={{
-            color: '#F9F8FE', 
-            fontSize: 12, 
-            fontFamily: 'Overpass', 
-            fontStyle: 'italic', 
-            fontWeight: '800', 
-            textTransform: 'uppercase', 
-            lineHeight: '12px', 
-            letterSpacing: 0.50,
-            alignSelf: 'center'
-          }}>потенциал:</div>
           <div style={{
             flex: '1 1 0', 
-            height: 12, 
-            position: 'relative',
-            alignSelf: 'center'
-          }}>
-            <div style={{
-              color: '#A1FF4A', 
-              fontSize: 12, 
-              fontFamily: 'Overpass', 
-              fontStyle: 'italic', 
-              fontWeight: '800', 
-              textTransform: 'uppercase', 
-              lineHeight: '12px', 
-              letterSpacing: 0.50
-            }}>{userProfile.potential}</div>
-          </div>
+            color: '#F9F8FE', 
+            fontSize: 16, 
+            fontFamily: 'Overpass', 
+            fontWeight: '700', 
+            textTransform: 'uppercase', 
+            lineHeight: '16px', 
+            letterSpacing: 0.50
+          }}>Константин</div>
         </div>
-      )}
-    </header>
-  );
-};
+        <div style={{
+          width: '100%', 
+          paddingTop: 4, 
+          paddingBottom: 4, 
+          justifyContent: 'flex-start', 
+          alignItems: 'center', 
+          gap: 10, 
+          display: 'flex'
+        }}>
+          <div style={{
+            flex: '1 1 0', 
+            color: '#F9F8FE', 
+            fontSize: 16, 
+            fontFamily: 'Overpass', 
+            fontWeight: '700', 
+            textTransform: 'uppercase', 
+            lineHeight: '16px', 
+            letterSpacing: 0.50
+          }}>Константинопольский</div>
+        </div>
+      </div>
+      <Image 
+        src="/logos/logo_akb.png" 
+        alt="Avatar" 
+        width={48} 
+        height={48} 
+        style={{borderRadius: 1}}
+        className="object-cover"
+      />
+    </div>
+    <div style={{
+      width: '100%', 
+      justifyContent: 'flex-start', 
+      alignItems: 'center', 
+      gap: 4, 
+      display: 'flex'
+    }}>
+      <Image 
+        src="/icons/ant-design-thunderbolt-filled.svg" 
+        alt="Потенциал" 
+        width={16} 
+        height={16} 
+        style={{ alignSelf: 'center' }}
+      />
+      <div style={{
+        color: '#F9F8FE', 
+        fontSize: 12, 
+        fontFamily: 'Overpass', 
+        fontStyle: 'italic', 
+        fontWeight: '800', 
+        textTransform: 'uppercase', 
+        lineHeight: '12px', 
+        letterSpacing: 0.50,
+        alignSelf: 'center'
+      }}>потенциал:</div>
+      <div style={{
+        flex: '1 1 0', 
+        height: 12, 
+        position: 'relative',
+        alignSelf: 'center'
+      }}>
+        <div style={{
+          color: '#A1FF4A', 
+          fontSize: 12, 
+          fontFamily: 'Overpass', 
+          fontStyle: 'italic', 
+          fontWeight: '800', 
+          textTransform: 'uppercase', 
+          lineHeight: '12px', 
+          letterSpacing: 0.50
+        }}>высокий</div>
+      </div>
+    </div>
+  </header>
+);
 
 const HeroVideoSection = () => (
   <section className="px-4" style={{ paddingBottom: '15px' }}>
