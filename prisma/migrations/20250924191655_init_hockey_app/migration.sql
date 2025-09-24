@@ -1,8 +1,11 @@
 -- CreateEnum
-CREATE TYPE "public"."VideoCategory" AS ENUM ('STRENGTH', 'ENDURANCE', 'SPEED', 'TECHNIQUE', 'TACTICAL', 'GOALKEEPER', 'GENERAL');
+CREATE TYPE "public"."VideoCategory" AS ENUM ('STRENGTH', 'ENDURANCE', 'SPEED', 'TECHNIQUE', 'SKATING', 'SHOOTING', 'PASSING', 'CHECKING', 'GOALKEEPER', 'POWER_PLAY', 'PENALTY_KILL', 'TACTICAL', 'GENERAL');
 
 -- CreateEnum
 CREATE TYPE "public"."VideoDifficulty" AS ENUM ('BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT');
+
+-- CreateEnum
+CREATE TYPE "public"."HockeyPosition" AS ENUM ('GOALTENDER', 'DEFENSEMAN', 'LEFT_WING', 'CENTER', 'RIGHT_WING');
 
 -- CreateTable
 CREATE TABLE "public"."users" (
@@ -21,7 +24,7 @@ CREATE TABLE "public"."users" (
 CREATE TABLE "public"."profiles" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
-    "position" TEXT,
+    "position" "public"."HockeyPosition",
     "number" INTEGER,
     "age" INTEGER,
     "height" INTEGER,
@@ -30,6 +33,10 @@ CREATE TABLE "public"."profiles" (
     "endurance" INTEGER NOT NULL DEFAULT 0,
     "speed" INTEGER NOT NULL DEFAULT 0,
     "technique" INTEGER NOT NULL DEFAULT 0,
+    "skating" INTEGER NOT NULL DEFAULT 0,
+    "shooting" INTEGER NOT NULL DEFAULT 0,
+    "passing" INTEGER NOT NULL DEFAULT 0,
+    "checking" INTEGER NOT NULL DEFAULT 0,
     "overall" INTEGER NOT NULL DEFAULT 0,
     "dailyProgress" INTEGER NOT NULL DEFAULT 0,
     "maxDailyGoal" INTEGER NOT NULL DEFAULT 10,
