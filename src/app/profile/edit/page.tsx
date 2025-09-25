@@ -168,20 +168,23 @@ const ProfileEditPage = () => {
         console.error('Server error:', responseData);
         throw new Error(responseData.error || `Ошибка сервера: ${response.status}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('=== PROFILE SAVE ERROR ===');
-      console.error('Error type:', error?.name);
-      console.error('Error message:', error?.message);
+      
+      const err = error as { name?: string; message?: string };
+      
+      console.error('Error type:', err?.name || 'Unknown');
+      console.error('Error message:', err?.message || 'No message');
       console.error('Full error:', error);
       
       let errorMessage = 'Ошибка при сохранении профиля. Попробуйте еще раз.';
       
-      if (error?.message?.includes('Failed to fetch')) {
+      if (err?.message?.includes('Failed to fetch')) {
         errorMessage = 'Проблема с подключением. Проверьте интернет соединение.';
-      } else if (error?.message?.includes('Сервер вернул невалидный ответ')) {
+      } else if (err?.message?.includes('Сервер вернул невалидный ответ')) {
         errorMessage = 'Сервер недоступен. Попробуйте позже.';
-      } else if (error?.message?.includes('Ошибка сервера:')) {
-        errorMessage = error.message;
+      } else if (err?.message?.includes('Ошибка сервера:')) {
+        errorMessage = err.message;
       }
       
       alert(errorMessage);
