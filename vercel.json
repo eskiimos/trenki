@@ -1,3 +1,9 @@
 {
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "env": {
+    "DATABASE_URL": "postgres://2f72b32ec43ba88878cada75ae8272ca19fffeafb7ec1102337ee6736f8d19a0:sk_KNbXiVixCXA0b00D4ZZnZ@db.prisma.io:5432/postgres?sslmode=require"
+  }
 }
