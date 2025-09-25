@@ -107,9 +107,9 @@ const Header = () => {
     fetchUserProfile();
   }, [user]);
 
-  // Показываем только имя из Telegram при первом запуске
-  const displayName = user?.first_name || 'Игрок';
-  const displayLastName = user?.last_name || '';
+  // Если профиль заполнен, показываем имя и фамилию из профиля, иначе из Telegram
+  const displayName = userProfile?.firstName || user?.first_name || 'Игрок';
+  const displayLastName = userProfile?.lastName || user?.last_name || '';
 
   return (
     <header style={{
