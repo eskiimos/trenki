@@ -69,14 +69,42 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    console.log('POST /api/profile - Received body:', body);
+    console.log('=== POST /api/profile START ===');
+    console.log('NODE_ENV:', process.env.NODE_ENV);
+    console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+    console.log('Request URL:', request.url);
+    console.log('Request headers:', Object.fromEntries(request.headers.entries()));
+    
+    let body;
+    try {
+      body = await request.json();
+      console.log('POST /api/profile - Received body:', JSON.stringify(body, null, 2));
+    } catch (parseError) {
+      console.error('POST /api/profile - Failed to parse JSON body:', parseError);
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    }
     
     const { telegramId, firstName, lastName, username, profile } = body;
 
     if (!telegramId) {
       console.log('POST /api/profile - Missing telegramId');
       return NextResponse.json({ error: 'telegramId required' }, { status: 400 });
+    }
+
+    console.log('POST /api/profile - Starting database operation...');
+    console.log('POST /api/profile - telegramId:', telegramId);
+    console.log('POST /api/profile - firstName:', firstName);
+    console.log('POST /api/profile - lastName:', lastName);
+    console.log('POST /api/profile - username:', username);
+    console.log('POST /api/profile - profile:', profile);
+
+    // Проверим подключение к базе данных
+    try {
+      await prisma.$connect();
+      console.log('POST /api/profile - Database connected successfully');
+    } catch (dbError) {
+      console.error('POST /api/profile - Database connection failed:', dbError);
+      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
     }
 
     // Обновляем или создаем пользователя и профиль
@@ -115,9 +143,45 @@ export async function POST(request: NextRequest) {
       include: { profile: true }
     });
 
+    console.log('POST /api/profile - User upserted successfully:', user.id);
+    console.log('=== POST /api/profile SUCCESS ===');
+
     return NextResponse.json({ user });
-  } catch (error) {
-    console.error('Error updating user profile:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  } catch (error: any) {
+    console.error('=== POST /api/profile ERROR ===');
+    console.error('Error type:', error?.constructor?.name);
+    console.error('Error message:', error?.message);
+    console.error('Error stack:', error?.stack);
+    
+    // Проверяем тип ошибки для более детального ответа
+    if (error?.code === 'P2002') {
+      console.error('Prisma unique constraint error:', error?.meta);
+      return NextResponse.json({ error: 'Data conflict: user already exists with different parameters' }, { status: 409 });
+    }
+    
+    if (error?.code === 'P2025') {
+      console.error('Prisma record not found error:', error?.meta);
+      return NextResponse.json({ error: 'Required record not found' }, { status: 404 });
+    }
+    
+    if (error?.name === 'PrismaClientKnownRequestError') {
+      console.error('Prisma known error:', error?.code, error?.meta);
+      return NextResponse.json({ error: `Database error: ${error?.code}` }, { status: 500 });
+    }
+    
+    if (error?.name === 'PrismaClientUnknownRequestError') {
+      console.error('Prisma unknown error');
+      return NextResponse.json({ error: 'Unknown database error' }, { status: 500 });
+    }
+    
+    if (error?.name === 'PrismaClientRustPanicError') {
+      console.error('Prisma rust panic error');
+      return NextResponse.json({ error: 'Database engine error' }, { status: 500 });
+    }
+
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+    }, { status: 500 });
   }
 }

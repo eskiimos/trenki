@@ -94,41 +94,97 @@ const ProfileEditPage = () => {
     setIsSaving(true);
 
     try {
-      console.log('User data:', user);
+      // Более надежное получение telegramId для продакшена
+      let telegramId = user?.id?.toString();
+      
+      // Fallback методы для получения telegramId на продакшене
+      if (!telegramId) {
+        telegramId = user?.username;
+      }
+      
+      // Попробуем получить данные из Telegram WebApp напрямую
+      if (!telegramId && typeof window !== 'undefined' && window.Telegram?.WebApp) {
+        const webAppUser = window.Telegram.WebApp.initDataUnsafe?.user;
+        telegramId = webAppUser?.id?.toString() || webAppUser?.username;
+      }
+      
+      // Последний fallback для тестирования
+      if (!telegramId) {
+        telegramId = 'testuser';
+      }
+      
+      console.log('=== PROFILE SAVE DEBUG ===');
+      console.log('User:', user);
+      console.log('Final telegramId:', telegramId);
       console.log('Form data:', formData);
+      console.log('Environment:', process.env.NODE_ENV);
+      console.log('Window Telegram:', typeof window !== 'undefined' ? window.Telegram : 'not available');
+      
+      const requestData = {
+        telegramId,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        username: user?.username,
+        profile: {
+          position: formData.position || null,
+          number: formData.number ? parseInt(formData.number) : null,
+          age: formData.age ? parseInt(formData.age) : null,
+          height: formData.height ? parseInt(formData.height) : null,
+          weight: formData.weight ? parseInt(formData.weight) : null,
+        },
+      };
+      
+      console.log('Request data:', JSON.stringify(requestData, null, 2));
+      
+      // Проверим доступность API перед основным запросом  
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      console.log('Base URL:', baseUrl);
+      console.log('API URL:', `${baseUrl}/api/profile`);
       
       const response = await fetch('/api/profile', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          telegramId: user?.id?.toString() || user?.username || 'testuser',
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          username: user?.username,
-          profile: {
-            position: formData.position || null,
-            number: formData.number ? parseInt(formData.number) : null,
-            age: formData.age ? parseInt(formData.age) : null,
-            height: formData.height ? parseInt(formData.height) : null,
-            weight: formData.weight ? parseInt(formData.weight) : null,
-          },
-        }),
+        body: JSON.stringify(requestData),
       });
 
-      const responseData = await response.json();
-      console.log('Response:', responseData);
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+      let responseData;
+      try {
+        responseData = await response.json();
+        console.log('Response data:', responseData);
+      } catch (parseError) {
+        console.error('Failed to parse response as JSON:', parseError);
+        throw new Error('Сервер вернул невалидный ответ');
+      }
 
       if (response.ok) {
+        console.log('Profile saved successfully, redirecting to profile page');
         router.push('/profile');
       } else {
-        throw new Error(responseData.error || 'Failed to save profile');
+        console.error('Server error:', responseData);
+        throw new Error(responseData.error || `Ошибка сервера: ${response.status}`);
       }
     } catch (error) {
-      console.error('Error saving profile:', error);
-      // Здесь можно добавить показ ошибки пользователю
-      alert('Ошибка при сохранении профиля. Попробуйте еще раз.');
+      console.error('=== PROFILE SAVE ERROR ===');
+      console.error('Error type:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Full error:', error);
+      
+      let errorMessage = 'Ошибка при сохранении профиля. Попробуйте еще раз.';
+      
+      if (error.message.includes('Failed to fetch')) {
+        errorMessage = 'Проблема с подключением. Проверьте интернет соединение.';
+      } else if (error.message.includes('Сервер вернул невалидный ответ')) {
+        errorMessage = 'Сервер недоступен. Попробуйте позже.';
+      } else if (error.message.includes('Ошибка сервера:')) {
+        errorMessage = error.message;
+      }
+      
+      alert(errorMessage);
     } finally {
       setIsSaving(false);
     }
