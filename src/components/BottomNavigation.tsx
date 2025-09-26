@@ -1,0 +1,62 @@
+import React from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+
+interface BottomNavigationProps {
+  activeTab?: 'home' | 'video' | 'hockey' | 'calendar' | 'profile';
+}
+
+const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' }) => {
+  return (
+    <nav className="fixed bottom-0 left-0 right-0 bg-[#101530] border-t border-[#2d3448] px-4 py-3 z-50">
+      <div className="flex justify-around items-center max-w-md mx-auto">
+        <Link href="/" className="flex items-center justify-center p-2">
+          <Image 
+            src={`/icons/tapbar/icon-type-home-active-${activeTab === 'home' ? 'yes' : 'no'}.svg`}
+            alt="Главная" 
+            width={28} 
+            height={28} 
+          />
+        </Link>
+        
+        <Link href="/video" className="flex items-center justify-center p-2">
+          <Image 
+            src={`/icons/tapbar/icon-type-play-active-${activeTab === 'video' ? 'yes' : 'no'}.svg`}
+            alt="Видео" 
+            width={28} 
+            height={28} 
+          />
+        </Link>
+        
+        <button className="flex items-center justify-center p-2">
+          <Image 
+            src={`/icons/tapbar/icon-type-hockey-active-${activeTab === 'hockey' ? 'yes' : 'no'}.svg`}
+            alt="Треньки" 
+            width={28} 
+            height={28} 
+          />
+        </button>
+        
+        <button className="flex items-center justify-center p-2">
+          <Image 
+            src={`/icons/tapbar/icon-type-calendar-active-${activeTab === 'calendar' ? 'yes' : 'no'}.svg`}
+            alt="Расписание" 
+            width={28} 
+            height={28} 
+          />
+        </button>
+        
+        <Link href="/profile" className="flex items-center justify-center p-2">
+          <Image 
+            src={`/icons/tapbar/icon-type-hockey-mask-active-${activeTab === 'profile' ? 'yes' : 'no'}.svg`}
+            alt="Профиль" 
+            width={28} 
+            height={28} 
+          />
+        </Link>
+      </div>
+    </nav>
+  );
+};
+
+export default BottomNavigation;

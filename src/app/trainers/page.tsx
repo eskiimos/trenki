@@ -6,19 +6,29 @@ import Link from 'next/link';
 const TrainersPage = () => {
   return (
     <div className="bg-[#101530] min-h-screen text-white">
-      {/* Кнопка назад */}
-      <div className="p-4 pt-[100px]">
+      {/* Верхняя панель с кнопками */}
+      <div className="p-4 pt-[100px] flex justify-between items-center">
+        {/* Кнопка назад */}
         <Link href="/" className="inline-block">
-          <div className="w-8 h-8 flex items-center justify-center">
+          <div className="w-12 h-12 flex items-center justify-center">
             <Image 
-              src="/icons/arrow.svg" 
+              src="/icons/icon-action-back.svg" 
               alt="Назад" 
-              width={16} 
-              height={16}
-              style={{ transform: 'rotate(180deg)' }}
+              width={32} 
+              height={32}
             />
           </div>
         </Link>
+
+        {/* Кнопка поиска */}
+        <div className="w-12 h-12 flex items-center justify-center">
+          <Image 
+            src="/icons/icon-action-search.svg" 
+            alt="Поиск" 
+            width={32} 
+            height={32}
+          />
+        </div>
       </div>
 
       {/* Контент страницы тренеров */}

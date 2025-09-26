@@ -2,7 +2,11 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Play, Pause, Heart, MessageCircle, Share, MoreVertical, Volume2, VolumeX } from 'lucide-react';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { Play, Pause, Heart, MessageCircle, Share, Volume2, VolumeX } from 'lucide-react';
+import TagsSection from '@/components/TagsSection';
+import BottomNavigation from '@/components/BottomNavigation';
 
 interface VideoPageProps {
   params: Promise<{
@@ -11,6 +15,7 @@ interface VideoPageProps {
 }
 
 export default function VideoPage({ params }: VideoPageProps) {
+  const router = useRouter();
   const [isPlaying, setIsPlaying] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [showComments, setShowComments] = useState(true);
@@ -136,16 +141,21 @@ export default function VideoPage({ params }: VideoPageProps) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#101530]">
+    <div className="min-h-screen bg-[#101530] pb-20">{/* pb-20 для отступа под таб-бар */}
       {/* Header */}
       <header className="flex items-center justify-between p-4 bg-[#101530] shadow-sm border-b border-gray-700" style={{ paddingTop: '90px' }}>
-        <Link href="/" className="text-white hover:text-gray-300">
-          <ArrowLeft size={24} />
-        </Link>
-        <h1 className="text-lg font-semibold text-white">Видео</h1>
-        <button className="text-white hover:text-gray-300">
-          <MoreVertical size={24} />
-        </button>
+        <div className="flex items-center space-x-2">
+          <button onClick={() => router.back()} className="text-white hover:text-gray-300">
+            <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
+          </button>
+          <h1 className="text-lg font-semibold text-white">ТРЕНЕРОВКА</h1>
+        </div>
+        <div className="flex items-center space-x-4">
+            <Image src="/icons/video/action-calendar.svg" alt="Календарь" width={24} height={24} />
+            <Image src="/icons/video/action-save.svg" alt="Сохранить" width={24} height={24} />
+            <Image src="/icons/video/action-share.svg" alt="Поделиться" width={24} height={24} />
+            <Image src="/icons/video/action-like.svg" alt="Лайк" width={24} height={24} />
+        </div>
       </header>
 
       {/* Video Player */}
@@ -208,131 +218,139 @@ export default function VideoPage({ params }: VideoPageProps) {
         </div>
       </div>
 
-      {/* Video Info */}
-      <div className="p-4 bg-[#1a1f3a] border-b border-[#2d3448]">
-        <h2 className="text-xl font-bold text-white mb-2">
-          {videoId === 'onboarding' ? 'Онбординг в тренажерный зал' : 'Видео тренировка'}
-        </h2>
-        <p className="text-[#ccd6f6] text-sm mb-4">
-          {videoId === 'onboarding' 
-            ? 'Первые шаги в тренажерном зале - как начать тренироваться правильно и безопасно'
-            : 'Описание видео тренировки'
-          }
-        </p>
+      <TagsSection />
 
-        {/* Trainer Info */}
-        <div className="flex items-center space-x-3 mb-4">
-          <div className="w-12 h-12 bg-[#2d3448] rounded-full flex items-center justify-center">
-            <span className="text-white font-semibold">М</span>
-          </div>
-          <div className="flex-1">
-            <h3 className="font-semibold text-white">Марк Петров</h3>
-            <p className="text-sm text-[#8892b0]">Сертифицированный тренер</p>
-          </div>
-          <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
-            Подписаться
-          </button>
-        </div>
+      {videoId !== 'onboarding' && (
+        <>
+          {/* Video Info */}
+          <div className="p-4 bg-[#1a1f3a] border-b border-[#2d3448]">
+            <h2 className="text-xl font-bold text-white mb-2">
+              {videoId === 'onboarding' ? 'Онбординг в тренажерный зал' : 'Видео тренировка'}
+            </h2>
+            <p className="text-[#ccd6f6] text-sm mb-4">
+              {videoId === 'onboarding' 
+                ? 'Первые шаги в тренажерном зале - как начать тренироваться правильно и безопасно'
+                : 'Описание видео тренировки'
+              }
+            </p>
 
-        {/* Action Buttons */}
-        <div className="flex items-center justify-between mb-6">
-          <button
-            onClick={toggleLike}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
-              isLiked ? 'bg-red-600/20 text-red-400 border border-red-600/30' : 'bg-[#2d3448] text-[#ccd6f6] border border-[#3d4759]'
-            }`}
-          >
-            <Heart size={20} className={isLiked ? 'fill-current' : ''} />
-            <span className="text-sm font-medium">125</span>
-          </button>
-          
-          <button
-            onClick={() => setShowComments(!showComments)}
-            className="flex items-center space-x-2 px-4 py-2 bg-[#2d3448] text-[#ccd6f6] rounded-lg border border-[#3d4759]"
-          >
-            <MessageCircle size={20} />
-            <span className="text-sm font-medium">28</span>
-          </button>
-          
-          <button className="flex items-center space-x-2 px-4 py-2 bg-[#2d3448] text-[#ccd6f6] rounded-lg border border-[#3d4759]">
-            <Share size={20} />
-            <span className="text-sm font-medium">Поделиться</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Comments Section */}
-      {showComments && (
-        <div className="bg-[#1a1f3a] border-t border-[#2d3448]">
-          <div className="p-4 border-b border-[#2d3448]">
-            <h3 className="font-semibold text-white mb-4">Комментарии</h3>
-            
-            {/* Comment Input */}
-            <div className="flex space-x-3 mb-4">
-              <div className="w-8 h-8 bg-[#2d3448] rounded-full flex items-center justify-center">
-                <span className="text-white text-sm font-semibold">А</span>
+            {/* Trainer Info */}
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-12 h-12 bg-[#2d3448] rounded-full flex items-center justify-center">
+                <span className="text-white font-semibold">М</span>
               </div>
               <div className="flex-1">
-                <input
-                  type="text"
-                  placeholder="Добавить комментарий..."
-                  className="w-full p-3 border border-[#3d4759] rounded-lg bg-[#2d3448] text-white placeholder-[#8892b0] focus:outline-none focus:ring-2 focus:ring-blue-600"
-                />
+                <h3 className="font-semibold text-white">Марк Петров</h3>
+                <p className="text-sm text-[#8892b0]">Сертифицированный тренер</p>
               </div>
+              <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
+                Подписаться
+              </button>
             </div>
 
-            {/* Comments List */}
-            <div className="space-y-4">
-              <div className="flex space-x-3">
-                <div className="w-8 h-8 bg-[#2d3448] rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-semibold">И</span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <span className="font-medium text-white text-sm">Иван Смирнов</span>
-                    <span className="text-[#8892b0] text-xs">2 часа назад</span>
-                  </div>
-                  <p className="text-[#ccd6f6] text-sm">Отличное видео! Очень помогло разобраться с техникой упражнений.</p>
-                  <button className="text-blue-400 text-xs mt-1">Ответить</button>
-                </div>
-              </div>
-
-              <div className="flex space-x-3">
-                <div className="w-8 h-8 bg-[#2d3448] rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-semibold">Е</span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <span className="font-medium text-white text-sm">Елена Кузнецова</span>
-                    <span className="text-[#8892b0] text-xs">4 часа назад</span>
-                  </div>
-                  <p className="text-[#ccd6f6] text-sm">Спасибо за подробное объяснение! Теперь не боюсь идти в зал.</p>
-                  <button className="text-blue-400 text-xs mt-1">Ответить</button>
-                </div>
-              </div>
-
-              <div className="flex space-x-3">
-                <div className="w-8 h-8 bg-[#2d3448] rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-semibold">Д</span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <span className="font-medium text-white text-sm">Дмитрий Волков</span>
-                    <span className="text-[#8892b0] text-xs">1 день назад</span>
-                  </div>
-                  <p className="text-[#ccd6f6] text-sm">Когда следующее видео? Жду продолжения серии!</p>
-                  <button className="text-blue-400 text-xs mt-1">Ответить</button>
-                </div>
-              </div>
+            {/* Action Buttons */}
+            <div className="flex items-center justify-between mb-6">
+              <button
+                onClick={toggleLike}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
+                  isLiked ? 'bg-red-600/20 text-red-400 border border-red-600/30' : 'bg-[#2d3448] text-[#ccd6f6] border border-[#3d4759]'
+                }`}
+              >
+                <Heart size={20} className={isLiked ? 'fill-current' : ''} />
+                <span className="text-sm font-medium">125</span>
+              </button>
+              
+              <button
+                onClick={() => setShowComments(!showComments)}
+                className="flex items-center space-x-2 px-4 py-2 bg-[#2d3448] text-[#ccd6f6] rounded-lg border border-[#3d4759]"
+              >
+                <MessageCircle size={20} />
+                <span className="text-sm font-medium">28</span>
+              </button>
+              
+              <button className="flex items-center space-x-2 px-4 py-2 bg-[#2d3448] text-[#ccd6f6] rounded-lg border border-[#3d4759]">
+                <Share size={20} />
+                <span className="text-sm font-medium">Поделиться</span>
+              </button>
             </div>
-
-            {/* Load More Comments */}
-            <button className="w-full mt-4 py-2 text-blue-400 text-sm font-medium">
-              Показать еще комментарии
-            </button>
           </div>
-        </div>
+
+          {/* Comments Section */}
+          {showComments && (
+            <div className="bg-[#1a1f3a] border-t border-[#2d3448]">
+              <div className="p-4 border-b border-[#2d3448]">
+                <h3 className="font-semibold text-white mb-4">Комментарии</h3>
+                
+                {/* Comment Input */}
+                <div className="flex space-x-3 mb-4">
+                  <div className="w-8 h-8 bg-[#2d3448] rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm font-semibold">А</span>
+                  </div>
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      placeholder="Добавить комментарий..."
+                      className="w-full p-3 border border-[#3d4759] rounded-lg bg-[#2d3448] text-white placeholder-[#8892b0] focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    />
+                  </div>
+                </div>
+
+                {/* Comments List */}
+                <div className="space-y-4">
+                  <div className="flex space-x-3">
+                    <div className="w-8 h-8 bg-[#2d3448] rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm font-semibold">И</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <span className="font-medium text-white text-sm">Иван Смирнов</span>
+                        <span className="text-[#8892b0] text-xs">2 часа назад</span>
+                      </div>
+                      <p className="text-[#ccd6f6] text-sm">Отличное видео! Очень помогло разобраться с техникой упражнений.</p>
+                      <button className="text-blue-400 text-xs mt-1">Ответить</button>
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-3">
+                    <div className="w-8 h-8 bg-[#2d3448] rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm font-semibold">Е</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <span className="font-medium text-white text-sm">Елена Кузнецова</span>
+                        <span className="text-[#8892b0] text-xs">4 часа назад</span>
+                      </div>
+                      <p className="text-[#ccd6f6] text-sm">Спасибо за подробное объяснение! Теперь не боюсь идти в зал.</p>
+                      <button className="text-blue-400 text-xs mt-1">Ответить</button>
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-3">
+                    <div className="w-8 h-8 bg-[#2d3448] rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm font-semibold">Д</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <span className="font-medium text-white text-sm">Дмитрий Волков</span>
+                        <span className="text-[#8892b0] text-xs">1 день назад</span>
+                      </div>
+                      <p className="text-[#ccd6f6] text-sm">Когда следующее видео? Жду продолжения серии!</p>
+                      <button className="text-blue-400 text-xs mt-1">Ответить</button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Load More Comments */}
+                <button className="w-full mt-4 py-2 text-blue-400 text-sm font-medium">
+                  Показать еще комментарии
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
+      
+      <BottomNavigation activeTab="video" />
     </div>
   );
 }

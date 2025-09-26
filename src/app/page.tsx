@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useTelegram } from '../hooks/useTelegram';
 import { apiCache } from '../lib/cache';
+import BottomNavigation from '@/components/BottomNavigation';
 
 // Компонент для короткого видео
 const ShortVideoPlayer = ({ index, poster }: { index: number; poster: string }) => {
@@ -50,7 +51,7 @@ const HomePage = () => {
       <PromoBannerSection />
       
       {/* Нижнее меню */}
-      <BottomNavigation />
+      <BottomNavigation activeTab="home" />
     </div>
   );
 };
@@ -725,32 +726,6 @@ const PromoBannerSection = () => (
             </div>
         </div>
     </section>
-);
-
-const BottomNavigation = () => (
-    <nav className="fixed bottom-0 left-0 right-0 bg-[#101530] border-t border-[#2d3448] px-4 py-3 z-50">
-        <div className="flex justify-around items-center max-w-md mx-auto">
-            <button className="flex items-center justify-center p-2">
-                <Image src="/icons/tapbar/icon-type-home-active-yes.svg" alt="Главная" width={28} height={28} />
-            </button>
-            
-            <button className="flex items-center justify-center p-2">
-                <Image src="/icons/tapbar/icon-type-play-active-no.svg" alt="Видео" width={28} height={28} />
-            </button>
-            
-            <button className="flex items-center justify-center p-2">
-                <Image src="/icons/tapbar/icon-type-hockey-active-no.svg" alt="Треньки" width={28} height={28} />
-            </button>
-            
-            <button className="flex items-center justify-center p-2">
-                <Image src="/icons/tapbar/icon-type-calendar-active-no.svg" alt="Расписание" width={28} height={28} />
-            </button>
-            
-            <Link href="/profile" className="flex items-center justify-center p-2">
-                <Image src="/icons/tapbar/icon-type-hockey-mask-active-no.svg" alt="Профиль" width={28} height={28} />
-            </Link>
-        </div>
-    </nav>
 );
 
 
