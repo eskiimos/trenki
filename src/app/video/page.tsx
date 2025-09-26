@@ -113,11 +113,6 @@ const VideoPage = () => {
                 
                 {/* Video Info */}
                 <div className="flex-1 flex flex-col justify-center">
-                  {/* Title */}
-                  <h3 className="text-white text-base font-medium mb-3 leading-tight">
-                    {video.title}
-                  </h3>
-                  
                   {/* Tags */}
                   <div className="flex flex-wrap gap-2">
                     {video.tags.map((tag, index) => (

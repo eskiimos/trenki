@@ -289,7 +289,7 @@ const Header = () => {
       </div>
       
       {/* Показываем потенциал только если профиль заполнен */}
-      {userProfile && (
+      {false && userProfile && (
         <div style={{
           width: '100%', 
           justifyContent: 'flex-start', 
