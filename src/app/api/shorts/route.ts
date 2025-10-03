@@ -14,7 +14,26 @@ export async function GET(request: NextRequest) {
       ]
     });
 
-    return NextResponse.json({ shorts });
+    // Загружаем данные тренеров для shorts, у которых есть trainerId
+    const shortsWithTrainers = await Promise.all(
+      shorts.map(async (short) => {
+        if (short.trainerId) {
+          const trainer = await prisma.trainer.findUnique({
+            where: { id: short.trainerId },
+            select: {
+              id: true,
+              name: true,
+              lastName: true,
+              avatar: true,
+            }
+          });
+          return { ...short, trainer };
+        }
+        return { ...short, trainer: null };
+      })
+    );
+
+    return NextResponse.json({ shorts: shortsWithTrainers });
   } catch (error) {
     console.error('Error fetching shorts:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

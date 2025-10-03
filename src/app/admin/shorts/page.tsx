@@ -18,8 +18,16 @@ interface Short {
   createdAt: string;
 }
 
+interface Trainer {
+  id: string;
+  name: string;
+  lastName: string;
+  avatar: string | null;
+}
+
 export default function AdminShortsPage() {
   const [shorts, setShorts] = useState<Short[]>([]);
+  const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingShortId, setEditingShortId] = useState<string | null>(null);
   
@@ -28,12 +36,14 @@ export default function AdminShortsPage() {
   const [description, setDescription] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
   const [thumbnail, setThumbnail] = useState('');
+  const [trainerId, setTrainerId] = useState<string>('');
   const [tags, setTags] = useState<string[]>([]);
   const [order, setOrder] = useState(0);
   const [isPublished, setIsPublished] = useState(true);
 
   useEffect(() => {
     fetchShorts();
+    fetchTrainers();
   }, []);
 
   const fetchShorts = async () => {
@@ -48,6 +58,16 @@ export default function AdminShortsPage() {
     }
   };
 
+  const fetchTrainers = async () => {
+    try {
+      const response = await fetch('/api/trainers');
+      const data = await response.json();
+      setTrainers(data.trainers || []);
+    } catch (error) {
+      console.error('Error loading trainers:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -56,6 +76,7 @@ export default function AdminShortsPage() {
       description,
       videoUrl,
       thumbnail,
+      trainerId: trainerId || null,
       tags,
       order,
       isPublished,
@@ -91,6 +112,7 @@ export default function AdminShortsPage() {
     setDescription(short.description || '');
     setVideoUrl(short.videoUrl);
     setThumbnail(short.thumbnail || '');
+    setTrainerId(short.trainerId || '');
     setTags(short.tags);
     setOrder(short.order);
     setIsPublished(short.isPublished);
@@ -118,6 +140,7 @@ export default function AdminShortsPage() {
     setDescription('');
     setVideoUrl('');
     setThumbnail('');
+    setTrainerId('');
     setTags([]);
     setOrder(0);
     setIsPublished(true);
@@ -214,6 +237,23 @@ export default function AdminShortsPage() {
                 className="w-full px-4 py-2 bg-[#2d3448] border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 rows={3}
               />
+            </div>
+
+            {/* Тренер */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Тренер</label>
+              <select
+                value={trainerId}
+                onChange={(e) => setTrainerId(e.target.value)}
+                className="w-full px-4 py-2 bg-[#2d3448] border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Не выбран</option>
+                {trainers.map((trainer) => (
+                  <option key={trainer.id} value={trainer.id}>
+                    {trainer.name} {trainer.lastName}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* URL видео */}

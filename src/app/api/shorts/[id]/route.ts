@@ -17,7 +17,26 @@ export async function GET(
       return NextResponse.json({ error: 'Short not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ short });
+    // Если есть trainerId, загружаем данные тренера
+    let trainer = null;
+    if (short.trainerId) {
+      trainer = await prisma.trainer.findUnique({
+        where: { id: short.trainerId },
+        select: {
+          id: true,
+          name: true,
+          lastName: true,
+          avatar: true,
+        }
+      });
+    }
+
+    return NextResponse.json({ 
+      short: {
+        ...short,
+        trainer
+      }
+    });
   } catch (error) {
     console.error('Error fetching short:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
