@@ -14,6 +14,27 @@ interface VideoPageProps {
   }>;
 }
 
+interface VideoData {
+  id: string;
+  title: string;
+  description: string;
+  videoUrl: string;
+  thumbnail: string;
+  duration: number;
+  trainer: {
+    id: string;
+    name: string;
+    lastName: string;
+    speciality: string;
+    avatar: string | null;
+  };
+  tags: string[];
+  equipment: string[];
+  category: string;
+  difficulty: string;
+  level: string;
+}
+
 export default function VideoPage({ params }: VideoPageProps) {
   const router = useRouter();
   const [isPlaying, setIsPlaying] = useState(true);
@@ -24,12 +45,29 @@ export default function VideoPage({ params }: VideoPageProps) {
   // const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(true);
   const [videoId, setVideoId] = useState<string>('');
+  const [videoData, setVideoData] = useState<VideoData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Получаем params асинхронно
+  // Получаем params асинхронно и загружаем данные видео
   useEffect(() => {
     const getParams = async () => {
       const resolvedParams = await params;
       setVideoId(resolvedParams.id);
+      
+      // Загружаем данные видео
+      try {
+        setIsLoading(true);
+        const response = await fetch('/api/videos');
+        const data = await response.json();
+        const video = data.videos.find((v: VideoData) => v.id === resolvedParams.id);
+        if (video) {
+          setVideoData(video);
+        }
+      } catch (error) {
+        console.error('Error loading video:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
     getParams();
   }, [params]);
@@ -165,190 +203,92 @@ export default function VideoPage({ params }: VideoPageProps) {
           onMouseMove={handleVideoInteraction}
           onTouchStart={handleVideoInteraction}
         >
-          <video
-            ref={videoRef}
-            className="w-full h-full object-cover"
-            src="/video/trenka.mp4"
-            autoPlay
-            muted
-            playsInline
-            onClick={togglePlay}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
-          />
+          {isLoading ? (
+            <div className="w-full h-full flex items-center justify-center bg-black">
+              <div className="text-white">Загрузка...</div>
+            </div>
+          ) : videoData?.videoUrl?.includes('kinescope.io') ? (
+            // Используем iframe для Kinescope
+            <iframe
+              src={videoData.videoUrl}
+              className="w-full h-full"
+              allow="autoplay; fullscreen; picture-in-picture; encrypted-media; gyroscope; accelerometer; clipboard-write;"
+              frameBorder="0"
+              allowFullScreen
+            />
+          ) : (
+            // Обычный video тег для локальных файлов или прямых ссылок
+            <>
+              <video
+                ref={videoRef}
+                className="w-full h-full object-cover"
+                src={videoData?.videoUrl || '/video/trenka.mp4'}
+                autoPlay
+                muted
+                playsInline
+                onClick={togglePlay}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+              />
+              
+              {/* Play/Pause Overlay - только для обычного video */}
+              <div className={`absolute inset-0 bg-gradient-to-b from-transparent to-black/50 flex items-center justify-center transition-opacity duration-300 ${
+                showControls ? 'opacity-100' : 'opacity-0'
+              }`}>
+                <button
+                  onClick={togglePlay}
+                  className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
+                >
+                  {isPlaying ? (
+                    <Pause size={32} className="text-white" />
+                  ) : (
+                    <Play size={32} className="text-white ml-1" />
+                  )}
+                </button>
+              </div>
+            </>
+          )}
           
-          {/* Play/Pause Overlay */}
-          <div className={`absolute inset-0 bg-gradient-to-b from-transparent to-black/50 flex items-center justify-center transition-opacity duration-300 ${
-            showControls ? 'opacity-100' : 'opacity-0'
-          }`}>
-            <button
-              onClick={togglePlay}
-              className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
-            >
-              {isPlaying ? (
-                <Pause size={32} className="text-white" />
-              ) : (
-                <Play size={32} className="text-white ml-1" />
-              )}
-            </button>
-          </div>
-          
-          {/* Video Controls */}
-          <div className={`absolute bottom-4 left-4 right-4 transition-opacity duration-300 ${
-            showControls ? 'opacity-100' : 'opacity-0'
-          }`}>
-            <div className="flex items-center space-x-4">
-              <div 
-                className="flex-1 h-1 bg-white/30 rounded-full cursor-pointer"
-                onClick={handleSeek}
-              >
+          {/* Video Controls - только для обычного video, не для Kinescope */}
+          {!videoData?.videoUrl?.includes('kinescope.io') && (
+            <div className={`absolute bottom-4 left-4 right-4 transition-opacity duration-300 ${
+              showControls ? 'opacity-100' : 'opacity-0'
+            }`}>
+              <div className="flex items-center space-x-4">
                 <div 
-                  className="h-full bg-white rounded-full transition-all"
-                  style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
-                ></div>
-              </div>
-              <span className="text-white text-sm">
-                {formatTime(currentTime)} / {formatTime(duration)}
-              </span>
-              <button onClick={toggleMute} className="text-white">
-                {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <TagsSection />
-
-      {videoId !== 'onboarding' && (
-        <>
-          {/* Video Info */}
-          <div className="p-4 bg-[#1a1f3a] border-b border-[#2d3448]">
-            <h2 className="text-xl font-bold text-white mb-2">
-              {videoId === 'onboarding' ? 'Онбординг в тренажерный зал' : 'Видео тренировка'}
-            </h2>
-            <p className="text-[#ccd6f6] text-sm mb-4">
-              {videoId === 'onboarding' 
-                ? 'Первые шаги в тренажерном зале - как начать тренироваться правильно и безопасно'
-                : 'Описание видео тренировки'
-              }
-            </p>
-
-            {/* Trainer Info */}
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-12 h-12 bg-[#2d3448] rounded-full flex items-center justify-center">
-                <span className="text-white font-semibold">М</span>
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-white">Марк Петров</h3>
-                <p className="text-sm text-[#8892b0]">Сертифицированный тренер</p>
-              </div>
-              <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">
-                Подписаться
-              </button>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center justify-between mb-6">
-              <button
-                onClick={toggleLike}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
-                  isLiked ? 'bg-red-600/20 text-red-400 border border-red-600/30' : 'bg-[#2d3448] text-[#ccd6f6] border border-[#3d4759]'
-                }`}
-              >
-                <Heart size={20} className={isLiked ? 'fill-current' : ''} />
-                <span className="text-sm font-medium">125</span>
-              </button>
-              
-              <button
-                onClick={() => setShowComments(!showComments)}
-                className="flex items-center space-x-2 px-4 py-2 bg-[#2d3448] text-[#ccd6f6] rounded-lg border border-[#3d4759]"
-              >
-                <MessageCircle size={20} />
-                <span className="text-sm font-medium">28</span>
-              </button>
-              
-              <button className="flex items-center space-x-2 px-4 py-2 bg-[#2d3448] text-[#ccd6f6] rounded-lg border border-[#3d4759]">
-                <Share size={20} />
-                <span className="text-sm font-medium">Поделиться</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Comments Section */}
-          {showComments && (
-            <div className="bg-[#1a1f3a] border-t border-[#2d3448]">
-              <div className="p-4 border-b border-[#2d3448]">
-                <h3 className="font-semibold text-white mb-4">Комментарии</h3>
-                
-                {/* Comment Input */}
-                <div className="flex space-x-3 mb-4">
-                  <div className="w-8 h-8 bg-[#2d3448] rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm font-semibold">А</span>
-                  </div>
-                  <div className="flex-1">
-                    <input
-                      type="text"
-                      placeholder="Добавить комментарий..."
-                      className="w-full p-3 border border-[#3d4759] rounded-lg bg-[#2d3448] text-white placeholder-[#8892b0] focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    />
-                  </div>
+                  className="flex-1 h-1 bg-white/30 rounded-full cursor-pointer"
+                  onClick={handleSeek}
+                >
+                  <div 
+                    className="h-full bg-white rounded-full transition-all"
+                    style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+                  ></div>
                 </div>
-
-                {/* Comments List */}
-                <div className="space-y-4">
-                  <div className="flex space-x-3">
-                    <div className="w-8 h-8 bg-[#2d3448] rounded-full flex items-center justify-center">
-                      <span className="text-white text-sm font-semibold">И</span>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <span className="font-medium text-white text-sm">Иван Смирнов</span>
-                        <span className="text-[#8892b0] text-xs">2 часа назад</span>
-                      </div>
-                      <p className="text-[#ccd6f6] text-sm">Отличное видео! Очень помогло разобраться с техникой упражнений.</p>
-                      <button className="text-blue-400 text-xs mt-1">Ответить</button>
-                    </div>
-                  </div>
-
-                  <div className="flex space-x-3">
-                    <div className="w-8 h-8 bg-[#2d3448] rounded-full flex items-center justify-center">
-                      <span className="text-white text-sm font-semibold">Е</span>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <span className="font-medium text-white text-sm">Елена Кузнецова</span>
-                        <span className="text-[#8892b0] text-xs">4 часа назад</span>
-                      </div>
-                      <p className="text-[#ccd6f6] text-sm">Спасибо за подробное объяснение! Теперь не боюсь идти в зал.</p>
-                      <button className="text-blue-400 text-xs mt-1">Ответить</button>
-                    </div>
-                  </div>
-
-                  <div className="flex space-x-3">
-                    <div className="w-8 h-8 bg-[#2d3448] rounded-full flex items-center justify-center">
-                      <span className="text-white text-sm font-semibold">Д</span>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <span className="font-medium text-white text-sm">Дмитрий Волков</span>
-                        <span className="text-[#8892b0] text-xs">1 день назад</span>
-                      </div>
-                      <p className="text-[#ccd6f6] text-sm">Когда следующее видео? Жду продолжения серии!</p>
-                      <button className="text-blue-400 text-xs mt-1">Ответить</button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Load More Comments */}
-                <button className="w-full mt-4 py-2 text-blue-400 text-sm font-medium">
-                  Показать еще комментарии
+                <span className="text-white text-sm">
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </span>
+                <button onClick={toggleMute} className="text-white">
+                  {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
                 </button>
               </div>
             </div>
           )}
-        </>
-      )}
+        </div>
+      </div>
+
+      <TagsSection 
+        tags={videoData?.tags}
+        equipment={videoData?.equipment}
+        category={videoData?.category}
+        difficulty={videoData?.difficulty}
+        level={videoData?.level}
+        description={videoData?.description}
+        trainer={videoData?.trainer ? {
+          name: videoData.trainer.name,
+          lastName: videoData.trainer.lastName,
+          avatar: videoData.trainer.avatar
+        } : null}
+      />
       
       <BottomNavigation activeTab="video" />
     </div>

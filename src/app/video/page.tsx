@@ -1,56 +1,80 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import BottomNavigation from '@/components/BottomNavigation';
 
+interface Video {
+  id: string;
+  title: string;
+  description?: string;
+  duration: string;
+  videoUrl: string;
+  thumbnail?: string;
+  category: string;
+  difficulty: string;
+  tags: string[];
+  equipment: string[];
+  level?: string;
+  viewsCount: number;
+  trainer: {
+    id: string;
+    name: string;
+    lastName: string;
+    avatar?: string;
+    speciality: string;
+  };
+  createdAt: string;
+}
+
 const VideoPage = () => {
   const [activeFilter, setActiveFilter] = useState('all');
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Временные данные для видео
-  const videos = [
-    {
-      id: 1,
-      title: 'Основы техники катания',
-      duration: '8:44',
-      thumbnail: '/images/video_prew_2.png',
-      category: 'technique',
-      tags: ['Тип тренировки', 'Оборудование', 'Уровень', 'Тренер']
-    },
-    {
-      id: 2,
-      title: 'Тренировка вратаря',
-      duration: '8:44',
-      thumbnail: '/images/video_prew_2.png', 
-      category: 'goalkeeper',
-      tags: ['Тип тренировки', 'Оборудование', 'Уровень', 'Тренер']
-    },
-    {
-      id: 'onboarding',
-      title: 'Онбординг в тренажерный зал',
-      duration: '8:44',
-      thumbnail: '/images/video_prew_2.png',
-      category: 'training',
-      tags: ['Тип тренировки', 'Оборудование', 'Уровень', 'Тренер']
+  // Загружаем видео при монтировании компонента
+  useEffect(() => {
+    fetchVideos();
+  }, []);
+
+  const fetchVideos = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/videos');
+      const data = await response.json();
+      setVideos(data.videos || []);
+    } catch (error) {
+      console.error('Error fetching videos:', error);
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
 
   const filters = [
     { id: 'all', label: 'Все видео' },
-    { id: 'technique', label: 'Техника' },
-    { id: 'training', label: 'Тренировки' },
-    { id: 'goalkeeper', label: 'Вратарь' },
-    { id: 'fitness', label: 'Фитнес' },
-    { id: 'beginner', label: 'Новичок' },
-    { id: 'advanced', label: 'Продвинутый' },
-    { id: 'cardio', label: 'Кардио' },
-    { id: 'strength', label: 'Силовая' }
+    { id: 'SKATING', label: 'Катание' },
+    { id: 'TECHNIQUE', label: 'Техника' },
+    { id: 'SHOOTING', label: 'Броски' },
+    { id: 'PASSING', label: 'Пас' },
+    { id: 'GOALKEEPER', label: 'Вратарь' },
+    { id: 'STRENGTH', label: 'Сила' },
+    { id: 'ENDURANCE', label: 'Выносливость' },
+    { id: 'SPEED', label: 'Скорость' },
+    { id: 'TACTICAL', label: 'Тактика' }
   ];
 
   const filteredVideos = activeFilter === 'all' 
     ? videos 
     : videos.filter(video => video.category === activeFilter);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#101530] pb-20 flex items-center justify-center">
+        <div className="text-white">Загрузка...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#101530] pb-20">
@@ -94,25 +118,44 @@ const VideoPage = () => {
 
       {/* Video Grid */}
       <div className="p-4">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          {filteredVideos.map((video) => (
-            <Link key={video.id} href={`/video/${video.id}`}>
+        {filteredVideos.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-400 text-lg">Видео не найдены</p>
+            <p className="text-gray-500 text-sm mt-2">Попробуйте выбрать другой фильтр</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            {filteredVideos.map((video) => (
+              <Link key={video.id} href={`/video/${video.id}`}>
               <div className="flex gap-4">
                 {/* Video Thumbnail */}
                 <div className="relative flex-shrink-0 border border-gray-600 border-opacity-30 rounded-lg overflow-hidden" style={{ width: '190px', height: '107px' }}>
                   <Image
-                    src={video.thumbnail}
+                    src={(video.thumbnail && video.thumbnail.trim() !== '') ? video.thumbnail : '/images/video_prew_2.png'}
                     alt={video.title}
                     fill
                     className="object-cover"
                   />
-                  <div className="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                  <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
                     {video.duration}
                   </div>
                 </div>
                 
                 {/* Video Info */}
                 <div className="flex-1 flex flex-col justify-center">
+                  {/* Trainer Name with Avatar */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <Image
+                      src={video.trainer.avatar || '/images/avatars/trainer-avatar-1.png'}
+                      alt={`${video.trainer.name} ${video.trainer.lastName}`}
+                      width={24}
+                      height={24}
+                      className="rounded-full"
+                    />
+                    <div className="text-white font-semibold truncate max-w-[150px]" style={{ fontSize: '12px' }}>
+                      {video.trainer.name} {video.trainer.lastName}
+                    </div>
+                  </div>
                   {/* Tags */}
                   <div className="flex flex-wrap gap-2">
                     {video.tags.map((tag, index) => (
@@ -129,7 +172,8 @@ const VideoPage = () => {
               </div>
             </Link>
           ))}
-        </div>
+          </div>
+        )}
       </div>
 
       <BottomNavigation activeTab="video" />

@@ -167,9 +167,16 @@ const Header = () => {
     };
   }, [user?.id]); // Зависимость только от ID пользователя
 
-  // Показываем только имя из Telegram при первом запуске
-  const displayName = user?.first_name || 'Игрок';
-  const displayLastName = user?.last_name || '';
+  // Логика отображения имени:
+  // - Если профиль заполнен (есть firstName и lastName) - показываем из профиля
+  // - Иначе показываем данные из Telegram
+  const displayName = (userProfile?.firstName) 
+    ? userProfile.firstName 
+    : (user?.first_name || 'Игрок');
+  
+  const displayLastName = (userProfile?.lastName) 
+    ? userProfile.lastName 
+    : (user?.last_name || '');
 
   return (
     <header style={{
@@ -351,16 +358,53 @@ const HeroVideoSection = () => (
   </section>
 );
 
-const TrenkiSection = () => (
-  <section style={{ paddingTop: '15px', paddingBottom: '15px' }}>
-    <div className="flex space-x-4 overflow-x-auto pb-4 px-4">
-      <ShortVideoPlayer index={0} poster="/images/preview_shorts/shorts_1.png" />
-      <ShortVideoPlayer index={1} poster="/images/preview_shorts/shorts_2.png" />
-      <ShortVideoPlayer index={2} poster="/images/preview_shorts/shorts_3.png" />
-      <ShortVideoPlayer index={3} poster="/images/preview_shorts/shorts_4.png" />
-    </div>
-  </section>
-);
+const TrenkiSection = () => {
+  const [shorts, setShorts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchShorts = async () => {
+      try {
+        const response = await fetch('/api/shorts');
+        const data = await response.json();
+        setShorts(data.shorts || []);
+      } catch (error) {
+        console.error('Error loading shorts:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchShorts();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <section style={{ paddingTop: '15px', paddingBottom: '15px' }}>
+        <div className="flex space-x-4 overflow-x-auto pb-4 px-4">
+          <div className="text-white text-sm">Загрузка...</div>
+        </div>
+      </section>
+    );
+  }
+
+  if (shorts.length === 0) {
+    return null; // Не показываем секцию если нет shorts
+  }
+
+  return (
+    <section style={{ paddingTop: '15px', paddingBottom: '15px' }}>
+      <div className="flex space-x-4 overflow-x-auto pb-4 px-4">
+        {shorts.map((short, index) => (
+          <ShortVideoPlayer 
+            key={short.id} 
+            index={index} 
+            poster={short.thumbnail || '/images/preview_shorts/shorts_1.png'} 
+          />
+        ))}
+      </div>
+    </section>
+  );
+};
 
 const TrainingsSection = () => (
     <section className="px-4" style={{ paddingBottom: '15px' }}>

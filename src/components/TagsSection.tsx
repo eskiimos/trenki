@@ -13,45 +13,82 @@ const Tag: React.FC<TagProps> = ({ text }) => {
   );
 };
 
-const TagsSection = () => {
-  const tags = [
-    'Тип тренировки',
-    'Оборудование',
-    'Уровень',
-    '+15 к потенциалу',
-    '+15 к потенциалу',
-    'Тренер',
-    'И все такое',
-  ];
+interface TagsSectionProps {
+  tags?: string[];
+  equipment?: string[];
+  category?: string;
+  difficulty?: string;
+  level?: string;
+  description?: string;
+  trainer?: {
+    name: string;
+    lastName: string;
+    avatar: string | null;
+  } | null;
+}
+
+const TagsSection: React.FC<TagsSectionProps> = ({ 
+  tags = [], 
+  equipment = [], 
+  category, 
+  difficulty, 
+  level,
+  description,
+  trainer 
+}) => {
+  // Собираем все теги в один массив
+  const allTags = [
+    ...(category ? [category] : []),
+    ...(difficulty ? [difficulty] : []),
+    ...(level ? [level] : []),
+    ...tags,
+    ...equipment,
+  ].filter(Boolean);
 
   return (
     <div className="p-4 bg-[#101530]">
-      <div className="flex flex-wrap gap-2 mb-4">
-        {tags.map((tag, index) => (
-          <Tag key={index} text={tag} />
-        ))}
-      </div>
+      {allTags.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {allTags.map((tag, index) => (
+            <Tag key={index} text={tag} />
+          ))}
+        </div>
+      )}
       
       {/* Trainer Info */}
-      <div className="flex items-center space-x-3 mb-4">
-        <Image 
-          src="/images/avatars/trainer-avatar-1.png" 
-          alt="Тренер" 
-          width={32} 
-          height={32}
-          className="rounded-full"
-        />
-        <div>
-          <p className="text-white text-sm font-medium">Марк Петров</p>
+      {trainer && (
+        <div className="flex items-center space-x-3 mb-4">
+          <div className="w-8 h-8 rounded-full overflow-hidden bg-[#2d3448] flex items-center justify-center">
+            {trainer.avatar ? (
+              <Image 
+                src={trainer.avatar} 
+                alt={trainer.name} 
+                width={32} 
+                height={32}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-white text-sm font-semibold">
+                {trainer.name.charAt(0)}
+              </span>
+            )}
+          </div>
+          <div>
+            <p className="text-white text-sm font-medium">
+              {trainer.name} {trainer.lastName}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
       
-      {/* Disclaimer */}
-      <div className="mt-4">
-        <p className="text-[#AEABBB] text-xs leading-relaxed">
-          Внимание! Все видео созданы для самостоятельных занятий, и автор контента не несёт ответственности за качество выполнения упражнений занимающимися. Занятия подходят для здоровых людей. Поэтому прислушивайтесь к своим ощущениям, и если вы не уверены в состоянии своего здоровья и возможности выполнения представленных упражнений и асан, то обратитесь ко врачу. Если во время практики почувствуете негативные ощущения, прекратите занятия и также посетите врача. Надеюсь, мои занятия принесут вам только пользу и положительные эмоции. Будьте здоровы и приятных занятий!
-        </p>
-      </div>
+      {/* Description */}
+      {description && (
+        <div className="mt-4">
+          <p className="text-[#AEABBB] text-xs leading-relaxed">
+            {description}
+          </p>
+        </div>
+      )}
     </div>
   );
 };

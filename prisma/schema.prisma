@@ -69,12 +69,17 @@ model Video {
   id          String            @id @default(cuid())
   title       String
   description String?
-  duration    Int
-  videoUrl    String
-  thumbnail   String?
+  duration    Int               // продолжительность в секундах
+  videoUrl    String            // URL видео со стороннего сервиса (например, YouTube, Vimeo, или CDN)
+  thumbnail   String?           // URL превью изображения
   category    VideoCategory
   difficulty  VideoDifficulty
   trainerId   String
+  tags        String[]          // массив тегов для фильтрации
+  equipment   String[]          // необходимое оборудование
+  level       String?           // уровень подготовки
+  isPublished Boolean           @default(false) // опубликовано ли видео
+  viewsCount  Int               @default(0)     // количество просмотров
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   favorites   FavoriteVideo[]
@@ -108,6 +113,23 @@ model FavoriteVideo {
 
   @@unique([userId, videoId])
   @@map("favorite_videos")
+}
+
+model Short {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  videoUrl    String   // URL короткого видео
+  thumbnail   String?  // URL превью изображения
+  trainerId   String?  // опционально - может быть без тренера
+  tags        String[] // массив тегов
+  isPublished Boolean  @default(false)
+  viewsCount  Int      @default(0)
+  order       Int      @default(0) // порядок отображения
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("shorts")
 }
 
 enum VideoCategory {
