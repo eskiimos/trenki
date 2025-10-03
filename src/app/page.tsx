@@ -50,6 +50,15 @@ const HomePage = () => {
       {/* Промо-баннер */}
       <PromoBannerSection />
       
+      {/* Кнопка админки */}
+      <div className="px-4 pb-8">
+        <Link href="/admin">
+          <button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl">
+            🔧 Админка
+          </button>
+        </Link>
+      </div>
+      
       {/* Нижнее меню */}
       <BottomNavigation activeTab="home" />
     </div>
