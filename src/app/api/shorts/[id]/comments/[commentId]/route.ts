@@ -9,10 +9,19 @@ export async function DELETE(
   try {
     const { commentId } = await context.params;
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    const telegramId = searchParams.get('userId');
 
-    if (!userId) {
+    if (!telegramId) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    }
+
+    // Находим пользователя по telegramId
+    const user = await prisma.user.findUnique({
+      where: { telegramId }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     // Проверяем, что комментарий принадлежит пользователю
@@ -24,7 +33,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
     }
 
-    if (comment.userId !== userId) {
+    if (comment.userId !== user.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 

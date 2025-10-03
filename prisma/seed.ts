@@ -118,9 +118,15 @@ async function main() {
     ]
   });
 
-  // Создаем тестового хоккеиста
-  const testUser = await prisma.user.create({
-    data: {
+  // Создаем тестового хоккеиста (с учетом того что может уже существовать)
+  const testUserData = await prisma.user.upsert({
+    where: { telegramId: '123456789' },
+    update: {
+      firstName: 'Константин',
+      lastName: 'Константинопольский',
+      username: 'goalie_88',
+    },
+    create: {
       telegramId: '123456789',
       firstName: 'Константин',
       lastName: 'Константинопольский',

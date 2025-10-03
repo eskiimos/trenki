@@ -15,6 +15,7 @@ export async function GET(
         user: {
           select: {
             id: true,
+            telegramId: true,
             firstName: true,
             lastName: true,
             username: true
@@ -41,9 +42,9 @@ export async function POST(
   try {
     const { id: shortId } = await context.params;
     const body = await request.json();
-    const { userId, text } = body;
+    const { userId: telegramId, text } = body;
 
-    if (!userId || !text) {
+    if (!telegramId || !text) {
       return NextResponse.json({ error: 'userId and text are required' }, { status: 400 });
     }
 
@@ -51,10 +52,19 @@ export async function POST(
       return NextResponse.json({ error: 'Comment cannot be empty' }, { status: 400 });
     }
 
-    // Создаём комментарий
+    // Находим пользователя по telegramId
+    const user = await prisma.user.findUnique({
+      where: { telegramId }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Создаём комментарий с внутренним userId
     const comment = await prisma.shortComment.create({
       data: {
-        userId,
+        userId: user.id,
         shortId,
         text: text.trim()
       },

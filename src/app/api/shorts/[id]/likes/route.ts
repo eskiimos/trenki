@@ -43,17 +43,26 @@ export async function POST(
   try {
     const { id: shortId } = await context.params;
     const body = await request.json();
-    const { userId } = body;
+    const { userId: telegramId } = body;
 
-    if (!userId) {
+    if (!telegramId) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 });
     }
 
-    // Проверяем, существует ли уже лайк
+    // Находим пользователя по telegramId
+    const user = await prisma.user.findUnique({
+      where: { telegramId }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Проверяем, существует ли уже лайк с внутренним userId
     const existingLike = await prisma.shortLike.findUnique({
       where: {
         userId_shortId: {
-          userId,
+          userId: user.id,
           shortId
         }
       }
@@ -63,10 +72,10 @@ export async function POST(
       return NextResponse.json({ error: 'Already liked' }, { status: 400 });
     }
 
-    // Создаём лайк
+    // Создаём лайк с внутренним userId
     const like = await prisma.shortLike.create({
       data: {
-        userId,
+        userId: user.id,
         shortId
       }
     });
@@ -96,17 +105,26 @@ export async function DELETE(
   try {
     const { id: shortId } = await context.params;
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    const telegramId = searchParams.get('userId');
 
-    if (!userId) {
+    if (!telegramId) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 });
     }
 
-    // Удаляем лайк
+    // Находим пользователя по telegramId
+    const user = await prisma.user.findUnique({
+      where: { telegramId }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Удаляем лайк с внутренним userId
     await prisma.shortLike.delete({
       where: {
         userId_shortId: {
-          userId,
+          userId: user.id,
           shortId
         }
       }

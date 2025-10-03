@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Heart, MessageCircle, Share, Volume2, VolumeX } from 'lucide-react';
+import { useTelegram } from '@/hooks/useTelegram';
 
 interface ShortPageProps {
   params: Promise<{
@@ -38,6 +39,7 @@ interface Comment {
   createdAt: string;
   user: {
     id: string;
+    telegramId: string;
     firstName: string | null;
     lastName: string | null;
     username: string | null;
@@ -46,6 +48,9 @@ interface Comment {
 
 export default function ShortPage({ params }: ShortPageProps) {
   const router = useRouter();
+  const { user } = useTelegram();
+  const userId = user?.id?.toString() || '123456789'; // fallback для разработки
+  
   const [shortId, setShortId] = useState<string>('');
   const [allShorts, setAllShorts] = useState<ShortData[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -376,8 +381,6 @@ export default function ShortPage({ params }: ShortPageProps) {
   const handleDeleteComment = async (commentId: string) => {
     const currentShort = allShorts[currentIndex];
     if (!currentShort) return;
-
-    const userId = '123456789';
 
     if (!confirm('Удалить комментарий?')) return;
 
@@ -741,7 +744,7 @@ export default function ShortPage({ params }: ShortPageProps) {
                         </div>
                         <p className="text-white text-sm">{comment.text}</p>
                       </div>
-                      {comment.user.id === '123456789' && (
+                      {comment.user.telegramId === userId && (
                         <button
                           onClick={() => handleDeleteComment(comment.id)}
                           className="text-red-400 hover:text-red-300 text-xs"

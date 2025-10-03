@@ -36,15 +36,22 @@ export async function GET(
     // Проверяем, лайкнул ли пользователь этот short
     let isLiked = false;
     if (userId) {
-      const like = await prisma.shortLike.findUnique({
-        where: {
-          userId_shortId: {
-            userId,
-            shortId: id
-          }
-        }
+      // Находим пользователя по telegramId
+      const user = await prisma.user.findUnique({
+        where: { telegramId: userId }
       });
-      isLiked = !!like;
+
+      if (user) {
+        const like = await prisma.shortLike.findUnique({
+          where: {
+            userId_shortId: {
+              userId: user.id,
+              shortId: id
+            }
+          }
+        });
+        isLiked = !!like;
+      }
     }
 
     // Получаем количество комментариев
