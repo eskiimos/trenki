@@ -9,14 +9,20 @@ import { apiCache } from '../lib/cache';
 import BottomNavigation from '@/components/BottomNavigation';
 
 // Компонент для короткого видео
-const ShortVideoPlayer = ({ index, poster }: { index: number; poster: string }) => {
+interface ShortVideoPlayerProps {
+  shortId: string;
+  poster: string;
+  title: string;
+}
+
+const ShortVideoPlayer = ({ shortId, poster, title }: ShortVideoPlayerProps) => {
   return (
-    <Link href={`/shorts?index=${index}`}>
+    <Link href={`/shorts/${shortId}`}>
       <div className="flex-shrink-0 w-36 cursor-pointer">
         <div className="bg-gray-200 rounded overflow-hidden relative aspect-[9/16]" style={{ borderRadius: '4px' }}>
           <Image
             src={poster}
-            alt={`Short video ${index + 1}`}
+            alt={title}
             fill
             className="object-cover"
             sizes="144px"
@@ -403,11 +409,12 @@ const TrenkiSection = () => {
   return (
     <section style={{ paddingTop: '15px', paddingBottom: '15px' }}>
       <div className="flex space-x-4 overflow-x-auto pb-4 px-4">
-        {shorts.map((short, index) => (
+        {shorts.map((short) => (
           <ShortVideoPlayer 
             key={short.id} 
-            index={index} 
-            poster={short.thumbnail || '/images/preview_shorts/shorts_1.png'} 
+            shortId={short.id}
+            poster={short.thumbnail || '/images/preview_shorts/shorts_1.png'}
+            title={short.title} 
           />
         ))}
       </div>
