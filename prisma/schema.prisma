@@ -9,16 +9,18 @@ datasource db {
 }
 
 model User {
-  id         String            @id @default(cuid())
-  telegramId String            @unique
-  firstName  String?
-  lastName   String?
-  username   String?
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
-  favorites  FavoriteVideo[]
-  profile    Profile?
-  sessions   TrainingSession[]
+  id            String            @id @default(cuid())
+  telegramId    String            @unique
+  firstName     String?
+  lastName      String?
+  username      String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  favorites     FavoriteVideo[]
+  profile       Profile?
+  sessions      TrainingSession[]
+  shortLikes    ShortLike[]
+  shortComments ShortComment[]
 
   @@map("users")
 }
@@ -116,20 +118,48 @@ model FavoriteVideo {
 }
 
 model Short {
-  id          String   @id @default(cuid())
+  id          String        @id @default(cuid())
   title       String
   description String?
-  videoUrl    String   // URL короткого видео
-  thumbnail   String?  // URL превью изображения
-  trainerId   String?  // опционально - может быть без тренера
-  tags        String[] // массив тегов
-  isPublished Boolean  @default(false)
-  viewsCount  Int      @default(0)
-  order       Int      @default(0) // порядок отображения
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  videoUrl    String        // URL короткого видео
+  thumbnail   String?       // URL превью изображения
+  trainerId   String?       // опционально - может быть без тренера
+  tags        String[]      // массив тегов
+  isPublished Boolean       @default(false)
+  viewsCount  Int           @default(0)
+  likesCount  Int           @default(0) // количество лайков
+  order       Int           @default(0) // порядок отображения
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  likes       ShortLike[]   // связь с лайками
+  comments    ShortComment[] // связь с комментариями
 
   @@map("shorts")
+}
+
+model ShortLike {
+  id        String   @id @default(cuid())
+  userId    String
+  shortId   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  short     Short    @relation(fields: [shortId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, shortId])
+  @@map("short_likes")
+}
+
+model ShortComment {
+  id        String   @id @default(cuid())
+  userId    String
+  shortId   String
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  short     Short    @relation(fields: [shortId], references: [id], onDelete: Cascade)
+
+  @@map("short_comments")
 }
 
 enum VideoCategory {

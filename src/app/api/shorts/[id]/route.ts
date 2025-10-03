@@ -8,6 +8,8 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params;
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
     
     const short = await prisma.short.findUnique({
       where: { id },
@@ -31,10 +33,31 @@ export async function GET(
       });
     }
 
+    // Проверяем, лайкнул ли пользователь этот short
+    let isLiked = false;
+    if (userId) {
+      const like = await prisma.shortLike.findUnique({
+        where: {
+          userId_shortId: {
+            userId,
+            shortId: id
+          }
+        }
+      });
+      isLiked = !!like;
+    }
+
+    // Получаем количество комментариев
+    const commentsCount = await prisma.shortComment.count({
+      where: { shortId: id }
+    });
+
     return NextResponse.json({ 
       short: {
         ...short,
-        trainer
+        trainer,
+        isLiked,
+        commentsCount
       }
     });
   } catch (error) {

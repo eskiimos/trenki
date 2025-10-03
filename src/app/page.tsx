@@ -373,6 +373,18 @@ const HeroVideoSection = () => (
   </section>
 );
 
+// Skeleton для шортсов
+const ShortVideoSkeleton = () => (
+  <div className="flex-shrink-0 w-36">
+    <div 
+      className="bg-gray-700/30 rounded overflow-hidden relative aspect-[9/16] animate-pulse" 
+      style={{ borderRadius: '4px' }}
+    >
+      <div className="absolute inset-0 bg-gradient-to-r from-gray-700/20 via-gray-600/30 to-gray-700/20" />
+    </div>
+  </div>
+);
+
 const TrenkiSection = () => {
   const [shorts, setShorts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -396,7 +408,10 @@ const TrenkiSection = () => {
     return (
       <section style={{ paddingTop: '15px', paddingBottom: '15px' }}>
         <div className="flex space-x-4 overflow-x-auto pb-4 px-4">
-          <div className="text-white text-sm">Загрузка...</div>
+          {/* Показываем 3 skeleton loader */}
+          <ShortVideoSkeleton />
+          <ShortVideoSkeleton />
+          <ShortVideoSkeleton />
         </div>
       </section>
     );
