@@ -7,7 +7,7 @@ interface TagProps {
 
 const Tag: React.FC<TagProps> = ({ text }) => {
   return (
-    <div className="bg-[#AEABBB33] text-white text-xs rounded-full px-4 py-2">
+    <div className="bg-[#AEABBB33] text-[#AEABBB] text-xs rounded-full px-4 py-2">
       {text}
     </div>
   );
@@ -20,6 +20,7 @@ interface TagsSectionProps {
   difficulty?: string;
   level?: string;
   description?: string;
+  title?: string;
   trainer?: {
     name: string;
     lastName: string;
@@ -34,27 +35,14 @@ const TagsSection: React.FC<TagsSectionProps> = ({
   difficulty, 
   level,
   description,
+  title,
   trainer 
 }) => {
-  // Собираем все теги в один массив
-  const allTags = [
-    ...(category ? [category] : []),
-    ...(difficulty ? [difficulty] : []),
-    ...(level ? [level] : []),
-    ...tags,
-    ...equipment,
-  ].filter(Boolean);
+  // Только теги из поля tags
+  const allTags = tags.filter(Boolean);
 
   return (
     <div className="p-4 bg-[#101530]">
-      {allTags.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {allTags.map((tag, index) => (
-            <Tag key={index} text={tag} />
-          ))}
-        </div>
-      )}
-      
       {/* Trainer Info */}
       {trainer && (
         <div className="flex items-center space-x-3 mb-4">
@@ -80,6 +68,36 @@ const TagsSection: React.FC<TagsSectionProps> = ({
           </div>
         </div>
       )}
+      
+      {/* Video Title */}
+      {title && (
+        <div className="mb-4">
+          <h2 className="text-white text-lg font-semibold leading-snug">
+            {title}
+          </h2>
+        </div>
+      )}
+      
+      {/* Tags */}
+      {allTags.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {allTags.map((tag, index) => (
+            <Tag key={index} text={tag} />
+          ))}
+        </div>
+      )}
+      
+      {/* Equipment Section */}
+      <div className="bg-[#AEABBB33] rounded-lg p-4 mb-4">
+        <h3 className="text-white text-sm font-medium mb-3">ОБОРУДОВАНИЕ</h3>
+        {equipment.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {equipment.map((item, index) => (
+              <Tag key={index} text={item} />
+            ))}
+          </div>
+        )}
+      </div>
       
       {/* Description */}
       {description && (

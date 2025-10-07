@@ -56,15 +56,6 @@ const HomePage = () => {
       {/* Промо-баннер */}
       <PromoBannerSection />
       
-      {/* Кнопка админки */}
-      <div className="px-4 pb-8">
-        <Link href="/admin">
-          <button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl">
-            🔧 Админка
-          </button>
-        </Link>
-      </div>
-      
       {/* Нижнее меню */}
       <BottomNavigation activeTab="home" />
     </div>
@@ -360,18 +351,72 @@ const Header = () => {
   );
 };
 
-const HeroVideoSection = () => (
-  <section className="px-4" style={{ paddingBottom: '15px' }}>
-    <Link href="/video/onboarding">
-      <div className="bg-red-500 overflow-hidden relative h-[193px] w-full cursor-pointer hover:opacity-90 transition-opacity" style={{ borderRadius: '4px' }}>
-        <Image src="/images/video_inbording.png" alt="Onboarding" layout="fill" className="object-cover" />
-        <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-          8:44
+const HeroVideoSection = () => {
+  const [randomVideo, setRandomVideo] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRandomVideo = async () => {
+      try {
+        const response = await fetch('/api/videos');
+        const data = await response.json();
+        const videos = data.videos || [];
+        
+        if (videos.length > 0) {
+          // Выбираем случайное видео
+          const randomIndex = Math.floor(Math.random() * videos.length);
+          setRandomVideo(videos[randomIndex]);
+        }
+      } catch (error) {
+        console.error('Error loading random video:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchRandomVideo();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <section className="px-4" style={{ paddingBottom: '15px' }}>
+        <div className="bg-gray-700/30 overflow-hidden relative aspect-video w-full animate-pulse" style={{ borderRadius: '4px' }}>
+          <div className="absolute inset-0 bg-gradient-to-r from-gray-700/20 via-gray-600/30 to-gray-700/20" />
         </div>
-      </div>
-    </Link>
-  </section>
-);
+      </section>
+    );
+  }
+
+  if (!randomVideo) {
+    return null;
+  }
+
+  // Форматируем длительность видео
+  const formatDuration = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <section className="px-4" style={{ paddingBottom: '15px' }}>
+      <Link href={`/video/${randomVideo.id}`}>
+        <div className="bg-gray-900 overflow-hidden relative aspect-video w-full cursor-pointer hover:opacity-90 transition-opacity" style={{ borderRadius: '4px' }}>
+          {randomVideo.thumbnail && (
+            <Image 
+              src={randomVideo.thumbnail} 
+              alt={randomVideo.title} 
+              fill
+              className="object-cover" 
+            />
+          )}
+          <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+            {formatDuration(randomVideo.duration)}
+          </div>
+        </div>
+      </Link>
+    </section>
+  );
+};
 
 // Skeleton для шортсов
 const ShortVideoSkeleton = () => (
@@ -477,7 +522,54 @@ const TrainingsSection = () => (
     </section>
 );
 
-const TrainersSection = () => (
+const TrainersSection = () => {
+  const [trainers, setTrainers] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTrainers = async () => {
+      try {
+        const response = await fetch('/api/trainers');
+        const data = await response.json();
+        // Берем только первых 2 тренеров для отображения
+        setTrainers((data.trainers || []).slice(0, 2));
+      } catch (error) {
+        console.error('Error loading trainers:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchTrainers();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <section style={{ paddingBottom: '15px' }}>
+        <div style={{
+          width: '100%',
+          paddingLeft: 16,
+          paddingRight: 16,
+          paddingTop: 24,
+          paddingBottom: 24,
+          background: 'linear-gradient(180deg, #101530 0%, #060919 100%)',
+          borderRadius: 1,
+          flexDirection: 'column',
+          gap: 16,
+          display: 'flex'
+        }}>
+          <div style={{ color: '#F9F8FE', fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>
+            тренеры
+          </div>
+          <div style={{ display: 'flex', gap: 16 }}>
+            <div className="w-1/2 h-[202px] bg-gray-700/30 rounded-lg animate-pulse" />
+            <div className="w-1/2 h-[202px] bg-gray-700/30 rounded-lg animate-pulse" />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
     <section style={{ paddingBottom: '15px' }}>
         <div style={{
             width: '100%', 
@@ -532,8 +624,8 @@ const TrainersSection = () => (
                 gap: 16, 
                 display: 'inline-flex'
             }}>
-                {/* Карточка Марка */}
-                <div style={{
+                {trainers.map((trainer) => (
+                  <div key={trainer.id} style={{
                     width: '50%', 
                     height: 202, 
                     paddingBottom: 8, 
@@ -556,8 +648,8 @@ const TrainersSection = () => (
                         alignItems: 'center'
                     }}>
                         <Image 
-                            src="/avatars/af9e5de293f8ce1c351f480e9af666a6453ed701.png" 
-                            alt="Марк" 
+                            src={trainer.avatar || '/avatars/af9e5de293f8ce1c351f480e9af666a6453ed701.png'} 
+                            alt={trainer.name} 
                             width={100}
                             height={100}
                             style={{
@@ -596,7 +688,7 @@ const TrainersSection = () => (
                                 textTransform: 'uppercase', 
                                 lineHeight: '10px', 
                                 letterSpacing: 0.50
-                            }}>5</div>
+                            }}>{trainer.rating}</div>
                         </div>
                     </div>
                     <div style={{
@@ -620,7 +712,7 @@ const TrainersSection = () => (
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap'
-                        }}>марк</div>
+                        }}>{trainer.name}</div>
                         <div style={{
                             alignSelf: 'stretch', 
                             color: '#445CFF', 
@@ -633,7 +725,7 @@ const TrainersSection = () => (
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap'
-                        }}>ковалевский</div>
+                        }}>{trainer.lastName}</div>
                     </div>
                     <div style={{
                         alignSelf: 'stretch', 
@@ -656,152 +748,82 @@ const TrainersSection = () => (
                             textTransform: 'uppercase', 
                             lineHeight: '12px', 
                             letterSpacing: 0.50
-                        }}>Главный тренер</div>
+                        }}>{trainer.speciality}</div>
                     </div>
                 </div>
-                
-                {/* Карточка Константина */}
-                <div style={{
-                    width: '50%', 
-                    height: 202, 
-                    paddingBottom: 8, 
-                    background: '#060919', 
-                    overflow: 'hidden', 
-                    borderRadius: 8, 
-                    flexDirection: 'column', 
-                    justifyContent: 'flex-start', 
-                    alignItems: 'flex-start', 
-                    display: 'inline-flex'
-                }}>
-                    <div style={{
-                        width: '100%', 
-                        height: 112, 
-                        position: 'relative', 
-                        background: 'linear-gradient(180deg, rgba(87, 108, 255, 0) 0%, rgba(87, 108, 255, 0.50) 100%)', 
-                        overflow: 'hidden',
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center'
-                    }}>
-                        <Image 
-                            src="/avatars/af9e5de293f8ce1c351f480e9af666a6453ed701.png" 
-                            alt="Константин" 
-                            width={100}
-                            height={100}
-                            style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover'
-                            }}
-                        />
-                        <div style={{
-                            width: 24, 
-                            height: 24, 
-                            left: 4, 
-                            top: 4, 
-                            position: 'absolute',
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center'
-                        }}>
-                            <Image 
-                                src="/icons/star-6.svg" 
-                                alt="Звезда рейтинга" 
-                                width={24} 
-                                height={24}
-                                style={{ position: 'absolute' }}
-                            />
-                            <div style={{
-                                position: 'relative',
-                                zIndex: 1,
-                                justifyContent: 'center', 
-                                display: 'flex', 
-                                flexDirection: 'column', 
-                                color: '#A1FF4A', 
-                                fontSize: 10, 
-                                fontFamily: 'Overpass', 
-                                fontWeight: '400', 
-                                textTransform: 'uppercase', 
-                                lineHeight: '10px', 
-                                letterSpacing: 0.50
-                            }}>5</div>
-                        </div>
-                    </div>
-                    <div style={{
-                        alignSelf: 'stretch', 
-                        padding: 8, 
-                        flexDirection: 'column', 
-                        justifyContent: 'center', 
-                        alignItems: 'flex-start', 
-                        gap: 8, 
-                        display: 'flex'
-                    }}>
-                        <div style={{
-                            alignSelf: 'stretch', 
-                            color: '#445CFF', 
-                            fontSize: 14, 
-                            fontFamily: 'Overpass', 
-                            fontWeight: '700', 
-                            textTransform: 'uppercase', 
-                            lineHeight: '14px', 
-                            letterSpacing: 0.50,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                        }}>константин</div>
-                        <div style={{
-                            alignSelf: 'stretch', 
-                            color: '#445CFF', 
-                            fontSize: 14, 
-                            fontFamily: 'Overpass', 
-                            fontWeight: '700', 
-                            textTransform: 'uppercase', 
-                            lineHeight: '14px', 
-                            letterSpacing: 0.50,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                        }}>константинопольский</div>
-                    </div>
-                    <div style={{
-                        alignSelf: 'stretch', 
-                        padding: 8, 
-                        borderTop: '1px #26252F solid', 
-                        justifyContent: 'flex-start', 
-                        alignItems: 'center', 
-                        gap: 10, 
-                        display: 'inline-flex'
-                    }}>
-                        <div style={{
-                            flex: '1 1 0', 
-                            justifyContent: 'center', 
-                            display: 'flex', 
-                            flexDirection: 'column', 
-                            color: '#F9F8FE', 
-                            fontSize: 12, 
-                            fontFamily: 'Overpass', 
-                            fontWeight: '700', 
-                            textTransform: 'uppercase', 
-                            lineHeight: '12px', 
-                            letterSpacing: 0.50
-                        }}>вратарский</div>
-                    </div>
-                </div>
+                ))}
             </div>
         </div>
     </section>
-);
+  );
+};
 
-const PromoBannerSection = () => (
-    <section className="px-4">
-        <div className="bg-[#2d3448] rounded-lg overflow-hidden relative h-48 border border-[#3d4759]">
-            <Image src="/images/video_prew_2.png" alt="Promo" layout="fill" className="object-cover" />
-            <div className="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
-                8:44
-            </div>
+const PromoBannerSection = () => {
+  const [randomVideo, setRandomVideo] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRandomVideo = async () => {
+      try {
+        const response = await fetch('/api/videos');
+        const data = await response.json();
+        const videos = data.videos || [];
+        
+        if (videos.length > 0) {
+          // Выбираем случайное видео
+          const randomIndex = Math.floor(Math.random() * videos.length);
+          setRandomVideo(videos[randomIndex]);
+        }
+      } catch (error) {
+        console.error('Error loading random video:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchRandomVideo();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <section className="px-4">
+        <div className="bg-gray-700/30 rounded-lg overflow-hidden relative aspect-video animate-pulse">
+          <div className="absolute inset-0 bg-gradient-to-r from-gray-700/20 via-gray-600/30 to-gray-700/20" />
         </div>
+      </section>
+    );
+  }
+
+  if (!randomVideo) {
+    return null;
+  }
+
+  // Форматируем длительность видео
+  const formatDuration = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <section className="px-4">
+      <Link href={`/video/${randomVideo.id}`}>
+        <div className="bg-[#2d3448] rounded-lg overflow-hidden relative aspect-video border border-[#3d4759] cursor-pointer hover:opacity-90 transition-opacity">
+          {randomVideo.thumbnail && (
+            <Image 
+              src={randomVideo.thumbnail} 
+              alt={randomVideo.title} 
+              fill
+              className="object-cover" 
+            />
+          )}
+          <div className="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+            {formatDuration(randomVideo.duration)}
+          </div>
+        </div>
+      </Link>
     </section>
-);
+  );
+};
 
 
 export default HomePage;

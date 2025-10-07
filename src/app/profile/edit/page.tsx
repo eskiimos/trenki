@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTelegram } from '../../../hooks/useTelegram';
 import { ProfileEditSkeleton } from '../../../components/Skeleton';
+import BottomNavigation from '@/components/BottomNavigation';
 
 const ProfileEditPage = () => {
   const { user } = useTelegram();
@@ -378,37 +379,9 @@ const ProfileEditPage = () => {
       </div>
 
       {/* Нижнее меню */}
-      <BottomNavigation />
+      <BottomNavigation activeTab="profile" />
     </div>
   );
 };
-
-// Компонент нижнего меню (можно выделить в отдельный файл)
-const BottomNavigation = () => (
-  <div className="fixed bottom-0 left-0 right-0 bg-[#101530] border-t border-gray-700">
-    <div className="flex justify-around py-2">
-      <Link href="/" className="flex flex-col items-center p-2">
-        <div className="w-6 h-6 mb-1">
-          <Image src="/icons/ant-design-thunderbolt-filled.svg" alt="Главная" width={24} height={24} />
-        </div>
-      </Link>
-      <Link href="/trainers" className="flex flex-col items-center p-2">
-        <div className="w-6 h-6 mb-1">
-          <Image src="/icons/ant-design-thunderbolt-filled_dark.svg" alt="Тренеры" width={24} height={24} />
-        </div>
-      </Link>
-      <Link href="/shorts" className="flex flex-col items-center p-2">
-        <div className="w-6 h-6 mb-1">
-          <Image src="/icons/ant-design-thunderbolt-filled_f.svg" alt="Shorts" width={24} height={24} />
-        </div>
-      </Link>
-      <Link href="/profile" className="flex flex-col items-center p-2">
-        <div className="w-6 h-6 mb-1">
-          <Image src="/icons/ant-design-thunderbolt-filled.svg" alt="Профиль" width={24} height={24} />
-        </div>
-      </Link>
-    </div>
-  </div>
-);
 
 export default ProfileEditPage;

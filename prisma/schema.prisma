@@ -19,6 +19,7 @@ model User {
   favorites     FavoriteVideo[]
   profile       Profile?
   sessions      TrainingSession[]
+  videoLikes    VideoLike[]
   shortLikes    ShortLike[]
   shortComments ShortComment[]
 
@@ -82,10 +83,12 @@ model Video {
   level       String?           // уровень подготовки
   isPublished Boolean           @default(false) // опубликовано ли видео
   viewsCount  Int               @default(0)     // количество просмотров
+  likesCount  Int               @default(0)     // количество лайков
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   favorites   FavoriteVideo[]
   sessions    TrainingSession[]
+  likes       VideoLike[]
   trainer     Trainer           @relation(fields: [trainerId], references: [id])
 
   @@map("videos")
@@ -115,6 +118,18 @@ model FavoriteVideo {
 
   @@unique([userId, videoId])
   @@map("favorite_videos")
+}
+
+model VideoLike {
+  id        String   @id @default(cuid())
+  userId    String
+  videoId   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, videoId])
+  @@map("video_likes")
 }
 
 model Short {

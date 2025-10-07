@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Play, Pause, Heart, MessageCircle, Share, Volume2, VolumeX } from 'lucide-react';
+import { Heart, MessageCircle, Share } from 'lucide-react';
 import TagsSection from '@/components/TagsSection';
 import BottomNavigation from '@/components/BottomNavigation';
 import { isKinescopeUrl, getKinescopeDirectUrl } from '@/lib/videoQuality';
@@ -22,6 +22,7 @@ interface VideoData {
   videoUrl: string;
   thumbnail: string;
   duration: number;
+  likesCount: number;
   trainer: {
     id: string;
     name: string;
@@ -40,12 +41,14 @@ export default function VideoPage({ params }: VideoPageProps) {
   const router = useRouter();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(0);
   const [showComments, setShowComments] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [buffered, setBuffered] = useState(0); // Прогресс загрузки видео
   // const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [videoId, setVideoId] = useState<string>('');
   const [videoData, setVideoData] = useState<VideoData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -134,6 +137,68 @@ export default function VideoPage({ params }: VideoPageProps) {
       ignore = true;
     };
   }, [videoData?.videoUrl]);
+
+  // Загружаем статус лайка при открытии видео
+  useEffect(() => {
+    const loadLikeStatus = async () => {
+      if (!videoId || !videoData) return;
+
+      try {
+        const telegramId = (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id?.toString();
+        if (!telegramId) {
+          // Если нет Telegram ID, показываем количество лайков из videoData
+          setLikesCount(videoData.likesCount || 0);
+          return;
+        }
+
+        const response = await fetch(`/api/videos/${videoId}/like`, {
+          headers: {
+            'X-Telegram-User-ID': telegramId,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setIsLiked(data.isLiked);
+          setLikesCount(data.likesCount);
+        } else {
+          setLikesCount(videoData.likesCount || 0);
+        }
+      } catch (error) {
+        console.error('Error loading like status:', error);
+        setLikesCount(videoData.likesCount || 0);
+      }
+    };
+
+    loadLikeStatus();
+  }, [videoId, videoData]);
+
+  // Функция переключения лайка
+  const toggleLike = async () => {
+    const telegramId = (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id?.toString();
+    if (!telegramId) {
+      alert('Пожалуйста, откройте приложение через Telegram');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/videos/${videoId}/like`, {
+        method: 'POST',
+        headers: {
+          'X-Telegram-User-ID': telegramId,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setIsLiked(data.isLiked);
+        setLikesCount(data.likesCount);
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
+    }
+  };
+
   const [showControls, setShowControls] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -148,10 +213,6 @@ export default function VideoPage({ params }: VideoPageProps) {
       setIsPlaying(!isPlaying);
     }
     showControlsTemporarily();
-  };
-
-  const toggleLike = () => {
-    setIsLiked(!isLiked);
   };
 
   const toggleMute = () => {
@@ -405,21 +466,28 @@ export default function VideoPage({ params }: VideoPageProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [togglePlay, toggleMute, showControlsTemporarily]);
 
+  // Отслеживание изменения полноэкранного режима
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#101530] pb-20">{/* pb-20 для отступа под таб-бар */}
       {/* Header */}
       <header className="flex items-center justify-between p-4 bg-[#101530] shadow-sm border-b border-gray-700" style={{ paddingTop: '90px' }}>
         <div className="flex items-center space-x-2">
-          <button onClick={() => router.back()} className="text-white hover:text-gray-300">
+          <button 
+            onClick={() => autoplayEnabled ? router.push('/video') : router.back()} 
+            className="text-white hover:text-gray-300"
+          >
             <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
           </button>
           <h1 className="text-lg font-semibold text-white">ТРЕНЕРОВКА</h1>
-        </div>
-        <div className="flex items-center space-x-4">
-            <Image src="/icons/video/action-calendar.svg" alt="Календарь" width={24} height={24} />
-            <Image src="/icons/video/action-save.svg" alt="Сохранить" width={24} height={24} />
-            <Image src="/icons/video/action-share.svg" alt="Поделиться" width={24} height={24} />
-            <Image src="/icons/video/action-like.svg" alt="Лайк" width={24} height={24} />
         </div>
       </header>
 
@@ -474,19 +542,19 @@ export default function VideoPage({ params }: VideoPageProps) {
                 }}
                 onLoadedData={(e) => {
                   const video = e.currentTarget;
-                  // Автоплей после загрузки данных
-                  if (!isMuted) {
-                    video.muted = false;
-                  }
                   
                   // Устанавливаем duration если еще не установлен
                   if (video.duration && !isNaN(video.duration)) {
                     setDuration(video.duration);
                   }
                   
-                  video.play().catch(err => {
+                  // Автоплей после загрузки данных
+                  video.play().then(() => {
+                    setIsPlaying(true);
+                    console.log('Autoplay started successfully');
+                  }).catch(err => {
                     console.log('Autoplay was prevented:', err);
-                    // Если автоплей заблокирован браузером, ничего страшного
+                    setIsPlaying(false);
                   });
                 }}
                 onDurationChange={(e) => {
@@ -507,11 +575,15 @@ export default function VideoPage({ params }: VideoPageProps) {
                   onClick={togglePlay}
                   className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
                 >
-                  {isPlaying ? (
-                    <Pause size={32} className="text-white" />
-                  ) : (
-                    <Play size={32} className="text-white ml-1" />
-                  )}
+                  <Image
+                    src={isPlaying 
+                      ? '/icons/video/player/pause.svg'
+                      : '/icons/video/player/Play.svg'
+                    }
+                    alt={isPlaying ? 'Пауза' : 'Воспроизвести'}
+                    width={32}
+                    height={32}
+                  />
                 </button>
               </div>
             </>
@@ -544,17 +616,35 @@ export default function VideoPage({ params }: VideoPageProps) {
                 {/* Play/Pause Button */}
                 <button 
                   onClick={togglePlay}
-                  className="text-white hover:text-blue-400 transition-colors"
+                  className="transition-opacity hover:opacity-80"
+                  title={isPlaying ? 'Пауза' : 'Воспроизвести'}
                 >
-                  {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+                  <Image
+                    src={isPlaying 
+                      ? '/icons/video/player/pause.svg'
+                      : '/icons/video/player/Play.svg'
+                    }
+                    alt={isPlaying ? 'Пауза' : 'Воспроизвести'}
+                    width={24}
+                    height={24}
+                  />
                 </button>
                 
                 {/* Volume Control */}
                 <button 
                   onClick={toggleMute} 
-                  className="text-white hover:text-blue-400 transition-colors"
+                  className="transition-opacity hover:opacity-80"
+                  title={isMuted ? 'Включить звук' : 'Выключить звук'}
                 >
-                  {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                  <Image
+                    src={isMuted 
+                      ? '/icons/video/player/Volume=No.svg'
+                      : '/icons/video/player/Volume=Yes.svg'
+                    }
+                    alt={isMuted ? 'Включить звук' : 'Выключить звук'}
+                    width={24}
+                    height={24}
+                  />
                 </button>
                 
                 {/* Time Display */}
@@ -567,25 +657,18 @@ export default function VideoPage({ params }: VideoPageProps) {
                 {/* Autoplay Toggle */}
                 <button 
                   onClick={() => setAutoplayEnabled(!autoplayEnabled)}
-                  className={`transition-colors ${autoplayEnabled ? 'text-blue-400' : 'text-white/50'} hover:text-blue-400`}
+                  className="transition-opacity hover:opacity-80"
                   title={autoplayEnabled ? 'Автоплей включен' : 'Автоплей выключен'}
                 >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 4h14v16H5V4z"></path>
-                    <path d="M5 12h14"></path>
-                    {autoplayEnabled && <path d="M12 4v16" stroke="currentColor" strokeWidth="3"></path>}
-                  </svg>
-                </button>
-                
-                {/* Settings Button (placeholder) */}
-                <button 
-                  className="text-white hover:text-blue-400 transition-colors"
-                  title="Настройки"
-                >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path d="M12 1v6m0 6v6m9-9h-6m-6 0H3"></path>
-                  </svg>
+                  <Image
+                    src={autoplayEnabled 
+                      ? '/icons/video/player/material-symbols_autoplay active.svg'
+                      : '/icons/video/player/material-symbols_autoplay def.svg'
+                    }
+                    alt="Автоплей"
+                    width={24}
+                    height={24}
+                  />
                 </button>
                 
                 {/* Fullscreen Button */}
@@ -599,12 +682,18 @@ export default function VideoPage({ params }: VideoPageProps) {
                       }
                     }
                   }}
-                  className="text-white hover:text-blue-400 transition-colors"
-                  title="Полноэкранный режим"
+                  className="transition-opacity hover:opacity-80"
+                  title={isFullscreen ? 'Выход из полноэкранного режима' : 'Полноэкранный режим'}
                 >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
-                  </svg>
+                  <Image
+                    src={isFullscreen 
+                      ? '/icons/video/player/Fulscreen=Yes.svg'
+                      : '/icons/video/player/Fulscreen=No.svg'
+                    }
+                    alt="Полноэкранный режим"
+                    width={24}
+                    height={24}
+                  />
                 </button>
               </div>
             </div>
@@ -731,6 +820,49 @@ export default function VideoPage({ params }: VideoPageProps) {
         </div>
       </div>
 
+      {/* Action Icons */}
+      <div className="bg-[#101530]">
+        <div className="overflow-x-auto scrollbar-hide">
+          <div className="flex items-center gap-3 p-4 min-w-max">
+            {/* Like */}
+            <button 
+              onClick={toggleLike}
+              className="bg-[#AEABBB33] rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0 transition-opacity hover:opacity-80"
+            >
+              <Image 
+                src={isLiked ? '/icons/video/Active=Yes.svg' : '/icons/video/Active=No.svg'} 
+                alt="Лайк" 
+                width={20} 
+                height={20} 
+              />
+              <span className="text-[#AEABBB] text-xs whitespace-nowrap">
+                {likesCount >= 1000 
+                  ? `${(likesCount / 1000).toFixed(1)} тыс.` 
+                  : likesCount}
+              </span>
+            </button>
+            
+            {/* Calendar */}
+            <div className="bg-[#AEABBB33] rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0">
+              <Image src="/icons/video/action-calendar.svg" alt="Календарь" width={20} height={20} />
+              <span className="text-[#AEABBB] text-xs whitespace-nowrap">Календарь</span>
+            </div>
+            
+            {/* Save */}
+            <div className="bg-[#AEABBB33] rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0">
+              <Image src="/icons/video/action-save.svg" alt="Сохранить" width={20} height={20} />
+              <span className="text-[#AEABBB] text-xs whitespace-nowrap">Скачать</span>
+            </div>
+            
+            {/* Share */}
+            <div className="bg-[#AEABBB33] rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0">
+              <Image src="/icons/video/action-share.svg" alt="Поделиться" width={20} height={20} />
+              <span className="text-[#AEABBB] text-xs whitespace-nowrap">Поделиться</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <TagsSection 
         tags={videoData?.tags}
         equipment={videoData?.equipment}
@@ -738,6 +870,7 @@ export default function VideoPage({ params }: VideoPageProps) {
         difficulty={videoData?.difficulty}
         level={videoData?.level}
         description={videoData?.description}
+        title={videoData?.title}
         trainer={videoData?.trainer ? {
           name: videoData.trainer.name,
           lastName: videoData.trainer.lastName,

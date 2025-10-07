@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
       equipment: video.equipment,
       level: video.level,
       viewsCount: video.viewsCount,
+      likesCount: video.likesCount,
       trainer: {
         id: video.trainer.id,
         name: video.trainer.name,

@@ -550,14 +550,14 @@ export default function ShortPage({ params }: ShortPageProps) {
       {/* Видео */}
       <div className="h-full w-full relative">
         {isKinescopeVideo ? (
-          isKinescopeLoading ? (
+          isKinescopeLoading || !kinescopeDirectUrl ? (
             <div className="w-full h-full flex items-center justify-center text-white">Загрузка видео...</div>
           ) : (
             <video
               ref={videoRef}
               key={shortData.id + '-kinescope'}
               className="w-full h-full object-cover cursor-pointer"
-              src={kinescopeDirectUrl || ''}
+              src={kinescopeDirectUrl}
               poster={shortData.thumbnail}
               autoPlay
               loop

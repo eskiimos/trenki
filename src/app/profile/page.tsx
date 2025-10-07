@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useTelegram } from '../../hooks/useTelegram';
 import { ProfileSkeleton } from '../../components/Skeleton';
+import BottomNavigation from '@/components/BottomNavigation';
 
 const ProfilePage = () => {
   const { user } = useTelegram();
@@ -217,11 +218,20 @@ const ProfilePage = () => {
               <FAQItem question="Как связаться с тренером?" />
             </div>
           </div>
+          
+          {/* Кнопка админки */}
+          <div className="pt-4">
+            <Link href="/admin">
+              <button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl">
+                🔧 Админка
+              </button>
+            </Link>
+          </div>
         </div>
       </div>
       
       {/* Тапбар */}
-      <BottomNavigation />
+      <BottomNavigation activeTab="profile" />
     </div>
   );
 };
@@ -275,33 +285,6 @@ const FAQItem = ({ question }: { question: string }) => (
       />
     </div>
   </div>
-);
-
-// Компонент тапбара
-const BottomNavigation = () => (
-    <nav className="fixed bottom-0 left-0 right-0 bg-[#101530] border-t border-[#2d3448] px-4 py-3 z-50">
-        <div className="flex justify-around items-center max-w-md mx-auto">
-            <Link href="/" className="flex items-center justify-center p-2">
-                <Image src="/icons/tapbar/icon-type-home-active-no.svg" alt="Главная" width={28} height={28} />
-            </Link>
-            
-            <button className="flex items-center justify-center p-2">
-                <Image src="/icons/tapbar/icon-type-play-active-no.svg" alt="Видео" width={28} height={28} />
-            </button>
-            
-            <button className="flex items-center justify-center p-2">
-                <Image src="/icons/tapbar/icon-type-hockey-active-no.svg" alt="Треньки" width={28} height={28} />
-            </button>
-            
-            <button className="flex items-center justify-center p-2">
-                <Image src="/icons/tapbar/icon-type-calendar-active-no.svg" alt="Расписание" width={28} height={28} />
-            </button>
-            
-            <button className="flex items-center justify-center p-2">
-                <Image src="/icons/tapbar/icon-type-hockey-mask-active-yes.svg" alt="Профиль" width={28} height={28} />
-            </button>
-        </div>
-    </nav>
 );
 
 export default ProfilePage;

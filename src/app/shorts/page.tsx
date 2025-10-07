@@ -7,14 +7,8 @@ import { ArrowLeft, Heart, MessageCircle, Share, MoreVertical, Volume2, VolumeX 
 
 const ShortsContent = () => {
   const searchParams = useSearchParams();
-  const startIndex = parseInt(searchParams.get('index') || '0');
+  const startIndexParam = parseInt(searchParams.get('index') || '0');
   
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(startIndex);
-  const [isLiked, setIsLiked] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-
   // Список коротких видео
   const videos = [
     {
@@ -54,6 +48,14 @@ const ShortsContent = () => {
       author: 'Елена Власова'
     }
   ];
+
+  // Нормализуем индекс чтобы он был в пределах массива
+  const normalizedIndex = startIndexParam % videos.length;
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(normalizedIndex);
+  const [isLiked, setIsLiked] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const currentVideo = videos[currentVideoIndex];
 
