@@ -243,9 +243,9 @@ const AdminVideosPage = () => {
             ...updates,
           }));
           
-          alert(`✅ Данные успешно получены из Kinescope!\n\nОбновлено: ${updatedFields.join(', ')}`);
+          alert(`Данные успешно получены из Kinescope!\n\nОбновлено: ${updatedFields.join(', ')}`);
         } else {
-          alert('ℹ️ Все данные уже заполнены или не найдены в Kinescope');
+          alert('Все данные уже заполнены или не найдены в Kinescope');
         }
       } else {
         console.error('Kinescope API error:', data);
@@ -267,7 +267,7 @@ const AdminVideosPage = () => {
       }
     } catch (error) {
       console.error('Error fetching Kinescope metadata:', error);
-      alert('❌ Произошла ошибка при получении данных.\nПроверьте консоль для деталей.');
+      alert('Произошла ошибка при получении данных.\nПроверьте консоль для деталей.');
     } finally {
       setIsLoading(false);
     }
@@ -310,6 +310,29 @@ const AdminVideosPage = () => {
     });
   };
 
+  const handleDeleteVideo = async (videoId: string) => {
+    if (!confirm('Вы уверены, что хотите удалить это видео? Это действие нельзя отменить.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/videos/${videoId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        alert('Видео успешно удалено!');
+        fetchVideos();
+      } else {
+        const data = await response.json();
+        alert(`Ошибка при удалении: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error deleting video:', error);
+      alert('Произошла ошибка при удалении видео');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#101530] text-white p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
@@ -336,7 +359,7 @@ const AdminVideosPage = () => {
 
         {/* Форма добавления/редактирования видео */}
         {showForm && (
-          <div className="bg-[#1a1f3a] rounded-lg p-4 md:p-6 mb-6 md:mb-8">
+          <div className="bg-[#1a1f3a] rounded-lg p-4 md:p-6 mb-6 md:mb-8 border border-white/5">
             <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">
               {editingVideoId ? 'Редактировать видео' : 'Новое видео'}
             </h2>
@@ -388,7 +411,7 @@ const AdminVideosPage = () => {
                         disabled={isLoading}
                         className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                       >
-                        {isLoading ? '⏳ Загрузка...' : '🔄 Получить данные'}
+                        {isLoading ? 'Загрузка...' : 'Получить данные'}
                       </button>
                     )}
                   </div>
@@ -574,7 +597,7 @@ const AdminVideosPage = () => {
         )}
 
         {/* Список видео */}
-        <div className="bg-[#1a1f3a] rounded-lg p-4 md:p-6">
+        <div className="bg-[#1a1f3a] rounded-lg p-4 md:p-6 border border-white/5">
           <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Все видео</h2>
           {videos.length === 0 ? (
             <p className="text-gray-400 text-center py-8">Видео пока нет. Добавьте первое!</p>
@@ -603,21 +626,25 @@ const AdminVideosPage = () => {
                   </p>
                   
                   {/* Кнопки */}
-                  <div className="flex flex-col gap-2 w-full sm:w-auto sm:max-w-[200px]">
+                  <div className="flex flex-wrap gap-2 mt-4">
                     <button
                       onClick={() => handleEditVideo(video)}
-                      className="flex items-center justify-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap"
+                      className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-sm font-semibold transition-colors"
                     >
-                      <span>✏️</span>
-                      <span>Редактировать</span>
+                      Редактировать
                     </button>
                     <Link 
                       href={`/video/${video.id}`}
-                      className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap"
+                      className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-semibold transition-colors"
                     >
-                      <span>👁️</span>
-                      <span>Просмотр</span>
+                      Просмотр
                     </Link>
+                    <button
+                      onClick={() => handleDeleteVideo(video.id)}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-semibold transition-colors"
+                    >
+                      Удалить
+                    </button>
                   </div>
                 </div>
               ))}

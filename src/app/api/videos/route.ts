@@ -43,7 +43,8 @@ export async function GET(request: NextRequest) {
       id: video.id,
       title: video.title,
       description: video.description,
-      duration: formatDuration(video.duration),
+      duration: video.duration, // Возвращаем как число (секунды)
+      durationFormatted: formatDuration(video.duration), // Форматированная строка для отображения
       videoUrl: video.videoUrl,
       thumbnail: video.thumbnail,
       category: video.category,

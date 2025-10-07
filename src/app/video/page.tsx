@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import BottomNavigation from '@/components/BottomNavigation';
+import { Skeleton } from '@/components/Skeleton';
 
 interface Video {
   id: string;
@@ -68,10 +69,70 @@ const VideoPage = () => {
     ? videos 
     : videos.filter(video => video.category === activeFilter);
 
+  // Skeleton компонент для видео карточки
+  const VideoCardSkeleton = () => (
+    <div className="mb-6">
+      {/* Превью видео */}
+      <div className="relative w-full aspect-video mb-3">
+        <Skeleton width="w-full" height="h-full" />
+      </div>
+      
+      {/* Контент */}
+      <div className="px-4 py-3">
+        {/* Аватар + Заголовок */}
+        <div className="flex items-center gap-3 mb-2">
+          <Skeleton width="w-10" height="h-10" rounded />
+          <div className="flex-1 space-y-2">
+            <Skeleton width="w-3/4" height="h-4" />
+            <Skeleton width="w-1/2" height="h-4" />
+          </div>
+        </div>
+        
+        {/* Теги */}
+        <div className="flex gap-2 mb-2">
+          <Skeleton width="w-20" height="h-6" className="rounded-full" />
+          <Skeleton width="w-24" height="h-6" className="rounded-full" />
+          <Skeleton width="w-16" height="h-6" className="rounded-full" />
+        </div>
+        
+        {/* Информация о тренере */}
+        <Skeleton width="w-full" height="h-3" />
+      </div>
+    </div>
+  );
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#101530] pb-20 flex items-center justify-center">
-        <div className="text-white">Загрузка...</div>
+      <div className="min-h-screen bg-[#101530] pb-20">
+        {/* Header */}
+        <header className="flex items-center justify-between p-4 bg-[#101530]" style={{ paddingTop: '90px' }}>
+          <div className="flex items-center space-x-2">
+            <Skeleton width="w-6" height="h-6" />
+            <Skeleton width="w-32" height="h-5" />
+          </div>
+          <div className="flex items-center space-x-4">
+            <Skeleton width="w-6" height="h-6" />
+            <Skeleton width="w-6" height="h-6" />
+          </div>
+        </header>
+
+        {/* Filters Skeleton */}
+        <div className="overflow-x-auto px-4 py-3 hide-scrollbar">
+          <div className="flex space-x-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} width="w-24" height="h-8" className="rounded-full" />
+            ))}
+          </div>
+        </div>
+
+        {/* Video Cards Skeleton */}
+        <div className="mt-4">
+          {[1, 2, 3, 4].map((i) => (
+            <VideoCardSkeleton key={i} />
+          ))}
+        </div>
+
+        <BottomNavigation activeTab="video" />
       </div>
     );
   }
@@ -117,61 +178,96 @@ const VideoPage = () => {
       </div>
 
       {/* Video Grid */}
-      <div className="p-4">
+      <div>
         {filteredVideos.length === 0 ? (
-          <div className="text-center py-12">
+          <div className="text-center py-12 px-4">
             <p className="text-gray-400 text-lg">Видео не найдены</p>
             <p className="text-gray-500 text-sm mt-2">Попробуйте выбрать другой фильтр</p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <div className="flex flex-col gap-4">
             {filteredVideos.map((video) => (
               <Link key={video.id} href={`/video/${video.id}`}>
-              <div className="flex gap-4">
-                {/* Video Thumbnail */}
-                <div className="relative flex-shrink-0 border border-gray-600 border-opacity-30 rounded-lg overflow-hidden" style={{ width: '190px', height: '107px' }}>
-                  <Image
-                    src={(video.thumbnail && video.thumbnail.trim() !== '') ? video.thumbnail : '/images/video_prew_2.png'}
-                    alt={video.title}
-                    fill
-                    className="object-cover"
-                  />
-                  <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-                    {video.duration}
-                  </div>
-                </div>
-                
-                {/* Video Info */}
-                <div className="flex-1 flex flex-col justify-center">
-                  {/* Trainer Name with Avatar */}
-                  <div className="flex items-center gap-2 mb-2">
+                <div>
+                  {/* Video Thumbnail - 100% ширины экрана */}
+                  <div className="relative w-full aspect-video">
                     <Image
-                      src={video.trainer.avatar || '/images/avatars/trainer-avatar-1.png'}
-                      alt={`${video.trainer.name} ${video.trainer.lastName}`}
-                      width={24}
-                      height={24}
-                      className="rounded-full"
+                      src={(video.thumbnail && video.thumbnail.trim() !== '') ? video.thumbnail : '/images/video_prew_2.png'}
+                      alt={video.title}
+                      fill
+                      className="object-cover"
                     />
-                    <div className="text-white font-semibold truncate max-w-[150px]" style={{ fontSize: '12px' }}>
-                      {video.trainer.name} {video.trainer.lastName}
+                    {/* Duration badge */}
+                    <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm text-white text-sm font-medium px-2.5 py-1 rounded-lg">
+                      {video.duration}
                     </div>
                   </div>
-                  {/* Tags */}
-                  <div className="flex flex-wrap gap-2">
-                    {video.tags.map((tag, index) => (
-                      <span
-                        key={index}
-                        className="px-3 py-1.5 text-[#AEABBB] bg-[#2d3448] rounded-full"
-                        style={{ fontSize: '8px' }}
-                      >
-                        {tag}
-                      </span>
-                    ))}
+                  
+                  {/* Video Info */}
+                  <div className="px-4 py-3">
+                    {/* Trainer Avatar + Title на одной строке */}
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-700">
+                        {video.trainer.avatar ? (
+                          <Image
+                            src={video.trainer.avatar}
+                            alt={`${video.trainer.name} ${video.trainer.lastName}`}
+                            width={40}
+                            height={40}
+                            className="object-cover w-full h-full"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-white font-bold">
+                            {video.trainer.name.charAt(0)}
+                          </div>
+                        )}
+                      </div>
+                      <h3 className="text-white text-base font-semibold line-clamp-2 leading-tight flex-1">
+                        {video.title.toUpperCase()}
+                      </h3>
+                    </div>
+                    
+                    {/* Tags - горизонтальный скролл */}
+              {/* Теги с горизонтальным скроллом */}
+              <div
+                className="overflow-x-auto -mx-4 px-4 mb-2"
+                style={{
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none',
+                }}
+              >
+                <div className="flex gap-2 w-max">
+                  {video.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="px-3 py-1 rounded-full text-xs whitespace-nowrap"
+                      style={{
+                        backgroundColor: '#AEABBB33',
+                        color: '#AEABBB',
+                      }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>                    {/* Trainer info - последняя строка */}
+                                  {/* Информация о тренере */}
+              <div
+                style={{ fontSize: '12px' }}
+                className="text-white/60 mt-2"
+              >
+                <span>
+                  {video.trainer.name} {video.trainer.lastName}
+                </span>
+                <span className="text-white/40"> | </span>
+                <span>{video.viewsCount} тыс. лайков</span>
+                <span className="text-white/40"> | </span>
+                <span>оборудование ({video.equipment.join(' / ')})</span>
+              </div>
                   </div>
                 </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            ))}
           </div>
         )}
       </div>

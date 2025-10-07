@@ -4,7 +4,9 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Heart, MessageCircle, Share, Volume2, VolumeX } from 'lucide-react';
+
 import { useTelegram } from '@/hooks/useTelegram';
+import { isKinescopeUrl, getKinescopeDirectUrl } from '@/lib/videoQuality';
 
 interface ShortPageProps {
   params: Promise<{
@@ -234,8 +236,32 @@ export default function ShortPage({ params }: ShortPageProps) {
   }, [handleWheel]);
 
   // Получаем текущий short и проверяем тип видео
+
   const currentShortData = allShorts[currentIndex];
-  const isKinescopeVideo = currentShortData?.videoUrl?.includes('kinescope.io') || false;
+  const [kinescopeDirectUrl, setKinescopeDirectUrl] = useState<string | null>(null);
+  const [isKinescopeLoading, setIsKinescopeLoading] = useState(false);
+  const isKinescopeVideo = isKinescopeUrl(currentShortData?.videoUrl || '');
+
+  // Получаем прямую ссылку для Kinescope
+  useEffect(() => {
+    let ignore = false;
+    if (isKinescopeVideo && currentShortData?.videoUrl) {
+      setIsKinescopeLoading(true);
+      getKinescopeDirectUrl(currentShortData.videoUrl)
+        .then((data) => {
+          if (!ignore) setKinescopeDirectUrl(data.directUrl);
+        })
+        .catch(() => {
+          if (!ignore) setKinescopeDirectUrl(null);
+        })
+        .finally(() => {
+          if (!ignore) setIsKinescopeLoading(false);
+        });
+    } else {
+      setKinescopeDirectUrl(null);
+    }
+    return () => { ignore = true; };
+  }, [currentShortData?.videoUrl, isKinescopeVideo]);
 
   // Принудительный автоплей при смене видео
   useEffect(() => {
@@ -415,16 +441,20 @@ export default function ShortPage({ params }: ShortPageProps) {
     }, 300); // Должно совпадать с длительностью анимации
   };
 
-  // Preload следующего и предыдущего видео
+  // Preload следующего и предыдущего видео (включая Kinescope)
   useEffect(() => {
     // Preload следующего видео
     const nextIndex = currentIndex + 1;
     if (nextIndex < allShorts.length) {
       const nextShort = allShorts[nextIndex];
-      const isNextKinescope = nextShort?.videoUrl?.includes('kinescope.io');
-      
-      // Предзагружаем только обычные видео (не Kinescope)
-      if (!isNextKinescope && nextShort?.videoUrl && preloadNextVideoRef.current) {
+      if (isKinescopeUrl(nextShort?.videoUrl)) {
+        getKinescopeDirectUrl(nextShort.videoUrl).then(data => {
+          if (preloadNextVideoRef.current) {
+            preloadNextVideoRef.current.src = data.directUrl;
+            preloadNextVideoRef.current.load();
+          }
+        });
+      } else if (nextShort?.videoUrl && preloadNextVideoRef.current) {
         preloadNextVideoRef.current.src = nextShort.videoUrl;
         preloadNextVideoRef.current.load();
       }
@@ -434,10 +464,14 @@ export default function ShortPage({ params }: ShortPageProps) {
     const prevIndex = currentIndex - 1;
     if (prevIndex >= 0) {
       const prevShort = allShorts[prevIndex];
-      const isPrevKinescope = prevShort?.videoUrl?.includes('kinescope.io');
-      
-      // Предзагружаем только обычные видео (не Kinescope)
-      if (!isPrevKinescope && prevShort?.videoUrl && preloadPrevVideoRef.current) {
+      if (isKinescopeUrl(prevShort?.videoUrl)) {
+        getKinescopeDirectUrl(prevShort.videoUrl).then(data => {
+          if (preloadPrevVideoRef.current) {
+            preloadPrevVideoRef.current.src = data.directUrl;
+            preloadPrevVideoRef.current.load();
+          }
+        });
+      } else if (prevShort?.videoUrl && preloadPrevVideoRef.current) {
         preloadPrevVideoRef.current.src = prevShort.videoUrl;
         preloadPrevVideoRef.current.load();
       }
@@ -516,16 +550,27 @@ export default function ShortPage({ params }: ShortPageProps) {
       {/* Видео */}
       <div className="h-full w-full relative">
         {isKinescopeVideo ? (
-          // Используем iframe для Kinescope
-          <iframe
-            src={shortData.videoUrl}
-            className="w-full h-full"
-            allow="autoplay; fullscreen; picture-in-picture; encrypted-media; gyroscope; accelerometer; clipboard-write;"
-            frameBorder="0"
-            allowFullScreen
-          />
+          isKinescopeLoading ? (
+            <div className="w-full h-full flex items-center justify-center text-white">Загрузка видео...</div>
+          ) : (
+            <video
+              ref={videoRef}
+              key={shortData.id + '-kinescope'}
+              className="w-full h-full object-cover cursor-pointer"
+              src={kinescopeDirectUrl || ''}
+              poster={shortData.thumbnail}
+              autoPlay
+              loop
+              muted={isMuted}
+              playsInline
+              preload="auto"
+              onClick={handleVideoClick}
+              onLoadedData={() => {
+                videoRef.current?.play().catch(err => console.log('Play prevented:', err));
+              }}
+            />
+          )
         ) : (
-          // Обычный video тег для локальных файлов
           <video
             ref={videoRef}
             key={shortData.id}
@@ -539,7 +584,6 @@ export default function ShortPage({ params }: ShortPageProps) {
             preload="auto"
             onClick={handleVideoClick}
             onLoadedData={() => {
-              // Принудительный старт после загрузки
               videoRef.current?.play().catch(err => console.log('Play prevented:', err));
             }}
           />

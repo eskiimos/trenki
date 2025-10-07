@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Play, Pause, Heart, MessageCircle, Share, Volume2, VolumeX } from 'lucide-react';
 import TagsSection from '@/components/TagsSection';
 import BottomNavigation from '@/components/BottomNavigation';
+import { isKinescopeUrl, getKinescopeDirectUrl } from '@/lib/videoQuality';
 
 interface VideoPageProps {
   params: Promise<{
@@ -37,16 +38,27 @@ interface VideoData {
 
 export default function VideoPage({ params }: VideoPageProps) {
   const router = useRouter();
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [showComments, setShowComments] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [buffered, setBuffered] = useState(0); // Прогресс загрузки видео
   // const [volume, setVolume] = useState(1);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const [videoId, setVideoId] = useState<string>('');
   const [videoData, setVideoData] = useState<VideoData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [kinescopeDirectUrl, setKinescopeDirectUrl] = useState<string | null>(null);
+  const [isKinescopeLoading, setIsKinescopeLoading] = useState(false);
+  
+  // Для автоплея следующего видео
+  const [allVideos, setAllVideos] = useState<VideoData[]>([]);
+  const [nextVideo, setNextVideo] = useState<VideoData | null>(null);
+  const [showNextVideoPreview, setShowNextVideoPreview] = useState(false);
+  const [countdown, setCountdown] = useState(5);
+  const [autoplayEnabled, setAutoplayEnabled] = useState(true);
+  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Получаем params асинхронно и загружаем данные видео
   useEffect(() => {
@@ -59,9 +71,22 @@ export default function VideoPage({ params }: VideoPageProps) {
         setIsLoading(true);
         const response = await fetch('/api/videos');
         const data = await response.json();
-        const video = data.videos.find((v: VideoData) => v.id === resolvedParams.id);
+        const videos = data.videos || [];
+        setAllVideos(videos);
+        
+        const currentVideoIndex = videos.findIndex((v: VideoData) => v.id === resolvedParams.id);
+        const video = videos[currentVideoIndex];
+        
         if (video) {
           setVideoData(video);
+          
+          // Находим следующее видео
+          if (currentVideoIndex !== -1 && currentVideoIndex < videos.length - 1) {
+            setNextVideo(videos[currentVideoIndex + 1]);
+          } else {
+            // Если это последнее видео, берем первое (цикл)
+            setNextVideo(videos[0]);
+          }
         }
       } catch (error) {
         console.error('Error loading video:', error);
@@ -71,6 +96,44 @@ export default function VideoPage({ params }: VideoPageProps) {
     };
     getParams();
   }, [params]);
+
+  // Загружаем прямую ссылку для Kinescope видео
+  useEffect(() => {
+    let ignore = false;
+    
+    // Сбрасываем состояния при смене видео
+    setCurrentTime(0);
+    setDuration(0);
+    setBuffered(0);
+    setShowNextVideoPreview(false);
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+    }
+    
+    const loadKinescopeUrl = async () => {
+      if (videoData?.videoUrl && isKinescopeUrl(videoData.videoUrl)) {
+        setIsKinescopeLoading(true);
+        try {
+          const result = await getKinescopeDirectUrl(videoData.videoUrl);
+          if (!ignore && result.directUrl) {
+            setKinescopeDirectUrl(result.directUrl);
+          }
+        } catch (error) {
+          console.error('Error loading Kinescope direct URL:', error);
+        } finally {
+          if (!ignore) {
+            setIsKinescopeLoading(false);
+          }
+        }
+      }
+    };
+
+    loadKinescopeUrl();
+
+    return () => {
+      ignore = true;
+    };
+  }, [videoData?.videoUrl]);
   const [showControls, setShowControls] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -119,14 +182,85 @@ export default function VideoPage({ params }: VideoPageProps) {
 
   const handleTimeUpdate = () => {
     if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
+      const video = videoRef.current;
+      setCurrentTime(video.currentTime);
+      
+      // Проверяем длительность каждый раз если она еще не установлена
+      if (!duration && video.duration && !isNaN(video.duration)) {
+        console.log('Duration set from timeupdate:', video.duration);
+        setDuration(video.duration);
+      }
+      
+      // Обновляем прогресс загрузки
+      updateBuffered();
     }
   };
 
+  const updateBuffered = () => {
+    if (videoRef.current && videoRef.current.duration) {
+      const video = videoRef.current;
+      if (video.buffered.length > 0) {
+        // Получаем самый дальний буферизованный момент
+        const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+        const bufferedPercent = (bufferedEnd / video.duration) * 100;
+        setBuffered(bufferedPercent);
+      }
+    }
+  };
+
+  const handleProgress = () => {
+    updateBuffered();
+  };
+
   const handleLoadedMetadata = () => {
-    if (videoRef.current) {
+    if (videoRef.current && videoRef.current.duration && !isNaN(videoRef.current.duration)) {
+      setDuration(videoRef.current.duration);
+      console.log('Video duration loaded:', videoRef.current.duration);
+    }
+  };
+
+  const handleCanPlay = () => {
+    // Дополнительная проверка когда видео готово к воспроизведению
+    if (videoRef.current && videoRef.current.duration && !isNaN(videoRef.current.duration)) {
       setDuration(videoRef.current.duration);
     }
+  };
+
+  const handleVideoEnded = () => {
+    setIsPlaying(false);
+    if (autoplayEnabled && nextVideo) {
+      // Показываем превью и запускаем обратный отсчёт
+      startCountdown();
+    }
+  };
+
+  const startCountdown = () => {
+    setShowNextVideoPreview(true);
+    setCountdown(5);
+    
+    countdownTimerRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          // Переходим к следующему видео
+          if (countdownTimerRef.current) {
+            clearInterval(countdownTimerRef.current);
+          }
+          if (nextVideo) {
+            router.push(`/video/${nextVideo.id}`);
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const cancelAutoplay = () => {
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+    }
+    setShowNextVideoPreview(false);
+    setAutoplayEnabled(false);
   };
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -149,13 +283,28 @@ export default function VideoPage({ params }: VideoPageProps) {
     if (video) {
       video.addEventListener('timeupdate', handleTimeUpdate);
       video.addEventListener('loadedmetadata', handleLoadedMetadata);
+      video.addEventListener('loadeddata', handleLoadedMetadata);
+      video.addEventListener('canplay', handleCanPlay);
+      video.addEventListener('durationchange', handleLoadedMetadata);
+      video.addEventListener('ended', handleVideoEnded);
+      video.addEventListener('progress', handleProgress); // Для отслеживания загрузки
+      
+      // Проверяем сразу, если метаданные уже загружены
+      if (video.duration && !isNaN(video.duration)) {
+        setDuration(video.duration);
+      }
       
       return () => {
         video.removeEventListener('timeupdate', handleTimeUpdate);
         video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        video.removeEventListener('loadeddata', handleLoadedMetadata);
+        video.removeEventListener('canplay', handleCanPlay);
+        video.removeEventListener('durationchange', handleLoadedMetadata);
+        video.removeEventListener('ended', handleVideoEnded);
+        video.removeEventListener('progress', handleProgress);
       };
     }
-  }, []);
+  }, [nextVideo, autoplayEnabled, showNextVideoPreview, duration]);
 
   // Скрываем элементы управления при запуске видео
   useEffect(() => {
@@ -169,14 +318,92 @@ export default function VideoPage({ params }: VideoPageProps) {
     }
   }, [isPlaying, showControlsTemporarily]);
 
-  // Очистка таймера при размонтировании
+  // Очистка таймеров при размонтировании
   useEffect(() => {
     return () => {
       if (hideControlsTimeoutRef.current) {
         clearTimeout(hideControlsTimeoutRef.current);
       }
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+      }
     };
   }, []);
+
+  // Горячие клавиши для управления видео
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!videoRef.current) return;
+
+      switch(e.key.toLowerCase()) {
+        case ' ':
+        case 'k':
+          e.preventDefault();
+          togglePlay();
+          break;
+        case 'arrowleft':
+          e.preventDefault();
+          videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 5);
+          showControlsTemporarily();
+          break;
+        case 'arrowright':
+          e.preventDefault();
+          videoRef.current.currentTime = Math.min(videoRef.current.duration, videoRef.current.currentTime + 5);
+          showControlsTemporarily();
+          break;
+        case 'j':
+          e.preventDefault();
+          videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
+          showControlsTemporarily();
+          break;
+        case 'l':
+          e.preventDefault();
+          videoRef.current.currentTime = Math.min(videoRef.current.duration, videoRef.current.currentTime + 10);
+          showControlsTemporarily();
+          break;
+        case 'm':
+          e.preventDefault();
+          toggleMute();
+          break;
+        case 'f':
+          e.preventDefault();
+          if (document.fullscreenElement) {
+            document.exitFullscreen();
+          } else {
+            videoRef.current.parentElement?.requestFullscreen();
+          }
+          break;
+        case '0':
+        case 'home':
+          e.preventDefault();
+          videoRef.current.currentTime = 0;
+          showControlsTemporarily();
+          break;
+        case 'end':
+          e.preventDefault();
+          videoRef.current.currentTime = videoRef.current.duration;
+          showControlsTemporarily();
+          break;
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+          e.preventDefault();
+          const percent = parseInt(e.key) * 10;
+          videoRef.current.currentTime = (videoRef.current.duration * percent) / 100;
+          showControlsTemporarily();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [togglePlay, toggleMute, showControlsTemporarily]);
 
   return (
     <div className="min-h-screen bg-[#101530] pb-20">{/* pb-20 для отступа под таб-бар */}
@@ -199,7 +426,7 @@ export default function VideoPage({ params }: VideoPageProps) {
       {/* Video Player */}
       <div className="relative bg-black">
         <div 
-          className="aspect-video relative"
+          className="aspect-video relative overflow-hidden"
           onMouseMove={handleVideoInteraction}
           onTouchStart={handleVideoInteraction}
         >
@@ -207,31 +434,72 @@ export default function VideoPage({ params }: VideoPageProps) {
             <div className="w-full h-full flex items-center justify-center bg-black">
               <div className="text-white">Загрузка...</div>
             </div>
-          ) : videoData?.videoUrl?.includes('kinescope.io') ? (
-            // Используем iframe для Kinescope
-            <iframe
-              src={videoData.videoUrl}
-              className="w-full h-full"
-              allow="autoplay; fullscreen; picture-in-picture; encrypted-media; gyroscope; accelerometer; clipboard-write;"
-              frameBorder="0"
-              allowFullScreen
-            />
+          ) : isKinescopeLoading ? (
+            // Загрузка прямой ссылки Kinescope - показываем превью
+            <div className="w-full h-full relative bg-black">
+              {videoData?.thumbnail && (
+                <Image
+                  src={videoData.thumbnail}
+                  alt={videoData.title}
+                  fill
+                  className="object-cover"
+                />
+              )}
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-3"></div>
+                  <div className="text-white text-sm">Подготовка видео...</div>
+                </div>
+              </div>
+            </div>
           ) : (
-            // Обычный video тег для локальных файлов или прямых ссылок
+            // Используем video тег для всех видео (включая Kinescope с прямыми CDN ссылками)
             <>
               <video
                 ref={videoRef}
                 className="w-full h-full object-cover"
-                src={videoData?.videoUrl || '/video/trenka.mp4'}
+                src={kinescopeDirectUrl || videoData?.videoUrl || '/video/trenka.mp4'}
+                poster={videoData?.thumbnail}
                 autoPlay
-                muted
                 playsInline
                 onClick={togglePlay}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
+                onLoadedMetadata={(e) => {
+                  const video = e.currentTarget;
+                  if (video.duration && !isNaN(video.duration)) {
+                    setDuration(video.duration);
+                    console.log('Duration set from loadedmetadata:', video.duration);
+                  }
+                }}
+                onLoadedData={(e) => {
+                  const video = e.currentTarget;
+                  // Автоплей после загрузки данных
+                  if (!isMuted) {
+                    video.muted = false;
+                  }
+                  
+                  // Устанавливаем duration если еще не установлен
+                  if (video.duration && !isNaN(video.duration)) {
+                    setDuration(video.duration);
+                  }
+                  
+                  video.play().catch(err => {
+                    console.log('Autoplay was prevented:', err);
+                    // Если автоплей заблокирован браузером, ничего страшного
+                  });
+                }}
+                onDurationChange={(e) => {
+                  const video = e.currentTarget;
+                  if (video.duration && !isNaN(video.duration)) {
+                    setDuration(video.duration);
+                    console.log('Duration changed:', video.duration);
+                  }
+                }}
+                preload="metadata"
               />
               
-              {/* Play/Pause Overlay - только для обычного video */}
+              {/* Play/Pause Overlay */}
               <div className={`absolute inset-0 bg-gradient-to-b from-transparent to-black/50 flex items-center justify-center transition-opacity duration-300 ${
                 showControls ? 'opacity-100' : 'opacity-0'
               }`}>
@@ -249,27 +517,214 @@ export default function VideoPage({ params }: VideoPageProps) {
             </>
           )}
           
-          {/* Video Controls - только для обычного video, не для Kinescope */}
-          {!videoData?.videoUrl?.includes('kinescope.io') && (
-            <div className={`absolute bottom-4 left-4 right-4 transition-opacity duration-300 ${
-              showControls ? 'opacity-100' : 'opacity-0'
-            }`}>
-              <div className="flex items-center space-x-4">
-                <div 
-                  className="flex-1 h-1 bg-white/30 rounded-full cursor-pointer"
-                  onClick={handleSeek}
+          {/* Video Controls - для всех видео */}
+          <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pt-12 pb-4 px-4 transition-opacity duration-300 ${
+            showControls ? 'opacity-100' : 'opacity-0'
+          }`}>
+            {/* Progress Bar */}
+            <div 
+              className="flex-1 h-1 bg-white/30 rounded-full cursor-pointer mb-3 hover:h-1.5 transition-all relative"
+              onClick={handleSeek}
+            >
+              {/* Buffered (загруженная часть) */}
+              <div 
+                className="absolute h-full bg-white/40 rounded-full transition-all"
+                style={{ width: `${buffered}%` }}
+              ></div>
+              {/* Current progress (текущая позиция) */}
+              <div 
+                className="absolute h-full bg-blue-500 rounded-full transition-all"
+                style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+              ></div>
+            </div>
+            
+            {/* Control Buttons */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                {/* Play/Pause Button */}
+                <button 
+                  onClick={togglePlay}
+                  className="text-white hover:text-blue-400 transition-colors"
                 >
-                  <div 
-                    className="h-full bg-white rounded-full transition-all"
-                    style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
-                  ></div>
-                </div>
-                <span className="text-white text-sm">
+                  {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+                </button>
+                
+                {/* Volume Control */}
+                <button 
+                  onClick={toggleMute} 
+                  className="text-white hover:text-blue-400 transition-colors"
+                >
+                  {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                </button>
+                
+                {/* Time Display */}
+                <span className="text-white text-sm font-medium">
                   {formatTime(currentTime)} / {formatTime(duration)}
                 </span>
-                <button onClick={toggleMute} className="text-white">
-                  {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+              </div>
+              
+              <div className="flex items-center space-x-3">
+                {/* Autoplay Toggle */}
+                <button 
+                  onClick={() => setAutoplayEnabled(!autoplayEnabled)}
+                  className={`transition-colors ${autoplayEnabled ? 'text-blue-400' : 'text-white/50'} hover:text-blue-400`}
+                  title={autoplayEnabled ? 'Автоплей включен' : 'Автоплей выключен'}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 4h14v16H5V4z"></path>
+                    <path d="M5 12h14"></path>
+                    {autoplayEnabled && <path d="M12 4v16" stroke="currentColor" strokeWidth="3"></path>}
+                  </svg>
                 </button>
+                
+                {/* Settings Button (placeholder) */}
+                <button 
+                  className="text-white hover:text-blue-400 transition-colors"
+                  title="Настройки"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M12 1v6m0 6v6m9-9h-6m-6 0H3"></path>
+                  </svg>
+                </button>
+                
+                {/* Fullscreen Button */}
+                <button 
+                  onClick={() => {
+                    if (videoRef.current) {
+                      if (document.fullscreenElement) {
+                        document.exitFullscreen();
+                      } else {
+                        videoRef.current.parentElement?.requestFullscreen();
+                      }
+                    }
+                  }}
+                  className="text-white hover:text-blue-400 transition-colors"
+                  title="Полноэкранный режим"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Next Video Preview with Countdown - Overlay */}
+          {showNextVideoPreview && nextVideo && (
+            <div className="absolute inset-0 bg-[#0A0E1A] p-4 md:p-8 z-50">
+              {/* Header - "ДАЛЬШЕ" слева, крестик справа */}
+              <div className="flex items-center justify-between mb-6 md:mb-8">
+                <h2 className="text-white text-xl md:text-4xl font-bold tracking-wider">ДАЛЬШЕ</h2>
+                
+                {/* Close Button */}
+                <button
+                  onClick={cancelAutoplay}
+                  className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center text-white hover:text-gray-300 transition-colors"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="md:w-7 md:h-7">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+              
+              {/* Content: Превью (240px) + Название справа на мобилке */}
+              <div className="flex flex-row md:flex-row items-start gap-4 md:gap-8">
+                {/* Thumbnail with Countdown - 240px на мобилке */}
+                <div className="relative w-60 md:w-[400px] flex-shrink-0">
+                  <div className="w-full aspect-video rounded-lg md:rounded-2xl overflow-hidden bg-white/5 backdrop-blur-sm border border-white/10">
+                    {nextVideo.thumbnail && (
+                      <Image
+                        src={nextVideo.thumbnail}
+                        alt={nextVideo.title}
+                        fill
+                        className="object-cover opacity-80"
+                      />
+                    )}
+                    {/* Countdown Circle - в центре превью */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="relative w-16 h-16 md:w-24 md:h-24">
+                        <svg className="w-full h-full transform -rotate-90">
+                          <circle
+                            cx="32"
+                            cy="32"
+                            r="28"
+                            stroke="rgba(255,255,255,0.15)"
+                            strokeWidth="2.5"
+                            fill="none"
+                            className="md:hidden"
+                          />
+                          <circle
+                            cx="32"
+                            cy="32"
+                            r="28"
+                            stroke="white"
+                            strokeWidth="2.5"
+                            fill="none"
+                            strokeDasharray={`${2 * Math.PI * 28}`}
+                            strokeDashoffset={`${2 * Math.PI * 28 * (1 - countdown / 5)}`}
+                            className="transition-all duration-1000 ease-linear md:hidden"
+                          />
+                          <circle
+                            cx="48"
+                            cy="48"
+                            r="42"
+                            stroke="rgba(255,255,255,0.15)"
+                            strokeWidth="3"
+                            fill="none"
+                            className="hidden md:block"
+                          />
+                          <circle
+                            cx="48"
+                            cy="48"
+                            r="42"
+                            stroke="white"
+                            strokeWidth="3"
+                            fill="none"
+                            strokeDasharray={`${2 * Math.PI * 42}`}
+                            strokeDashoffset={`${2 * Math.PI * 42 * (1 - countdown / 5)}`}
+                            className="hidden md:block transition-all duration-1000 ease-linear"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-white text-2xl md:text-4xl font-bold">{countdown}</span>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Timer Badge */}
+                    <div className="absolute bottom-2 right-2 md:bottom-3 md:right-3 bg-black/70 backdrop-blur-sm rounded px-2 py-1 md:px-2.5 md:py-1">
+                      <span className="text-white text-[10px] md:text-xs font-medium">
+                        {nextVideo.duration && !isNaN(nextVideo.duration) && nextVideo.duration > 0 
+                          ? `${Math.floor(nextVideo.duration / 60)}:${String(Math.floor(nextVideo.duration % 60)).padStart(2, '0')}` 
+                          : '0:00'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Video Title - справа от превью */}
+                <div className="flex-1 flex flex-col justify-start">
+                  <h3 className="text-white text-sm md:text-xl font-semibold leading-snug mb-3 md:mb-6">
+                    {nextVideo.title}
+                  </h3>
+                  
+                  {/* Info - только на десктопе */}
+                  <div className="hidden md:flex flex-col gap-5 text-white/60 uppercase tracking-wider text-xs font-medium">
+                    <div className="flex flex-col gap-1">
+                      <div className="text-[9px] text-white/40">ВИД</div>
+                      <div className="text-xs">{nextVideo.category || 'ТРЕНИРОВКИ'}</div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <div className="text-[9px] text-white/40">ТРЕНЕР</div>
+                      <div className="text-xs">{nextVideo.trainer.name} {nextVideo.trainer.lastName}</div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <div className="text-[9px] text-white/40">ОБОРУДОВАНИЕ</div>
+                      <div className="text-xs">{nextVideo.equipment?.join(', ') || 'НЕТ'}</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

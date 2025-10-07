@@ -77,7 +77,42 @@ export async function POST(request: NextRequest) {
     const title = videoData.title || videoData.name || '';
     const description = videoData.description || videoData.subtitle || '';
 
-    console.log('Extracted data:', { duration, thumbnail, title, description });
+    // Извлекаем прямые ссылки на видео в разных качествах
+    const assets = videoData.assets || [];
+    const videoQualities: Record<string, string> = {};
+    
+    // Сортируем по качеству (от лучшего к худшему)
+    const qualityOrder = ['1080p', '720p', '480p', '360p', 'original'];
+    
+    assets.forEach((asset: any) => {
+      if (asset.filetype === 'mp4' && asset.url) {
+        const quality = asset.quality || 'unknown';
+        videoQualities[quality] = asset.url;
+      }
+    });
+
+    // Выбираем оптимальное качество (720p по умолчанию, или лучшее доступное)
+    let directVideoUrl = '';
+    for (const quality of qualityOrder) {
+      if (videoQualities[quality]) {
+        directVideoUrl = videoQualities[quality];
+        break;
+      }
+    }
+
+    // Если не нашли MP4, используем HLS ссылку
+    if (!directVideoUrl && videoData.hls_link) {
+      directVideoUrl = videoData.hls_link;
+    }
+
+    console.log('Extracted data:', { 
+      duration, 
+      thumbnail, 
+      title, 
+      description,
+      availableQualities: Object.keys(videoQualities),
+      directVideoUrl: directVideoUrl ? 'found' : 'not found'
+    });
 
     return NextResponse.json({ 
       success: true,
@@ -86,6 +121,9 @@ export async function POST(request: NextRequest) {
       title,
       description,
       videoId,
+      directVideoUrl, // Прямая ссылка на видео
+      availableQualities: videoQualities, // Все доступные качества
+      hlsUrl: videoData.hls_link, // HLS ссылка для adaptive streaming
     });
   } catch (error: any) {
     console.error('Error fetching Kinescope metadata:', error);

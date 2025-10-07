@@ -210,7 +210,7 @@ export default function AdminShortsPage() {
         </div>
 
         {/* Форма добавления/редактирования */}
-        <div className="bg-[#1a1f3a] rounded-lg p-6 mb-8">
+        <div className="bg-[#1a1f3a] rounded-lg p-6 mb-8 border border-white/5">
           <h2 className="text-xl font-semibold mb-4">
             {editingShortId ? 'Редактировать Short' : 'Добавить новый Short'}
           </h2>
@@ -358,7 +358,7 @@ export default function AdminShortsPage() {
         </div>
 
         {/* Список shorts */}
-        <div className="bg-[#1a1f3a] rounded-lg p-6">
+        <div className="bg-[#1a1f3a] rounded-lg p-6 border border-white/5">
           <h2 className="text-xl font-semibold mb-4">Список Shorts ({shorts.length})</h2>
           
           {isLoading ? (
