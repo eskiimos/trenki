@@ -152,17 +152,36 @@ export default function VideoPage({ params }: VideoPageProps) {
       setIsFullscreen(isCurrentlyFullscreen);
     };
 
+    // Для iOS - отслеживаем события на video элементе
+    const handleWebkitFullscreenChange = () => {
+      if (videoRef.current) {
+        const isFullscreen = !!(videoRef.current as any).webkitDisplayingFullscreen;
+        setIsFullscreen(isFullscreen);
+      }
+    };
+
     // Добавляем все возможные события для кроссбраузерности
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
     document.addEventListener('mozfullscreenchange', handleFullscreenChange);
     document.addEventListener('MSFullscreenChange', handleFullscreenChange);
     
+    // iOS-специфичные события
+    if (videoRef.current) {
+      videoRef.current.addEventListener('webkitbeginfullscreen', handleWebkitFullscreenChange);
+      videoRef.current.addEventListener('webkitendfullscreen', handleWebkitFullscreenChange);
+    }
+    
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
       document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
       document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+      
+      if (videoRef.current) {
+        videoRef.current.removeEventListener('webkitbeginfullscreen', handleWebkitFullscreenChange);
+        videoRef.current.removeEventListener('webkitendfullscreen', handleWebkitFullscreenChange);
+      }
     };
   }, []);
 
@@ -302,7 +321,18 @@ export default function VideoPage({ params }: VideoPageProps) {
         (document as any).msExitFullscreen();
       }
     } else {
-      // Вход в fullscreen - используем родительский контейнер видео
+      // Для iOS Safari - используем webkitEnterFullscreen на самом video элементе
+      const video = videoRef.current;
+      if (video && (video as any).webkitEnterFullscreen) {
+        try {
+          (video as any).webkitEnterFullscreen();
+          return;
+        } catch (err) {
+          console.error('iOS fullscreen failed:', err);
+        }
+      }
+
+      // Для остальных браузеров - используем родительский контейнер видео
       const element = videoRef.current?.parentElement;
       if (!element) return;
 
@@ -651,6 +681,9 @@ export default function VideoPage({ params }: VideoPageProps) {
                 poster={videoData?.thumbnail}
                 autoPlay
                 playsInline
+                webkit-playsinline="true"
+                x-webkit-airplay="allow"
+                controlsList="nodownload"
                 onClick={togglePlay}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
