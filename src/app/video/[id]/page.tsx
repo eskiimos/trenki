@@ -49,6 +49,8 @@ export default function VideoPage({ params }: VideoPageProps) {
   // const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // Отслеживание ориентации экрана (ландшафт/портрет) для мобильных устройств
+  const [isLandscape, setIsLandscape] = useState(false);
   const [videoId, setVideoId] = useState<string>('');
   const [videoData, setVideoData] = useState<VideoData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -161,6 +163,28 @@ export default function VideoPage({ params }: VideoPageProps) {
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
       document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
       document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
+
+  // Отслеживание ориентации экрана для адаптации под горизонтальный режим
+  useEffect(() => {
+    const checkOrientation = () => {
+      // Проверяем: горизонтальная ориентация И мобильное устройство (ширина < 768px)
+      const isLandscapeOrientation = window.matchMedia('(orientation: landscape)').matches;
+      const isMobileWidth = window.innerWidth < 768;
+      setIsLandscape(isLandscapeOrientation && isMobileWidth);
+    };
+
+    // Проверяем при монтировании
+    checkOrientation();
+
+    // Слушаем изменения ориентации и размера экрана
+    window.addEventListener('resize', checkOrientation);
+    window.addEventListener('orientationchange', checkOrientation);
+    
+    return () => {
+      window.removeEventListener('resize', checkOrientation);
+      window.removeEventListener('orientationchange', checkOrientation);
     };
   }, []);
 
@@ -548,10 +572,35 @@ export default function VideoPage({ params }: VideoPageProps) {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  // Отслеживаем поворот экрана и размер окна, чтобы адаптировать UI для мобильного ландшафта
+  useEffect(() => {
+    const checkLandscape = () => {
+      try {
+        const mq = window.matchMedia && window.matchMedia('(orientation: landscape)');
+        const isOr = mq ? mq.matches : window.innerWidth > window.innerHeight;
+        // Считаем мобильным, если ширина меньше 900px (примерно breakpoint md) и ориентация landscape
+        setIsLandscape(isOr && window.innerWidth <= 900);
+      } catch (e) {
+        setIsLandscape(window.innerWidth > window.innerHeight && window.innerWidth <= 900);
+      }
+    };
+
+    checkLandscape();
+    window.addEventListener('orientationchange', checkLandscape);
+    window.addEventListener('resize', checkLandscape);
+    return () => {
+      window.removeEventListener('orientationchange', checkLandscape);
+      window.removeEventListener('resize', checkLandscape);
+    };
+  }, []);
+
+  // Контейнер с адаптацией для ландшафтного режима на мобильных
+  const containerClass = `min-h-screen bg-[#101530] pb-20 ${isLandscape ? 'overflow-hidden h-screen' : ''}`;
+
   return (
-    <div className="min-h-screen bg-[#101530] pb-20">{/* pb-20 для отступа под таб-бар */}
+    <div className={containerClass}>{/* pb-20 для отступа под таб-бар */}
       {/* Header */}
-      <header className="flex items-center justify-between p-4 bg-[#101530] shadow-sm border-b border-gray-700" style={{ paddingTop: '90px' }}>
+  <header className={`flex items-center justify-between p-4 bg-[#101530] shadow-sm border-b border-gray-700 ${isLandscape ? 'hidden' : ''}`} style={{ paddingTop: '90px' }}>
         <div className="flex items-center space-x-2">
           <button 
             onClick={() => autoplayEnabled ? router.push('/video') : router.back()} 
@@ -564,9 +613,9 @@ export default function VideoPage({ params }: VideoPageProps) {
       </header>
 
       {/* Video Player */}
-      <div className="relative bg-black">
+      <div className={isLandscape ? 'fixed inset-0 z-50 bg-black flex items-center justify-center' : 'relative bg-black'}>
         <div 
-          className="aspect-video relative overflow-hidden"
+          className={`${isLandscape ? 'w-full h-full' : 'aspect-video'} relative overflow-hidden`}
           onMouseMove={handleVideoInteraction}
           onTouchStart={handleVideoInteraction}
         >
@@ -662,12 +711,12 @@ export default function VideoPage({ params }: VideoPageProps) {
           )}
           
           {/* Video Controls - для всех видео */}
-          <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pt-12 pb-4 px-4 transition-opacity duration-300 ${
+          <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pt-12 ${isLandscape ? 'pb-8 px-6' : 'pb-4 px-4'} transition-opacity duration-300 ${
             showControls ? 'opacity-100' : 'opacity-0'
           }`}>
             {/* Progress Bar */}
             <div 
-              className="flex-1 h-1 bg-white/30 rounded-full cursor-pointer mb-3 hover:h-1.5 transition-all relative"
+              className={`flex-1 bg-white/30 rounded-full cursor-pointer mb-3 hover:h-2 transition-all relative ${isLandscape ? 'h-1.5' : 'h-1'}`}
               onClick={handleSeek}
             >
               {/* Buffered (загруженная часть) */}
@@ -684,11 +733,11 @@ export default function VideoPage({ params }: VideoPageProps) {
             
             {/* Control Buttons */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
+              <div className={`flex items-center space-x-3 ${isLandscape ? 'space-x-4' : ''}`}>
                 {/* Play/Pause Button */}
                 <button 
                   onClick={togglePlay}
-                  className="transition-opacity hover:opacity-80"
+                  className={`transition-opacity hover:opacity-80 ${isLandscape ? 'w-12 h-12' : ''}`}
                   title={isPlaying ? 'Пауза' : 'Воспроизвести'}
                 >
                   <Image
@@ -697,8 +746,8 @@ export default function VideoPage({ params }: VideoPageProps) {
                       : '/icons/video/player/Play.svg'
                     }
                     alt={isPlaying ? 'Пауза' : 'Воспроизвести'}
-                    width={24}
-                    height={24}
+                    width={isLandscape ? 28 : 24}
+                    height={isLandscape ? 28 : 24}
                   />
                 </button>
                 
@@ -714,18 +763,18 @@ export default function VideoPage({ params }: VideoPageProps) {
                       : '/icons/video/player/Volume=Yes.svg'
                     }
                     alt={isMuted ? 'Включить звук' : 'Выключить звук'}
-                    width={24}
-                    height={24}
+                    width={isLandscape ? 28 : 24}
+                    height={isLandscape ? 28 : 24}
                   />
                 </button>
                 
                 {/* Time Display */}
-                <span className="text-white text-sm font-medium">
+                <span className={`text-white font-medium ${isLandscape ? 'text-base' : 'text-sm'}`}>
                   {formatTime(currentTime)} / {formatTime(duration)}
                 </span>
               </div>
               
-              <div className="flex items-center space-x-3">
+              <div className={`flex items-center space-x-3 ${isLandscape ? 'space-x-4' : ''}`}>
                 {/* Autoplay Toggle */}
                 <button 
                   onClick={() => setAutoplayEnabled(!autoplayEnabled)}
@@ -738,8 +787,8 @@ export default function VideoPage({ params }: VideoPageProps) {
                       : '/icons/video/player/material-symbols_autoplay def.svg'
                     }
                     alt="Автоплей"
-                    width={24}
-                    height={24}
+                    width={isLandscape ? 28 : 24}
+                    height={isLandscape ? 28 : 24}
                   />
                 </button>
                 
@@ -756,8 +805,8 @@ export default function VideoPage({ params }: VideoPageProps) {
                       : '/icons/video/player/Fulscreen=No.svg'
                     }
                     alt="Полноэкранный режим"
-                    width={24}
-                    height={24}
+                    width={isLandscape ? 28 : 24}
+                    height={isLandscape ? 28 : 24}
                   />
                 </button>
               </div>
@@ -885,8 +934,8 @@ export default function VideoPage({ params }: VideoPageProps) {
         </div>
       </div>
 
-      {/* Action Icons */}
-      <div className="bg-[#101530]">
+  {/* Action Icons (скрываем в ландшафтном режиме на мобилках) */}
+  <div className={`bg-[#101530] ${isLandscape ? 'hidden' : ''}`}>
         <div className="overflow-x-auto scrollbar-hide">
           <div className="flex items-center gap-3 p-4 min-w-max">
             {/* Like */}
@@ -928,6 +977,8 @@ export default function VideoPage({ params }: VideoPageProps) {
         </div>
       </div>
 
+      {/* Tags / Description / Trainer - скрываем при ландшафте на мобилке */}
+      <div className={`${isLandscape ? 'hidden' : ''}`}>
       <TagsSection 
         tags={videoData?.tags}
         equipment={videoData?.equipment}
@@ -942,6 +993,7 @@ export default function VideoPage({ params }: VideoPageProps) {
           avatar: videoData.trainer.avatar
         } : null}
       />
+      </div>
       
       <BottomNavigation activeTab="video" />
     </div>
