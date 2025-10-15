@@ -6,11 +6,18 @@ import Image from 'next/image';
 import BottomNavigation from '@/components/BottomNavigation';
 import { Skeleton } from '@/components/Skeleton';
 
+// Функция для форматирования длительности видео
+const formatDuration = (seconds: number): string => {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+};
+
 interface Video {
   id: string;
   title: string;
   description?: string;
-  duration: string;
+  duration: number;
   videoUrl: string;
   thumbnail?: string;
   category: string;
@@ -199,7 +206,7 @@ const VideoPage = () => {
                     />
                     {/* Duration badge */}
                     <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm text-white text-sm font-medium px-2.5 py-1 rounded-lg">
-                      {video.duration}
+                      {formatDuration(video.duration)}
                     </div>
                   </div>
                   

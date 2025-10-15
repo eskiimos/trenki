@@ -138,6 +138,32 @@ export default function VideoPage({ params }: VideoPageProps) {
     };
   }, [videoData?.videoUrl]);
 
+  // Отслеживание изменения полноэкранного режима (кроссбраузерное)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isCurrentlyFullscreen = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      setIsFullscreen(isCurrentlyFullscreen);
+    };
+
+    // Добавляем все возможные события для кроссбраузерности
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+    
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
+
   // Загружаем статус лайка при открытии видео
   useEffect(() => {
     const loadLikeStatus = async () => {
@@ -219,6 +245,52 @@ export default function VideoPage({ params }: VideoPageProps) {
     if (videoRef.current) {
       videoRef.current.muted = !isMuted;
       setIsMuted(!isMuted);
+    }
+    showControlsTemporarily();
+  };
+
+  // Проверка поддержки Fullscreen API
+  const isFullscreenSupported = () => {
+    return !!(
+      document.fullscreenEnabled ||
+      (document as any).webkitFullscreenEnabled ||
+      (document as any).mozFullScreenEnabled ||
+      (document as any).msFullscreenEnabled
+    );
+  };
+
+  // Универсальная функция для fullscreen с кроссбраузерной поддержкой
+  const toggleFullscreen = () => {
+    if (!isFullscreenSupported()) {
+      console.warn('Fullscreen API не поддерживается в этом браузере');
+      return;
+    }
+
+    if (document.fullscreenElement || (document as any).webkitFullscreenElement || (document as any).mozFullScreenElement || (document as any).msFullscreenElement) {
+      // Выход из fullscreen
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(console.error);
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+      } else if ((document as any).mozCancelFullScreen) {
+        (document as any).mozCancelFullScreen();
+      } else if ((document as any).msExitFullscreen) {
+        (document as any).msExitFullscreen();
+      }
+    } else {
+      // Вход в fullscreen - используем родительский контейнер видео
+      const element = videoRef.current?.parentElement;
+      if (!element) return;
+
+      if (element.requestFullscreen) {
+        element.requestFullscreen().catch(console.error);
+      } else if ((element as any).webkitRequestFullscreen) {
+        (element as any).webkitRequestFullscreen();
+      } else if ((element as any).mozRequestFullScreen) {
+        (element as any).mozRequestFullScreen();
+      } else if ((element as any).msRequestFullscreen) {
+        (element as any).msRequestFullscreen();
+      }
     }
     showControlsTemporarily();
   };
@@ -673,17 +745,10 @@ export default function VideoPage({ params }: VideoPageProps) {
                 
                 {/* Fullscreen Button */}
                 <button 
-                  onClick={() => {
-                    if (videoRef.current) {
-                      if (document.fullscreenElement) {
-                        document.exitFullscreen();
-                      } else {
-                        videoRef.current.parentElement?.requestFullscreen();
-                      }
-                    }
-                  }}
-                  className="transition-opacity hover:opacity-80"
+                  onClick={toggleFullscreen}
+                  className="transition-opacity hover:opacity-80 disabled:opacity-50"
                   title={isFullscreen ? 'Выход из полноэкранного режима' : 'Полноэкранный режим'}
+                  disabled={!isFullscreenSupported()}
                 >
                   <Image
                     src={isFullscreen 
