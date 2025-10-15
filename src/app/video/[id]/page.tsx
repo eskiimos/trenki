@@ -1028,7 +1028,8 @@ export default function VideoPage({ params }: VideoPageProps) {
       />
       </div>
       
-      <BottomNavigation activeTab="video" />
+      {/* Скрываем BottomNavigation в горизонтальном режиме */}
+      {!isLandscape && <BottomNavigation activeTab="video" />}
     </div>
   );
 }
