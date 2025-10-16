@@ -178,11 +178,11 @@ const Header = () => {
   // - Иначе показываем данные из Telegram
   const displayName = (userProfile?.firstName) 
     ? userProfile.firstName 
-    : (user?.first_name || 'Игрок');
+    : (user?.first_name || 'ТРЕНЬКИ');
   
   const displayLastName = (userProfile?.lastName) 
     ? userProfile.lastName 
-    : (user?.last_name || '');
+    : (user?.last_name || 'ТРЕНЬКИ');
 
   return (
     <header style={{

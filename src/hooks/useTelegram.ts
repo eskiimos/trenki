@@ -12,6 +12,9 @@ export const useTelegram = () => {
     if (!initialized.current) {
       initialized.current = true;
       
+      // Проверяем, открыто ли приложение в Telegram
+      const isTelegramApp = window.Telegram?.WebApp?.initData && window.Telegram?.WebApp?.initData.length > 0;
+      
       if (window.Telegram?.WebApp) {
         const tg = window.Telegram.WebApp;
         
@@ -32,24 +35,25 @@ export const useTelegram = () => {
         tg.MainButton.hide();
         
         console.log('Telegram WebApp initialized');
+        console.log('Platform:', tg.platform);
+        console.log('Is Telegram App:', isTelegramApp);
       }
 
-      // Моковые данные для разработки
-      const mockUser = {
-        id: 123456789,
-        first_name: 'Тест',
-        last_name: 'Пользователь',
-        username: 'testuser'
-      };
-
-      // Устанавливаем пользователя один раз
+      // Получаем пользователя из Telegram (если есть)
+      // В браузере/PWA будет null, и приложение предложит регистрацию
       const telegramUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
-      setUser(telegramUser || mockUser);
+      setUser(telegramUser || null);
     }
   }, []);
+
+  // Определяем источник запуска
+  const isTelegramApp = isClient && window.Telegram?.WebApp?.initData && window.Telegram?.WebApp?.initData.length > 0;
+  const platform = isClient ? window.Telegram?.WebApp?.platform : null;
 
   return {
     webApp: isClient ? window.Telegram?.WebApp : null,
     user, // Теперь стабильный объект
+    isTelegramApp, // true - если открыто в Telegram Mini App, false - если PWA/браузер
+    platform, // 'ios', 'android', 'macos', 'windows', 'web' и т.д.
   };
 };

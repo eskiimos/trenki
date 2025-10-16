@@ -62,8 +62,8 @@ const ProfilePage = () => {
   }, [user?.id]); // Зависимость только от ID пользователя
 
   // Определяем отображаемые данные
-  const displayName = userProfile?.firstName || user?.first_name || 'Игрок';
-  const displayLastName = userProfile?.lastName || user?.last_name || '';
+  const displayName = userProfile?.firstName || user?.first_name || 'ТРЕНЬКИ';
+  const displayLastName = userProfile?.lastName || user?.last_name || 'ТРЕНЬКИ';
   
   // Мапинг позиций
   const positionMap: Record<string, string> = {
