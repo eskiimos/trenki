@@ -30,6 +30,7 @@ model Profile {
   id            String          @id @default(cuid())
   userId        String          @unique
   position      HockeyPosition?
+  gender        Gender?
   number        Int?
   age           Int?
   height        Int?
@@ -206,4 +207,10 @@ enum HockeyPosition {
   LEFT_WING
   CENTER
   RIGHT_WING
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  NOT_SPECIFIED
 }

@@ -136,6 +136,7 @@ async function main() {
           position: 'GOALTENDER',
           number: 88,
           age: 24,
+          gender: 'MALE',
           height: 185,
           weight: 82,
           strength: 78,
@@ -155,8 +156,14 @@ async function main() {
   });
 
   // Добавляем ещё тестовых хоккеистов
-  await prisma.user.create({
-    data: {
+  await prisma.user.upsert({
+    where: { telegramId: '987654321' },
+    update: {
+      firstName: 'Александр',
+      lastName: 'Овечкин',
+      username: 'alex_ovi',
+    },
+    create: {
       telegramId: '987654321',
       firstName: 'Александр',
       lastName: 'Овечкин',
@@ -166,6 +173,7 @@ async function main() {
           position: 'LEFT_WING',
           number: 8,
           age: 28,
+          gender: 'MALE',
           height: 191,
           weight: 107,
           strength: 95,
@@ -184,8 +192,14 @@ async function main() {
     }
   });
 
-  await prisma.user.create({
-    data: {
+  await prisma.user.upsert({
+    where: { telegramId: '456789123' },
+    update: {
+      firstName: 'Никита',
+      lastName: 'Кучеров',
+      username: 'kuch_86',
+    },
+    create: {
       telegramId: '456789123',
       firstName: 'Никита',
       lastName: 'Кучеров',
@@ -195,6 +209,7 @@ async function main() {
           position: 'RIGHT_WING',
           number: 86,
           age: 25,
+          gender: 'MALE',
           height: 180,
           weight: 82,
           strength: 72,

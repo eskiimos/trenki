@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Overpass } from "next/font/google";
 import "./globals.css";
 import TelegramProvider from "@/components/TelegramProvider";
+import OnboardingWrapper from "@/components/OnboardingWrapper";
 
 const overpass = Overpass({
   subsets: ["cyrillic", "latin"],
@@ -38,9 +39,11 @@ export default function RootLayout({
       </head>
       <body className={`${overpass.variable} antialiased mobile-layout`}>
         <TelegramProvider>
-          <div className="mobile-container">
-            {children}
-          </div>
+          <OnboardingWrapper>
+            <div className="mobile-container">
+              {children}
+            </div>
+          </OnboardingWrapper>
         </TelegramProvider>
       </body>
     </html>
