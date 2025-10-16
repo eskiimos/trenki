@@ -24,9 +24,9 @@ export default function OnboardingWrapper({ children }: OnboardingWrapperProps) 
       console.log('OnboardingWrapper: telegramId:', telegramId);
       
       if (!telegramId) {
-        // Если нет Telegram ID (открыто в браузере), не показываем онбординг
-        console.log('OnboardingWrapper: No telegramId, skipping onboarding');
-        setShowOnboarding(false);
+        // Если нет Telegram ID (открыто в браузере/PWA), показываем онбординг для регистрации
+        console.log('OnboardingWrapper: No telegramId, showing onboarding for registration');
+        setShowOnboarding(true);
         setIsLoading(false);
         return;
       }
