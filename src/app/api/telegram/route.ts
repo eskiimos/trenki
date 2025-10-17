@@ -105,6 +105,8 @@ export async function POST(request: NextRequest) {
   try {
     const body: TelegramUpdate = await request.json();
     
+    console.log('📨 Received Telegram update:', JSON.stringify(body, null, 2));
+    
     // Обработка обычных сообщений
     if (body.message) {
       const message = body.message;
@@ -112,15 +114,21 @@ export async function POST(request: NextRequest) {
       const text = message.text;
       const firstName = message.from.first_name || 'друг';
 
+      console.log(`📝 Message from ${firstName}: ${text}`);
+
       // Команда /start
       if (text?.startsWith('/start')) {
         // Проверяем, есть ли параметр login токена
         const parts = text.split(' ');
         const param = parts[1];
         
+        console.log(`🔍 Start command with param: ${param}`);
+        
         if (param && param.startsWith('login_')) {
           // Это запрос на авторизацию - показываем кнопку подтверждения
           const token = param.replace('login_', '');
+          
+          console.log(`🔐 Login request with token: ${token.substring(0, 8)}...`);
           
           const loginMessage = `
 🔐 **Подтверждение входа**
@@ -151,7 +159,9 @@ export async function POST(request: NextRequest) {
             }
           };
           
-          await sendMessage(chatId, loginMessage, keyboard);
+          console.log('📤 Sending login confirmation message...');
+          const result = await sendMessage(chatId, loginMessage, keyboard);
+          console.log('✅ Message sent:', result);
         } else {
           // Обычный /start
           const welcomeMessage = `
@@ -241,15 +251,23 @@ export async function POST(request: NextRequest) {
       if (data?.startsWith('confirm_login:')) {
         const token = data.replace('confirm_login:', '');
         
+        console.log(`✅ Login confirmation for token: ${token.substring(0, 8)}...`);
+        
         try {
           // Активируем токен - связываем его с telegram_id
+          console.log(`📡 Activating token for Telegram ID: ${telegramId}`);
+          
           const activateResponse = await fetch(`${WEB_APP_URL}/api/auth/activate-token`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ token, telegramId })
           });
           
+          console.log(`📊 Activation response status: ${activateResponse.status}`);
+          
           if (activateResponse.ok) {
+            console.log('✅ Token activated successfully');
+            
             const successMessage = `
 ✅ **Вход подтверждён!**
 
