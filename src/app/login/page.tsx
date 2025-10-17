@@ -104,13 +104,23 @@ export default function LoginPage() {
     
     // Открываем бота с токеном
     const botUsername = process.env.NEXT_PUBLIC_BOT_USERNAME || 'trenkibot';
-    const deepLink = `https://t.me/${botUsername}?start=login_${loginToken}`;
     
-    console.log('🔗 Opening deep link:', deepLink);
+    // Используем tg:// протокол для автоматической отправки команды
+    const tgProtocolLink = `tg://resolve?domain=${botUsername}&start=login_${loginToken}`;
+    const httpsLink = `https://t.me/${botUsername}?start=login_${loginToken}`;
+    
+    console.log('🔗 Opening Telegram links:');
+    console.log('  tg:// protocol:', tgProtocolLink);
+    console.log('  https fallback:', httpsLink);
     console.log('🎫 Login token:', loginToken.substring(0, 16) + '...');
     
-    // Открываем в новом окне/вкладке
-    window.open(deepLink, '_blank');
+    // Сначала пробуем tg:// протокол (работает в десктоп приложениях)
+    window.location.href = tgProtocolLink;
+    
+    // Fallback: через 500мс открываем https://t.me/ (работает везде)
+    setTimeout(() => {
+      window.open(httpsLink, '_blank');
+    }, 500);
   };
 
   // Показываем загрузку во время проверки авторизации
