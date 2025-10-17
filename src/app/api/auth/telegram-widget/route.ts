@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
         lastName: user.lastName,
         username: user.username,
       },
+      needsOnboarding: !user.profile?.age || !user.profile?.gender,
     });
     
   } catch (error) {
