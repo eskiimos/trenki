@@ -11,9 +11,74 @@ export default function OnboardingProfilePage() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [age, setAge] = useState('');
+  const [email, setEmail] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [isCodeSent, setIsCodeSent] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSendingCode, setIsSendingCode] = useState(false);
 
-  const isFormValid = firstName.trim() !== '' && lastName.trim() !== '' && age.trim() !== '' && selectedGender !== null;
+  const isFormValid = 
+    firstName.trim() !== '' && 
+    lastName.trim() !== '' && 
+    age.trim() !== '' && 
+    selectedGender !== null &&
+    email.trim() !== '' &&
+    isVerified;
+
+  const sendVerificationCode = async () => {
+    if (!email || !email.includes('@')) {
+      alert('Введите корректный email');
+      return;
+    }
+
+    setIsSendingCode(true);
+
+    try {
+      const response = await fetch('/api/verify-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      if (response.ok) {
+        setIsCodeSent(true);
+        alert('Код отправлен на ваш email! Проверьте почту.');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Ошибка отправки кода');
+      }
+    } catch (error) {
+      console.error('Error sending code:', error);
+      alert('Ошибка соединения');
+    } finally {
+      setIsSendingCode(false);
+    }
+  };
+
+  const verifyCode = async () => {
+    if (!verificationCode || verificationCode.length !== 4) {
+      alert('Введите 4-значный код');
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/verify-email?email=${encodeURIComponent(email)}&code=${verificationCode}`
+      );
+
+      if (response.ok) {
+        setIsVerified(true);
+        alert('✅ Email подтверждён!');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Неверный код');
+      }
+    } catch (error) {
+      console.error('Error verifying code:', error);
+      alert('Ошибка проверки кода');
+    }
+  };
 
   const handleSubmit = async () => {
     if (!isFormValid) return;
@@ -39,6 +104,8 @@ export default function OnboardingProfilePage() {
           lastName,
           age,
           gender: selectedGender,
+          email,
+          emailVerified: true,
         }),
       });
 
@@ -150,6 +217,76 @@ export default function OnboardingProfilePage() {
                 onBlur={(e) => (e.target.style.border = '1px solid transparent')}
               />
             </div>
+
+            {/* Email */}
+            <div>
+              <label className="text-white text-sm mb-2 block">EMAIL</label>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  placeholder="email@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isVerified}
+                  className="flex-1 text-white placeholder-gray-400 px-4 border focus:outline-none transition-colors disabled:opacity-50"
+                  style={{
+                    background: '#AEABBB33',
+                    borderRadius: '32px',
+                    border: '1px solid transparent',
+                    height: '44px',
+                  }}
+                  onFocus={(e) => (e.target.style.border = '1px solid #A1FF4A')}
+                  onBlur={(e) => (e.target.style.border = '1px solid transparent')}
+                />
+                {!isVerified && (
+                  <button
+                    onClick={sendVerificationCode}
+                    disabled={!email || isSendingCode}
+                    className="px-6 py-2 rounded-full font-medium bg-[#A1FF4A] text-[#0A0E1A] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    {isSendingCode ? '...' : isCodeSent ? 'Повторить' : 'Отправить'}
+                  </button>
+                )}
+                {isVerified && (
+                  <div className="flex items-center px-4">
+                    <span className="text-[#A1FF4A] text-2xl">✓</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Код верификации */}
+            {isCodeSent && !isVerified && (
+              <div>
+                <label className="text-white text-sm mb-2 block">КОД ИЗ EMAIL</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="1234"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    maxLength={4}
+                    className="flex-1 text-white placeholder-gray-400 px-4 border focus:outline-none transition-colors text-center text-2xl tracking-widest"
+                    style={{
+                      background: '#AEABBB33',
+                      borderRadius: '32px',
+                      border: '1px solid transparent',
+                      height: '44px',
+                    }}
+                    onFocus={(e) => (e.target.style.border = '1px solid #A1FF4A')}
+                    onBlur={(e) => (e.target.style.border = '1px solid transparent')}
+                  />
+                  <button
+                    onClick={verifyCode}
+                    disabled={verificationCode.length !== 4}
+                    className="px-6 py-2 rounded-full font-medium bg-[#A1FF4A] text-[#0A0E1A] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Проверить
+                  </button>
+                </div>
+                <p className="text-gray-400 text-xs mt-2">Проверьте почту и введите 4-значный код</p>
+              </div>
+            )}
 
             {/* Пол */}
             <div>
