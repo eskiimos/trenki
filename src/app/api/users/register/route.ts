@@ -4,9 +4,9 @@ import prisma from '@/lib/prisma';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { telegramId, firstName, lastName, age, gender } = body;
+    const { telegramId, firstName, lastName, age, gender, email, emailVerified } = body;
 
-    console.log('Register user:', { telegramId, firstName, lastName, age, gender });
+    console.log('Register user:', { telegramId, firstName, lastName, age, gender, email, emailVerified });
 
     if (!telegramId || !firstName || !lastName || !age || !gender) {
       return NextResponse.json(
@@ -31,6 +31,8 @@ export async function POST(request: NextRequest) {
       update: {
         firstName,
         lastName,
+        email: email || undefined,
+        emailVerified: emailVerified || false,
         profile: {
           upsert: {
             create: {
@@ -48,6 +50,8 @@ export async function POST(request: NextRequest) {
         telegramId,
         firstName,
         lastName,
+        email: email || undefined,
+        emailVerified: emailVerified || false,
         profile: {
           create: {
             age: parseInt(age),
