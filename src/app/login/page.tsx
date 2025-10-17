@@ -25,6 +25,16 @@ export default function LoginPage() {
     console.log('✅ Telegram Login Widget auth:', user);
     
     try {
+      // Сохраняем авторизацию СРАЗУ, до запроса на сервер
+      saveAuth({
+        telegramId: user.id.toString(),
+        firstName: user.first_name,
+        lastName: user.last_name,
+        username: user.username,
+      });
+      
+      console.log('💾 Auth saved to localStorage');
+      
       // Проверяем подпись на сервере
       const response = await fetch('/api/auth/telegram-widget', {
         method: 'POST',
@@ -39,18 +49,12 @@ export default function LoginPage() {
       const data = await response.json();
       console.log('✅ Server verified auth:', data);
 
-      // Сохраняем авторизацию
-      saveAuth({
-        telegramId: user.id.toString(),
-        firstName: user.first_name,
-        lastName: user.last_name,
-        username: user.username,
-      });
-
       // Проверяем, нужен ли онбординг
       if (data.needsOnboarding) {
+        console.log('📝 Redirecting to onboarding...');
         router.push('/onboarding');
       } else {
+        console.log('🏠 Redirecting to home...');
         router.push('/');
       }
     } catch (err) {
