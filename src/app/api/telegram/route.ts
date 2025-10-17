@@ -208,18 +208,12 @@ export async function POST(request: NextRequest) {
           await sendMessage(chatId, loginMessage, keyboard);
         } 
         else {
-          // Обычный /start
+          // Обычный /start - показываем кнопку для запуска приложения
           const welcomeMessage = `👋 Привет, ${firstName}!
 
-Добро пожаловать в Trenki - социальную сеть для тренировок! 💪
+Добро пожаловать в Trenki - твой цифровой мир хоккея! 🏒
 
-🔥 Здесь вы можете:
-• Смотреть короткие видео тренировок 
-• Изучать упражнения от профессиональных тренеров
-• Делиться своими результатами
-• Находить единомышленников
-
-Готовы начать тренировки? Нажмите кнопку ниже! 👇`;
+Нажми кнопку ниже, чтобы открыть приложение 👇`;
 
           const keyboard = {
             reply_markup: {
@@ -230,16 +224,6 @@ export async function POST(request: NextRequest) {
                     web_app: {
                       url: WEB_APP_URL
                     }
-                  }
-                ],
-                [
-                  {
-                    text: '💪 О приложении',
-                    callback_data: 'about'
-                  },
-                  {
-                    text: '❓ Помощь',
-                    callback_data: 'help'
                   }
                 ]
               ]

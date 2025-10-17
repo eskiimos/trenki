@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
-import { getUserData, updateLastLogin } from '@/lib/auth';
+import { saveAuth, getUserData, updateLastLogin } from '@/lib/auth';
 
 export const useTelegram = () => {
   const [isClient, setIsClient] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const initialized = useRef(false);
 
   useEffect(() => {
@@ -13,57 +14,87 @@ export const useTelegram = () => {
     if (!initialized.current) {
       initialized.current = true;
       
-      // Проверяем, открыто ли приложение в Telegram
-      const isTelegramApp = window.Telegram?.WebApp?.initData && window.Telegram?.WebApp?.initData.length > 0;
-      
-      if (window.Telegram?.WebApp) {
-        const tg = window.Telegram.WebApp;
+      const initTelegram = async () => {
+        // Проверяем, открыто ли приложение в Telegram
+        const isTelegramApp = window.Telegram?.WebApp?.initData && window.Telegram?.WebApp?.initData.length > 0;
         
-        // Разворачиваем приложение на полный экран
-        tg.expand();
-        
-        // Отключаем вертикальные свайпы, которые могут сворачивать приложение
-        tg.isVerticalSwipesEnabled = false;
-        
-        // Включаем подтверждение закрытия
-        tg.enableClosingConfirmation();
-        
-        // Устанавливаем цвета темы
-        tg.setHeaderColor('#060919');
-        tg.setBackgroundColor('#060919');
-        
-        // Показываем основную кнопку если нужно
-        tg.MainButton.hide();
-        
-        console.log('Telegram WebApp initialized');
-        console.log('Platform:', tg.platform);
-        console.log('Is Telegram App:', isTelegramApp);
-      }
+        if (window.Telegram?.WebApp) {
+          const tg = window.Telegram.WebApp;
+          
+          // Разворачиваем приложение на полный экран
+          tg.expand();
+          
+          // Отключаем вертикальные свайпы, которые могут сворачивать приложение
+          tg.isVerticalSwipesEnabled = false;
+          
+          // Включаем подтверждение закрытия
+          tg.enableClosingConfirmation();
+          
+          // Устанавливаем цвета темы
+          tg.setHeaderColor('#060919');
+          tg.setBackgroundColor('#060919');
+          
+          // Показываем основную кнопку если нужно
+          tg.MainButton.hide();
+          
+          console.log('✅ Telegram WebApp initialized');
+          console.log('📱 Platform:', tg.platform);
+          console.log('🔐 Is Telegram App:', isTelegramApp);
+          
+          // Если открыто в Telegram, автоматически авторизуемся
+          if (isTelegramApp && tg.initData) {
+            console.log('🔄 Auto-authenticating via Telegram WebApp...');
+            
+            try {
+              // Отправляем initData на сервер для проверки
+              const response = await fetch('/api/auth/verify-telegram', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ initData: tg.initData }),
+              });
+              
+              if (response.ok) {
+                const data = await response.json();
+                console.log('✅ Telegram auth successful!', data.user);
+                
+                // Сохраняем авторизацию
+                saveAuth({
+                  telegramId: data.user.telegramId,
+                  firstName: data.user.firstName,
+                  lastName: data.user.lastName,
+                  username: data.user.username,
+                });
+                
+                setUser(data.user);
+                
+                // Если нужен онбординг, редиректим
+                if (data.user.needsOnboarding) {
+                  window.location.href = '/onboarding';
+                }
+              } else {
+                console.error('❌ Telegram auth failed:', await response.text());
+              }
+            } catch (error) {
+              console.error('❌ Error during auto-auth:', error);
+            }
+          }
+        }
 
-      // Получаем данные пользователя через нашу систему авторизации
-      const userData = getUserData();
+        // Проверяем сохранённые данные пользователя
+        const userData = getUserData();
+        
+        if (userData) {
+          updateLastLogin();
+          console.log('👤 User loaded from storage:', userData);
+          setUser(userData);
+        } else {
+          console.log('⚠️ No user found in storage');
+        }
+        
+        setIsLoading(false);
+      };
       
-      if (userData) {
-        // Обновляем время последнего входа
-        updateLastLogin();
-        
-        // Формируем объект пользователя в формате Telegram
-        const telegramUser = {
-          id: userData.id,
-          is_bot: false,
-          first_name: userData.firstName || 'User',
-          last_name: userData.lastName,
-          username: userData.username,
-          language_code: (userData as any).languageCode || 'ru',
-          photo_url: (userData as any).photoUrl,
-        };
-        
-        console.log('useTelegram: User loaded:', telegramUser);
-        setUser(telegramUser);
-      } else {
-        console.log('useTelegram: No user found');
-        setUser(null);
-      }
+      initTelegram();
     }
   }, []);
 
@@ -73,7 +104,8 @@ export const useTelegram = () => {
 
   return {
     webApp: isClient ? window.Telegram?.WebApp : null,
-    user, // Теперь стабильный объект
+    user,
+    isLoading,
     isTelegramApp, // true - если открыто в Telegram Mini App, false - если PWA/браузер
     platform, // 'ios', 'android', 'macos', 'windows', 'web' и т.д.
   };
