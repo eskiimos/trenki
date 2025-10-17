@@ -106,6 +106,9 @@ export default function LoginPage() {
     const botUsername = process.env.NEXT_PUBLIC_BOT_USERNAME || 'trenkibot';
     const deepLink = `https://t.me/${botUsername}?start=login_${loginToken}`;
     
+    console.log('🔗 Opening deep link:', deepLink);
+    console.log('🎫 Login token:', loginToken.substring(0, 16) + '...');
+    
     // Открываем в новом окне/вкладке
     window.open(deepLink, '_blank');
   };
@@ -165,16 +168,34 @@ export default function LoginPage() {
             </div>
             
             {/* Инструкция */}
-            <div className="bg-[#1a1f3a] border border-[#A1FF4A]/20 rounded-lg p-4 space-y-2 max-w-sm">
+            <div className="bg-[#1a1f3a] border border-[#A1FF4A]/20 rounded-lg p-4 space-y-3 max-w-sm">
               <p className="text-[#A1FF4A] font-semibold text-sm">📱 Что делать:</p>
               <ol className="text-gray-300 text-sm space-y-1 list-decimal list-inside">
                 <li>Откройте бота <span className="text-[#A1FF4A]">@trenkibot</span></li>
                 <li>Нажмите кнопку <span className="text-white font-semibold">START</span> (если есть)</li>
                 <li>Нажмите <span className="text-[#A1FF4A]">✅ Подтвердить вход</span></li>
               </ol>
-              <p className="text-gray-500 text-xs mt-2">
-                💡 Если не видите сообщения - отправьте боту команду /start
-              </p>
+              
+              {/* Кнопка для копирования команды */}
+              <div className="mt-3 pt-3 border-t border-gray-700">
+                <p className="text-gray-400 text-xs mb-2">💡 Если не видите сообщения, отправьте команду:</p>
+                <div className="flex gap-2">
+                  <code className="flex-1 bg-[#0d1020] text-[#A1FF4A] text-xs px-3 py-2 rounded font-mono break-all">
+                    /start login_{loginToken?.substring(0, 8)}...
+                  </code>
+                  <button
+                    onClick={() => {
+                      if (loginToken) {
+                        navigator.clipboard.writeText(`/start login_${loginToken}`);
+                        alert('Команда скопирована! Вставьте её в бот @trenkibot');
+                      }
+                    }}
+                    className="bg-[#A1FF4A] hover:bg-[#8FE030] text-black px-3 py-2 rounded text-xs font-semibold whitespace-nowrap transition-colors"
+                  >
+                    📋 Копировать
+                  </button>
+                </div>
+              </div>
             </div>
             
             <button
