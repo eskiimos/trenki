@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Onboarding from './Onboarding';
+import { getTelegramId, isAuthenticated } from '@/lib/auth';
 
 interface OnboardingWrapperProps {
   children: React.ReactNode;
@@ -17,17 +18,38 @@ export default function OnboardingWrapper({ children }: OnboardingWrapperProps) 
 
   const checkUserRegistration = async () => {
     try {
-      // Получаем Telegram ID пользователя
-      const telegramId = (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id?.toString();
+      console.log('OnboardingWrapper: Checking user registration...');
       
-      console.log('OnboardingWrapper: Telegram WebApp:', (window as any).Telegram?.WebApp);
+      // Проверяем, есть ли сохранённая авторизация
+      if (isAuthenticated()) {
+        console.log('OnboardingWrapper: User is authenticated, checking profile completeness...');
+        
+        const telegramId = getTelegramId();
+        if (telegramId) {
+          // Проверяем, заполнен ли профиль
+          const response = await fetch(`/api/users/check?telegramId=${telegramId}`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.exists && data.user?.profile?.age && data.user?.profile?.gender) {
+              // Всё заполнено, пропускаем онбординг
+              console.log('OnboardingWrapper: Profile complete, skipping onboarding');
+              setShowOnboarding(false);
+              setIsLoading(false);
+              return;
+            }
+          }
+        }
+      }
+      
+      // Получаем Telegram ID через централизованную функцию
+      const telegramId = getTelegramId();
+      
       console.log('OnboardingWrapper: telegramId:', telegramId);
       
       if (!telegramId) {
-        // Если нет Telegram ID (открыто в браузере/PWA), показываем онбординг для регистрации
-        console.log('OnboardingWrapper: No telegramId, showing onboarding for registration');
-        setShowOnboarding(true);
-        setIsLoading(false);
+        // Если нет ID, перенаправляем на страницу входа
+        console.log('OnboardingWrapper: No telegramId, redirecting to login');
+        window.location.href = '/login';
         return;
       }
 

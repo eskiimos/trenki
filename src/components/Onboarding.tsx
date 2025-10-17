@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
+import { saveAuth, getTelegramId } from '@/lib/auth';
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -23,14 +24,16 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     } else if (currentStep === 2) {
       // Сохраняем данные в БД перед переходом на экран успеха
       try {
-        const telegramId = (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id?.toString();
+        // Используем централизованную функцию получения ID
+        const telegramId = getTelegramId();
         
         if (!telegramId) {
           console.error('No Telegram ID found');
-          // Все равно переходим на экран успеха для тестирования
-          setCurrentStep(3);
+          alert('Не удалось получить ID пользователя');
           return;
         }
+
+        console.log('Registering user with ID:', telegramId);
 
         const response = await fetch('/api/users/register', {
           method: 'POST',
@@ -47,7 +50,17 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         });
 
         if (response.ok) {
-          console.log('User registered successfully');
+          const data = await response.json();
+          console.log('User registered successfully:', data);
+          
+          // Сохраняем данные авторизации для автологина
+          saveAuth({
+            telegramId,
+            firstName,
+            lastName,
+            username: (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.username,
+          });
+          
           setCurrentStep(3);
         } else {
           const error = await response.json();

@@ -3,11 +3,14 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTelegram } from '../../hooks/useTelegram';
 import { ProfileSkeleton } from '../../components/Skeleton';
 import BottomNavigation from '@/components/BottomNavigation';
+import { clearAuth } from '@/lib/auth';
 
 const ProfilePage = () => {
+  const router = useRouter();
   const { user } = useTelegram();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -25,33 +28,39 @@ const ProfilePage = () => {
         const telegramId = user?.id?.toString() || user?.username || 'testuser';
         console.log('Profile page: fetching profile for', telegramId);
         
-        // Запрос к API для получения полного профиля пользователя
-        const response = await fetch(`/api/profile?telegramId=${telegramId}`);
+        // Запрос к API для получения полного профиля пользователя с таймаутом
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
+        
+        const response = await fetch(`/api/profile?telegramId=${telegramId}`, {
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
         
         if (!response.ok || cancelled) {
           throw new Error('Ошибка загрузки профиля');
         }
 
         const data = await response.json();
+        console.log('Profile data received:', data);
         
         if (!cancelled) {
           setUserProfile(data.user);
+          setIsLoading(false);
         }
       } catch (error) {
         if (!cancelled) {
           console.error('Ошибка загрузки профиля:', error);
-        }
-      } finally {
-        if (!cancelled) {
           setIsLoading(false);
         }
       }
     };
 
-    // Проверяем, есть ли уже данные профиля для этого пользователя
-    if (user?.id && !userProfile) {
+    // Запускаем загрузку только если есть user.id и ещё нет профиля
+    if (user?.id) {
       fetchUserProfile();
-    } else if (user?.id && userProfile) {
+    } else {
       setIsLoading(false);
     }
 
@@ -77,6 +86,15 @@ const ProfilePage = () => {
   const displayPosition = userProfile?.profile?.position ? 
     positionMap[userProfile.profile.position] || userProfile.profile.position :
     'Позиция не указана';
+
+  // Функция выхода
+  const handleLogout = () => {
+    if (confirm('Вы уверены, что хотите выйти?')) {
+      clearAuth();
+      router.push('/');
+      router.refresh();
+    }
+  };
 
   // Показываем скелетон во время загрузки
   if (isLoading) {
@@ -226,6 +244,16 @@ const ProfilePage = () => {
                 🔧 Админка
               </button>
             </Link>
+          </div>
+          
+          {/* Кнопка выхода */}
+          <div className="pt-2">
+            <button 
+              onClick={handleLogout}
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-4 rounded-lg transition-all duration-300"
+            >
+              🚪 Выйти
+            </button>
           </div>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { getUserData, updateLastLogin } from '@/lib/auth';
 
 export const useTelegram = () => {
   const [isClient, setIsClient] = useState(false);
@@ -39,10 +40,30 @@ export const useTelegram = () => {
         console.log('Is Telegram App:', isTelegramApp);
       }
 
-      // Получаем пользователя из Telegram (если есть)
-      // В браузере/PWA будет null, и приложение предложит регистрацию
-      const telegramUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
-      setUser(telegramUser || null);
+      // Получаем данные пользователя через нашу систему авторизации
+      const userData = getUserData();
+      
+      if (userData) {
+        // Обновляем время последнего входа
+        updateLastLogin();
+        
+        // Формируем объект пользователя в формате Telegram
+        const telegramUser = {
+          id: userData.id,
+          is_bot: false,
+          first_name: userData.firstName || 'User',
+          last_name: userData.lastName,
+          username: userData.username,
+          language_code: (userData as any).languageCode || 'ru',
+          photo_url: (userData as any).photoUrl,
+        };
+        
+        console.log('useTelegram: User loaded:', telegramUser);
+        setUser(telegramUser);
+      } else {
+        console.log('useTelegram: No user found');
+        setUser(null);
+      }
     }
   }, []);
 

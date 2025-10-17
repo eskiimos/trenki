@@ -3,21 +3,27 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('=== GET /api/profile START ===');
     const { searchParams } = new URL(request.url);
     const telegramId = searchParams.get('telegramId');
+    console.log('Requested telegramId:', telegramId);
 
     if (!telegramId) {
+      console.log('ERROR: telegramId not provided');
       return NextResponse.json({ error: 'telegramId required' }, { status: 400 });
     }
 
     // Ищем пользователя с профилем
+    console.log('Searching for user in database...');
     let user = await prisma.user.findUnique({
       where: { telegramId },
       include: { profile: true }
     });
+    console.log('User found:', user ? 'Yes' : 'No', user?.id);
 
     // Если пользователя нет, создаем
     if (!user) {
+      console.log('User not found, creating new user...');
       user = await prisma.user.create({
         data: {
           telegramId,
@@ -36,10 +42,12 @@ export async function GET(request: NextRequest) {
         },
         include: { profile: true }
       });
+      console.log('New user created:', user.id);
     }
 
     // Если профиля нет, создаем
     if (!user.profile) {
+      console.log('Profile not found for user, creating...');
       await prisma.profile.create({
         data: {
           userId: user.id,
@@ -54,16 +62,23 @@ export async function GET(request: NextRequest) {
       });
 
       // Перезапрашиваем пользователя с профилем
+      console.log('Refetching user with profile...');
       user = await prisma.user.findUnique({
         where: { telegramId },
         include: { profile: true }
       });
+      console.log('User refetched with profile');
     }
 
+    console.log('=== GET /api/profile SUCCESS ===');
     return NextResponse.json({ user });
   } catch (error) {
+    console.error('=== GET /api/profile ERROR ===');
     console.error('Error fetching user profile:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
 
