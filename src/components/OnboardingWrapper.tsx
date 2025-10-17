@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import Onboarding from './Onboarding';
 import { getTelegramId, isAuthenticated } from '@/lib/auth';
 
@@ -9,6 +10,7 @@ interface OnboardingWrapperProps {
 }
 
 export default function OnboardingWrapper({ children }: OnboardingWrapperProps) {
+  const pathname = usePathname();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -18,6 +20,13 @@ export default function OnboardingWrapper({ children }: OnboardingWrapperProps) 
 
   const checkUserRegistration = async () => {
     try {
+      // Пропускаем проверку для страниц логина и онбординга
+      if (pathname === '/login' || pathname === '/onboarding') {
+        console.log('OnboardingWrapper: Skipping check for', pathname);
+        setIsLoading(false);
+        return;
+      }
+      
       console.log('OnboardingWrapper: Checking user registration...');
       
       // Проверяем, есть ли сохранённая авторизация

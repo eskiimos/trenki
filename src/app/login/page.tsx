@@ -1,15 +1,26 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import TelegramLogin, { TelegramAuthData } from '@/components/TelegramLogin';
-import { saveAuth } from '@/lib/auth';
+import { saveAuth, isAuthenticated } from '@/lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isChecking, setIsChecking] = useState(true);
+
+  // Проверяем, не авторизован ли пользователь уже
+  useEffect(() => {
+    if (isAuthenticated()) {
+      console.log('User already authenticated, redirecting to home...');
+      router.push('/');
+    } else {
+      setIsChecking(false);
+    }
+  }, [router]);
 
   const handleTelegramAuth = async (user: TelegramAuthData) => {
     setIsLoading(true);
@@ -57,6 +68,18 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+
+  // Показываем загрузку во время проверки авторизации
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-[#101530] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#A1FF4A] mx-auto mb-4"></div>
+          <p className="text-gray-400">Проверка авторизации...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#101530] flex flex-col items-center justify-center px-6">
