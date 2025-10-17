@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Временное хранилище для pending login токенов (пользователь -> токен)
+declare global {
+  var pendingLoginTokens: Map<number, string>;
+}
+
+if (!global.pendingLoginTokens) {
+  global.pendingLoginTokens = new Map();
+}
+
 // Типы для Telegram API
 interface TelegramMessage {
   message_id: number;
@@ -121,14 +130,18 @@ export async function POST(request: NextRequest) {
         // Проверяем, есть ли параметр login токена
         const parts = text.split(' ');
         const param = parts[1];
+        const userId = message.from.id;
         
         console.log(`🔍 Start command with param: ${param}`);
         
         if (param && param.startsWith('login_')) {
-          // Это запрос на авторизацию - показываем кнопку подтверждения
+          // Это запрос на авторизацию - сохраняем токен для пользователя
           const token = param.replace('login_', '');
           
-          console.log(`🔐 Login request with token: ${token.substring(0, 8)}...`);
+          console.log(`🔐 Login request with token: ${token.substring(0, 8)}... from user ${userId}`);
+          
+          // Сохраняем токен для этого пользователя
+          global.pendingLoginTokens.set(userId, token);
           
           const loginMessage = `
 🔐 **Подтверждение входа**
@@ -162,7 +175,45 @@ export async function POST(request: NextRequest) {
           console.log('📤 Sending login confirmation message...');
           const result = await sendMessage(chatId, loginMessage, keyboard);
           console.log('✅ Message sent:', result);
-        } else {
+        } 
+        // Проверяем, есть ли сохранённый токен для этого пользователя
+        else if (global.pendingLoginTokens.has(userId)) {
+          const token = global.pendingLoginTokens.get(userId)!;
+          
+          console.log(`🔄 Found pending login token for user ${userId}: ${token.substring(0, 8)}...`);
+          
+          const loginMessage = `
+🔐 **Подтверждение входа**
+
+У вас есть незавершённый запрос на вход в приложение **Trenki**.
+
+⚠️ **Важно:** Нажимайте кнопку только если вы сами открыли страницу входа!
+
+Подтвердите вход, нажав кнопку ниже 👇
+          `;
+          
+          const keyboard = {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: '✅ Да, это я! Подтвердить вход',
+                    callback_data: `confirm_login:${token}`
+                  }
+                ],
+                [
+                  {
+                    text: '❌ Отменить',
+                    callback_data: `cancel_login:${token}`
+                  }
+                ]
+              ]
+            }
+          };
+          
+          await sendMessage(chatId, loginMessage, keyboard);
+        } 
+        else {
           // Обычный /start
           const welcomeMessage = `
 👋 Привет, ${firstName}!
@@ -253,6 +304,9 @@ export async function POST(request: NextRequest) {
         
         console.log(`✅ Login confirmation for token: ${token.substring(0, 8)}...`);
         
+        // Удаляем pending токен
+        global.pendingLoginTokens.delete(telegramId);
+        
         try {
           // Активируем токен - связываем его с telegram_id
           console.log(`📡 Activating token for Telegram ID: ${telegramId}`);
@@ -308,6 +362,9 @@ export async function POST(request: NextRequest) {
       
       // Обработка отмены входа
       else if (data?.startsWith('cancel_login:')) {
+        // Удаляем pending токен
+        global.pendingLoginTokens.delete(telegramId);
+        
         const cancelMessage = `
 ❌ **Вход отменён**
 
