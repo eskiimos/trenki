@@ -115,14 +115,17 @@ export function getTelegramId(): string | null {
     return auth.telegramId;
   }
   
-  // В dev-режиме создаём тестовый ID
-  if (process.env.NODE_ENV === 'development') {
-    const devId = localStorage.getItem('dev_telegram_id') || String(Date.now());
-    localStorage.setItem('dev_telegram_id', devId);
-    return devId;
+  // Если нет ни WebApp, ни сохранённых данных - создаём временный ID
+  // Это позволит пользователям регистрироваться без Telegram авторизации
+  const tempId = localStorage.getItem('temp_user_id');
+  if (tempId) {
+    return tempId;
   }
   
-  return null;
+  // Создаём новый временный ID
+  const newTempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  localStorage.setItem('temp_user_id', newTempId);
+  return newTempId;
 }
 
 /**
@@ -154,18 +157,16 @@ export function getUserData() {
     };
   }
   
-  // Dev-режим
-  if (process.env.NODE_ENV === 'development') {
-    const devId = getTelegramId();
-    if (devId) {
-      return {
-        id: parseInt(devId) || 0,
-        telegramId: devId,
-        firstName: 'Test',
-        lastName: 'User',
-        username: 'testuser',
-      };
-    }
+  // Dev-режим или fallback для пользователей без Telegram
+  const tempId = getTelegramId();
+  if (tempId) {
+    return {
+      id: parseInt(tempId.replace(/\D/g, '').slice(0, 10)) || Date.now(),
+      telegramId: tempId,
+      firstName: 'User',
+      lastName: '',
+      username: tempId,
+    };
   }
   
   return null;
