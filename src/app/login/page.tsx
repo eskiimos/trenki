@@ -2,60 +2,97 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { isAuthenticated } from '@/lib/auth';
+import { isAuthenticated, saveAuth } from '@/lib/auth';
+
+declare global {
+  interface Window {
+    TelegramLoginWidget?: {
+      dataOnauth?: (user: any) => void;
+    };
+  }
+}
 
 export default function LoginPage() {
   const router = useRouter();
   const scriptLoaded = useRef(false);
   const [isChecking, setIsChecking] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Проверяем, не авторизован ли пользователь уже
   useEffect(() => {
     if (isAuthenticated()) {
-      console.log('User already authenticated, redirecting to home...');
+      console.log('✅ User already authenticated, redirecting...');
       router.push('/');
     } else {
       setIsChecking(false);
     }
   }, [router]);
 
+  // Обработчик успешной авторизации
+  const onTelegramAuth = async (user: any) => {
+    console.log('✅ Telegram Login Widget auth:', user);
+    
+    try {
+      // Проверяем подпись на сервере
+      const response = await fetch('/api/auth/telegram-widget', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(user),
+      });
+
+      if (!response.ok) {
+        throw new Error('Auth verification failed');
+      }
+
+      const data = await response.json();
+      console.log('✅ Server verified auth:', data);
+
+      // Сохраняем авторизацию
+      saveAuth({
+        telegramId: user.id.toString(),
+        firstName: user.first_name,
+        lastName: user.last_name,
+        username: user.username,
+      });
+
+      // Перенаправляем
+      if (data.needsOnboarding) {
+        router.push('/onboarding');
+      } else {
+        router.push('/');
+      }
+    } catch (err) {
+      console.error('❌ Auth error:', err);
+      setError('Ошибка авторизации. Попробуйте ещё раз.');
+    }
+  };
+
   // Загружаем Telegram Login Widget
   useEffect(() => {
     if (isChecking) return;
     
+    // Устанавливаем глобальный обработчик
+    window.TelegramLoginWidget = {
+      dataOnauth: onTelegramAuth,
+    };
+
     if (!scriptLoaded.current) {
       const script = document.createElement('script');
       script.src = 'https://telegram.org/js/telegram-widget.js?22';
       script.setAttribute('data-telegram-login', 'trenkibot');
       script.setAttribute('data-size', 'large');
       script.setAttribute('data-radius', '8');
-      script.setAttribute('data-auth-url', 'https://trenki.vercel.app/api/auth/telegram-callback');
+      script.setAttribute('data-onauth', 'TelegramLoginWidget.dataOnauth(user)');
       script.setAttribute('data-request-access', 'write');
       script.async = true;
       
       const container = document.getElementById('telegram-login-container');
       if (container) {
         container.appendChild(script);
+        scriptLoaded.current = true;
       }
-      
-      scriptLoaded.current = true;
     }
-
-    // Слушаем успешную авторизацию
-    const handleAuth = (event: MessageEvent) => {
-      if (event.data.type === 'telegram-auth-success') {
-        console.log('✅ Telegram auth successful!');
-        // Проверяем localStorage и перенаправляем
-        const userData = localStorage.getItem('telegram_user');
-        if (userData) {
-          router.push('/');
-        }
-      }
-    };
-
-    window.addEventListener('message', handleAuth);
-    return () => window.removeEventListener('message', handleAuth);
-  }, [router, isChecking]);
+  }, [isChecking]);
 
   // Показываем загрузку во время проверки авторизации
   if (isChecking) {
@@ -94,12 +131,21 @@ export default function LoginPage() {
         <div className="flex flex-col items-center gap-4">
           <div 
             id="telegram-login-container" 
-            className="flex justify-center"
+            className="flex justify-center w-full"
           />
           
-          <p className="text-gray-500 text-xs text-center max-w-sm">
-            При нажатии на кнопку откроется окно Telegram для авторизации
-          </p>
+          {error && (
+            <div className="w-full p-4 bg-red-500/20 border border-red-500 rounded-lg">
+              <p className="text-red-400 text-sm text-center">{error}</p>
+            </div>
+          )}
+          
+          <div className="text-center text-xs text-gray-500 max-w-sm space-y-2">
+            <p>При нажатии на кнопку откроется окно Telegram для авторизации</p>
+            <p className="text-[#A1FF4A]">
+              ⚠️ Если видите ошибку "Bot domain invalid", настройте домен в @BotFather
+            </p>
+          </div>
         </div>
 
         {/* Информация */}
