@@ -4,7 +4,7 @@
 
 В BotFather настроен домен: **trenki.vercel.app**
 
-Но ваше приложение на домене: **trenki-mvp.vercel.app**
+Но ваше приложение на домене: **trenki.vercel.app**
 
 ## ✅ Решение: Добавить второй домен
 
@@ -24,7 +24,7 @@ Telegram поддерживает **несколько доменов** для �
 ```
 
 ```
-trenki-mvp.vercel.app
+trenki.vercel.app
 ```
 
 ### Что произойдёт:
@@ -33,19 +33,19 @@ BotFather добавит новый домен, **не удаляя** стары
 
 ```
 ✅ Success! Users will be able to log in from:
-trenki-mvp.vercel.app
+trenki.vercel.app
 ```
 
 Теперь Login Widget будет работать на **обоих** доменах:
 - ✅ trenki.vercel.app
-- ✅ trenki-mvp.vercel.app
+- ✅ trenki.vercel.app
 
 ## Проверка
 
 После настройки откройте:
 
 ```
-https://trenki-mvp.vercel.app/login
+https://trenki.vercel.app/login
 ```
 
 Ошибка "Bot domain invalid" должна исчезнуть! ✅
@@ -63,7 +63,7 @@ https://trenki-mvp.vercel.app/login
 Если у вас есть оба домена, рекомендую:
 
 - **trenki.vercel.app** - основной production
-- **trenki-mvp.vercel.app** - staging/preview
+- **trenki.vercel.app** - staging/preview
 
 Или наоборот, как вам удобно! Telegram Login будет работать на обоих.
 
