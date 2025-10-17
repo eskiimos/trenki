@@ -156,10 +156,36 @@ export default function LoginPage() {
             {loginToken ? 'Войти через Telegram' : 'Загрузка...'}
           </button>
         ) : (
-          <div className="flex flex-col items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#A1FF4A] mb-4"></div>
-            <p className="text-gray-400">Ожидание подтверждения в Telegram...</p>
-            <p className="text-gray-500 text-sm mt-2">Откройте бота и нажмите кнопку подтверждения</p>
+          <div className="flex flex-col items-center justify-center py-8 space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#A1FF4A]"></div>
+            
+            <div className="text-center space-y-2">
+              <p className="text-white font-semibold">Ожидание подтверждения...</p>
+              <p className="text-gray-400 text-sm">Откройте бота @trenkibot в Telegram</p>
+            </div>
+            
+            {/* Инструкция */}
+            <div className="bg-[#1a1f3a] border border-[#A1FF4A]/20 rounded-lg p-4 space-y-2 max-w-sm">
+              <p className="text-[#A1FF4A] font-semibold text-sm">📱 Что делать:</p>
+              <ol className="text-gray-300 text-sm space-y-1 list-decimal list-inside">
+                <li>Откройте бота <span className="text-[#A1FF4A]">@trenkibot</span></li>
+                <li>Нажмите кнопку <span className="text-white font-semibold">START</span> (если есть)</li>
+                <li>Нажмите <span className="text-[#A1FF4A]">✅ Подтвердить вход</span></li>
+              </ol>
+              <p className="text-gray-500 text-xs mt-2">
+                💡 Если не видите сообщения - отправьте боту команду /start
+              </p>
+            </div>
+            
+            <button
+              onClick={() => {
+                setIsLoading(false);
+                setIsPolling(false);
+              }}
+              className="text-gray-400 hover:text-white text-sm underline transition-colors"
+            >
+              Отменить
+            </button>
           </div>
         )}
 
