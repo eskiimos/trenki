@@ -113,8 +113,48 @@ export async function POST(request: NextRequest) {
       const firstName = message.from.first_name || 'друг';
 
       // Команда /start
-      if (text === '/start') {
-        const welcomeMessage = `
+      if (text?.startsWith('/start')) {
+        // Проверяем, есть ли параметр login токена
+        const parts = text.split(' ');
+        const param = parts[1];
+        
+        if (param && param.startsWith('login_')) {
+          // Это запрос на авторизацию - показываем кнопку подтверждения
+          const token = param.replace('login_', '');
+          
+          const loginMessage = `
+🔐 **Подтверждение входа**
+
+Вы хотите войти в приложение **Trenki** с вашего браузера?
+
+⚠️ Нажимайте кнопку только если вы сами запросили вход!
+
+Нажмите кнопку ниже, чтобы подтвердить вход и открыть приложение.
+          `;
+          
+          const keyboard = {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: '✅ Да, это я! Подтвердить вход',
+                    callback_data: `confirm_login:${token}`
+                  }
+                ],
+                [
+                  {
+                    text: '❌ Отменить',
+                    callback_data: `cancel_login:${token}`
+                  }
+                ]
+              ]
+            }
+          };
+          
+          await sendMessage(chatId, loginMessage, keyboard);
+        } else {
+          // Обычный /start
+          const welcomeMessage = `
 👋 Привет, ${firstName}!
 
 Добро пожаловать в **Trenki** - социальную сеть для тренировок! 💪
@@ -126,34 +166,35 @@ export async function POST(request: NextRequest) {
 • Находить единомышленников
 
 Готовы начать тренировки? Нажмите кнопку ниже! 👇
-        `;
+          `;
 
-        const keyboard = {
-          reply_markup: {
-            inline_keyboard: [
-              [
-                {
-                  text: '🚀 Открыть Trenki',
-                  web_app: {
-                    url: WEB_APP_URL
+          const keyboard = {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: '🚀 Открыть Trenki',
+                    web_app: {
+                      url: WEB_APP_URL
+                    }
                   }
-                }
-              ],
-              [
-                {
-                  text: '💪 О приложении',
-                  callback_data: 'about'
-                },
-                {
-                  text: '❓ Помощь',
-                  callback_data: 'help'
-                }
+                ],
+                [
+                  {
+                    text: '💪 О приложении',
+                    callback_data: 'about'
+                  },
+                  {
+                    text: '❓ Помощь',
+                    callback_data: 'help'
+                  }
+                ]
               ]
-            ]
-          }
-        };
+            }
+          };
 
-        await sendMessage(chatId, welcomeMessage, keyboard);
+          await sendMessage(chatId, welcomeMessage, keyboard);
+        }
       } 
       // Другие сообщения
       else {
@@ -194,8 +235,76 @@ export async function POST(request: NextRequest) {
       const chatId = message.chat.id;
       const messageId = message.message_id;
       const firstName = callbackQuery.from.first_name || 'друг';
+      const telegramId = callbackQuery.from.id;
 
-      if (data === 'about') {
+      // Обработка подтверждения входа
+      if (data?.startsWith('confirm_login:')) {
+        const token = data.replace('confirm_login:', '');
+        
+        try {
+          // Активируем токен - связываем его с telegram_id
+          const activateResponse = await fetch(`${WEB_APP_URL}/api/auth/activate-token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, telegramId })
+          });
+          
+          if (activateResponse.ok) {
+            const successMessage = `
+✅ **Вход подтверждён!**
+
+Вы успешно авторизовались в приложении **Trenki**.
+
+Теперь вы можете вернуться в браузер - вход будет выполнен автоматически.
+
+Или нажмите кнопку ниже, чтобы открыть приложение прямо сейчас! 👇
+            `;
+            
+            const keyboard = {
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: '🚀 Открыть Trenki',
+                      web_app: {
+                        url: WEB_APP_URL
+                      }
+                    }
+                  ]
+                ]
+              }
+            };
+            
+            await editMessage(chatId, messageId, successMessage, keyboard);
+            await answerCallbackQuery(callbackQuery.id);
+          } else {
+            await editMessage(chatId, messageId, '❌ Ошибка активации токена. Токен истёк или уже использован.');
+            await answerCallbackQuery(callbackQuery.id);
+          }
+        } catch (error) {
+          console.error('Error confirming login:', error);
+          await editMessage(chatId, messageId, '❌ Произошла ошибка. Попробуйте запросить вход заново.');
+          await answerCallbackQuery(callbackQuery.id);
+        }
+      }
+      
+      // Обработка отмены входа
+      else if (data?.startsWith('cancel_login:')) {
+        const cancelMessage = `
+❌ **Вход отменён**
+
+Запрос на вход был отменён.
+
+Если вы не запрашивали вход, всё в порядке - ваша безопасность не нарушена.
+
+Чтобы открыть приложение, отправьте /start
+        `;
+        
+        await editMessage(chatId, messageId, cancelMessage);
+        await answerCallbackQuery(callbackQuery.id);
+      }
+      
+      else if (data === 'about') {
         const aboutMessage = `
 📱 **О приложении Trenki**
 
