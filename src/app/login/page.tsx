@@ -4,14 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAuthenticated, saveAuth } from '@/lib/auth';
 
-declare global {
-  interface Window {
-    TelegramLoginWidget?: {
-      dataOnauth?: (user: any) => void;
-    };
-  }
-}
-
 export default function LoginPage() {
   const router = useRouter();
   const scriptLoaded = useRef(false);
@@ -71,10 +63,8 @@ export default function LoginPage() {
   useEffect(() => {
     if (isChecking) return;
     
-    // Устанавливаем глобальный обработчик
-    window.TelegramLoginWidget = {
-      dataOnauth: onTelegramAuth,
-    };
+    // Устанавливаем глобальный обработчик ПЕРЕД загрузкой скрипта
+    (window as any).onTelegramAuth = onTelegramAuth;
 
     if (!scriptLoaded.current) {
       const script = document.createElement('script');
@@ -82,7 +72,7 @@ export default function LoginPage() {
       script.setAttribute('data-telegram-login', 'trenkibot');
       script.setAttribute('data-size', 'large');
       script.setAttribute('data-radius', '8');
-      script.setAttribute('data-onauth', 'TelegramLoginWidget.dataOnauth(user)');
+      script.setAttribute('data-onauth', 'onTelegramAuth(user)');
       script.setAttribute('data-request-access', 'write');
       script.async = true;
       
