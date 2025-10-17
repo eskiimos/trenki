@@ -63,7 +63,6 @@ async function sendMessage(chatId: number, text: string, replyMarkup?: InlineKey
   const body = {
     chat_id: chatId,
     text,
-    parse_mode: 'Markdown',
     ...replyMarkup
   };
 
@@ -84,7 +83,6 @@ async function editMessage(chatId: number, messageId: number, text: string, repl
     chat_id: chatId,
     message_id: messageId,
     text,
-    parse_mode: 'Markdown',
     ...replyMarkup
   };
 
@@ -143,15 +141,13 @@ export async function POST(request: NextRequest) {
           // Сохраняем токен для этого пользователя
           global.pendingLoginTokens.set(userId, token);
           
-          const loginMessage = `
-🔐 **Подтверждение входа**
+          const loginMessage = `🔐 Подтверждение входа
 
-Вы запросили вход в приложение **Trenki** с компьютера или браузера.
+Вы запросили вход в приложение Trenki с компьютера или браузера.
 
-⚠️ **Важно:** Нажимайте кнопку только если вы сами открыли страницу входа!
+⚠️ Важно: Нажимайте кнопку только если вы сами открыли страницу входа!
 
-Подтвердите вход, нажав кнопку ниже 👇
-          `;
+Подтвердите вход, нажав кнопку ниже 👇`;
           
           const keyboard = {
             reply_markup: {
@@ -182,15 +178,13 @@ export async function POST(request: NextRequest) {
           
           console.log(`🔄 Found pending login token for user ${userId}: ${token.substring(0, 8)}...`);
           
-          const loginMessage = `
-🔐 **Подтверждение входа**
+          const loginMessage = `🔐 Подтверждение входа
 
-У вас есть незавершённый запрос на вход в приложение **Trenki**.
+У вас есть незавершённый запрос на вход в приложение Trenki.
 
-⚠️ **Важно:** Нажимайте кнопку только если вы сами открыли страницу входа!
+⚠️ Важно: Нажимайте кнопку только если вы сами открыли страницу входа!
 
-Подтвердите вход, нажав кнопку ниже 👇
-          `;
+Подтвердите вход, нажав кнопку ниже 👇`;
           
           const keyboard = {
             reply_markup: {
@@ -215,10 +209,9 @@ export async function POST(request: NextRequest) {
         } 
         else {
           // Обычный /start
-          const welcomeMessage = `
-👋 Привет, ${firstName}!
+          const welcomeMessage = `👋 Привет, ${firstName}!
 
-Добро пожаловать в **Trenki** - социальную сеть для тренировок! 💪
+Добро пожаловать в Trenki - социальную сеть для тренировок! 💪
 
 🔥 Здесь вы можете:
 • Смотреть короткие видео тренировок 
@@ -226,8 +219,7 @@ export async function POST(request: NextRequest) {
 • Делиться своими результатами
 • Находить единомышленников
 
-Готовы начать тренировки? Нажмите кнопку ниже! 👇
-          `;
+Готовы начать тренировки? Нажмите кнопку ниже! 👇`;
 
           const keyboard = {
             reply_markup: {
