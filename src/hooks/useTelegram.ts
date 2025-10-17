@@ -66,11 +66,6 @@ export const useTelegram = () => {
                 });
                 
                 setUser(data.user);
-                
-                // Если нужен онбординг, редиректим
-                if (data.user.needsOnboarding) {
-                  window.location.href = '/onboarding';
-                }
               } else {
                 console.error('❌ Telegram auth failed:', await response.text());
               }

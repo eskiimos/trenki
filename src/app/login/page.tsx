@@ -47,12 +47,8 @@ export default function LoginPage() {
         username: user.username,
       });
 
-      // Перенаправляем
-      if (data.needsOnboarding) {
-        router.push('/onboarding');
-      } else {
-        router.push('/');
-      }
+      // Просто перенаправляем на главную
+      router.push('/');
     } catch (err) {
       console.error('❌ Auth error:', err);
       setError('Ошибка авторизации. Попробуйте ещё раз.');
