@@ -16,6 +16,16 @@ export default function LoginPage() {
     if (isAuthenticated()) {
       console.log('✅ User already authenticated, redirecting...');
       router.push('/');
+      return;
+    }
+    
+    // Проверяем, есть ли активный токен в localStorage
+    const savedToken = localStorage.getItem('pendingLoginToken');
+    if (savedToken) {
+      console.log('🔄 Found pending login token, resuming authentication...');
+      setLoginToken(savedToken);
+      setIsLoggingIn(true);
+      resumeLoginCheck(savedToken);
     } else {
       setIsChecking(false);
     }
@@ -59,6 +69,9 @@ export default function LoginPage() {
       const data = await response.json();
       
       if (data.authenticated && data.user) {
+        // Очищаем сохраненный токен
+        localStorage.removeItem('pendingLoginToken');
+        
         // Сохраняем авторизацию
         saveAuth({
           telegramId: data.user.telegramId,
@@ -84,6 +97,29 @@ export default function LoginPage() {
     }
   };
 
+  // Функция для возобновления проверки при возврате в приложение
+  const resumeLoginCheck = (token: string) => {
+    console.log('🔄 Resuming login check for token:', token);
+    
+    // Начинаем проверять статус каждые 2 секунды
+    const intervalId = setInterval(async () => {
+      const authenticated = await checkLoginStatus(token);
+      
+      if (authenticated) {
+        clearInterval(intervalId);
+        setIsLoggingIn(false);
+      }
+    }, 2000);
+
+    // Останавливаем проверку через 5 минут
+    setTimeout(() => {
+      clearInterval(intervalId);
+      setIsLoggingIn(false);
+      localStorage.removeItem('pendingLoginToken');
+      setError('Время ожидания истекло. Попробуйте снова.');
+    }, 5 * 60 * 1000);
+  };
+
   // Обработчик входа через Telegram
   const handleTelegramLogin = async () => {
     setIsLoggingIn(true);
@@ -93,6 +129,9 @@ export default function LoginPage() {
       // Создаем токен
       const token = await createLoginToken();
       setLoginToken(token);
+      
+      // Сохраняем токен в localStorage для продолжения проверки после возврата
+      localStorage.setItem('pendingLoginToken', token);
 
       console.log('🔑 Login token created:', token);
 
@@ -105,33 +144,22 @@ export default function LoginPage() {
       if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
         console.log('📱 Using Telegram WebApp API');
         (window as any).Telegram.WebApp.openTelegramLink(botUrl);
+        
+        // Запускаем polling для проверки статуса
+        resumeLoginCheck(token);
       } else {
         console.log('🌐 Using direct navigation');
         // Для обычного браузера используем прямой переход
+        // При возврате useEffect подхватит токен из localStorage
         window.location.href = botUrl;
         return; // Выходим, так как страница будет перезагружена
       }
-
-      // Начинаем проверять статус каждые 2 секунды
-      const intervalId = setInterval(async () => {
-        const authenticated = await checkLoginStatus(token);
-        
-        if (authenticated) {
-          clearInterval(intervalId);
-        }
-      }, 2000);
-
-      // Останавливаем проверку через 5 минут
-      setTimeout(() => {
-        clearInterval(intervalId);
-        setIsLoggingIn(false);
-        setError('Время ожидания истекло. Попробуйте снова.');
-      }, 5 * 60 * 1000);
 
     } catch (err) {
       console.error('Login error:', err);
       setError('Ошибка входа. Попробуйте снова.');
       setIsLoggingIn(false);
+      localStorage.removeItem('pendingLoginToken');
     }
   };
 
@@ -191,18 +219,33 @@ export default function LoginPage() {
           )}
 
           {isLoggingIn && (
-            <div className="w-full p-6 bg-[#0A0E1A] border border-[#A1FF4A] rounded-xl">
-              <div className="flex items-center gap-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#A1FF4A]"></div>
-                <div className="flex-1">
-                  <p className="text-white font-medium mb-1">
-                    Откройте Telegram
-                  </p>
-                  <p className="text-gray-400 text-sm">
-                    Нажмите "Старт" в боте для подтверждения входа
-                  </p>
+            <div className="w-full space-y-3">
+              <div className="p-6 bg-[#0A0E1A] border border-[#A1FF4A] rounded-xl">
+                <div className="flex items-center gap-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#A1FF4A]"></div>
+                  <div className="flex-1">
+                    <p className="text-white font-medium mb-1">
+                      Откройте Telegram
+                    </p>
+                    <p className="text-gray-400 text-sm">
+                      Нажмите "Старт" в боте для подтверждения входа
+                    </p>
+                  </div>
                 </div>
               </div>
+              
+              {/* Кнопка отмены */}
+              <button
+                onClick={() => {
+                  setIsLoggingIn(false);
+                  setLoginToken(null);
+                  localStorage.removeItem('pendingLoginToken');
+                  setError(null);
+                }}
+                className="w-full py-3 text-gray-400 hover:text-white text-sm transition-colors"
+              >
+                Отменить
+              </button>
             </div>
           )}
           

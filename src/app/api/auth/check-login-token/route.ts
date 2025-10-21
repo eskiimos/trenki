@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token');
 
+    console.log('🔍 Checking token:', token);
+
     if (!token) {
       return NextResponse.json(
         { error: 'Token is required' },
@@ -20,6 +22,12 @@ export async function GET(request: NextRequest) {
     }
 
     const tokenData = global.loginTokens?.get(token);
+    
+    console.log('📊 Token data:', tokenData ? {
+      authenticated: tokenData.authenticated,
+      userId: tokenData.userId,
+      createdAt: new Date(tokenData.createdAt).toISOString(),
+    } : 'NOT FOUND');
 
     if (!tokenData) {
       return NextResponse.json(
@@ -31,6 +39,7 @@ export async function GET(request: NextRequest) {
     // Проверяем, не истек ли токен (5 минут)
     const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
     if (tokenData.createdAt < fiveMinutesAgo) {
+      console.log('⏰ Token expired');
       global.loginTokens.delete(token);
       return NextResponse.json(
         { error: 'Token expired' },
@@ -40,6 +49,7 @@ export async function GET(request: NextRequest) {
 
     // Если токен не аутентифицирован, возвращаем статус pending
     if (!tokenData.authenticated) {
+      console.log('⏳ Token pending authentication');
       return NextResponse.json({
         authenticated: false,
         status: 'pending',
@@ -47,6 +57,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Токен аутентифицирован, возвращаем данные пользователя
+    console.log('✅ Token authenticated, returning user data');
     return NextResponse.json({
       authenticated: true,
       user: tokenData.userData,

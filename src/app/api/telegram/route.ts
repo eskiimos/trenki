@@ -138,12 +138,18 @@ export async function POST(request: NextRequest) {
           console.log(`🔐 Login request with token: ${param.substring(0, 8)}... from user ${userId}`);
           
           // Проверяем, существует ли токен
+          console.log('🔍 Checking login token:', param);
+          console.log('🗂️ Available tokens:', Array.from(global.loginTokens?.keys() || []));
+          
           if (!global.loginTokens || !global.loginTokens.has(param)) {
+            console.log('❌ Token not found or expired:', param);
             await sendMessage(chatId, `❌ Неверная или устаревшая ссылка для входа.
 
 Попробуйте войти снова через веб-приложение.`);
             return NextResponse.json({ ok: true });
           }
+
+          console.log('✅ Token found, proceeding with authentication');
 
           // Создаем или обновляем пользователя в базе
           const prisma = (await import('@/lib/prisma')).prisma;
@@ -189,6 +195,8 @@ export async function POST(request: NextRequest) {
           // Активируем токен
           const tokenData = global.loginTokens.get(param);
           if (tokenData) {
+            console.log('📝 Current token data:', tokenData);
+            
             tokenData.authenticated = true;
             tokenData.userId = userId.toString();
             tokenData.needsOnboarding = needsOnboarding;
@@ -199,7 +207,14 @@ export async function POST(request: NextRequest) {
               username: username,
             };
             global.loginTokens.set(param, tokenData);
-            console.log(`✅ Token activated for user ${userId}`);
+            
+            console.log('✅ Token activated for user ${userId}:', {
+              authenticated: tokenData.authenticated,
+              userId: tokenData.userId,
+              needsOnboarding: tokenData.needsOnboarding,
+            });
+          } else {
+            console.log('⚠️ Token data not found after check!');
           }
 
           // Отправляем сообщение об успешном входе
