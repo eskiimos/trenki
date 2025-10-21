@@ -139,14 +139,33 @@ const Header = () => {
             'RIGHT_WING': 'ПК'
           };
 
-          setUserProfile({
+          const profileData = {
             overall: cachedData.user.profile.overall,
             number: cachedData.user.profile.number,
             position: positionMap[cachedData.user.profile.position] || cachedData.user.profile.position,
             firstName: cachedData.user.firstName,
             lastName: cachedData.user.lastName,
             potential: 'высокий' // Можно вычислить на основе overall
-          });
+          };
+          
+          setUserProfile(profileData);
+          
+          // Обновляем authData если данные из базы отличаются
+          if (authData && (authData.firstName !== cachedData.user.firstName || authData.lastName !== cachedData.user.lastName)) {
+            console.log('🔄 Updating authData with correct data from database');
+            const { saveAuth } = require('@/lib/auth');
+            saveAuth({
+              telegramId: cachedData.user.telegramId,
+              firstName: cachedData.user.firstName,
+              lastName: cachedData.user.lastName,
+              username: cachedData.user.username,
+            });
+            setAuthData({
+              ...authData,
+              firstName: cachedData.user.firstName,
+              lastName: cachedData.user.lastName,
+            });
+          }
         } else {
           setUserProfile(null);
         }
@@ -219,23 +238,23 @@ const Header = () => {
   }, [user?.id, authData?.telegramId]); // Зависимость от обоих источников ID
 
   // Логика отображения имени (приоритет):
-  // 1. Из localStorage (authData) - сохранено при входе через бота ✅ САМЫЙ НАДЁЖНЫЙ
-  // 2. Из профиля базы данных (если заполнен через онбординг)
+  // 1. Из профиля базы данных (САМЫЙ НАДЁЖНЫЙ - заполнен через онбординг)
+  // 2. Из localStorage (authData) - может быть неправильным если в Telegram неправильное имя
   // 3. Из Telegram WebApp (может быть неправильным)
   // 4. Заглушка "ТРЕНЬКИ"
-  const displayName = authData?.firstName 
-    || userProfile?.firstName 
+  const displayName = userProfile?.firstName 
+    || authData?.firstName 
     || user?.first_name 
     || 'ТРЕНЬКИ';
   
-  const displayLastName = authData?.lastName 
-    || userProfile?.lastName 
+  const displayLastName = userProfile?.lastName 
+    || authData?.lastName 
     || user?.last_name 
     || 'ТРЕНЬКИ';
 
   console.log('👤 Header display name sources:', {
-    'authData?.firstName': authData?.firstName,
     'userProfile?.firstName': userProfile?.firstName,
+    'authData?.firstName': authData?.firstName,
     'user?.first_name': user?.first_name,
     'final displayName': displayName,
     'final displayLastName': displayLastName
