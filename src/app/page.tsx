@@ -4,8 +4,10 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTelegram } from '../hooks/useTelegram';
 import { apiCache } from '../lib/cache';
+import { getTelegramId } from '@/lib/auth';
 import BottomNavigation from '@/components/BottomNavigation';
 
 // Компонент для короткого видео
@@ -34,8 +36,38 @@ const ShortVideoPlayer = ({ shortId, poster, title }: ShortVideoPlayerProps) => 
 };
 
 const HomePage = () => {
+  const router = useRouter();
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  
   // Инициализируем Telegram WebApp
   useTelegram();
+  
+  // Проверяем авторизацию при загрузке страницы
+  useEffect(() => {
+    const checkAuth = () => {
+      const telegramId = getTelegramId();
+      
+      if (!telegramId) {
+        console.log('❌ Пользователь не авторизован, редирект на /login');
+        router.push('/login');
+        return;
+      }
+      
+      console.log('✅ Пользователь авторизован:', telegramId);
+      setIsCheckingAuth(false);
+    };
+
+    checkAuth();
+  }, [router]);
+
+  // Показываем загрузку во время проверки авторизации
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-[#060919] flex items-center justify-center">
+        <div className="text-white text-xl">Загрузка...</div>
+      </div>
+    );
+  }
   
   return (
     <div className="bg-[#060919] min-h-screen text-white pb-32">

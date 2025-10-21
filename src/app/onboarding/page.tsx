@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { getTelegramId } from '@/lib/auth';
@@ -12,6 +12,25 @@ export default function OnboardingProfilePage() {
   const [lastName, setLastName] = useState('');
   const [age, setAge] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // Проверяем авторизацию при загрузке страницы
+  useEffect(() => {
+    const checkAuth = () => {
+      const telegramId = getTelegramId();
+      
+      if (!telegramId) {
+        console.log('❌ Пользователь не авторизован, редирект на /login');
+        router.push('/login');
+        return;
+      }
+      
+      console.log('✅ Пользователь авторизован:', telegramId);
+      setIsCheckingAuth(false);
+    };
+
+    checkAuth();
+  }, [router]);
 
   const isFormValid = 
     firstName.trim() !== '' && 
@@ -66,6 +85,15 @@ export default function OnboardingProfilePage() {
       setIsLoading(false);
     }
   };
+
+  // Показываем загрузку во время проверки авторизации
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-[#101530] flex items-center justify-center">
+        <div className="text-white text-xl">Проверка авторизации...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#101530] flex flex-col relative">
