@@ -177,32 +177,25 @@ export default function LoginPage() {
 
       console.log('🔑 Login token created:', token);
 
-      // Открываем бота с токеном
+      // Открываем бота с токеном в новой вкладке
       const botUrl = `https://t.me/trenkibot?start=${token}`;
       
-      console.log('🤖 Opening bot URL:', botUrl);
+      console.log('🤖 Opening bot URL in new tab:', botUrl);
       
-      // Используем Telegram WebApp API если доступен
-      if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
-        console.log('📱 Using Telegram WebApp API');
-        (window as any).Telegram.WebApp.openTelegramLink(botUrl);
-        
-        // Запускаем polling для проверки статуса
-        resumeLoginCheck(token);
-      } else {
-        console.log('🌐 Opening in new tab via link');
-        // Для обычного браузера создаем временную ссылку и кликаем
-        const link = document.createElement('a');
-        link.href = botUrl;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Запускаем polling - при возврате продолжим проверку
-        resumeLoginCheck(token);
-      }
+      // ВСЕГДА открываем в новой вкладке через createElement
+      // Это работает и в PWA, и в обычном браузере
+      const link = document.createElement('a');
+      link.href = botUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('✅ Link clicked, starting polling...');
+      
+      // Запускаем polling - при возврате продолжим проверку
+      resumeLoginCheck(token);
 
     } catch (err) {
       console.error('Login error:', err);
