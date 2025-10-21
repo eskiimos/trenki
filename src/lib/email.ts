@@ -1,6 +1,18 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Ленивая инициализация Resend
+let resendInstance: Resend | null = null;
+
+function getResend() {
+  if (!resendInstance) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      throw new Error('RESEND_API_KEY is not set in environment variables');
+    }
+    resendInstance = new Resend(apiKey);
+  }
+  return resendInstance;
+}
 
 export interface SendEmailOptions {
   to: string | string[];
@@ -14,6 +26,7 @@ export interface SendEmailOptions {
  */
 export async function sendEmail({ to, subject, html, from }: SendEmailOptions) {
   try {
+    const resend = getResend();
     const result = await resend.emails.send({
       from: from || 'Треньки <onboarding@resend.dev>', // Замени на свой домен позже
       to: Array.isArray(to) ? to : [to],

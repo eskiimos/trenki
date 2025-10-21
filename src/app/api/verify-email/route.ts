@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendEmail } from '@/lib/email';
 
+export const dynamic = 'force-dynamic';
+
 // Храним коды верификации в памяти (в продакшене лучше использовать Redis)
 const verificationCodes = new Map<string, { code: string; expiresAt: number }>();
 
