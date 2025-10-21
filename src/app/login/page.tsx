@@ -262,15 +262,38 @@ export default function LoginPage() {
         {/* Кнопка входа через Telegram */}
         <div className="flex flex-col items-center gap-4">
           {!isLoggingIn ? (
-            <button
-              onClick={handleTelegramLogin}
-              className="w-full bg-[#0088cc] hover:bg-[#006699] text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all shadow-lg"
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.03-1.99 1.27-5.62 3.73-.53.36-1.01.54-1.44.53-.47-.01-1.38-.27-2.06-.49-.83-.27-1.49-.42-1.43-.88.03-.24.38-.48.9-.72 3.55-1.55 5.93-2.57 7.14-3.07 3.4-1.42 4.1-1.67 4.57-1.67.1 0 .33.02.48.14.12.1.15.24.17.34-.01.1.01.24 0 .35z"/>
-              </svg>
-              Вход через Telegram
-            </button>
+            <>
+              <button
+                onClick={handleTelegramLogin}
+                className="w-full bg-[#0088cc] hover:bg-[#006699] text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all shadow-lg"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.03-1.99 1.27-5.62 3.73-.53.36-1.01.54-1.44.53-.47-.01-1.38-.27-2.06-.49-.83-.27-1.49-.42-1.43-.88.03-.24.38-.48.9-.72 3.55-1.55 5.93-2.57 7.14-3.07 3.4-1.42 4.1-1.67 4.57-1.67.1 0 .33.02.48.14.12.1.15.24.17.34-.01.1.01.24 0 .35z"/>
+                </svg>
+                Вход через Telegram
+              </button>
+              
+              {/* Dev-кнопка для localhost */}
+              {typeof window !== 'undefined' && 
+                (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && (
+                <button
+                  onClick={() => {
+                    console.log('🔓 Dev mode: bypassing authentication');
+                    // Создаём фейковые данные для разработки
+                    saveAuth({
+                      telegramId: 'dev_user_' + Date.now(),
+                      firstName: 'Dev',
+                      lastName: 'User',
+                      username: 'dev_user',
+                    });
+                    window.location.href = '/';
+                  }}
+                  className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-all"
+                >
+                  🔓 Dev: Войти без Telegram
+                </button>
+              )}
+            </>
           ) : (
             <button
               disabled

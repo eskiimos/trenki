@@ -17,6 +17,15 @@ function isPublicRoute(pathname: string): boolean {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // 🔓 Пропускаем localhost без проверки авторизации (для разработки)
+  const hostname = request.nextUrl.hostname;
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+  
+  if (isLocalhost) {
+    console.log(`🔓 Middleware: localhost detected, skipping auth check`);
+    return NextResponse.next();
+  }
+
   // Пропускаем статические файлы и API маршруты (кроме защищённых)
   if (
     pathname.startsWith('/_next') ||

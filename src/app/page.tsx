@@ -45,6 +45,16 @@ const HomePage = () => {
   // Проверяем авторизацию при загрузке страницы
   useEffect(() => {
     const checkAuth = () => {
+      // 🔓 Пропускаем проверку авторизации на localhost
+      const isLocalhost = typeof window !== 'undefined' && 
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      
+      if (isLocalhost) {
+        console.log('🔓 Localhost detected, skipping auth check');
+        setIsCheckingAuth(false);
+        return;
+      }
+      
       const telegramId = getTelegramId();
       
       if (!telegramId) {
