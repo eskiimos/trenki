@@ -98,20 +98,31 @@ const Header = () => {
   const { user } = useTelegram();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [authData, setAuthData] = useState<any>(null);
+
+  // Загружаем данные авторизации из localStorage
+  useEffect(() => {
+    const { getAuth } = require('@/lib/auth');
+    const auth = getAuth();
+    setAuthData(auth);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     
     const fetchUserProfile = async () => {
-      if (!user?.id || cancelled) {
+      // Используем user.id из Telegram WebApp или telegramId из authData
+      const userId = user?.id || authData?.telegramId;
+      
+      if (!userId || cancelled) {
         setIsLoading(false);
         return;
       }
 
-      console.log('Header: attempting to fetch user status for', user.id);
+      console.log('Header: attempting to fetch user status for', userId);
 
       // Проверяем кеш перед запросом
-      const cacheKey = `user-status-${user.id}`;
+      const cacheKey = `user-status-${userId}`;
       const cachedData = apiCache.get(cacheKey);
       
       if (cachedData && !cancelled) {
@@ -145,7 +156,7 @@ const Header = () => {
       try {
         console.log('Header: making API request to /api/user/status');
         // Запрос к API для проверки статуса профиля
-        const response = await fetch(`/api/user/status?telegramId=${user.id}`);
+        const response = await fetch(`/api/user/status?telegramId=${userId}`);
         
         if (!response.ok || cancelled) {
           throw new Error('Ошибка загрузки профиля');
@@ -193,9 +204,10 @@ const Header = () => {
     };
 
     // Загружаем данные только если их еще нет
-    if (user?.id && !userProfile) {
+    const userId = user?.id || authData?.telegramId;
+    if (userId && !userProfile) {
       fetchUserProfile();
-    } else if (user?.id && userProfile) {
+    } else if (userId && userProfile) {
       setIsLoading(false);
     }
     
@@ -203,18 +215,22 @@ const Header = () => {
     return () => {
       cancelled = true;
     };
-  }, [user?.id]); // Зависимость только от ID пользователя
+  }, [user?.id, authData?.telegramId]); // Зависимость от обоих источников ID
 
-  // Логика отображения имени:
-  // - Если профиль заполнен (есть firstName и lastName) - показываем из профиля
-  // - Иначе показываем данные из Telegram
-  const displayName = (userProfile?.firstName) 
-    ? userProfile.firstName 
-    : (user?.first_name || 'ТРЕНЬКИ');
+  // Логика отображения имени (приоритет):
+  // 1. Из профиля (если заполнен через онбординг)
+  // 2. Из Telegram WebApp
+  // 3. Из localStorage (authData)
+  // 4. Заглушка "ТРЕНЬКИ"
+  const displayName = userProfile?.firstName 
+    || user?.first_name 
+    || authData?.firstName 
+    || 'ТРЕНЬКИ';
   
-  const displayLastName = (userProfile?.lastName) 
-    ? userProfile.lastName 
-    : (user?.last_name || 'ТРЕНЬКИ');
+  const displayLastName = userProfile?.lastName 
+    || user?.last_name 
+    || authData?.lastName 
+    || 'ТРЕНЬКИ';
 
   return (
     <header style={{
