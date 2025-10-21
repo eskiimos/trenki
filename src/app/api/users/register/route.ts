@@ -25,6 +25,14 @@ export async function POST(request: NextRequest) {
       genderEnum = 'NOT_SPECIFIED';
     }
 
+    console.log('🔄 Upserting user with data:', {
+      telegramId,
+      firstName,
+      lastName,
+      age: parseInt(age),
+      gender: genderEnum
+    });
+
     // Создаем или обновляем пользователя и профиль
     const user = await prisma.user.upsert({
       where: { telegramId },
@@ -60,7 +68,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    console.log('User registered:', user);
+    console.log('✅ User registered successfully:', {
+      id: user.id,
+      telegramId: user.telegramId,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      profile: user.profile
+    });
 
     return NextResponse.json({
       success: true,
