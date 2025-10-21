@@ -11,26 +11,6 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loginToken, setLoginToken] = useState<string | null>(null);
 
-  // Проверяем, не авторизован ли пользователь уже
-  useEffect(() => {
-    if (isAuthenticated()) {
-      console.log('✅ User already authenticated, redirecting...');
-      router.push('/');
-      return;
-    }
-    
-    // Проверяем, есть ли активный токен в localStorage
-    const savedToken = localStorage.getItem('pendingLoginToken');
-    if (savedToken) {
-      console.log('🔄 Found pending login token, resuming authentication...');
-      setLoginToken(savedToken);
-      setIsLoggingIn(true);
-      resumeLoginCheck(savedToken);
-    } else {
-      setIsChecking(false);
-    }
-  }, [router]);
-
   // Создаем токен для входа
   const createLoginToken = async () => {
     try {
@@ -101,24 +81,56 @@ export default function LoginPage() {
   const resumeLoginCheck = (token: string) => {
     console.log('🔄 Resuming login check for token:', token);
     
+    let attempts = 0;
+    const maxAttempts = 150; // 150 попыток * 2 секунды = 5 минут
+    
     // Начинаем проверять статус каждые 2 секунды
     const intervalId = setInterval(async () => {
+      attempts++;
       const authenticated = await checkLoginStatus(token);
       
       if (authenticated) {
+        console.log('✅ Authentication successful!');
         clearInterval(intervalId);
         setIsLoggingIn(false);
+      } else if (authenticated === null) {
+        // Ошибка или токен не найден - прекращаем
+        console.log('❌ Token invalid or expired, stopping check');
+        clearInterval(intervalId);
+        setIsLoggingIn(false);
+        localStorage.removeItem('pendingLoginToken');
+        setError('Токен истек. Попробуйте войти снова.');
+      } else if (attempts >= maxAttempts) {
+        // Достигли максимального количества попыток
+        console.log('⏰ Max attempts reached');
+        clearInterval(intervalId);
+        setIsLoggingIn(false);
+        localStorage.removeItem('pendingLoginToken');
+        setError('Время ожидания истекло. Попробуйте снова.');
       }
     }, 2000);
-
-    // Останавливаем проверку через 5 минут
-    setTimeout(() => {
-      clearInterval(intervalId);
-      setIsLoggingIn(false);
-      localStorage.removeItem('pendingLoginToken');
-      setError('Время ожидания истекло. Попробуйте снова.');
-    }, 5 * 60 * 1000);
   };
+
+  // Проверяем, не авторизован ли пользователь уже
+  useEffect(() => {
+    if (isAuthenticated()) {
+      console.log('✅ User already authenticated, redirecting...');
+      router.push('/');
+      return;
+    }
+    
+    // Проверяем, есть ли активный токен в localStorage
+    const savedToken = localStorage.getItem('pendingLoginToken');
+    if (savedToken) {
+      console.log('🔄 Found pending login token, resuming authentication...');
+      setLoginToken(savedToken);
+      setIsLoggingIn(true);
+      setIsChecking(false); // Важно! Убираем экран проверки авторизации
+      resumeLoginCheck(savedToken);
+    } else {
+      setIsChecking(false);
+    }
+  }, [router]);
 
   // Обработчик входа через Telegram
   const handleTelegramLogin = async () => {
