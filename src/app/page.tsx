@@ -104,6 +104,7 @@ const Header = () => {
   useEffect(() => {
     const { getAuth } = require('@/lib/auth');
     const auth = getAuth();
+    console.log('📦 Header: loaded authData from localStorage:', auth);
     setAuthData(auth);
   }, []);
 
@@ -231,6 +232,14 @@ const Header = () => {
     || userProfile?.lastName 
     || user?.last_name 
     || 'ТРЕНЬКИ';
+
+  console.log('👤 Header display name sources:', {
+    'authData?.firstName': authData?.firstName,
+    'userProfile?.firstName': userProfile?.firstName,
+    'user?.first_name': user?.first_name,
+    'final displayName': displayName,
+    'final displayLastName': displayLastName
+  });
 
   return (
     <header style={{
