@@ -218,18 +218,18 @@ const Header = () => {
   }, [user?.id, authData?.telegramId]); // Зависимость от обоих источников ID
 
   // Логика отображения имени (приоритет):
-  // 1. Из профиля (если заполнен через онбординг)
-  // 2. Из Telegram WebApp
-  // 3. Из localStorage (authData)
+  // 1. Из localStorage (authData) - сохранено при входе через бота ✅ САМЫЙ НАДЁЖНЫЙ
+  // 2. Из профиля базы данных (если заполнен через онбординг)
+  // 3. Из Telegram WebApp (может быть неправильным)
   // 4. Заглушка "ТРЕНЬКИ"
-  const displayName = userProfile?.firstName 
+  const displayName = authData?.firstName 
+    || userProfile?.firstName 
     || user?.first_name 
-    || authData?.firstName 
     || 'ТРЕНЬКИ';
   
-  const displayLastName = userProfile?.lastName 
+  const displayLastName = authData?.lastName 
+    || userProfile?.lastName 
     || user?.last_name 
-    || authData?.lastName 
     || 'ТРЕНЬКИ';
 
   return (
