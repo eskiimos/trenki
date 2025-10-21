@@ -24,18 +24,25 @@ export default function LoginPage() {
   // Создаем токен для входа
   const createLoginToken = async () => {
     try {
+      console.log('📡 Creating login token...');
+      
       const response = await fetch('/api/auth/create-login-token', {
         method: 'POST',
       });
 
+      console.log('📡 Response status:', response.status);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Failed to create token:', errorText);
         throw new Error('Failed to create login token');
       }
 
       const data = await response.json();
+      console.log('✅ Token created:', data.token);
       return data.token;
     } catch (err) {
-      console.error('Error creating login token:', err);
+      console.error('❌ Error creating login token:', err);
       throw err;
     }
   };
@@ -87,9 +94,23 @@ export default function LoginPage() {
       const token = await createLoginToken();
       setLoginToken(token);
 
+      console.log('🔑 Login token created:', token);
+
       // Открываем бота с токеном
       const botUrl = `https://t.me/trenkibot?start=${token}`;
-      window.open(botUrl, '_blank');
+      
+      console.log('🤖 Opening bot URL:', botUrl);
+      
+      // Используем Telegram WebApp API если доступен
+      if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
+        console.log('📱 Using Telegram WebApp API');
+        (window as any).Telegram.WebApp.openTelegramLink(botUrl);
+      } else {
+        console.log('🌐 Using direct navigation');
+        // Для обычного браузера используем прямой переход
+        window.location.href = botUrl;
+        return; // Выходим, так как страница будет перезагружена
+      }
 
       // Начинаем проверять статус каждые 2 секунды
       const intervalId = setInterval(async () => {
