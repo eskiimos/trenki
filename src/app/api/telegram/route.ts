@@ -125,93 +125,100 @@ export async function POST(request: NextRequest) {
 
       // Команда /start
       if (text?.startsWith('/start')) {
-        // Проверяем, есть ли параметр login токена
         const parts = text.split(' ');
-        const param = parts[1];
+        const param = parts[1]; // Токен после /start
         const userId = message.from.id;
+        const userName = `${message.from.first_name || ''} ${message.from.last_name || ''}`.trim();
+        const username = message.from.username;
         
         console.log(`🔍 Start command with param: ${param}`);
         
-        if (param && param.startsWith('login_')) {
-          // Это запрос на авторизацию - сохраняем токен для пользователя
-          const token = param.replace('login_', '');
+        // Если есть параметр - это токен для входа
+        if (param) {
+          console.log(`🔐 Login request with token: ${param.substring(0, 8)}... from user ${userId}`);
           
-          console.log(`🔐 Login request with token: ${token.substring(0, 8)}... from user ${userId}`);
-          
-          // Сохраняем токен для этого пользователя
-          global.pendingLoginTokens.set(userId, token);
-          
-          const loginMessage = `🔐 Подтверждение входа
+          // Проверяем, существует ли токен
+          if (!global.loginTokens || !global.loginTokens.has(param)) {
+            await sendMessage(chatId, `❌ Неверная или устаревшая ссылка для входа.
 
-Вы запросили вход в приложение Trenki с компьютера или браузера.
+Попробуйте войти снова через веб-приложение.`);
+            return NextResponse.json({ ok: true });
+          }
 
-⚠️ Важно: Нажимайте кнопку только если вы сами открыли страницу входа!
+          // Создаем или обновляем пользователя в базе
+          const prisma = (await import('@/lib/prisma')).prisma;
+          
+          // Генерируем email в формате {telegram_id}@t.me
+          const autoEmail = `${userId}@t.me`;
+          
+          // Проверяем, существует ли пользователь
+          let user = await prisma.user.findUnique({
+            where: { telegramId: userId.toString() },
+            include: { profile: true }
+          });
 
-Подтвердите вход, нажав кнопку ниже 👇`;
-          
-          const keyboard = {
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  {
-                    text: '✅ Да, это я! Подтвердить вход',
-                    callback_data: `confirm_login:${token}`
-                  }
-                ],
-                [
-                  {
-                    text: '❌ Отменить',
-                    callback_data: `cancel_login:${token}`
-                  }
-                ]
-              ]
-            }
-          };
-          
-          console.log('📤 Sending login confirmation message...');
-          const result = await sendMessage(chatId, loginMessage, keyboard);
-          console.log('✅ Message sent:', result);
-        } 
-        // Проверяем, есть ли сохранённый токен для этого пользователя
-        else if (global.pendingLoginTokens.has(userId)) {
-          const token = global.pendingLoginTokens.get(userId)!;
-          
-          console.log(`🔄 Found pending login token for user ${userId}: ${token.substring(0, 8)}...`);
-          
-          const loginMessage = `🔐 Подтверждение входа
+          const needsOnboarding = !user || !user.profile || !user.profile.age || !user.profile.gender;
 
-У вас есть незавершённый запрос на вход в приложение Trenki.
+          // Если пользователя нет, создаем
+          if (!user) {
+            user = await prisma.user.create({
+              data: {
+                telegramId: userId.toString(),
+                firstName: message.from.first_name || 'User',
+                lastName: message.from.last_name || '',
+                username: username,
+                email: autoEmail,
+                emailVerified: true, // Автоматически верифицируем Telegram email
+              },
+              include: { profile: true }
+            });
+            console.log(`✅ Created new user: ${user.id}`);
+          } else if (!user.email) {
+            // Обновляем email если его нет
+            user = await prisma.user.update({
+              where: { id: user.id },
+              data: {
+                email: autoEmail,
+                emailVerified: true,
+              },
+              include: { profile: true }
+            });
+            console.log(`✅ Updated user email: ${autoEmail}`);
+          }
 
-⚠️ Важно: Нажимайте кнопку только если вы сами открыли страницу входа!
+          // Активируем токен
+          const tokenData = global.loginTokens.get(param);
+          if (tokenData) {
+            tokenData.authenticated = true;
+            tokenData.userId = userId.toString();
+            tokenData.needsOnboarding = needsOnboarding;
+            tokenData.userData = {
+              telegramId: userId.toString(),
+              firstName: message.from.first_name || 'User',
+              lastName: message.from.last_name || '',
+              username: username,
+            };
+            global.loginTokens.set(param, tokenData);
+            console.log(`✅ Token activated for user ${userId}`);
+          }
 
-Подтвердите вход, нажав кнопку ниже 👇`;
-          
-          const keyboard = {
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  {
-                    text: '✅ Да, это я! Подтвердить вход',
-                    callback_data: `confirm_login:${token}`
-                  }
-                ],
-                [
-                  {
-                    text: '❌ Отменить',
-                    callback_data: `cancel_login:${token}`
-                  }
-                ]
-              ]
-            }
-          };
-          
-          await sendMessage(chatId, loginMessage, keyboard);
+          // Отправляем сообщение об успешном входе
+          const successMessage = `✅ Вход подтвержден!
+
+Теперь вы можете вернуться в приложение и продолжить работу.
+
+📧 Ваш автоматический email: ${autoEmail}
+${needsOnboarding ? '\n📝 При первом входе вам нужно будет завершить регистрацию.' : ''}
+
+Приятных тренировок! 🏒`;
+
+          await sendMessage(chatId, successMessage);
         } 
         else {
           // Обычный /start - показываем кнопку для запуска приложения
           const welcomeMessage = `👋 Привет, ${firstName}!
 
-Добро пожаловать в Trenki - твой цифровой мир хоккея! 🏒
+Добро пожаловать в Треньки - твой цифровой мир хоккея! 🏒
 
 Нажми кнопку ниже, чтобы открыть приложение 👇`;
 
@@ -220,7 +227,7 @@ export async function POST(request: NextRequest) {
               inline_keyboard: [
                 [
                   {
-                    text: '🚀 Открыть Trenki',
+                    text: '🚀 Открыть Треньки',
                     web_app: {
                       url: WEB_APP_URL
                     }

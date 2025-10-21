@@ -1,14 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAuthenticated, saveAuth } from '@/lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
-  const scriptLoaded = useRef(false);
   const [isChecking, setIsChecking] = useState(true);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loginToken, setLoginToken] = useState<string | null>(null);
 
   // Проверяем, не авторизован ли пользователь уже
   useEffect(() => {
@@ -20,73 +21,98 @@ export default function LoginPage() {
     }
   }, [router]);
 
-  // Обработчик успешной авторизации
-  const onTelegramAuth = async (user: any) => {
-    console.log('✅ Telegram Login Widget auth:', user);
-    
+  // Создаем токен для входа
+  const createLoginToken = async () => {
     try {
-      // Сохраняем авторизацию СРАЗУ, до запроса на сервер
-      saveAuth({
-        telegramId: user.id.toString(),
-        firstName: user.first_name,
-        lastName: user.last_name,
-        username: user.username,
-      });
-      
-      console.log('💾 Auth saved to localStorage');
-      
-      // Проверяем подпись на сервере
-      const response = await fetch('/api/auth/telegram-widget', {
+      const response = await fetch('/api/auth/create-login-token', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(user),
       });
 
       if (!response.ok) {
-        throw new Error('Auth verification failed');
+        throw new Error('Failed to create login token');
       }
 
       const data = await response.json();
-      console.log('✅ Server verified auth:', data);
-
-      // Проверяем, нужен ли онбординг
-      if (data.needsOnboarding) {
-        console.log('📝 Redirecting to onboarding...');
-        router.push('/onboarding');
-      } else {
-        console.log('🏠 Redirecting to home...');
-        router.push('/');
-      }
+      return data.token;
     } catch (err) {
-      console.error('❌ Auth error:', err);
-      setError('Ошибка авторизации. Попробуйте ещё раз.');
+      console.error('Error creating login token:', err);
+      throw err;
     }
   };
 
-  // Загружаем Telegram Login Widget
-  useEffect(() => {
-    if (isChecking) return;
-    
-    // Устанавливаем глобальный обработчик ПЕРЕД загрузкой скрипта
-    (window as any).onTelegramAuth = onTelegramAuth;
-
-    if (!scriptLoaded.current) {
-      const script = document.createElement('script');
-      script.src = 'https://telegram.org/js/telegram-widget.js?22';
-      script.setAttribute('data-telegram-login', 'trenkibot');
-      script.setAttribute('data-size', 'large');
-      script.setAttribute('data-radius', '8');
-      script.setAttribute('data-onauth', 'onTelegramAuth(user)');
-      script.setAttribute('data-request-access', 'write');
-      script.async = true;
+  // Проверяем статус токена
+  const checkLoginStatus = async (token: string) => {
+    try {
+      const response = await fetch(`/api/auth/check-login-token?token=${token}`);
       
-      const container = document.getElementById('telegram-login-container');
-      if (container) {
-        container.appendChild(script);
-        scriptLoaded.current = true;
+      if (!response.ok) {
+        return null;
       }
+
+      const data = await response.json();
+      
+      if (data.authenticated && data.user) {
+        // Сохраняем авторизацию
+        saveAuth({
+          telegramId: data.user.telegramId,
+          firstName: data.user.firstName,
+          lastName: data.user.lastName,
+          username: data.user.username,
+        });
+
+        // Перенаправляем
+        if (data.needsOnboarding) {
+          router.push('/onboarding');
+        } else {
+          router.push('/');
+        }
+        
+        return true;
+      }
+      
+      return false;
+    } catch (err) {
+      console.error('Error checking login status:', err);
+      return null;
     }
-  }, [isChecking]);
+  };
+
+  // Обработчик входа через Telegram
+  const handleTelegramLogin = async () => {
+    setIsLoggingIn(true);
+    setError(null);
+
+    try {
+      // Создаем токен
+      const token = await createLoginToken();
+      setLoginToken(token);
+
+      // Открываем бота с токеном
+      const botUrl = `https://t.me/trenkibot?start=${token}`;
+      window.open(botUrl, '_blank');
+
+      // Начинаем проверять статус каждые 2 секунды
+      const intervalId = setInterval(async () => {
+        const authenticated = await checkLoginStatus(token);
+        
+        if (authenticated) {
+          clearInterval(intervalId);
+        }
+      }, 2000);
+
+      // Останавливаем проверку через 5 минут
+      setTimeout(() => {
+        clearInterval(intervalId);
+        setIsLoggingIn(false);
+        setError('Время ожидания истекло. Попробуйте снова.');
+      }, 5 * 60 * 1000);
+
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('Ошибка входа. Попробуйте снова.');
+      setIsLoggingIn(false);
+    }
+  };
 
   // Показываем загрузку во время проверки авторизации
   if (isChecking) {
@@ -121,25 +147,40 @@ export default function LoginPage() {
           Используйте Telegram для быстрого и безопасного входа
         </p>
 
-        {/* Telegram Login Widget */}
+        {/* Кнопка входа через Telegram */}
         <div className="flex flex-col items-center gap-4">
-          <div 
-            id="telegram-login-container" 
-            className="flex justify-center w-full"
-          />
+          <button
+            onClick={handleTelegramLogin}
+            disabled={isLoggingIn}
+            className="w-full bg-[#0088cc] hover:bg-[#006699] disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all shadow-lg"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.03-1.99 1.27-5.62 3.73-.53.36-1.01.54-1.44.53-.47-.01-1.38-.27-2.06-.49-.83-.27-1.49-.42-1.43-.88.03-.24.38-.48.9-.72 3.55-1.55 5.93-2.57 7.14-3.07 3.4-1.42 4.1-1.67 4.57-1.67.1 0 .33.02.48.14.12.1.15.24.17.34-.01.1.01.24 0 .35z"/>
+            </svg>
+            {isLoggingIn ? 'Ожидание подтверждения...' : 'Вход через Telegram'}
+          </button>
+
+          {isLoggingIn && (
+            <div className="w-full p-6 bg-[#0A0E1A] border border-[#A1FF4A] rounded-xl">
+              <div className="flex items-center gap-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#A1FF4A]"></div>
+                <div className="flex-1">
+                  <p className="text-white font-medium mb-1">
+                    Откройте Telegram
+                  </p>
+                  <p className="text-gray-400 text-sm">
+                    Нажмите "Старт" в боте для подтверждения входа
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           
           {error && (
             <div className="w-full p-4 bg-red-500/20 border border-red-500 rounded-lg">
               <p className="text-red-400 text-sm text-center">{error}</p>
             </div>
           )}
-          
-          <div className="text-center text-xs text-gray-500 max-w-sm space-y-2">
-            <p>При нажатии на кнопку откроется окно Telegram для авторизации</p>
-            <p className="text-[#A1FF4A]">
-              ⚠️ Если видите ошибку "Bot domain invalid", настройте домен в @BotFather
-            </p>
-          </div>
         </div>
 
         {/* Информация */}
@@ -149,7 +190,7 @@ export default function LoginPage() {
               ✓
             </div>
             <p className="text-gray-400 text-sm">
-              Безопасная авторизация через Telegram
+              Безопасная авторизация через Telegram бота
             </p>
           </div>
           <div className="flex items-start gap-3">
@@ -157,7 +198,7 @@ export default function LoginPage() {
               ✓
             </div>
             <p className="text-gray-400 text-sm">
-              Не нужно запоминать пароли
+              Автоматическая регистрация при первом входе
             </p>
           </div>
           <div className="flex items-start gap-3">
@@ -165,7 +206,7 @@ export default function LoginPage() {
               ✓
             </div>
             <p className="text-gray-400 text-sm">
-              Мгновенный вход в один клик
+              Email в формате {`{ваш_id}@t.me`} создается автоматически
             </p>
           </div>
         </div>
