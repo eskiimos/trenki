@@ -190,9 +190,15 @@ export default function LoginPage() {
         // Запускаем polling для проверки статуса
         resumeLoginCheck(token);
       } else {
-        console.log('🌐 Opening in new tab');
-        // Для обычного браузера открываем в новой вкладке
-        window.open(botUrl, '_blank');
+        console.log('🌐 Opening in new tab via link');
+        // Для обычного браузера создаем временную ссылку и кликаем
+        const link = document.createElement('a');
+        link.href = botUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
         
         // Запускаем polling - при возврате продолжим проверку
         resumeLoginCheck(token);
@@ -276,10 +282,10 @@ export default function LoginPage() {
             </button>
           )}
 
-          {isLoggingIn && (
+          {isLoggingIn && loginToken && (
             <div className="w-full space-y-3">
               <div className="p-6 bg-[#0A0E1A] border border-[#A1FF4A] rounded-xl">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 mb-3">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#A1FF4A]"></div>
                   <div className="flex-1">
                     <p className="text-white font-medium mb-1">
@@ -290,6 +296,16 @@ export default function LoginPage() {
                     </p>
                   </div>
                 </div>
+                
+                {/* Ссылка для ручного открытия */}
+                <a
+                  href={`https://t.me/trenkibot?start=${loginToken}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full text-center py-2 px-4 bg-[#0088cc] hover:bg-[#006699] text-white text-sm rounded-lg transition-colors"
+                >
+                  Или откройте бота вручную
+                </a>
               </div>
               
               {/* Кнопка отмены */}
