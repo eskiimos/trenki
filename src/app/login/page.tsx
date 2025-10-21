@@ -116,29 +116,50 @@ export default function LoginPage() {
     console.log('🚀 LoginPage useEffect started');
     console.log('📊 Initial state:', { isChecking, isLoggingIn });
     
-    const authStatus = isAuthenticated();
-    console.log('🔐 isAuthenticated():', authStatus);
+    const checkAuthAndToken = () => {
+      const authStatus = isAuthenticated();
+      console.log('🔐 isAuthenticated():', authStatus);
+      
+      if (authStatus) {
+        console.log('✅ User already authenticated, redirecting to /...');
+        router.push('/');
+        return true;
+      }
+      
+      // Проверяем, есть ли активный токен в localStorage
+      const savedToken = localStorage.getItem('pendingLoginToken');
+      console.log('🗂️ Saved token in localStorage:', savedToken ? 'EXISTS' : 'NOT FOUND');
+      
+      if (savedToken) {
+        console.log('🔄 Found pending login token, resuming authentication...');
+        setLoginToken(savedToken);
+        setIsLoggingIn(true);
+        setIsChecking(false); // Важно! Убираем экран проверки авторизации
+        resumeLoginCheck(savedToken);
+      } else {
+        console.log('✅ No pending token, showing login form');
+        setIsChecking(false);
+      }
+      
+      return false;
+    };
     
-    if (authStatus) {
-      console.log('✅ User already authenticated, redirecting to /...');
-      router.push('/');
-      return;
-    }
+    // Проверяем при загрузке
+    checkAuthAndToken();
     
-    // Проверяем, есть ли активный токен в localStorage
-    const savedToken = localStorage.getItem('pendingLoginToken');
-    console.log('🗂️ Saved token in localStorage:', savedToken ? 'EXISTS' : 'NOT FOUND');
+    // Слушаем событие возврата в приложение (когда пользователь переключается обратно на вкладку)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('👀 App became visible, checking auth status...');
+        checkAuthAndToken();
+      }
+    };
     
-    if (savedToken) {
-      console.log('🔄 Found pending login token, resuming authentication...');
-      setLoginToken(savedToken);
-      setIsLoggingIn(true);
-      setIsChecking(false); // Важно! Убираем экран проверки авторизации
-      resumeLoginCheck(savedToken);
-    } else {
-      console.log('✅ No pending token, showing login form');
-      setIsChecking(false);
-    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [router]);
 
   // Обработчик входа через Telegram
@@ -169,11 +190,12 @@ export default function LoginPage() {
         // Запускаем polling для проверки статуса
         resumeLoginCheck(token);
       } else {
-        console.log('🌐 Using direct navigation');
-        // Для обычного браузера используем прямой переход
-        // При возврате useEffect подхватит токен из localStorage
-        window.location.href = botUrl;
-        return; // Выходим, так как страница будет перезагружена
+        console.log('🌐 Opening in new tab');
+        // Для обычного браузера открываем в новой вкладке
+        window.open(botUrl, '_blank');
+        
+        // Запускаем polling - при возврате продолжим проверку
+        resumeLoginCheck(token);
       }
 
     } catch (err) {
