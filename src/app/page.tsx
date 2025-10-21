@@ -129,24 +129,28 @@ const Header = () => {
       if (cachedData && !cancelled) {
         console.log('Header: using cached data for user status');
         
-        if (cachedData.hasCompleteProfile && cachedData.user.profile) {
-          // Определяем отображаемую позицию
-          const positionMap: Record<string, string> = {
-            'GOALTENDER': 'ВР',
-            'DEFENSEMAN': 'ЗАЩ',
-            'LEFT_WING': 'ЛК',
-            'CENTER': 'Ц',
-            'RIGHT_WING': 'ПК'
-          };
-
-          const profileData = {
-            overall: cachedData.user.profile.overall,
-            number: cachedData.user.profile.number,
-            position: positionMap[cachedData.user.profile.position] || cachedData.user.profile.position,
+        // ВСЕГДА устанавливаем данные пользователя (имя и фамилию)
+        if (cachedData.user) {
+          const profileData: any = {
             firstName: cachedData.user.firstName,
             lastName: cachedData.user.lastName,
-            potential: 'высокий' // Можно вычислить на основе overall
           };
+          
+          // Если профиль полностью заполнен, добавляем дополнительные данные
+          if (cachedData.hasCompleteProfile && cachedData.user.profile) {
+            const positionMap: Record<string, string> = {
+              'GOALTENDER': 'ВР',
+              'DEFENSEMAN': 'ЗАЩ',
+              'LEFT_WING': 'ЛК',
+              'CENTER': 'Ц',
+              'RIGHT_WING': 'ПК'
+            };
+            
+            profileData.overall = cachedData.user.profile.overall;
+            profileData.number = cachedData.user.profile.number;
+            profileData.position = positionMap[cachedData.user.profile.position] || cachedData.user.profile.position;
+            profileData.potential = 'высокий';
+          }
           
           setUserProfile(profileData);
           
@@ -189,24 +193,30 @@ const Header = () => {
         apiCache.set(cacheKey, data);
         console.log('Header: cached user status data');
         
-        if (data.hasCompleteProfile && data.user.profile) {
-          // Определяем отображаемую позицию
-          const positionMap: Record<string, string> = {
-            'GOALTENDER': 'ВР',
-            'DEFENSEMAN': 'ЗАЩ',
-            'LEFT_WING': 'ЛК',
-            'CENTER': 'Ц',
-            'RIGHT_WING': 'ПК'
-          };
-
-          setUserProfile({
-            overall: data.user.profile.overall,
-            number: data.user.profile.number,
-            position: positionMap[data.user.profile.position] || data.user.profile.position,
+        // ВСЕГДА устанавливаем данные пользователя (имя и фамилию)
+        if (data.user) {
+          const profileData: any = {
             firstName: data.user.firstName,
             lastName: data.user.lastName,
-            potential: 'высокий' // Можно вычислить на основе overall
-          });
+          };
+          
+          // Если профиль полностью заполнен, добавляем дополнительные данные
+          if (data.hasCompleteProfile && data.user.profile) {
+            const positionMap: Record<string, string> = {
+              'GOALTENDER': 'ВР',
+              'DEFENSEMAN': 'ЗАЩ',
+              'LEFT_WING': 'ЛК',
+              'CENTER': 'Ц',
+              'RIGHT_WING': 'ПК'
+            };
+            
+            profileData.overall = data.user.profile.overall;
+            profileData.number = data.user.profile.number;
+            profileData.position = positionMap[data.user.profile.position] || data.user.profile.position;
+            profileData.potential = 'высокий';
+          }
+          
+          setUserProfile(profileData);
           
           // Обновляем authData если данные из базы отличаются
           if (authData && (authData.firstName !== data.user.firstName || authData.lastName !== data.user.lastName)) {
