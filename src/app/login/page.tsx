@@ -113,14 +113,22 @@ export default function LoginPage() {
 
   // Проверяем, не авторизован ли пользователь уже
   useEffect(() => {
-    if (isAuthenticated()) {
-      console.log('✅ User already authenticated, redirecting...');
+    console.log('🚀 LoginPage useEffect started');
+    console.log('📊 Initial state:', { isChecking, isLoggingIn });
+    
+    const authStatus = isAuthenticated();
+    console.log('🔐 isAuthenticated():', authStatus);
+    
+    if (authStatus) {
+      console.log('✅ User already authenticated, redirecting to /...');
       router.push('/');
       return;
     }
     
     // Проверяем, есть ли активный токен в localStorage
     const savedToken = localStorage.getItem('pendingLoginToken');
+    console.log('🗂️ Saved token in localStorage:', savedToken ? 'EXISTS' : 'NOT FOUND');
+    
     if (savedToken) {
       console.log('🔄 Found pending login token, resuming authentication...');
       setLoginToken(savedToken);
@@ -128,6 +136,7 @@ export default function LoginPage() {
       setIsChecking(false); // Важно! Убираем экран проверки авторизации
       resumeLoginCheck(savedToken);
     } else {
+      console.log('✅ No pending token, showing login form');
       setIsChecking(false);
     }
   }, [router]);
@@ -178,11 +187,26 @@ export default function LoginPage() {
   // Показываем загрузку во время проверки авторизации
   if (isChecking) {
     return (
-      <div className="min-h-screen bg-[#101530] flex items-center justify-center">
+      <div className="min-h-screen bg-[#101530] flex flex-col items-center justify-center gap-4">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#A1FF4A] mx-auto mb-4"></div>
           <p className="text-gray-400">Проверка авторизации...</p>
         </div>
+        
+        {/* Кнопка для отладки - если застряло */}
+        <button
+          onClick={() => {
+            console.log('🔄 Manual reset triggered');
+            localStorage.removeItem('pendingLoginToken');
+            localStorage.removeItem('telegramId');
+            setIsChecking(false);
+            setIsLoggingIn(false);
+            setError(null);
+          }}
+          className="text-gray-500 text-sm hover:text-white transition-colors"
+        >
+          Сбросить состояние
+        </button>
       </div>
     );
   }
