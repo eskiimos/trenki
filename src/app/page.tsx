@@ -152,7 +152,7 @@ const Header = () => {
           
           // Обновляем authData если данные из базы отличаются
           if (authData && (authData.firstName !== cachedData.user.firstName || authData.lastName !== cachedData.user.lastName)) {
-            console.log('🔄 Updating authData with correct data from database');
+            console.log('🔄 Updating authData with correct data from database (from cache)');
             const { saveAuth } = require('@/lib/auth');
             saveAuth({
               telegramId: cachedData.user.telegramId,
@@ -160,11 +160,10 @@ const Header = () => {
               lastName: cachedData.user.lastName,
               username: cachedData.user.username,
             });
-            setAuthData({
-              ...authData,
-              firstName: cachedData.user.firstName,
-              lastName: cachedData.user.lastName,
-            });
+            
+            // Перезагружаем страницу чтобы обновить все компоненты
+            console.log('🔄 Reloading page to apply updated authData...');
+            window.location.reload();
           }
         } else {
           setUserProfile(null);
@@ -219,11 +218,10 @@ const Header = () => {
               lastName: data.user.lastName,
               username: data.user.username,
             });
-            setAuthData({
-              ...authData,
-              firstName: data.user.firstName,
-              lastName: data.user.lastName,
-            });
+            
+            // Перезагружаем страницу чтобы обновить все компоненты
+            console.log('🔄 Reloading page to apply updated authData...');
+            window.location.reload();
           }
         } else {
           setUserProfile(null);
