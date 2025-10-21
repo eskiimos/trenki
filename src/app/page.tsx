@@ -208,6 +208,23 @@ const Header = () => {
             lastName: data.user.lastName,
             potential: 'высокий' // Можно вычислить на основе overall
           });
+          
+          // Обновляем authData если данные из базы отличаются
+          if (authData && (authData.firstName !== data.user.firstName || authData.lastName !== data.user.lastName)) {
+            console.log('🔄 Updating authData with correct data from database (API response)');
+            const { saveAuth } = require('@/lib/auth');
+            saveAuth({
+              telegramId: data.user.telegramId,
+              firstName: data.user.firstName,
+              lastName: data.user.lastName,
+              username: data.user.username,
+            });
+            setAuthData({
+              ...authData,
+              firstName: data.user.firstName,
+              lastName: data.user.lastName,
+            });
+          }
         } else {
           setUserProfile(null);
         }
@@ -242,6 +259,12 @@ const Header = () => {
   // 2. Из localStorage (authData) - может быть неправильным если в Telegram неправильное имя
   // 3. Из Telegram WebApp (может быть неправильным)
   // 4. Заглушка "ТРЕНЬКИ"
+  console.log('🎨 Header display name sources:', {
+    userProfile: { firstName: userProfile?.firstName, lastName: userProfile?.lastName },
+    authData: { firstName: authData?.firstName, lastName: authData?.lastName },
+    user: { first_name: user?.first_name, last_name: user?.last_name }
+  });
+  
   const displayName = userProfile?.firstName 
     || authData?.firstName 
     || user?.first_name 
