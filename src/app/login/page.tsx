@@ -49,10 +49,12 @@ export default function LoginPage() {
       const data = await response.json();
       
       if (data.authenticated && data.user) {
+        console.log('✅ Authentication successful!');
+        
         // Очищаем сохраненный токен
         localStorage.removeItem('pendingLoginToken');
         
-        // Сохраняем авторизацию
+        // Сохраняем авторизацию (включая cookie)
         saveAuth({
           telegramId: data.user.telegramId,
           firstName: data.user.firstName,
@@ -60,12 +62,16 @@ export default function LoginPage() {
           username: data.user.username,
         });
 
-        // Перенаправляем
-        if (data.needsOnboarding) {
-          router.push('/onboarding');
-        } else {
-          router.push('/');
-        }
+        console.log('🔄 Redirecting to:', data.needsOnboarding ? '/onboarding' : '/');
+
+        // Используем агрессивный редирект через window.location для гарантии
+        setTimeout(() => {
+          if (data.needsOnboarding) {
+            window.location.href = '/onboarding';
+          } else {
+            window.location.href = '/';
+          }
+        }, 100);
         
         return true;
       }

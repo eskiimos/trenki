@@ -41,8 +41,14 @@ export function saveAuth(authData: Omit<AuthData, 'deviceId' | 'lastLogin'>): vo
     lastLogin: new Date().toISOString(),
   };
   
+  // Сохраняем в localStorage
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data));
+  
+  // Сохраняем telegramId в cookies для middleware
+  document.cookie = `telegramId=${data.telegramId}; path=/; max-age=${60 * 60 * 24 * 30}`; // 30 дней
+  
   console.log('Auth saved:', data);
+  console.log('Cookie set:', `telegramId=${data.telegramId}`);
 }
 
 /**
@@ -89,7 +95,11 @@ export function updateLastLogin(): void {
  */
 export function clearAuth(): void {
   localStorage.removeItem(AUTH_STORAGE_KEY);
-  console.log('Auth cleared');
+  
+  // Удаляем cookie
+  document.cookie = 'telegramId=; path=/; max-age=0';
+  
+  console.log('Auth cleared (localStorage + cookie)');
 }
 
 /**
