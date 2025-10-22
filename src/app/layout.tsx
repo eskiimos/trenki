@@ -5,6 +5,7 @@ import TelegramProvider from "@/components/TelegramProvider";
 import OnboardingWrapper from "@/components/OnboardingWrapper";
 import PWAInit from "@/components/PWAInit";
 import OfflineHandler from "@/components/OfflineHandler";
+import AppLoader from "@/components/AppLoader";
 
 const overpass = Overpass({
   subsets: ["cyrillic", "latin"],
@@ -59,6 +60,7 @@ export default function RootLayout({
         <script src="https://telegram.org/js/telegram-web-app.js" async></script>
       </head>
       <body className={`${overpass.variable} antialiased mobile-layout`}>
+        <AppLoader />
         <PWAInit />
         <OfflineHandler />
         <TelegramProvider>
