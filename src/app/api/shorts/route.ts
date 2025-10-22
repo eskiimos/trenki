@@ -4,6 +4,9 @@ import { prisma } from '@/lib/prisma';
 // GET - получить все опубликованные shorts
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+    
     const shorts = await prisma.short.findMany({
       where: {
         isPublished: true,
@@ -14,11 +17,12 @@ export async function GET(request: NextRequest) {
       ]
     });
 
-    // Загружаем данные тренеров для shorts, у которых есть trainerId
-    const shortsWithTrainers = await Promise.all(
+    // Загружаем данные тренеров и статусы лайков
+    const shortsWithData = await Promise.all(
       shorts.map(async (short) => {
+        let trainer = null;
         if (short.trainerId) {
-          const trainer = await prisma.trainer.findUnique({
+          trainer = await prisma.trainer.findUnique({
             where: { id: short.trainerId },
             select: {
               id: true,
@@ -27,13 +31,43 @@ export async function GET(request: NextRequest) {
               avatar: true,
             }
           });
-          return { ...short, trainer };
         }
-        return { ...short, trainer: null };
+
+        // Проверяем статус лайка
+        let isLiked = false;
+        if (userId) {
+          const user = await prisma.user.findUnique({
+            where: { telegramId: userId }
+          });
+
+          if (user) {
+            const like = await prisma.shortLike.findUnique({
+              where: {
+                userId_shortId: {
+                  userId: user.id,
+                  shortId: short.id
+                }
+              }
+            });
+            isLiked = !!like;
+          }
+        }
+
+        // Получаем количество комментариев
+        const commentsCount = await prisma.shortComment.count({
+          where: { shortId: short.id }
+        });
+
+        return { 
+          ...short, 
+          trainer,
+          isLiked,
+          commentsCount
+        };
       })
     );
 
-    return NextResponse.json({ shorts: shortsWithTrainers });
+    return NextResponse.json({ shorts: shortsWithData });
   } catch (error) {
     console.error('Error fetching shorts:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

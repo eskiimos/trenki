@@ -35,18 +35,17 @@ export async function GET(
   }
 }
 
-// POST - Поставить лайк
+// POST - Toggle лайк (поставить или убрать)
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id: shortId } = await context.params;
-    const body = await request.json();
-    const { userId: telegramId } = body;
+    const telegramId = request.headers.get('X-Telegram-User-ID');
 
     if (!telegramId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Telegram ID is required' }, { status: 400 });
     }
 
     // Находим пользователя по telegramId
@@ -58,7 +57,7 @@ export async function POST(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Проверяем, существует ли уже лайк с внутренним userId
+    // Проверяем, существует ли уже лайк
     const existingLike = await prisma.shortLike.findUnique({
       where: {
         userId_shortId: {
@@ -68,31 +67,60 @@ export async function POST(
       }
     });
 
+    let isLiked: boolean;
+    let short;
+
     if (existingLike) {
-      return NextResponse.json({ error: 'Already liked' }, { status: 400 });
+      // Убираем лайк
+      await prisma.shortLike.delete({
+        where: {
+          userId_shortId: {
+            userId: user.id,
+            shortId
+          }
+        }
+      });
+
+      // Обновляем счётчик
+      short = await prisma.short.update({
+        where: { id: shortId },
+        data: {
+          likesCount: {
+            decrement: 1
+          }
+        }
+      });
+
+      isLiked = false;
+    } else {
+      // Создаём лайк
+      await prisma.shortLike.create({
+        data: {
+          userId: user.id,
+          shortId
+        }
+      });
+
+      // Обновляем счётчик
+      short = await prisma.short.update({
+        where: { id: shortId },
+        data: {
+          likesCount: {
+            increment: 1
+          }
+        }
+      });
+
+      isLiked = true;
     }
 
-    // Создаём лайк с внутренним userId
-    const like = await prisma.shortLike.create({
-      data: {
-        userId: user.id,
-        shortId
-      }
+    return NextResponse.json({ 
+      success: true,
+      isLiked,
+      likesCount: short.likesCount
     });
-
-    // Обновляем счётчик лайков в short
-    await prisma.short.update({
-      where: { id: shortId },
-      data: {
-        likesCount: {
-          increment: 1
-        }
-      }
-    });
-
-    return NextResponse.json({ like, success: true });
   } catch (error) {
-    console.error('Error creating like:', error);
+    console.error('Error toggling like:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

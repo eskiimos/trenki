@@ -127,3 +127,38 @@ export async function DELETE(
     }, { status: 500 });
   }
 }
+
+// PATCH - обновить счетчик просмотров или другие метрики
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await context.params;
+    const body = await request.json();
+
+    if (body.action === 'incrementViews') {
+      const short = await prisma.short.update({
+        where: { id },
+        data: {
+          viewsCount: {
+            increment: 1
+          }
+        },
+      });
+
+      return NextResponse.json({ 
+        success: true,
+        viewsCount: short.viewsCount 
+      });
+    }
+
+    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+  } catch (error: any) {
+    console.error('Error patching short:', error);
+    return NextResponse.json({ 
+      error: 'Failed to patch short',
+      details: error.message 
+    }, { status: 500 });
+  }
+}

@@ -1,66 +1,190 @@
 'use client';
 
-import React, { useState, useRef, useEffect, Suspense } from 'react';
+import React, { useState, useRef, useEffect, Suspense, useCallback } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Heart, MessageCircle, Share, MoreVertical, Volume2, VolumeX } from 'lucide-react';
+import { getTelegramId } from '@/lib/auth';
+import { isKinescopeUrl, getKinescopeDirectUrl } from '@/lib/videoQuality';
+
+interface ShortData {
+  id: string;
+  title: string;
+  description?: string;
+  videoUrl: string;
+  thumbnail?: string;
+  tags: string[];
+  viewsCount: number;
+  likesCount: number;
+  commentsCount?: number;
+  isLiked?: boolean;
+  order: number;
+  trainerId?: string | null;
+  trainer?: {
+    id: string;
+    name: string;
+    lastName: string;
+    avatar: string | null;
+  };
+}
 
 const ShortsContent = () => {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const startIndexParam = parseInt(searchParams.get('index') || '0');
   
-  // Список коротких видео
-  const videos = [
-    {
-      id: 1,
-      src: '/video/shots/short_1.mp4',
-      poster: '/images/preview_shorts/shorts_1.png',
-      likes: 156,
-      comments: 23,
-      description: 'Быстрая тренировка на все группы мышц',
-      author: 'Марк Петров'
-    },
-    {
-      id: 2,
-      src: '/video/shots/short_2.mp4',
-      poster: '/images/preview_shorts/shorts_2.png',
-      likes: 289,
-      comments: 41,
-      description: 'Кардио тренировка для сжигания жира',
-      author: 'Анна Ковалева'
-    },
-    {
-      id: 3,
-      src: '/video/shots/short_3.mp4',
-      poster: '/images/preview_shorts/shorts_3.png',
-      likes: 203,
-      comments: 18,
-      description: 'Упражнения для укрепления кора',
-      author: 'Сергей Михайлов'
-    },
-    {
-      id: 4,
-      src: '/video/shots/short_4.mp4',
-      poster: '/images/preview_shorts/shorts_4.png',
-      likes: 342,
-      comments: 67,
-      description: 'Растяжка после тренировки',
-      author: 'Елена Власова'
-    }
-  ];
-
-  // Нормализуем индекс чтобы он был в пределах массива
-  const normalizedIndex = startIndexParam % videos.length;
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(normalizedIndex);
-  const [isLiked, setIsLiked] = useState(false);
+  const [shorts, setShorts] = useState<ShortData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  
+  // Kinescope URLs cache
+  const [kinescopeUrls, setKinescopeUrls] = useState<Record<string, string>>({});
+  
   const videoRef = useRef<HTMLVideoElement>(null);
+  const userId = getTelegramId();
 
-  const currentVideo = videos[currentVideoIndex];
+  // Загрузка shorts из API
+  useEffect(() => {
+    const loadShorts = async () => {
+      try {
+        setIsLoading(true);
+        const url = userId 
+          ? `/api/shorts?userId=${userId}`
+          : '/api/shorts';
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          const loadedShorts = data.shorts || [];
+          setShorts(loadedShorts);
+          
+          // Нормализуем индекс
+          if (loadedShorts.length > 0) {
+            const normalizedIndex = Math.min(startIndexParam, loadedShorts.length - 1);
+            setCurrentVideoIndex(normalizedIndex);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading shorts:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadShorts();
+  }, [startIndexParam, userId]);
 
-  const toggleLike = () => {
-    setIsLiked(!isLiked);
+  const currentShort = shorts[currentVideoIndex];
+
+  // Загрузка Kinescope URL
+  useEffect(() => {
+    const loadKinescopeUrl = async () => {
+      if (!currentShort || !isKinescopeUrl(currentShort.videoUrl)) return;
+      
+      // Проверяем кэш
+      if (kinescopeUrls[currentShort.id]) return;
+      
+      try {
+        const result = await getKinescopeDirectUrl(currentShort.videoUrl);
+        if (result.directUrl) {
+          setKinescopeUrls(prev => ({
+            ...prev,
+            [currentShort.id]: result.directUrl
+          }));
+        }
+      } catch (error) {
+        console.error('Error loading Kinescope URL:', error);
+      }
+    };
+    
+    loadKinescopeUrl();
+  }, [currentShort, kinescopeUrls]);
+
+  // Получаем видео URL (Kinescope или прямой)
+  const getVideoUrl = (short: ShortData) => {
+    if (isKinescopeUrl(short.videoUrl) && kinescopeUrls[short.id]) {
+      return kinescopeUrls[short.id];
+    }
+    return short.videoUrl;
+  };
+
+  // Увеличиваем счетчик просмотров
+  useEffect(() => {
+    const incrementViews = async () => {
+      if (!currentShort) return;
+      
+      try {
+        await fetch(`/api/shorts/${currentShort.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: 'incrementViews' }),
+        });
+      } catch (error) {
+        console.error('Error incrementing views:', error);
+      }
+    };
+    
+    // Увеличиваем просмотры через 3 секунды просмотра
+    const timer = setTimeout(incrementViews, 3000);
+    return () => clearTimeout(timer);
+  }, [currentShort]);
+
+  // Лайк/дизлайк
+  const toggleLike = async () => {
+    if (!userId || !currentShort) {
+      alert('Пожалуйста, войдите в приложение');
+      return;
+    }
+
+    const wasLiked = currentShort.isLiked;
+    
+    // Оптимистичное обновление UI
+    setShorts(prev => prev.map((short, idx) => 
+      idx === currentVideoIndex 
+        ? {
+            ...short,
+            isLiked: !wasLiked,
+            likesCount: wasLiked ? short.likesCount - 1 : short.likesCount + 1
+          }
+        : short
+    ));
+
+    try {
+      const response = await fetch(`/api/shorts/${currentShort.id}/likes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Telegram-User-ID': userId,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Обновляем с данными сервера
+        setShorts(prev => prev.map((short, idx) =>
+          idx === currentVideoIndex
+            ? { ...short, isLiked: data.isLiked, likesCount: data.likesCount }
+            : short
+        ));
+      } else {
+        // Откатываем изменения при ошибке
+        setShorts(prev => prev.map((short, idx) =>
+          idx === currentVideoIndex
+            ? { ...short, isLiked: wasLiked, likesCount: currentShort.likesCount }
+            : short
+        ));
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
+      // Откатываем изменения
+      setShorts(prev => prev.map((short, idx) =>
+        idx === currentVideoIndex
+          ? { ...short, isLiked: wasLiked, likesCount: currentShort.likesCount }
+          : short
+      ));
+    }
   };
 
   const toggleMute = () => {
@@ -71,44 +195,95 @@ const ShortsContent = () => {
   };
 
   const handleVideoEnd = () => {
-    // Зацикливаем видео
     if (videoRef.current) {
       videoRef.current.currentTime = 0;
       videoRef.current.play();
     }
   };
 
-  const handleSwipeUp = () => {
-    // Переход к следующему видео (если есть)
-    if (currentVideoIndex < videos.length - 1 && !isTransitioning) {
+  const handleSwipeUp = useCallback(() => {
+    if (currentVideoIndex < shorts.length - 1 && !isTransitioning) {
       setIsTransitioning(true);
       setTimeout(() => {
-        setCurrentVideoIndex(currentVideoIndex + 1);
-        setIsLiked(false);
+        setCurrentVideoIndex(prev => prev + 1);
         setIsTransitioning(false);
       }, 150);
     }
-  };
+  }, [currentVideoIndex, shorts.length, isTransitioning]);
 
-  const handleSwipeDown = () => {
-    // Переход к предыдущему видео (если есть)
+  const handleSwipeDown = useCallback(() => {
     if (currentVideoIndex > 0 && !isTransitioning) {
       setIsTransitioning(true);
       setTimeout(() => {
-        setCurrentVideoIndex(currentVideoIndex - 1);
-        setIsLiked(false);
+        setCurrentVideoIndex(prev => prev - 1);
         setIsTransitioning(false);
       }, 150);
+    }
+  }, [currentVideoIndex, isTransitioning]);
+
+  // Открыть комментарии
+  const openComments = () => {
+    if (currentShort) {
+      router.push(`/shorts/${currentShort.id}`);
+    }
+  };
+
+  // Поделиться
+  const handleShare = () => {
+    if (!currentShort) return;
+    
+    const shareUrl = `${window.location.origin}/shorts/${currentShort.id}`;
+    const shareText = `${currentShort.title}${currentShort.description ? ` - ${currentShort.description}` : ''}`;
+    
+    // Telegram Web App share
+    if (window.Telegram?.WebApp) {
+      window.Telegram.WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`);
+    } else if (navigator.share) {
+      // Web Share API
+      navigator.share({
+        title: currentShort.title,
+        text: shareText,
+        url: shareUrl,
+      }).catch(console.error);
+    } else {
+      // Fallback - копируем в буфер
+      navigator.clipboard.writeText(shareUrl);
+      alert('Ссылка скопирована!');
     }
   };
 
   useEffect(() => {
-    // Автозапуск видео при загрузке/смене
-    if (videoRef.current && !isTransitioning) {
+    if (videoRef.current && !isTransitioning && currentShort) {
       videoRef.current.currentTime = 0;
-      videoRef.current.play();
+      videoRef.current.play().catch(console.error);
     }
-  }, [currentVideoIndex, isTransitioning]);
+  }, [currentVideoIndex, isTransitioning, currentShort]);
+
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 bg-[#101530] z-50 flex items-center justify-center">
+        <div className="text-white text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p>Загрузка...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (shorts.length === 0) {
+    return (
+      <div className="fixed inset-0 bg-[#101530] z-50 flex items-center justify-center">
+        <div className="text-white text-center">
+          <p className="text-xl mb-4">Shorts пока нет</p>
+          <Link href="/" className="text-blue-400 hover:text-blue-300">
+            Вернуться на главную
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentShort) return null;
 
   return (
     <div className="fixed inset-0 bg-[#101530] z-50 flex">
@@ -131,8 +306,8 @@ const ShortsContent = () => {
           <video
             ref={videoRef}
             className="w-full h-full object-cover"
-            src={currentVideo.src}
-            poster={currentVideo.poster}
+            src={getVideoUrl(currentShort)}
+            poster={currentShort.thumbnail}
             autoPlay
             muted={isMuted}
             loop
@@ -142,7 +317,7 @@ const ShortsContent = () => {
           />
         </div>
 
-        {/* UI Overlay with fade transition */}
+        {/* UI Overlay */}
         <div className={`absolute inset-0 transition-opacity duration-200 ${
           isTransitioning ? 'opacity-0' : 'opacity-100'
         }`}>
@@ -154,28 +329,36 @@ const ShortsContent = () => {
               className="flex flex-col items-center space-y-1"
             >
               <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 border ${
-                isLiked ? 'bg-red-500 scale-110 border-red-400' : 'bg-white/10 backdrop-blur-sm border-white/20'
+                currentShort.isLiked ? 'bg-red-500 scale-110 border-red-400' : 'bg-white/10 backdrop-blur-sm border-white/20'
               }`}>
                 <Heart 
                   size={24} 
-                  className={`${isLiked ? 'text-white fill-current' : 'text-white'}`} 
+                  className={`${currentShort.isLiked ? 'text-white fill-current' : 'text-white'}`} 
                 />
               </div>
               <span className="text-white text-xs font-medium">
-                {isLiked ? currentVideo.likes + 1 : currentVideo.likes}
+                {currentShort.likesCount}
               </span>
             </button>
 
             {/* Comment Button */}
-            <button className="flex flex-col items-center space-y-1">
+            <button 
+              onClick={openComments}
+              className="flex flex-col items-center space-y-1"
+            >
               <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/20">
                 <MessageCircle size={24} className="text-white" />
               </div>
-              <span className="text-white text-xs font-medium">{currentVideo.comments}</span>
+              <span className="text-white text-xs font-medium">
+                {currentShort.commentsCount || 0}
+              </span>
             </button>
 
             {/* Share Button */}
-            <button className="flex flex-col items-center space-y-1">
+            <button 
+              onClick={handleShare}
+              className="flex flex-col items-center space-y-1"
+            >
               <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/20">
                 <Share size={24} className="text-white" />
               </div>
@@ -199,18 +382,44 @@ const ShortsContent = () => {
 
           {/* Bottom Info */}
           <div className="absolute bottom-4 left-4 right-20 text-white">
-            <div className="flex items-center space-x-3 mb-3">
-              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center border border-white/30">
-                <span className="text-white font-semibold text-sm">
-                  {currentVideo.author.charAt(0)}
-                </span>
+            {currentShort.trainer && (
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center border border-white/30 overflow-hidden">
+                  {currentShort.trainer.avatar ? (
+                    <img 
+                      src={currentShort.trainer.avatar} 
+                      alt={currentShort.trainer.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-white font-semibold text-sm">
+                      {currentShort.trainer.name.charAt(0)}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm text-white">
+                    {currentShort.trainer.name} {currentShort.trainer.lastName}
+                  </h3>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-sm text-white">{currentVideo.author}</h3>
-                <button className="text-xs text-blue-300 hover:text-blue-200">Подписаться</button>
+            )}
+            <h2 className="font-bold text-base mb-1">{currentShort.title}</h2>
+            {currentShort.description && (
+              <p className="text-sm mb-2 text-gray-200 line-clamp-2">{currentShort.description}</p>
+            )}
+            {currentShort.tags && currentShort.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {currentShort.tags.slice(0, 3).map((tag, idx) => (
+                  <span 
+                    key={idx}
+                    className="text-xs bg-white/10 backdrop-blur-sm px-2 py-1 rounded-full"
+                  >
+                    #{tag}
+                  </span>
+                ))}
               </div>
-            </div>
-            <p className="text-sm mb-2 text-gray-200">{currentVideo.description}</p>
+            )}
           </div>
         </div>
       </div>
@@ -224,7 +433,7 @@ const ShortsContent = () => {
             const startY = e.touches[0].clientY;
             const handleTouchEnd = (endEvent: TouchEvent) => {
               const endY = endEvent.changedTouches[0].clientY;
-              if (endY - startY > 50) { // Swipe down
+              if (endY - startY > 50) {
                 handleSwipeDown();
               }
               document.removeEventListener('touchend', handleTouchEnd);
@@ -240,7 +449,7 @@ const ShortsContent = () => {
             const startY = e.touches[0].clientY;
             const handleTouchEnd = (endEvent: TouchEvent) => {
               const endY = endEvent.changedTouches[0].clientY;
-              if (startY - endY > 50) { // Swipe up
+              if (startY - endY > 50) {
                 handleSwipeUp();
               }
               document.removeEventListener('touchend', handleTouchEnd);
@@ -255,7 +464,14 @@ const ShortsContent = () => {
 
 const ShortsPage = () => {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-screen bg-black text-white">Загрузка...</div>}>
+    <Suspense fallback={
+      <div className="fixed inset-0 bg-[#101530] z-50 flex items-center justify-center">
+        <div className="text-white text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p>Загрузка...</p>
+        </div>
+      </div>
+    }>
       <ShortsContent />
     </Suspense>
   );
