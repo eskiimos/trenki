@@ -140,11 +140,37 @@ export default function VideoPage({ params }: VideoPageProps) {
     
     const loadKinescopeUrl = async () => {
       if (videoData?.videoUrl && isKinescopeUrl(videoData.videoUrl)) {
+        // Проверяем кэш сначала
+        const cacheKey = `kinescope_url_${videoData.videoUrl}`;
+        const cached = sessionStorage.getItem(cacheKey);
+        
+        if (cached) {
+          try {
+            const cachedData = JSON.parse(cached);
+            // Используем кэш если он не старше 1 часа
+            if (Date.now() - cachedData.timestamp < 3600000) {
+              if (!ignore) {
+                setKinescopeDirectUrl(cachedData.url);
+                console.log('Using cached Kinescope URL');
+              }
+              return;
+            }
+          } catch (e) {
+            console.error('Error parsing cached Kinescope URL:', e);
+          }
+        }
+        
         setIsKinescopeLoading(true);
         try {
           const result = await getKinescopeDirectUrl(videoData.videoUrl);
           if (!ignore && result.directUrl) {
             setKinescopeDirectUrl(result.directUrl);
+            // Кэшируем URL
+            sessionStorage.setItem(cacheKey, JSON.stringify({
+              url: result.directUrl,
+              timestamp: Date.now()
+            }));
+            console.log('Kinescope URL cached');
           }
         } catch (error) {
           console.error('Error loading Kinescope direct URL:', error);
@@ -457,51 +483,7 @@ export default function VideoPage({ params }: VideoPageProps) {
     showControlsTemporarily();
   };
 
-  const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      const video = videoRef.current;
-      setCurrentTime(video.currentTime);
-      
-      // Проверяем длительность каждый раз если она еще не установлена
-      if (!duration && video.duration && !isNaN(video.duration)) {
-        console.log('Duration set from timeupdate:', video.duration);
-        setDuration(video.duration);
-      }
-      
-      // Обновляем прогресс загрузки
-      updateBuffered();
-    }
-  };
-
-  const updateBuffered = () => {
-    if (videoRef.current && videoRef.current.duration) {
-      const video = videoRef.current;
-      if (video.buffered.length > 0) {
-        // Получаем самый дальний буферизованный момент
-        const bufferedEnd = video.buffered.end(video.buffered.length - 1);
-        const bufferedPercent = (bufferedEnd / video.duration) * 100;
-        setBuffered(bufferedPercent);
-      }
-    }
-  };
-
-  const handleProgress = () => {
-    updateBuffered();
-  };
-
-  const handleLoadedMetadata = () => {
-    if (videoRef.current && videoRef.current.duration && !isNaN(videoRef.current.duration)) {
-      setDuration(videoRef.current.duration);
-      console.log('Video duration loaded:', videoRef.current.duration);
-    }
-  };
-
-  const handleCanPlay = () => {
-    // Дополнительная проверка когда видео готово к воспроизведению
-    if (videoRef.current && videoRef.current.duration && !isNaN(videoRef.current.duration)) {
-      setDuration(videoRef.current.duration);
-    }
-  };
+  // Все обработчики событий видео (timeupdate, progress, canplay и т.д.) теперь inline на video элементе
 
   const handleVideoEnded = () => {
     setIsPlaying(false);
@@ -555,33 +537,13 @@ export default function VideoPage({ params }: VideoPageProps) {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  // Проверяем метаданные видео при монтировании
   useEffect(() => {
     const video = videoRef.current;
-    if (video) {
-      video.addEventListener('timeupdate', handleTimeUpdate);
-      video.addEventListener('loadedmetadata', handleLoadedMetadata);
-      video.addEventListener('loadeddata', handleLoadedMetadata);
-      video.addEventListener('canplay', handleCanPlay);
-      video.addEventListener('durationchange', handleLoadedMetadata);
-      video.addEventListener('ended', handleVideoEnded);
-      video.addEventListener('progress', handleProgress); // Для отслеживания загрузки
-      
-      // Проверяем сразу, если метаданные уже загружены
-      if (video.duration && !isNaN(video.duration)) {
-        setDuration(video.duration);
-      }
-      
-      return () => {
-        video.removeEventListener('timeupdate', handleTimeUpdate);
-        video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-        video.removeEventListener('loadeddata', handleLoadedMetadata);
-        video.removeEventListener('canplay', handleCanPlay);
-        video.removeEventListener('durationchange', handleLoadedMetadata);
-        video.removeEventListener('ended', handleVideoEnded);
-        video.removeEventListener('progress', handleProgress);
-      };
+    if (video && video.duration && !isNaN(video.duration)) {
+      setDuration(video.duration);
     }
-  }, [nextVideo, autoplayEnabled, showNextVideoPreview, duration]);
+  }, []);
 
   // Скрываем элементы управления при запуске видео
   useEffect(() => {
@@ -770,13 +732,26 @@ export default function VideoPage({ params }: VideoPageProps) {
                 src={kinescopeDirectUrl || videoData?.videoUrl || '/video/trenka.mp4'}
                 poster={videoData?.thumbnail}
                 autoPlay
+                muted={isMuted}
                 playsInline
                 webkit-playsinline="true"
                 x-webkit-airplay="allow"
                 controlsList="nodownload"
+                preload="auto"
                 onClick={togglePlay}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
+                onTimeUpdate={(e) => {
+                  const video = e.currentTarget;
+                  setCurrentTime(video.currentTime);
+                  
+                  // Обновляем буферизацию
+                  if (video.buffered.length > 0) {
+                    const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+                    const bufferedPercent = (bufferedEnd / video.duration) * 100;
+                    setBuffered(bufferedPercent);
+                  }
+                }}
                 onLoadedMetadata={(e) => {
                   const video = e.currentTarget;
                   if (video.duration && !isNaN(video.duration)) {
@@ -784,32 +759,44 @@ export default function VideoPage({ params }: VideoPageProps) {
                     console.log('Duration set from loadedmetadata:', video.duration);
                   }
                 }}
-                onLoadedData={(e) => {
+                onCanPlay={(e) => {
                   const video = e.currentTarget;
-                  
-                  // Устанавливаем duration если еще не установлен
-                  if (video.duration && !isNaN(video.duration)) {
-                    setDuration(video.duration);
-                  }
-                  
-                  // Автоплей после загрузки данных
-                  video.play().then(() => {
-                    setIsPlaying(true);
-                    console.log('Autoplay started successfully');
-                  }).catch(err => {
-                    console.log('Autoplay was prevented:', err);
-                    setIsPlaying(false);
-                  });
-                }}
-                onDurationChange={(e) => {
-                  const video = e.currentTarget;
-                  if (video.duration && !isNaN(video.duration)) {
-                    setDuration(video.duration);
-                    console.log('Duration changed:', video.duration);
+                  // Пытаемся начать воспроизведение когда видео готово
+                  if (!isPlaying) {
+                    video.play().then(() => {
+                      setIsPlaying(true);
+                      console.log('Autoplay started successfully');
+                    }).catch(err => {
+                      console.log('Autoplay was prevented:', err);
+                      // Если autoplay заблокирован, ждем клика пользователя
+                      setIsPlaying(false);
+                    });
                   }
                 }}
-                preload="metadata"
+                onProgress={(e) => {
+                  const video = e.currentTarget;
+                  // Обновляем прогресс буферизации
+                  if (video.buffered.length > 0) {
+                    const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+                    const bufferedPercent = (bufferedEnd / video.duration) * 100;
+                    setBuffered(bufferedPercent);
+                  }
+                }}
+                onWaiting={() => {
+                  console.log('Video is buffering...');
+                }}
+                onCanPlayThrough={() => {
+                  console.log('Video can play through without buffering');
+                }}
+                onEnded={handleVideoEnded}
               />
+              
+              {/* Buffering Indicator */}
+              {buffered < 100 && buffered > 0 && (
+                <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-full text-white text-xs">
+                  Загружено: {Math.round(buffered)}%
+                </div>
+              )}
               
               {/* Play/Pause Overlay */}
               <div className={`absolute inset-0 bg-gradient-to-b from-transparent to-black/50 flex items-center justify-center transition-opacity duration-300 ${
