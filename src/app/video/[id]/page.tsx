@@ -4,11 +4,17 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Heart, MessageCircle, Share } from 'lucide-react';
+import { Heart, MessageCircle, Share, Download, CheckCircle } from 'lucide-react';
 import TagsSection from '@/components/TagsSection';
 import BottomNavigation from '@/components/BottomNavigation';
 import { isKinescopeUrl, getKinescopeDirectUrl } from '@/lib/videoQuality';
 import { getTelegramId } from '@/lib/auth';
+import { 
+  downloadVideo, 
+  isVideoDownloaded, 
+  deleteVideo,
+  type OfflineVideo 
+} from '@/lib/offlineVideos';
 
 interface VideoPageProps {
   params: Promise<{
@@ -66,6 +72,11 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [autoplayEnabled, setAutoplayEnabled] = useState(true);
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Состояние для скачивания видео
+  const [isDownloaded, setIsDownloaded] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+
   // Получаем params асинхронно и загружаем данные видео
   useEffect(() => {
     const getParams = async () => {
@@ -102,6 +113,17 @@ export default function VideoPage({ params }: VideoPageProps) {
     };
     getParams();
   }, [params]);
+
+  // Проверяем, скачано ли видео
+  useEffect(() => {
+    const checkDownloadStatus = async () => {
+      if (videoId) {
+        const downloaded = await isVideoDownloaded(videoId);
+        setIsDownloaded(downloaded);
+      }
+    };
+    checkDownloadStatus();
+  }, [videoId]);
 
   // Загружаем прямую ссылку для Kinescope видео
   useEffect(() => {
@@ -266,6 +288,73 @@ export default function VideoPage({ params }: VideoPageProps) {
       }
     } catch (error) {
       console.error('Error toggling like:', error);
+    }
+  };
+
+  // Функция скачивания видео
+  const handleDownload = async () => {
+    if (isDownloading) return;
+
+    if (isDownloaded) {
+      // Если уже скачано - удаляем
+      if (confirm('Удалить это видео из офлайн-хранилища?')) {
+        try {
+          await deleteVideo(videoId);
+          setIsDownloaded(false);
+          alert('Видео удалено из офлайн-хранилища');
+        } catch (error) {
+          console.error('Error deleting video:', error);
+          alert('Ошибка при удалении видео');
+        }
+      }
+      return;
+    }
+
+    // Проверяем поддержку
+    if (!('serviceWorker' in navigator) || !('caches' in window)) {
+      alert('Ваш браузер не поддерживает офлайн-режим');
+      return;
+    }
+
+    if (!videoData) {
+      alert('Данные видео не загружены');
+      return;
+    }
+
+    try {
+      setIsDownloading(true);
+      setDownloadProgress(0);
+
+      const offlineVideo: OfflineVideo = {
+        id: videoData.id,
+        title: videoData.title,
+        description: videoData.description,
+        duration: videoData.duration,
+        thumbnail: videoData.thumbnail,
+        videoUrl: kinescopeDirectUrl || videoData.videoUrl,
+        category: videoData.category,
+        difficulty: videoData.difficulty,
+        trainerId: videoData.trainer?.id,
+        trainer: videoData.trainer ? {
+          name: videoData.trainer.name,
+          lastName: videoData.trainer.lastName,
+          avatar: videoData.trainer.avatar || undefined,
+        } : undefined,
+        downloadedAt: Date.now(),
+      };
+
+      await downloadVideo(offlineVideo, (progress) => {
+        setDownloadProgress(progress);
+      });
+
+      setIsDownloaded(true);
+      alert('Видео успешно скачано! Доступно в разделе "Офлайн-видео"');
+    } catch (error) {
+      console.error('Error downloading video:', error);
+      alert('Ошибка при скачивании видео. Попробуйте еще раз.');
+    } finally {
+      setIsDownloading(false);
+      setDownloadProgress(0);
     }
   };
 
@@ -996,11 +1085,35 @@ export default function VideoPage({ params }: VideoPageProps) {
               <span className="text-[#AEABBB] text-xs whitespace-nowrap">Календарь</span>
             </div>
             
-            {/* Save */}
-            <div className="bg-[#AEABBB33] rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0">
-              <Image src="/icons/video/action-save.svg" alt="Сохранить" width={20} height={20} />
-              <span className="text-[#AEABBB] text-xs whitespace-nowrap">Скачать</span>
-            </div>
+            {/* Download */}
+            <button
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className={`rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0 transition-all ${
+                isDownloaded 
+                  ? 'bg-green-500/20 hover:bg-green-500/30' 
+                  : 'bg-[#AEABBB33] hover:opacity-80'
+              } ${isDownloading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {isDownloading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-[#AEABBB] text-xs whitespace-nowrap">
+                    {Math.round(downloadProgress)}%
+                  </span>
+                </>
+              ) : isDownloaded ? (
+                <>
+                  <CheckCircle size={20} className="text-green-400" />
+                  <span className="text-green-400 text-xs whitespace-nowrap">Скачано</span>
+                </>
+              ) : (
+                <>
+                  <Download size={20} className="text-[#AEABBB]" />
+                  <span className="text-[#AEABBB] text-xs whitespace-nowrap">Скачать</span>
+                </>
+              )}
+            </button>
             
             {/* Share */}
             <div className="bg-[#AEABBB33] rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0">

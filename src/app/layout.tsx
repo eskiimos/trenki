@@ -4,6 +4,7 @@ import "./globals.css";
 import TelegramProvider from "@/components/TelegramProvider";
 import OnboardingWrapper from "@/components/OnboardingWrapper";
 import PWAInit from "@/components/PWAInit";
+import OfflineHandler from "@/components/OfflineHandler";
 
 const overpass = Overpass({
   subsets: ["cyrillic", "latin"],
@@ -59,6 +60,7 @@ export default function RootLayout({
       </head>
       <body className={`${overpass.variable} antialiased mobile-layout`}>
         <PWAInit />
+        <OfflineHandler />
         <TelegramProvider>
           <OnboardingWrapper>
             <div className="mobile-container">
