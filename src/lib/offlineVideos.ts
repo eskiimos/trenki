@@ -86,14 +86,14 @@ export async function downloadVideo(video: OfflineVideo, onProgress?: (progress:
       throw new Error('Не удалось получить reader для видео');
     }
 
-    const chunks: Uint8Array[] = [];
+    const chunks: BlobPart[] = [];
     let receivedLength = 0;
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      chunks.push(value);
+      chunks.push(value as BlobPart);
       receivedLength += value.length;
 
       if (onProgress && total > 0) {
