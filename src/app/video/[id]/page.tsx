@@ -8,6 +8,7 @@ import { Heart, MessageCircle, Share } from 'lucide-react';
 import TagsSection from '@/components/TagsSection';
 import BottomNavigation from '@/components/BottomNavigation';
 import { isKinescopeUrl, getKinescopeDirectUrl } from '@/lib/videoQuality';
+import { getTelegramId } from '@/lib/auth';
 
 interface VideoPageProps {
   params: Promise<{
@@ -213,9 +214,9 @@ export default function VideoPage({ params }: VideoPageProps) {
       if (!videoId || !videoData) return;
 
       try {
-        const telegramId = (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id?.toString();
+        const telegramId = getTelegramId();
         if (!telegramId) {
-          // Если нет Telegram ID, показываем количество лайков из videoData
+          // Если нет ID пользователя, показываем количество лайков из videoData
           setLikesCount(videoData.likesCount || 0);
           return;
         }
@@ -244,9 +245,9 @@ export default function VideoPage({ params }: VideoPageProps) {
 
   // Функция переключения лайка
   const toggleLike = async () => {
-    const telegramId = (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id?.toString();
+    const telegramId = getTelegramId();
     if (!telegramId) {
-      alert('Пожалуйста, откройте приложение через Telegram');
+      alert('Пожалуйста, войдите в приложение');
       return;
     }
 

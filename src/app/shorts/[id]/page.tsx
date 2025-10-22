@@ -7,6 +7,7 @@ import { ArrowLeft, Heart, MessageCircle, Share, Volume2, VolumeX } from 'lucide
 
 import { useTelegram } from '@/hooks/useTelegram';
 import { isKinescopeUrl, getKinescopeDirectUrl } from '@/lib/videoQuality';
+import { getTelegramId } from '@/lib/auth';
 
 interface ShortPageProps {
   params: Promise<{
@@ -51,7 +52,7 @@ interface Comment {
 export default function ShortPage({ params }: ShortPageProps) {
   const router = useRouter();
   const { user } = useTelegram();
-  const userId = user?.id?.toString() || '123456789'; // fallback для разработки
+  const userId = getTelegramId(); // Используем универсальную функцию аутентификации
   
   const [shortId, setShortId] = useState<string>('');
   const [allShorts, setAllShorts] = useState<ShortData[]>([]);
@@ -325,8 +326,10 @@ export default function ShortPage({ params }: ShortPageProps) {
     const currentShort = allShorts[currentIndex];
     if (!currentShort) return;
 
-    // Для демо используем фиксированный userId (в реальном приложении берём из Telegram)
-    const userId = '123456789';
+    if (!userId) {
+      alert('Пожалуйста, войдите в приложение');
+      return;
+    }
 
     try {
       if (isLiked) {
@@ -384,7 +387,10 @@ export default function ShortPage({ params }: ShortPageProps) {
     const currentShort = allShorts[currentIndex];
     if (!currentShort) return;
 
-    const userId = '123456789'; // В реальном приложении берём из Telegram
+    if (!userId) {
+      alert('Пожалуйста, войдите в приложение');
+      return;
+    }
 
     try {
       const response = await fetch(`/api/shorts/${currentShort.id}/comments`, {

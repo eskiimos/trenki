@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
 
 interface Notification {
   id: string;
@@ -104,9 +106,38 @@ export default function NotificationsAdminPage() {
       margin: '0 auto',
       fontFamily: 'Overpass, sans-serif',
     }}>
-      <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '20px' }}>
-        📬 Push-уведомления
-      </h1>
+      {/* Header с кнопкой назад */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px', gap: '12px' }}>
+        <Link href="/admin">
+          <button
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              background: '#1a1a1a',
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'background 0.2s',
+            }}
+            onMouseOver={(e) => e.currentTarget.style.background = '#2a2a2a'}
+            onMouseOut={(e) => e.currentTarget.style.background = '#1a1a1a'}
+          >
+            <Image 
+              src="/icons/arrow.svg" 
+              alt="Назад" 
+              width={20} 
+              height={20}
+              style={{ transform: 'rotate(180deg)' }}
+            />
+          </button>
+        </Link>
+        <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>
+          📬 Push-уведомления
+        </h1>
+      </div>
 
       {/* Статистика */}
       {history && (
