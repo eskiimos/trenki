@@ -169,3 +169,28 @@ input:focus, button:focus, textarea:focus, select:focus {
 .animate-fadeOut {
   animation: fadeOut 0.3s ease-out forwards;
 }
+
+/* Админка - полноэкранный режим на десктопе */
+.admin-layout {
+  width: 100%;
+  max-width: 100% !important;
+  min-height: 100vh;
+  background: #101530;
+}
+
+.admin-layout .mobile-container {
+  max-width: 100% !important;
+}
+
+/* Переопределяем ограничения для страниц админки */
+body:has(.admin-layout) {
+  max-width: 100% !important;
+}
+
+body:has(.admin-layout) .mobile-layout {
+  max-width: 100% !important;
+}
+
+body:has(.admin-layout) .mobile-container {
+  max-width: 100% !important;
+}

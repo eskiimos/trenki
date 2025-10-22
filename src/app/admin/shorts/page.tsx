@@ -201,7 +201,7 @@ export default function AdminShortsPage() {
 
   return (
     <div className="min-h-screen bg-[#101530] text-white p-6">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Управление Shorts</h1>
           <Link href="/admin" className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">
