@@ -93,6 +93,7 @@ model Video {
   sessions    TrainingSession[]
   likes       VideoLike[]
   trainer     Trainer           @relation(fields: [trainerId], references: [id])
+  videoTags   VideoTag[]        // связь с тегами
 
   @@map("videos")
 }
@@ -151,6 +152,7 @@ model Short {
   updatedAt   DateTime      @updatedAt
   likes       ShortLike[]   // связь с лайками
   comments    ShortComment[] // связь с комментариями
+  shortTags   ShortTag[]    // связь с тегами
 
   @@map("shorts")
 }
@@ -215,4 +217,110 @@ enum Gender {
   MALE
   FEMALE
   NOT_SPECIFIED
+}
+
+// Типы нагрузки для тегов
+enum LoadType {
+  SPEED                  // Скорость - 30-45" интервальной работы
+  POWER                  // Мощность (взрывная сила) - взрывные упражнения с плиометрикой
+  MAX_STRENGTH           // Сила (максимальная сила) - статическая/изометрическая нагрузка
+  STRENGTH_ENDURANCE     // Выносливость: силовая
+  ANAEROBIC_ENDURANCE    // Выносливость: анаэробная
+  AEROBIC_ENDURANCE      // Выносливость: аэробная
+  AGILITY                // Ловкость (координация, баланс-равновесие)
+  MOBILITY               // Мобильность (вращательные функции суставов и мышц)
+  STATIC_STRETCH         // Растяжка: статическая
+  DYNAMIC_STRETCH        // Растяжка: динамическая
+  PREHAB                 // ЛФК (восстановление и предотвращение травм)
+  TECHNICAL_SKILL        // Техника (технические элементы)
+}
+
+// Направление нагрузки (какие мышцы)
+enum MuscleGroup {
+  LOWER_BODY             // Низ тела: ноги, ягодицы, колени, голеностоп
+  UPPER_PULL             // Верх тела тяга: спина, бицепс, задние дельты
+  UPPER_PUSH             // Верх тела жим: грудь, трицепс, передние/средние дельты
+  CORE_STABILITY         // Кор стабилизация: статическая работа кора
+  CORE_DYNAMICS          // Кор динамика: динамическая работа кора, ротационные движения
+  PREHAB_SHOULDER        // ЛФК плечо: ротаторы плеча, профилактика, растяжка и мобильность
+  PREHAB_KNEE            // ЛФК колено: профилактика травм коленей, укрепление связок
+  PREHAB_BACK            // ЛФК спина: профилактика болей в спине, стречинг
+  FULL_BODY              // Все тело: упражнения, комплексно нагружающие организм
+}
+
+// Сложность упражнения
+enum Complexity {
+  BEGINNER               // Новичок
+  AMATEUR                // Любитель
+  ADVANCED               // Продвинутый
+  PRO                    // Профессионал
+}
+
+// Цель тренировки / состояние спортсмена
+enum TrainingGoal {
+  RECOVERY               // Восстановление
+  DEVELOPMENT            // Развитие
+  PEAK                   // Пик формы
+}
+
+// Тип тега (для группировки)
+enum TagType {
+  LOAD                   // Тип нагрузки
+  MUSCLE                 // Направление нагрузки (мышечные группы)
+  COMPLEXITY             // Сложность
+  GOAL                   // Цель/состояние
+}
+
+model Tag {
+  id          String        @id @default(cuid())
+  name        String        @unique // уникальное имя тега (например, "speed")
+  displayName String        // отображаемое имя (например, "Скорость")
+  description String?       // описание тега
+  tagType     TagType       // тип тега (load, muscle, complexity, goal)
+  
+  // Опциональные поля в зависимости от типа
+  loadType     LoadType?     // для tagType = LOAD
+  muscleGroup  MuscleGroup?  // для tagType = MUSCLE
+  complexity   Complexity?   // для tagType = COMPLEXITY
+  trainingGoal TrainingGoal? // для tagType = GOAL
+  
+  icon        String?       // иконка/эмодзи для визуализации
+  color       String?       // цвет тега для UI
+  order       Int           @default(0) // порядок отображения
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  // Связи Many-to-Many
+  videos      VideoTag[]
+  shorts      ShortTag[]
+
+  @@map("tags")
+}
+
+// Many-to-Many связь Video <-> Tag
+model VideoTag {
+  id        String   @id @default(cuid())
+  videoId   String
+  tagId     String
+  createdAt DateTime @default(now())
+  
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, tagId])
+  @@map("video_tags")
+}
+
+// Many-to-Many связь Short <-> Tag
+model ShortTag {
+  id        String   @id @default(cuid())
+  shortId   String
+  tagId     String
+  createdAt DateTime @default(now())
+  
+  short     Short    @relation(fields: [shortId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([shortId, tagId])
+  @@map("short_tags")
 }

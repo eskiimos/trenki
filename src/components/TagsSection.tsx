@@ -1,11 +1,24 @@
-import React from 'react';
+'use client';
+
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
+
+interface Tag {
+  id: string;
+  name: string;
+  displayName: string;
+  description: string | null;
+  loadType: string;
+  icon: string | null;
+  color: string | null;
+  order: number;
+}
 
 interface TagProps {
   text: string;
 }
 
-const Tag: React.FC<TagProps> = ({ text }) => {
+const SimpleTag: React.FC<TagProps> = ({ text }) => {
   return (
     <div className="bg-[#AEABBB33] text-[#AEABBB] text-xs rounded-full px-4 py-2">
       {text}
@@ -26,6 +39,12 @@ interface TagsSectionProps {
     lastName: string;
     avatar: string | null;
   } | null;
+  // Новые пропсы для интерактивных тегов
+  selectedTags?: string[];
+  onTagsChange?: (tags: string[]) => void;
+  multiSelect?: boolean;
+  showFilterTags?: boolean; // показывать теги из базы для фильтрации
+  tagFilterType?: 'load' | 'muscle' | 'complexity' | 'goal' | 'all'; // тип тегов для фильтрации
 }
 
 const TagsSection: React.FC<TagsSectionProps> = ({ 
@@ -36,13 +55,102 @@ const TagsSection: React.FC<TagsSectionProps> = ({
   level,
   description,
   title,
-  trainer 
+  trainer,
+  selectedTags = [],
+  onTagsChange,
+  multiSelect = true,
+  showFilterTags = false,
+  tagFilterType = 'all',
 }) => {
+  const [dbTags, setDbTags] = useState<Tag[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (showFilterTags) {
+      fetchTags();
+    }
+  }, [showFilterTags, tagFilterType]);
+
+  const fetchTags = async () => {
+    setLoading(true);
+    try {
+      const url = tagFilterType === 'all' 
+        ? '/api/tags' 
+        : `/api/tags?type=${tagFilterType}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      setDbTags(data);
+    } catch (error) {
+      console.error('Error fetching tags:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTagClick = (tagName: string) => {
+    if (!onTagsChange) return;
+
+    if (multiSelect) {
+      if (selectedTags.includes(tagName)) {
+        onTagsChange(selectedTags.filter(t => t !== tagName));
+      } else {
+        onTagsChange([...selectedTags, tagName]);
+      }
+    } else {
+      onTagsChange(selectedTags.includes(tagName) ? [] : [tagName]);
+    }
+  };
+
   // Только теги из поля tags
   const allTags = tags.filter(Boolean);
 
   return (
     <div className="p-4 bg-[#101530]">
+      {/* Интерактивные теги для фильтрации */}
+      {showFilterTags && (
+        <div className="mb-4">
+          <h3 className="text-white text-sm font-medium mb-3">ФИЛЬТР ПО ТИПУ НАГРУЗКИ</h3>
+          {loading ? (
+            <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
+              {[...Array(6)].map((_, i) => (
+                <div
+                  key={i}
+                  className="flex-shrink-0 h-9 w-24 bg-gray-700 rounded-full animate-pulse"
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
+              {dbTags.map((tag) => {
+                const isSelected = selectedTags.includes(tag.name);
+                
+                return (
+                  <button
+                    key={tag.id}
+                    onClick={() => handleTagClick(tag.name)}
+                    className={`
+                      flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium
+                      transition-all duration-200 flex items-center gap-1.5
+                      ${isSelected 
+                        ? 'text-white shadow-lg scale-105' 
+                        : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                      }
+                    `}
+                    style={{
+                      backgroundColor: isSelected ? tag.color || '#A1FF4A' : undefined,
+                    }}
+                    title={tag.description || undefined}
+                  >
+                    {tag.icon && <span className="text-base">{tag.icon}</span>}
+                    <span>{tag.displayName}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Trainer Info */}
       {trainer && (
         <div className="flex items-center space-x-3 mb-4">
@@ -82,7 +190,7 @@ const TagsSection: React.FC<TagsSectionProps> = ({
       {allTags.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-4">
           {allTags.map((tag, index) => (
-            <Tag key={index} text={tag} />
+            <SimpleTag key={index} text={tag} />
           ))}
         </div>
       )}
@@ -93,7 +201,7 @@ const TagsSection: React.FC<TagsSectionProps> = ({
         {equipment.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {equipment.map((item, index) => (
-              <Tag key={index} text={item} />
+              <SimpleTag key={index} text={item} />
             ))}
           </div>
         )}
