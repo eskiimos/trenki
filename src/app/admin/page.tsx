@@ -49,6 +49,14 @@ const AdminPage = () => {
               <p className="text-sm md:text-base text-gray-400">Просмотр аналитики</p>
             </div>
           </Link>
+
+          {/* Push-уведомления */}
+          <Link href="/admin/notifications">
+            <div className="bg-[#1a1f3a] rounded-lg p-5 md:p-6 hover:bg-[#2d3448] transition-colors cursor-pointer h-full border border-white/5">
+              <h2 className="text-xl md:text-2xl font-bold mb-2">📬 Уведомления</h2>
+              <p className="text-sm md:text-base text-gray-400">Push-уведомления пользователям</p>
+            </div>
+          </Link>
         </div>
 
         <div className="mt-6 md:mt-8">

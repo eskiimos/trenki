@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTelegram } from '../../hooks/useTelegram';
+import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { ProfileSkeleton } from '../../components/Skeleton';
 import BottomNavigation from '@/components/BottomNavigation';
 import { clearAuth } from '@/lib/auth';
@@ -14,6 +15,16 @@ const ProfilePage = () => {
   const { user } = useTelegram();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Push-уведомления
+  const { 
+    isSupported, 
+    isSubscribed, 
+    isLoading: pushLoading, 
+    error: pushError,
+    subscribe, 
+    unsubscribe 
+  } = usePushNotifications();
 
   useEffect(() => {
     let cancelled = false;
@@ -245,6 +256,26 @@ const ProfilePage = () => {
               </button>
             </Link>
           </div>
+          
+          {/* Кнопка push-уведомлений */}
+          {isSupported && (
+            <div className="pt-2">
+              <button 
+                onClick={isSubscribed ? unsubscribe : subscribe}
+                disabled={pushLoading}
+                className={`w-full ${
+                  isSubscribed 
+                    ? 'bg-gray-600 hover:bg-gray-700' 
+                    : 'bg-green-600 hover:bg-green-700'
+                } text-white font-semibold py-4 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {pushLoading ? '⏳ Загрузка...' : isSubscribed ? '🔕 Отключить уведомления' : '🔔 Включить уведомления'}
+              </button>
+              {pushError && (
+                <p className="text-red-500 text-xs mt-1 text-center">{pushError}</p>
+              )}
+            </div>
+          )}
           
           {/* Кнопка выхода */}
           <div className="pt-2">

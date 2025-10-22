@@ -95,26 +95,71 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Push уведомления (опционально)
+// Push уведомления
 self.addEventListener('push', (event) => {
-  const options = {
-    body: event.data ? event.data.text() : 'Новое уведомление',
+  console.log('[SW] Push notification received');
+  
+  let notificationData = {
+    title: 'Треньки',
+    body: 'Новое уведомление',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
+    url: '/',
+  };
+  
+  // Парсим данные из push-уведомления
+  if (event.data) {
+    try {
+      const data = event.data.json();
+      notificationData = {
+        title: data.title || notificationData.title,
+        body: data.body || notificationData.body,
+        icon: data.icon || notificationData.icon,
+        badge: data.badge || notificationData.badge,
+        url: data.url || notificationData.url,
+      };
+    } catch (e) {
+      console.error('[SW] Error parsing push data:', e);
+    }
+  }
+  
+  const options = {
+    body: notificationData.body,
+    icon: notificationData.icon,
+    badge: notificationData.badge,
     vibrate: [200, 100, 200],
     tag: 'trenki-notification',
     requireInteraction: false,
+    data: {
+      url: notificationData.url,
+    },
   };
 
   event.waitUntil(
-    self.registration.showNotification('Треньки', options)
+    self.registration.showNotification(notificationData.title, options)
   );
 });
 
 // Обработка клика по уведомлению
 self.addEventListener('notificationclick', (event) => {
+  console.log('[SW] Notification clicked');
   event.notification.close();
+  
+  const urlToOpen = event.notification.data?.url || '/';
+  
   event.waitUntil(
-    clients.openWindow('/')
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // Если есть открытое окно - фокусируемся на нём и переходим по URL
+        for (const client of clientList) {
+          if (client.url === urlToOpen && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        // Если нет - открываем новое окно
+        if (clients.openWindow) {
+          return clients.openWindow(urlToOpen);
+        }
+      })
   );
 });

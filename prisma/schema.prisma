@@ -324,3 +324,31 @@ model ShortTag {
   @@unique([shortId, tagId])
   @@map("short_tags")
 }
+
+// Push Subscriptions для уведомлений
+model PushSubscription {
+  id         String   @id @default(cuid())
+  userId     String?  // Опционально - для неавторизованных пользователей
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("push_subscriptions")
+}
+
+// История отправленных уведомлений
+model PushNotification {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  icon      String?
+  url       String?
+  sentCount Int      @default(0)
+  createdAt DateTime @default(now())
+  sentBy    String?  // ID администратора
+
+  @@map("push_notifications")
+}

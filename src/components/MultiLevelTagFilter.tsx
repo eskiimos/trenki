@@ -16,33 +16,39 @@ interface Tag {
 interface MultiLevelTagFilterProps {
   selectedTags?: string[];
   onTagsChange?: (tags: string[]) => void;
+  onApply?: () => void; // Новый проп для применения фильтров
+  showApplyButton?: boolean; // Показывать ли кнопку применить
 }
 
 export default function MultiLevelTagFilter({ 
   selectedTags = [], 
-  onTagsChange 
+  onTagsChange,
+  onApply,
+  showApplyButton = false
 }: MultiLevelTagFilterProps) {
-  const [activeCategory, setActiveCategory] = useState<string>('load');
-  const [tags, setTags] = useState<Tag[]>([]);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(false);
 
   const categories = [
-    { key: 'load', label: 'Тип нагрузки', icon: '⚡' },
-    { key: 'muscle', label: 'Группы мышц', icon: '💪' },
-    { key: 'complexity', label: 'Сложность', icon: '🎯' },
-    { key: 'goal', label: 'Цель', icon: '🎪' },
+    { key: 'LOAD', label: 'ТИП ТРЕНИРОВКИ' },
+    { key: 'LOAD_TYPE', label: 'ТИП НАГРУЗКИ' },
+    { key: 'MUSCLE', label: 'НАПРАВЛЕНИЕ НАГРУЗКИ' },
+    { key: 'GOAL', label: 'СОСТОЯНИЕ' },
+    { key: 'EQUIPMENT', label: 'ОБОРУДОВАНИЕ' },
+    { key: 'COMPLEXITY', label: 'СЛОЖНОСТЬ' },
+    { key: 'TRAINER', label: 'ТРЕНЕР' },
   ];
 
   useEffect(() => {
-    fetchTags();
-  }, [activeCategory]);
+    fetchAllTags();
+  }, []);
 
-  const fetchTags = async () => {
+  const fetchAllTags = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/tags?type=${activeCategory}`);
+      const response = await fetch('/api/tags');
       const data = await response.json();
-      setTags(data);
+      setAllTags(data);
     } catch (error) {
       console.error('Error fetching tags:', error);
     } finally {
@@ -60,85 +66,90 @@ export default function MultiLevelTagFilter({
     }
   };
 
-  return (
-    <div className="bg-[#1a1f3a] rounded-xl p-4">
-      {/* Категории */}
-      <div className="flex gap-2 overflow-x-auto pb-3 mb-4 border-b border-gray-700 hide-scrollbar">
-        {categories.map((cat) => (
-          <button
-            key={cat.key}
-            onClick={() => setActiveCategory(cat.key)}
-            className={`
-              flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium
-              transition-all duration-200 flex items-center gap-2
-              ${activeCategory === cat.key
-                ? 'bg-[#A1FF4A] text-[#060919]'
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-              }
-            `}
-          >
-            <span>{cat.icon}</span>
-            <span>{cat.label}</span>
-          </button>
+  const getTagsByType = (type: string) => {
+    return allTags.filter(tag => tag.tagType === type);
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        {[...Array(5)].map((_, i) => (
+          <div key={i}>
+            <div className="h-4 w-32 bg-gray-700 rounded mb-3 animate-pulse" />
+            <div className="flex flex-wrap gap-2">
+              {[...Array(4)].map((_, j) => (
+                <div key={j} className="h-10 w-24 bg-gray-700 rounded-full animate-pulse" />
+              ))}
+            </div>
+          </div>
         ))}
       </div>
+    );
+  }
 
-      {/* Теги выбранной категории */}
-      {loading ? (
-        <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
-          {[...Array(6)].map((_, i) => (
-            <div
-              key={i}
-              className="flex-shrink-0 h-10 w-32 bg-gray-700 rounded-full animate-pulse"
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="flex flex-wrap gap-2">
-          {tags.map((tag) => {
-            const isSelected = selectedTags.includes(tag.name);
-            
-            return (
-              <button
-                key={tag.id}
-                onClick={() => handleTagClick(tag.name)}
-                className={`
-                  flex-shrink-0 px-4 py-2.5 rounded-full text-sm font-medium
-                  transition-all duration-200 flex items-center gap-2
-                  ${isSelected 
-                    ? 'text-white shadow-lg scale-105 ring-2 ring-white/20' 
-                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:scale-105'
-                  }
-                `}
-                style={{
-                  backgroundColor: isSelected ? tag.color || '#A1FF4A' : undefined,
-                }}
-                title={tag.description || undefined}
-              >
-                {tag.icon && <span className="text-lg">{tag.icon}</span>}
-                <span>{tag.displayName}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Выбранные теги (счетчик) */}
-      {selectedTags.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-gray-700">
-          <div className="flex items-center justify-between">
-            <span className="text-gray-400 text-sm">
-              Выбрано фильтров: <span className="text-[#A1FF4A] font-semibold">{selectedTags.length}</span>
-            </span>
-            <button
-              onClick={() => onTagsChange?.([])}
-              className="text-sm text-gray-400 hover:text-white transition-colors"
+  return (
+    <div className="space-y-6">
+      {categories.map((category) => {
+        const categoryTags = getTagsByType(category.key);
+        
+        if (categoryTags.length === 0) return null;
+        
+        return (
+          <div key={category.key}>
+            {/* Заголовок категории */}
+            <h3 
+              className="mb-3 uppercase"
+              style={{
+                fontFamily: 'Overpass, sans-serif',
+                fontWeight: 700,
+                fontSize: '12px',
+                lineHeight: '120%',
+                letterSpacing: '0.5px',
+                color: '#F9F8FE',
+              }}
             >
-              Сбросить всё
-            </button>
+              {category.label}
+            </h3>
+            
+            {/* Теги категории */}
+            <div className="flex flex-wrap" style={{ gap: '16px' }}>
+              {categoryTags.map((tag) => {
+                const isSelected = selectedTags.includes(tag.name);
+                
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => handleTagClick(tag.name)}
+                    className="uppercase transition-all duration-200 hover:scale-105"
+                    style={{
+                      height: '44px',
+                      paddingTop: '12px',
+                      paddingRight: '16px',
+                      paddingBottom: '12px',
+                      paddingLeft: '16px',
+                      borderRadius: '32px',
+                      backgroundColor: isSelected ? '#A1FF4A' : '#AEABBB33',
+                      color: isSelected ? '#060919' : '#F9F8FE',
+                      fontFamily: 'Overpass, sans-serif',
+                      fontWeight: 700,
+                      fontSize: '14px',
+                      lineHeight: '120%',
+                      letterSpacing: '0.5px',
+                      textAlign: 'center',
+                      opacity: 1,
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={tag.description || undefined}
+                  >
+                    {tag.displayName}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })}
     </div>
   );
 }

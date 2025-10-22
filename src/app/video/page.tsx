@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import BottomNavigation from '@/components/BottomNavigation';
 import { Skeleton } from '@/components/Skeleton';
+import MultiLevelTagFilter from '@/components/MultiLevelTagFilter';
 
 // Функция для форматирования длительности видео
 const formatDuration = (seconds: number): string => {
@@ -40,6 +41,8 @@ const VideoPage = () => {
   const [activeFilter, setActiveFilter] = useState('all');
   const [videos, setVideos] = useState<Video[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showTagsModal, setShowTagsModal] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   // Загружаем видео при монтировании компонента
   useEffect(() => {
@@ -72,9 +75,17 @@ const VideoPage = () => {
     { id: 'TACTICAL', label: 'Тактика' }
   ];
 
-  const filteredVideos = activeFilter === 'all' 
-    ? videos 
-    : videos.filter(video => video.category === activeFilter);
+  // Фильтрация видео по категории и тегам
+  const filteredVideos = videos.filter(video => {
+    // Фильтр по категории
+    const categoryMatch = activeFilter === 'all' || video.category === activeFilter;
+    
+    // Фильтр по тегам (если выбраны теги, видео должно содержать хотя бы один из них)
+    const tagsMatch = selectedTags.length === 0 || 
+      selectedTags.some(tag => video.tags.includes(tag));
+    
+    return categoryMatch && tagsMatch;
+  });
 
   // Skeleton компонент для видео карточки
   const VideoCardSkeleton = () => (
@@ -158,8 +169,16 @@ const VideoPage = () => {
           <button className="text-white hover:text-gray-300">
             <Image src="/icons/video/search.svg" alt="Поиск" width={24} height={24} />
           </button>
-          <button className="text-white hover:text-gray-300">
+          <button 
+            onClick={() => setShowTagsModal(true)}
+            className="text-white hover:text-gray-300 relative"
+          >
             <Image src="/icons/video/Filter.svg" alt="Фильтр" width={24} height={24} />
+            {selectedTags.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-[#A1FF4A] text-[#060919] text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                {selectedTags.length}
+              </span>
+            )}
           </button>
         </div>
       </header>
@@ -278,6 +297,72 @@ const VideoPage = () => {
           </div>
         )}
       </div>
+
+      {/* Модальное окно с фильтрами по тегам */}
+      {showTagsModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowTagsModal(false)}
+        >
+          <div 
+            className="bg-[#101530] w-full rounded-t-3xl flex flex-col"
+            style={{ 
+              height: '85vh', 
+              maxHeight: '85vh',
+              marginBottom: '69px' // Отступ для таб-меню
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Контент с фильтрами */}
+            <div 
+              className="overflow-y-auto p-4 pt-6" 
+              style={{ 
+                overscrollBehavior: 'contain',
+                flex: '1 1 auto',
+                minHeight: 0
+              }}
+            >
+              <MultiLevelTagFilter 
+                selectedTags={selectedTags}
+                onTagsChange={setSelectedTags}
+                showApplyButton={false}
+                onApply={() => setShowTagsModal(false)}
+              />
+            </div>
+
+            {/* Footer с кнопкой применить */}
+            <div 
+              className="p-4"
+              style={{
+                flexShrink: 0,
+                borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                backgroundColor: '#101530'
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setShowTagsModal(false)}
+                disabled={selectedTags.length === 0}
+                className="w-full rounded-full font-medium transition-all uppercase"
+                style={{
+                  backgroundColor: '#A1FF4A',
+                  color: '#060919',
+                  opacity: selectedTags.length === 0 ? 0.2 : 1,
+                  fontFamily: 'Overpass, sans-serif',
+                  fontWeight: 700,
+                  fontSize: '16px',
+                  letterSpacing: '0.5px',
+                  cursor: selectedTags.length === 0 ? 'not-allowed' : 'pointer',
+                  height: '56px',
+                  padding: '0 16px',
+                }}
+              >
+                Применить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <BottomNavigation activeTab="video" />
     </div>

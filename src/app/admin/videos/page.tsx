@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import MultiLevelTagFilter from '@/components/MultiLevelTagFilter';
 
 interface Trainer {
   id: string;
@@ -36,6 +37,7 @@ const AdminVideosPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]); // ID тегов из базы
   
   // Данные формы
   const [formData, setFormData] = useState({
@@ -47,7 +49,7 @@ const AdminVideosPage = () => {
     category: 'SKATING',
     difficulty: 'BEGINNER',
     trainerId: '',
-    tags: '',
+    tags: '', // Оставляем для обратной совместимости (старые текстовые теги)
     equipment: '',
     level: '',
   });
@@ -87,6 +89,7 @@ const AdminVideosPage = () => {
     setIsLoading(true);
 
     try {
+      // Старые текстовые теги (для обратной совместимости)
       const tagsArray = formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
       const equipmentArray = formData.equipment.split(',').map(eq => eq.trim()).filter(eq => eq);
 
@@ -115,9 +118,30 @@ const AdminVideosPage = () => {
       console.log('Response:', data);
 
       if (response.ok) {
+        // Если есть выбранные теги из базы, создаем связи VideoTag
+        if (selectedTagIds.length > 0) {
+          const videoId = editingVideoId || data.id;
+          
+          // Если редактируем, сначала удаляем старые связи
+          if (editingVideoId) {
+            await fetch(`/api/videos/${videoId}/tags`, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+          
+          // Создаем новые связи с тегами
+          await fetch(`/api/videos/${videoId}/tags`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tagIds: selectedTagIds }),
+          });
+        }
+        
         alert(editingVideoId ? 'Видео успешно обновлено!' : 'Видео успешно добавлено!');
         setShowForm(false);
         setEditingVideoId(null);
+        setSelectedTagIds([]); // Очищаем выбранные теги
         setFormData({
           title: '',
           description: '',
@@ -273,7 +297,7 @@ const AdminVideosPage = () => {
     }
   };
 
-  const handleEditVideo = (video: Video) => {
+  const handleEditVideo = async (video: Video) => {
     setEditingVideoId(video.id);
     setFormData({
       title: video.title,
@@ -284,10 +308,24 @@ const AdminVideosPage = () => {
       category: video.category,
       difficulty: video.difficulty,
       trainerId: video.trainer.id,
-      tags: video.tags.join(', '),
+      tags: video.tags.join(', '), // Старые текстовые теги
       equipment: video.equipment.join(', '),
       level: video.level || '',
     });
+    
+    // Загружаем теги из базы данных для этого видео
+    try {
+      const response = await fetch(`/api/videos/${video.id}/tags`);
+      if (response.ok) {
+        const data = await response.json();
+        // data.tags - массив объектов Tag с полем id
+        setSelectedTagIds(data.tags.map((tag: { id: string }) => tag.id));
+      }
+    } catch (error) {
+      console.error('Error loading video tags:', error);
+      setSelectedTagIds([]);
+    }
+    
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -295,6 +333,7 @@ const AdminVideosPage = () => {
   const handleCancelEdit = () => {
     setEditingVideoId(null);
     setShowForm(false);
+    setSelectedTagIds([]); // Очищаем выбранные теги
     setFormData({
       title: '',
       description: '',
@@ -538,14 +577,10 @@ const AdminVideosPage = () => {
 
                 {/* Теги */}
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-2">Теги (через запятую)</label>
-                  <input
-                    type="text"
-                    name="tags"
-                    value={formData.tags}
-                    onChange={handleChange}
-                    placeholder="Техника, Катание, Основы, Новичок"
-                    className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  <label className="block text-sm font-medium mb-2">Теги</label>
+                  <MultiLevelTagFilter 
+                    selectedTags={selectedTagIds}
+                    onTagsChange={setSelectedTagIds}
                   />
                 </div>
 
