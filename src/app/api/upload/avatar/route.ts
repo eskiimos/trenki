@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
-import path from 'path';
-import { existsSync, mkdirSync } from 'fs';
+import { v2 as cloudinary } from 'cloudinary';
+
+// Конфигурация Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,47 +30,45 @@ export async function POST(request: NextRequest) {
     console.log('File type:', file.type);
     console.log('File size:', file.size);
 
+    // Проверяем размер файла (макс 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      return NextResponse.json({ error: 'File size must not exceed 5MB' }, { status: 400 });
+    }
+
+    // Конвертируем файл в buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Создаем уникальное имя файла
-    const timestamp = Date.now();
-    const filename = `${timestamp}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-    
-    console.log('Generated filename:', filename);
-    
-    // Путь к папке public/avatars
-    const uploadDir = path.join(process.cwd(), 'public', 'avatars');
-    
-    console.log('Upload directory:', uploadDir);
-    
-    // Создаем папку если её нет
-    if (!existsSync(uploadDir)) {
-      console.log('Creating upload directory...');
-      mkdirSync(uploadDir, { recursive: true });
-    }
+    // Загружаем в Cloudinary
+    const uploadResponse = await new Promise<any>((resolve, reject) => {
+      cloudinary.uploader.upload_stream(
+        {
+          folder: 'trenki/avatars',
+          resource_type: 'image',
+          transformation: [
+            { width: 500, height: 500, crop: 'fill', gravity: 'face' }
+          ]
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      ).end(buffer);
+    });
 
-    // Сохраняем файл
-    const filepath = path.join(uploadDir, filename);
-    console.log('Saving to:', filepath);
-    
-    await writeFile(filepath, buffer);
-    
-    console.log('File saved successfully');
-
-    // Возвращаем путь к файлу (относительно public)
-    const publicPath = `/avatars/${filename}`;
-
-    console.log('Public path:', publicPath);
+    console.log('Cloudinary upload successful:', uploadResponse.secure_url);
     console.log('=== Avatar upload completed ===');
 
     return NextResponse.json({ 
       success: true, 
-      url: publicPath,
+      url: uploadResponse.secure_url,
       message: 'Avatar uploaded successfully' 
     });
   } catch (error) {
     console.error('Error uploading avatar:', error);
-    return NextResponse.json({ error: 'Failed to upload avatar' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to upload avatar',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
