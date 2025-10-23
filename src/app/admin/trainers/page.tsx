@@ -147,10 +147,12 @@ export default function AdminTrainersPage() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('Upload response:', data);
         setAvatar(data.url);
         alert('Аватар загружен успешно!');
       } else {
         const errorData = await response.json();
+        console.error('Upload error:', errorData);
         alert(`Ошибка загрузки: ${errorData.error}`);
       }
     } catch (error) {
