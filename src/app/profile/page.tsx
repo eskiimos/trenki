@@ -222,6 +222,23 @@ const ProfilePage = () => {
 
         {/* Меню разделы */}
         <div className="space-y-4">
+          <Link href="/training/history">
+            <div className="flex justify-between items-center cursor-pointer hover:opacity-80 transition-opacity">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🏋️</span>
+                <span className="text-[#AEABBB] text-xs font-normal font-overpass">История тренировок</span>
+              </div>
+              <div className="w-4 h-4 flex items-center justify-center">
+                <Image 
+                  src="/icons/arrow.svg" 
+                  alt="Стрелка" 
+                  width={16} 
+                  height={16}
+                  className="transform rotate-90"
+                />
+              </div>
+            </div>
+          </Link>
           <MenuSection title="Плейлисты" />
           <MenuSection title="Избранные тренера" />
           <MenuSection title="Избранные видео" />

@@ -602,38 +602,43 @@ const TrenkiSection = () => {
 
 const TrainingsSection = () => (
     <section className="px-4" style={{ paddingBottom: '15px' }}>
-        <div style={{width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', gap: 8, display: 'inline-flex'}}>
-            <div style={{flex: '1 1 0', alignSelf: 'stretch', paddingLeft: 16, paddingRight: 16, paddingTop: 8, paddingBottom: 8, background: 'linear-gradient(180deg, rgba(87, 108, 255, 0) 0%, rgba(87, 108, 255, 0.50) 100%)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', gap: 8, display: 'inline-flex'}}>
-                <Image 
-                    src="/icons/icon-cards.svg" 
-                    alt="ИИ тренер" 
-                    width={16} 
-                    height={16}
-                />
-                <div style={{alignSelf: 'stretch'}}>
-                    <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>
-                        персональный <span style={{color: '#A1FF4A'}}>ИИ</span> тренер
+        <div style={{width: '100%', height: '100%', flexDirection: 'column', gap: 8, display: 'flex'}}>
+            {/* Нижний ряд - 2 колонки */}
+            <div style={{width: '100%', height: '100%', justifyContent: 'center', alignItems: 'stretch', gap: 8, display: 'inline-flex'}}>
+                <Link href="/training/assessment" style={{flex: '1 1 0', textDecoration: 'none', display: 'flex'}}>
+                    <div style={{width: '100%', paddingLeft: 16, paddingRight: 16, paddingTop: 8, paddingBottom: 8, background: 'linear-gradient(180deg, rgba(87, 108, 255, 0) 0%, rgba(87, 108, 255, 0.50) 100%)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', gap: 8, display: 'flex', cursor: 'pointer', transition: 'all 0.2s'}}>
+                        <Image 
+                            src="/icons/icon-cards.svg" 
+                            alt="ИИ тренер" 
+                            width={16} 
+                            height={16}
+                        />
+                        <div style={{alignSelf: 'stretch'}}>
+                            <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>
+                                персональный <span style={{color: '#A1FF4A'}}>ИИ</span> тренер
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div style={{flex: '1 1 0', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 8, display: 'inline-flex'}}>
-                <div style={{alignSelf: 'stretch', paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 8, display: 'flex'}}>
-                    <Image 
-                        src="/icons/ant-design-thunderbolt-filled_f.svg" 
-                        alt="Потенциал" 
-                        width={16} 
-                        height={16}
-                    />
-                    <div style={{width: 146, color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>повышение потенциала</div>
-                </div>
-                <div style={{alignSelf: 'stretch', paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 8, display: 'flex'}}>
-                    <Image 
-                        src="/icons/icon-cards-kl.svg" 
-                        alt="Треньки" 
-                        width={16} 
-                        height={16}
-                    />
-                    <div style={{alignSelf: 'stretch', color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>треньки, советы профи, разборы</div>
+                </Link>
+                <div style={{flex: '1 1 0', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 8, display: 'inline-flex'}}>
+                    <div style={{alignSelf: 'stretch', paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 8, display: 'flex'}}>
+                        <Image 
+                            src="/icons/ant-design-thunderbolt-filled_f.svg" 
+                            alt="Потенциал" 
+                            width={16} 
+                            height={16}
+                        />
+                        <div style={{width: 146, color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>повышение потенциала</div>
+                    </div>
+                    <div style={{alignSelf: 'stretch', paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 8, display: 'flex'}}>
+                        <Image 
+                            src="/icons/icon-cards-kl.svg" 
+                            alt="Треньки" 
+                            width={16} 
+                            height={16}
+                        />
+                        <div style={{alignSelf: 'stretch', color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>треньки, советы профи, разборы</div>
+                    </div>
                 </div>
             </div>
         </div>

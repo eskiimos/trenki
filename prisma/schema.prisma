@@ -94,6 +94,7 @@ model Video {
   likes       VideoLike[]
   trainer     Trainer           @relation(fields: [trainerId], references: [id])
   videoTags   VideoTag[]        // связь с тегами
+  trainingModules TrainingModule[] // связь с модулями тренировок
 
   @@map("videos")
 }
@@ -351,4 +352,146 @@ model PushNotification {
   sentBy    String?  // ID администратора
 
   @@map("push_notifications")
+}
+
+// ========================================
+// МОДУЛЬ ГЕНЕРАЦИИ ПЕРСОНАЛЬНЫХ ТРЕНИРОВОК
+// ========================================
+
+// Модуль тренировки (1 из 4 типов)
+model TrainingModule {
+  id                String                    @id @default(cuid())
+  name              String                    // название модуля
+  description       String?                   // описание
+  type              ModuleType                // тип модуля (разминка, основная, заминка, восстановление)
+  duration          Int                       // длительность в секундах
+  videoId           String?                   // ID видео (если есть)
+  order             Int                       @default(0) // порядок в последовательности
+  
+  // Характеристики модуля для алгоритма
+  loadType          LoadType?                 // тип нагрузки
+  muscleGroup       MuscleGroup?              // целевая мышечная группа
+  complexity        Complexity                @default(BEGINNER)
+  rpeMin            Int?                      // минимальный RPE (1-10)
+  rpeMax            Int?                      // максимальный RPE (1-10)
+  
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  
+  video             Video?                    @relation(fields: [videoId], references: [id])
+  workoutSessions   WorkoutSessionModule[]    // связь с тренировками
+  userHistory       UserModuleHistory[]       // история выполнения
+
+  @@map("training_modules")
+}
+
+// Оценка текущего состояния пользователя
+model UserStateAssessment {
+  id                String                @id @default(cuid())
+  userId            String
+  
+  // Ответы на вопросы (п.2 алгоритма)
+  lastTrainingTime  LastTrainingTime      // когда была последняя тренировка
+  energyLevel       Int                   // уровень энергии 1-10
+  muscleReadiness   Int                   // готовность мышц 1-10
+  motivation        Int                   // уровень мотивации 1-10
+  availableTime     Int                   // доступное время в минутах
+  
+  // Рассчитанные значения
+  loadDirection     LoadDirection         // направление нагрузки (легкая/средняя/высокая)
+  recommendedRPE    Int                   // рекомендуемый RPE
+  
+  createdAt         DateTime              @default(now())
+
+  @@index([userId, createdAt])
+  @@map("user_state_assessments")
+}
+
+// Сессия тренировки (сгенерированная тренировка)
+model WorkoutSession {
+  id                String                    @id @default(cuid())
+  userId            String
+  
+  // Параметры генерации
+  assessmentId      String?                   // ID оценки состояния
+  targetDuration    Int                       // целевая длительность в минутах
+  targetRPE         Int                       // целевой RPE
+  loadDirection     LoadDirection             // направление нагрузки
+  
+  // Статус выполнения
+  status            WorkoutStatus             @default(PENDING)
+  completedAt       DateTime?
+  actualDuration    Int?                      // фактическая длительность
+  actualRPE         Int?                      // фактический RPE (оценка после)
+  
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  
+  modules           WorkoutSessionModule[]    // модули в тренировке
+
+  @@index([userId, createdAt])
+  @@map("workout_sessions")
+}
+
+// Many-to-Many связь WorkoutSession <-> TrainingModule
+model WorkoutSessionModule {
+  id                String                @id @default(cuid())
+  sessionId         String
+  moduleId          String
+  order             Int                   // порядок модуля в тренировке
+  completed         Boolean               @default(false)
+  actualRPE         Int?                  // фактический RPE для этого модуля
+  
+  session           WorkoutSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  module            TrainingModule        @relation(fields: [moduleId], references: [id])
+
+  @@unique([sessionId, moduleId])
+  @@map("workout_session_modules")
+}
+
+// История выполнения модулей пользователем (п.6 - предотвращение повторов)
+model UserModuleHistory {
+  id                String                @id @default(cuid())
+  userId            String
+  moduleId          String
+  completedAt       DateTime              @default(now())
+  rpe               Int?                  // оценка RPE после выполнения
+  
+  module            TrainingModule        @relation(fields: [moduleId], references: [id])
+
+  @@index([userId, completedAt])
+  @@index([userId, moduleId])
+  @@map("user_module_history")
+}
+
+// Типы модулей (4 типа по алгоритму)
+enum ModuleType {
+  WARMUP           // Разминка
+  MAIN             // Основная часть
+  COOLDOWN         // Заминка
+  RECOVERY         // Восстановление
+}
+
+// Направление нагрузки (п.3 алгоритма)
+enum LoadDirection {
+  LIGHT            // Легкая нагрузка (RPE 2-4)
+  MEDIUM           // Средняя нагрузка (RPE 5-7)
+  HIGH             // Высокая нагрузка (RPE 8-10)
+}
+
+// Время последней тренировки (п.2 опрос)
+enum LastTrainingTime {
+  TODAY            // Сегодня
+  YESTERDAY        // Вчера
+  TWO_DAYS_AGO     // 2 дня назад
+  THREE_PLUS_DAYS  // 3+ дня назад
+  WEEK_PLUS        // Неделя+ назад
+}
+
+// Статус тренировки
+enum WorkoutStatus {
+  PENDING          // Создана, не начата
+  IN_PROGRESS      // Выполняется
+  COMPLETED        // Завершена
+  SKIPPED          // Пропущена
 }
