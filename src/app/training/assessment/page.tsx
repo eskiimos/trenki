@@ -50,6 +50,10 @@ export default function TrainingAssessmentPage() {
         body: JSON.stringify({
           userId: user.id.toString(),
           ...formData,
+          // Добавляем значения по умолчанию для удаленных полей
+          muscleReadiness: 5,
+          motivation: 5,
+          availableTime: 30,
         }),
       });
 
