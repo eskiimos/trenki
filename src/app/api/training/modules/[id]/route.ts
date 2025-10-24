@@ -4,11 +4,12 @@ import prisma from '@/lib/prisma';
 // GET /api/training/modules/:id - Получить модуль по ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const module = await prisma.trainingModule.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         video: {
           include: {
@@ -48,9 +49,10 @@ export async function GET(
 // PUT /api/training/modules/:id - Обновить модуль
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body = await request.json();
     const {
       name,
@@ -121,7 +123,7 @@ export async function PUT(
 
     // Обновляем модуль
     const module = await prisma.trainingModule.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name,
         description: description || null,
@@ -164,12 +166,13 @@ export async function PUT(
 // DELETE /api/training/modules/:id - Удалить модуль
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     // Проверяем, используется ли видео в тренировках
     const usageCount = await prisma.workoutSessionVideo.count({
-      where: { videoId: params.id },
+      where: { videoId: id },
     });
 
     if (usageCount > 0) {
@@ -184,7 +187,7 @@ export async function DELETE(
 
     // Удаляем модуль
     await prisma.trainingModule.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({
