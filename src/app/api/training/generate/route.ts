@@ -131,10 +131,11 @@ export async function POST(request: NextRequest) {
 
 /**
  * Подбор модулей для тренировки
- * Алгоритм (упрощенный MVP):
- * 1. Разминка (1 модуль) - обязательна
- * 2. Основная часть (1-3 модуля) - в зависимости от времени и нагрузки
- * 3. Заминка (1 модуль) - обязательна
+ * Алгоритм по документу:
+ * 1. Разминка (WARMUP) - 1 модуль
+ * 2. Физическая подготовка (FITNESS) - 1 модуль (стержневой)
+ * 3. Техника (TECHNIQUE) - 1 модуль
+ * 4. Заминка (COOLDOWN) - 1 модуль
  */
 async function selectModulesForWorkout(
   loadDirection: LoadDirection,
@@ -144,7 +145,7 @@ async function selectModulesForWorkout(
 ) {
   const modules: any[] = [];
 
-  // 1. Разминка (обязательна)
+  // 1. РАЗМИНКА (обязательна)
   const warmup = await prisma.trainingModule.findFirst({
     where: {
       type: ModuleType.WARMUP,
@@ -158,24 +159,44 @@ async function selectModulesForWorkout(
     modules.push(warmup);
   }
 
-  // 2. Основная часть
-  const remainingTime = availableTime * 60 - (warmup?.duration || 0);
-  const mainModulesCount = loadDirection === LoadDirection.HIGH ? 3 : loadDirection === LoadDirection.MEDIUM ? 2 : 1;
-
-  const mainModules = await prisma.trainingModule.findMany({
+  // 2. ФИЗИЧЕСКАЯ ПОДГОТОВКА (стержневой модуль)
+  // Подбираем по loadDirection и targetRPE
+  const fitness = await prisma.trainingModule.findFirst({
     where: {
-      type: ModuleType.MAIN,
+      type: ModuleType.FITNESS,
       id: { notIn: [...excludeModuleIds, ...(warmup ? [warmup.id] : [])] },
       rpeMin: { lte: targetRPE + 2 },
       rpeMax: { gte: targetRPE - 2 },
     },
-    take: mainModulesCount,
     orderBy: { createdAt: 'desc' },
   });
 
-  modules.push(...mainModules);
+  if (fitness) {
+    modules.push(fitness);
+  }
 
-  // 3. Заминка (обязательна)
+  // 3. ТЕХНИКА
+  // Подбираем совместимую с физ подготовкой
+  const technique = await prisma.trainingModule.findFirst({
+    where: {
+      type: ModuleType.TECHNIQUE,
+      id: { 
+        notIn: [
+          ...excludeModuleIds,
+          ...modules.map((m) => m.id),
+        ] 
+      },
+      rpeMin: { lte: targetRPE + 2 },
+      rpeMax: { gte: targetRPE - 2 },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (technique) {
+    modules.push(technique);
+  }
+
+  // 4. ЗАМИНКА (обязательна)
   const cooldown = await prisma.trainingModule.findFirst({
     where: {
       type: ModuleType.COOLDOWN,
