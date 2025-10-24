@@ -30,17 +30,18 @@ export async function GET(request: NextRequest) {
           },
         },
         include: {
-          modules: {
+          videos: {
             include: {
-              module: {
+              video: {
                 select: {
                   id: true,
-                  name: true,
-                  type: true,
+                  title: true,
+                  category: true,
                   duration: true,
                 },
               },
             },
+            orderBy: { order: 'asc' },
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
         targetRPE: w.targetRPE,
         actualRPE: w.actualRPE,
         loadDirection: w.loadDirection,
-        modulesCount: w.modules.length,
+        modulesCount: w.videos.length,
         createdAt: w.createdAt,
         completedAt: w.completedAt,
       })),
