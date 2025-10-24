@@ -22,12 +22,7 @@ export async function PUT(
       equipment,
       level,
       isPublished,
-      // Новые поля для алгоритма
-      типМодуля,
-      типНагрузки,
-      группаМышц,
-      сложность,
-      rpeМин,
+      rpeМін,
       rpeМакс,
     } = body;
 
@@ -38,7 +33,7 @@ export async function PUT(
     }
 
         // Преобразуем RPE в числа
-    const rpeМинNum = rpeМин ? parseInt(rpeМин.toString()) : null;
+    const rpeМинNum = rpeМін ? parseInt(rpeМін.toString()) : null;
     const rpeМаксNum = rpeМакс ? parseInt(rpeМакс.toString()) : null;
 
     // Обновляем видео
@@ -57,11 +52,6 @@ export async function PUT(
         equipment: equipment || [],
         level: level || '',
         isPublished: isPublished !== undefined ? isPublished : true,
-        // Поля для алгоритма
-        типМодуля: типМодуля || null,
-        типНагрузки: типНагрузки || null,
-        группаМышц: группаМышц || null,
-        сложность: сложность || null,
         rpeМин: rpeМинNum,
         rpeМакс: rpeМаксNum,
       },

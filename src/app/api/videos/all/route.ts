@@ -48,11 +48,6 @@ export async function GET(request: NextRequest) {
         speciality: video.trainer.speciality,
       },
       createdAt: video.createdAt,
-      // Поля для алгоритма
-      типМодуля: video.типМодуля,
-      типНагрузки: video.типНагрузки,
-      группаМышц: video.группаМышц,
-      сложность: video.сложность,
       rpeМин: video.rpeМин,
       rpeМакс: video.rpeМакс,
     }));
