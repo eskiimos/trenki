@@ -6,16 +6,25 @@ import { useTelegram } from '@/hooks/useTelegram';
 
 interface WorkoutModule {
   id: string;
-  moduleId: string;
-  name: string;
+  sessionVideoId?: string;
+  title: string;
   description: string | null;
-  type: string;
+  типМодуля: string | null;
+  типНагрузки: string | null;
   duration: number;
   rpeRange: string;
-  video: any;
+  videoUrl: string;
+  thumbnail: string | null;
+  trainer: {
+    id: string;
+    name: string;
+    lastName: string;
+  };
   order: number;
   completed: boolean;
-  actualRPE: number | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  watchedDuration?: number | null;
 }
 
 interface Workout {
@@ -24,7 +33,10 @@ interface Workout {
   targetDuration: number;
   targetRPE: number;
   loadDirection: string;
-  progress: number;
+  progress?: number;
+  currentVideoIndex?: number;
+  totalVideos?: number;
+  startedAt?: string | null;
   createdAt: string;
   modules: WorkoutModule[];
   equipment?: string[];
@@ -38,6 +50,7 @@ export default function WorkoutPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showInfoBlock, setShowInfoBlock] = useState(true);
   const [isClosing, setIsClosing] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
 
   useEffect(() => {
     if (webApp) {
@@ -56,16 +69,70 @@ export default function WorkoutPage() {
     }
   }, [user]);
 
+  // Перезагружаем данные при возврате на страницу (например, после просмотра видео)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user?.id) {
+        console.log('🔄 Page became visible, reloading workout data...');
+        loadWorkout();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user]);
+
+  // Проверяем завершение всех модулей
+  useEffect(() => {
+    if (workout && workout.modules.length > 0) {
+      const allCompleted = workout.modules.every(m => m.completed);
+      if (allCompleted && !showCompletionModal) {
+        console.log('🎉 All modules completed! Showing completion modal');
+        setShowCompletionModal(true);
+      }
+    }
+  }, [workout]);
+
   const loadWorkout = async () => {
     try {
-      const response = await fetch(`/api/training/current?userId=${user?.id}`);
+      // Проверяем, есть ли ID тренировки в URL (при переходе из напоминания)
+      const urlParams = new URLSearchParams(window.location.search);
+      const workoutId = urlParams.get('id');
+
+      let response;
+      if (workoutId) {
+        // Загружаем конкретную тренировку по ID
+        // TODO: создать отдельный endpoint /api/training/session/{id}
+        // Пока используем current, так как он возвращает последнюю незавершенную
+        response = await fetch(`/api/training/current?userId=${user?.id}`);
+      } else {
+        // Загружаем текущую незавершенную тренировку
+        response = await fetch(`/api/training/current?userId=${user?.id}`);
+      }
+
       const data = await response.json();
 
-      if (data.success) {
+      if (data.workout) {
+        console.log('📊 Loaded workout data:', {
+          id: data.workout.id,
+          currentVideoIndex: data.workout.currentVideoIndex,
+          totalVideos: data.workout.totalVideos,
+          modules: data.workout.modules.map((m: any, i: number) => ({
+            index: i,
+            title: m.title?.substring(0, 20),
+            типМодуля: m.типМодуля,
+            completed: m.completed,
+            order: m.order,
+          })),
+        });
         setWorkout(data.workout);
       } else {
         // Нет активной тренировки, перенаправляем на оценку
-        router.push('/training/assessment');
+        console.log('No active workout, redirecting to assessment');
+        // router.push('/training/assessment');
       }
     } catch (error) {
       console.error('Ошибка загрузки тренировки:', error);
@@ -83,9 +150,31 @@ export default function WorkoutPage() {
   };
 
   const startWorkout = () => {
-    // Переход к первому модулю
+    // Переход к первому видео с параметрами fromWorkout и sessionId
     if (workout && workout.modules.length > 0) {
-      router.push(`/training/module/${workout.modules[0].id}`);
+      router.push(`/video/${workout.modules[0].id}?fromWorkout=true&sessionId=${workout.id}`);
+    }
+  };
+
+  const completeWorkout = async () => {
+    try {
+      // Отправляем запрос на завершение тренировки
+      const response = await fetch('/api/training/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: workout?.id,
+          userId: user?.id,
+        }),
+      });
+
+      if (response.ok) {
+        console.log('✅ Workout completed successfully');
+        // Перенаправляем на главную страницу или страницу истории тренировок
+        router.push('/');
+      }
+    } catch (error) {
+      console.error('❌ Error completing workout:', error);
     }
   };
 
@@ -115,11 +204,24 @@ export default function WorkoutPage() {
     return null;
   }
 
+  // Маппинг русских названий на типы для UI
+  const moduleTypeMap: Record<string, string> = {
+    'Разминка': 'WARMUP',
+    'ОФП': 'FITNESS',
+    'Техника': 'TECHNIQUE',
+    'Заминка': 'COOLDOWN',
+  };
+
   const moduleTypeInfo = {
     WARMUP: { label: 'РАЗМИНКА', number: 1 },
     FITNESS: { label: 'ФИЗИЧЕСКАЯ ПОДГОТОВКА', number: 2 },
     TECHNIQUE: { label: 'ТЕХНИКА', number: 3 },
     COOLDOWN: { label: 'ЗАМИНКА', number: 4 },
+  };
+
+  // Функция для получения типа модуля
+  const getModuleType = (module: WorkoutModule): string => {
+    return moduleTypeMap[module.типМодуля || ''] || 'WARMUP';
   };
 
   return (
@@ -195,45 +297,189 @@ export default function WorkoutPage() {
       {/* Модули тренировки */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         {workout.modules.map((module, index) => {
-          const info = moduleTypeInfo[module.type as keyof typeof moduleTypeInfo];
-          const isActive = index === 0; // Первый модуль активный
+          const moduleType = getModuleType(module);
+          const info = moduleTypeInfo[moduleType as keyof typeof moduleTypeInfo];
+          const isCompleted = module.completed;
+          
+          // Находим первый незавершенный модуль
+          const firstIncompleteIndex = workout.modules.findIndex(m => !m.completed);
+          
+          // Модуль активен, если:
+          // 1. Он не завершен
+          // 2. Это первый незавершенный модуль (в случае рассинхронизации с currentVideoIndex)
+          const isActive = !isCompleted && index === firstIncompleteIndex;
+          const isLocked = !isCompleted && !isActive;
+
+          // Логирование для отладки
+          console.log(`Module ${index}:`, {
+            title: module.title?.substring(0, 30),
+            completed: isCompleted,
+            firstIncompleteIndex,
+            isActive,
+            isLocked,
+            currentVideoIndex: workout.currentVideoIndex,
+          });
+          
+          // Определяем фоновое изображение
+          const backgroundImages: Record<string, string> = {
+            'WARMUP': '/images/warm-up-1.png',
+            'TECHNIQUE': '/images/Technic-3.png',
+            'FITNESS': '/images/physical-training-2.png',
+            'COOLDOWN': '/images/hitch-4.png',
+          };
+          
+          const bgImage = backgroundImages[moduleType] || '/images/warm-up-1.png';
+          
+          // Определяем overlay цвет
+          let overlayColor = 'rgba(174, 171, 187, 0.2)'; // Базовое перекрытие
+          if (isCompleted) {
+            overlayColor = 'rgba(68, 92, 255, 0.2)'; // Выполненная (синий оттенок)
+          } else if (isActive) {
+            overlayColor = 'rgba(161, 255, 74, 0.15)'; // Текущая (зеленый оттенок)
+          } else if (isLocked) {
+            overlayColor = 'rgba(16, 21, 48, 0.7)'; // Заблокированная (темнее)
+          }
+          
+          // Определяем иконку нумерации
+          const checkIcons = [
+            '/icons/check-1.svg',
+            '/icons/check-2.svg',
+            '/icons/check-3.svg',
+            '/icons/check-4.svg',
+          ];
+          const checkIcon = isCompleted ? '/icons/check-done.svg' : checkIcons[index] || checkIcons[0];
+          
+          const handleModuleClick = () => {
+            if (isLocked) {
+              // Показываем уведомление о блокировке
+              alert('Сначала завершите предыдущие модули');
+              return;
+            }
+            // Переходим к видео
+            router.push(`/video/${module.id}?fromWorkout=true&sessionId=${workout.id}`);
+          };
           
           return (
             <div
               key={module.id}
+              onClick={handleModuleClick}
               style={{
                 width: '100%',
-                height: '254px',
-                padding: '16px',
+                aspectRatio: '1 / 1', // Квадратная карточка
                 borderRadius: '16px',
-                background: isActive 
-                  ? 'linear-gradient(180deg, rgba(68, 92, 255, 0.5) 0%, rgba(68, 92, 255, 0) 100%)'
-                  : 'rgba(39, 42, 60, 0.5)',
-                backdropFilter: 'blur(10px)',
+                position: 'relative',
+                overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
-                justifyContent: 'space-between',
-                position: 'relative',
-                opacity: isActive ? 1 : 0.6
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundImage: `url(${bgImage})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                gap: '12px',
+                cursor: isLocked ? 'not-allowed' : 'pointer',
+                opacity: isLocked ? 0.6 : 1,
+                transition: 'transform 0.2s ease',
+                border: isActive ? '2px solid #A1FF4A' : 'none',
+              }}
+              onMouseDown={(e) => {
+                if (!isLocked) {
+                  e.currentTarget.style.transform = 'scale(0.98)';
+                }
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
               }}
             >
-              {/* Номер */}
+              {/* Overlay */}
               <div style={{
-                fontFamily: 'Overpass',
-                fontWeight: 700,
-                fontSize: '80px',
-                lineHeight: '100%',
-                color: '#F9F8FE',
-                opacity: 0.1,
                 position: 'absolute',
-                top: '16px',
-                right: '16px'
-              }}>
-                {info?.number || index + 1}
-              </div>
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: overlayColor,
+                zIndex: 1,
+              }} />
 
-              {/* Название модуля */}
+              {/* Иконка блокировки для недоступных модулей */}
+              {isLocked && (
+                <div style={{
+                  position: 'absolute',
+                  top: '12px',
+                  right: '12px',
+                  zIndex: 3,
+                  width: '24px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <path d="M15.8333 9.16667H4.16667C3.24619 9.16667 2.5 9.91286 2.5 10.8333V16.6667C2.5 17.5871 3.24619 18.3333 4.16667 18.3333H15.8333C16.7538 18.3333 17.5 17.5871 17.5 16.6667V10.8333C17.5 9.91286 16.7538 9.16667 15.8333 9.16667Z" stroke="#F9F8FE" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M5.83333 9.16667V5.83333C5.83333 4.72826 6.27232 3.66846 7.05372 2.88706C7.83512 2.10565 8.89493 1.66667 10 1.66667C11.1051 1.66667 12.1649 2.10565 12.9463 2.88706C13.7277 3.66846 14.1667 4.72826 14.1667 5.83333V9.16667" stroke="#F9F8FE" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              )}
+
+              {/* Индикатор завершения */}
+              {isCompleted && (
+                <div style={{
+                  position: 'absolute',
+                  top: '12px',
+                  left: '12px',
+                  zIndex: 3,
+                  padding: '4px 8px',
+                  borderRadius: '12px',
+                  background: 'rgba(68, 92, 255, 0.8)',
+                  fontFamily: 'Overpass',
+                  fontWeight: 600,
+                  fontSize: '10px',
+                  color: '#F9F8FE',
+                }}>
+                  ✓ Завершено
+                </div>
+              )}
+
+              {/* Индикатор текущего модуля */}
+              {isActive && !isCompleted && (
+                <div style={{
+                  position: 'absolute',
+                  top: '12px',
+                  left: '12px',
+                  zIndex: 3,
+                  padding: '4px 8px',
+                  borderRadius: '12px',
+                  background: 'rgba(161, 255, 74, 0.8)',
+                  fontFamily: 'Overpass',
+                  fontWeight: 600,
+                  fontSize: '10px',
+                  color: '#101530',
+                }}>
+                  ▶ Текущий
+                </div>
+              )}
+
+              {/* Иконка нумерации */}
+              <img 
+                src={checkIcon}
+                alt={`Шаг ${index + 1}`}
+                width={24}
+                height={24}
+                style={{
+                  position: 'relative',
+                  zIndex: 2,
+                }}
+              />
+
+              {/* Название модуля по центру */}
               <div style={{
+                position: 'relative',
+                zIndex: 2,
                 fontFamily: 'Overpass',
                 fontWeight: 700,
                 fontSize: '14px',
@@ -241,9 +487,10 @@ export default function WorkoutPage() {
                 letterSpacing: '0.5px',
                 textTransform: 'uppercase',
                 color: '#F9F8FE',
-                marginTop: 'auto'
+                textAlign: 'center',
+                padding: '0 16px',
               }}>
-                {info?.label || module.type}
+                {info?.label || module.типМодуля || 'МОДУЛЬ'}
               </div>
             </div>
           );
@@ -329,6 +576,103 @@ export default function WorkoutPage() {
           Начать тренировку
         </button>
       </div>
+
+      {/* Модальное окно завершения тренировки */}
+      {showCompletionModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#1A1F3A',
+              borderRadius: '24px',
+              padding: '32px 24px',
+              maxWidth: '400px',
+              width: '100%',
+              textAlign: 'center',
+              border: '1px solid rgba(161, 255, 74, 0.2)',
+            }}
+          >
+            {/* Иконка успеха */}
+            <div
+              style={{
+                width: '80px',
+                height: '80px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(161, 255, 74, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 24px',
+              }}
+            >
+              <span style={{ fontSize: '48px' }}>🎉</span>
+            </div>
+
+            {/* Заголовок */}
+            <h2
+              style={{
+                fontFamily: 'Overpass, sans-serif',
+                fontWeight: 700,
+                fontSize: '24px',
+                lineHeight: '120%',
+                color: '#F9F8FE',
+                marginBottom: '12px',
+              }}
+            >
+              Тренировка завершена!
+            </h2>
+
+            {/* Текст поздравления */}
+            <p
+              style={{
+                fontFamily: 'Overpass, sans-serif',
+                fontWeight: 400,
+                fontSize: '16px',
+                lineHeight: '150%',
+                color: 'rgba(249, 248, 254, 0.7)',
+                marginBottom: '32px',
+              }}
+            >
+              Отличная работа! Ты молодец, все модули пройдены успешно 💪
+            </p>
+
+            {/* Кнопка завершения */}
+            <button
+              type="button"
+              onClick={completeWorkout}
+              style={{
+                width: '100%',
+                height: '56px',
+                borderRadius: '28px',
+                backgroundColor: '#A1FF4A',
+                color: '#060919',
+                fontFamily: 'Overpass, sans-serif',
+                fontWeight: 700,
+                fontSize: '16px',
+                letterSpacing: '0.5px',
+                cursor: 'pointer',
+                border: 'none',
+                textTransform: 'uppercase',
+              }}
+            >
+              Завершить тренировку
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

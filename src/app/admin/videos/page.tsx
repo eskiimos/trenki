@@ -29,6 +29,13 @@ interface Video {
   equipment: string[];
   level?: string;
   isPublished: boolean;
+  // Поля для алгоритма
+  типМодуля?: string;
+  типНагрузки?: string;
+  группаМышц?: string;
+  сложность?: string;
+  rpeМин?: number;
+  rpeМакс?: number;
 }
 
 const AdminVideosPage = () => {
@@ -39,11 +46,10 @@ const AdminVideosPage = () => {
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]); // ID тегов из базы
   
-  // Данные формы
-  const [formData, setFormData] = useState({
+    // Начальное состояние формы
+  const initialFormState = {
     title: '',
     description: '',
-    duration: 0,
     videoUrl: '',
     thumbnail: '',
     category: 'SKATING',
@@ -51,8 +57,17 @@ const AdminVideosPage = () => {
     trainerId: '',
     tags: '', // Оставляем для обратной совместимости (старые текстовые теги)
     equipment: '',
-    level: '',
-  });
+    // Поля для алгоритма тренировок
+    типМодуля: '',
+    типНагрузки: '',
+    группаМышц: '',
+    сложность: '',
+    rpeМин: 3,
+    rpeМакс: 5,
+  };
+  
+  // Данные формы
+  const [formData, setFormData] = useState(initialFormState);
 
   useEffect(() => {
     fetchTrainers();
@@ -95,7 +110,6 @@ const AdminVideosPage = () => {
 
       const payload = {
         ...formData,
-        duration: parseInt(formData.duration.toString()) || 0,
         tags: tagsArray,
         equipment: equipmentArray,
         isPublished: true,
@@ -143,17 +157,8 @@ const AdminVideosPage = () => {
         setEditingVideoId(null);
         setSelectedTagIds([]); // Очищаем выбранные теги
         setFormData({
-          title: '',
-          description: '',
-          duration: 0,
-          videoUrl: '',
-          thumbnail: '',
-          category: 'SKATING',
-          difficulty: 'BEGINNER',
+          ...initialFormState,
           trainerId: trainers[0]?.id || '',
-          tags: '',
-          equipment: '',
-          level: '',
         });
         fetchVideos();
       } else {
@@ -297,12 +302,11 @@ const AdminVideosPage = () => {
     }
   };
 
-  const handleEditVideo = async (video: Video) => {
+    const handleEditVideo = async (video: Video) => {
     setEditingVideoId(video.id);
     setFormData({
       title: video.title,
       description: video.description || '',
-      duration: parseInt(video.duration.split(':')[0]) * 60 + parseInt(video.duration.split(':')[1]),
       videoUrl: video.videoUrl,
       thumbnail: video.thumbnail || '',
       category: video.category,
@@ -310,7 +314,13 @@ const AdminVideosPage = () => {
       trainerId: video.trainer.id,
       tags: video.tags.join(', '), // Старые текстовые теги
       equipment: video.equipment.join(', '),
-      level: video.level || '',
+      // Поля для алгоритма
+      типМодуля: video.типМодуля || '',
+      типНагрузки: video.типНагрузки || '',
+      группаМышц: video.группаМышц || '',
+      сложность: video.сложность || '',
+      rpeМин: video.rpeМин || 3,
+      rpeМакс: video.rpeМакс || 5,
     });
     
     // Загружаем теги из базы данных для этого видео
@@ -335,17 +345,8 @@ const AdminVideosPage = () => {
     setShowForm(false);
     setSelectedTagIds([]); // Очищаем выбранные теги
     setFormData({
-      title: '',
-      description: '',
-      duration: 0,
-      videoUrl: '',
-      thumbnail: '',
-      category: 'SKATING',
-      difficulty: 'BEGINNER',
+      ...initialFormState,
       trainerId: trainers[0]?.id || '',
-      tags: '',
-      equipment: '',
-      level: '',
     });
   };
 
@@ -402,214 +403,432 @@ const AdminVideosPage = () => {
             <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">
               {editingVideoId ? 'Редактировать видео' : 'Новое видео'}
             </h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Название */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Название *</label>
-                  <input
-                    type="text"
-                    name="title"
-                    value={formData.title}
-                    onChange={handleChange}
-                    required
-                    className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  />
-                </div>
-
-                {/* Длительность (в секундах) */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Длительность (сек) *</label>
-                  <input
-                    type="number"
-                    name="duration"
-                    value={formData.duration}
-                    onChange={handleChange}
-                    required
-                    className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  />
-                </div>
-
-                {/* URL видео */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-2">URL видео *</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="url"
-                      name="videoUrl"
-                      value={formData.videoUrl}
-                      onChange={handleChange}
-                      required
-                      placeholder="https://kinescope.io/..."
-                      className="flex-1 bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    />
-                    {formData.videoUrl && formData.videoUrl.includes('kinescope.io') && (
-                      <button
-                        type="button"
-                        onClick={handleFetchKinescopeMetadata}
-                        disabled={isLoading}
-                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                      >
-                        {isLoading ? 'Загрузка...' : 'Получить данные'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Превью */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-2">Превью</label>
-                  <div className="space-y-2">
-                    {/* Текущее превью */}
-                    {formData.thumbnail && (
-                      <div className="relative w-full h-32 bg-[#2d3448] rounded-lg overflow-hidden">
-                        <img 
-                          src={formData.thumbnail} 
-                          alt="Preview" 
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
-                    
-                    {/* URL превью */}
+            <form onSubmit={handleSubmit} className="space-y-6">
+              
+              {/* 📹 Основная информация о видео */}
+              <fieldset className="border border-blue-500/30 rounded-lg p-4 md:p-6 bg-blue-900/5">
+                <legend className="px-3 text-base font-bold text-blue-300">📹 Видео и медиа</legend>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  
+                  {/* Название */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-2">Название *</label>
                     <input
                       type="text"
-                      name="thumbnail"
-                      value={formData.thumbnail}
+                      name="title"
+                      value={formData.title}
                       onChange={handleChange}
-                      placeholder="URL превью или загрузите файл ниже"
+                      required
+                      placeholder="Например: Разминка для хоккеистов"
                       className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                     />
-                    
-                    {/* Загрузка файла */}
-                    <div className="flex items-center gap-2">
+                  </div>
+
+                  {/* URL видео */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-2">URL видео *</label>
+                    <div className="flex gap-2">
                       <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        id="thumbnail-upload"
+                        type="url"
+                        name="videoUrl"
+                        value={formData.videoUrl}
+                        onChange={handleChange}
+                        required
+                        placeholder="https://kinescope.io/..."
+                        className="flex-1 bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                       />
-                      <label 
-                        htmlFor="thumbnail-upload"
-                        className="cursor-pointer bg-[#3d4759] hover:bg-[#4d5769] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        📁 Загрузить с устройства
-                      </label>
-                      <span className="text-xs text-gray-400">
-                        Или вставьте URL выше
-                      </span>
+                      {formData.videoUrl && formData.videoUrl.includes('kinescope.io') && (
+                        <button
+                          type="button"
+                          onClick={handleFetchKinescopeMetadata}
+                          disabled={isLoading}
+                          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        >
+                          {isLoading ? 'Загрузка...' : '🔄 Получить данные'}
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      💡 После вставки URL нажмите "Получить данные" для автозаполнения превью
+                    </p>
+                  </div>
+
+                  {/* Превью */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-2">Превью</label>
+                    <div className="space-y-3">
+                      {/* Текущее превью */}
+                      {formData.thumbnail && (
+                        <div className="relative w-full h-40 bg-[#2d3448] rounded-lg overflow-hidden">
+                          <img 
+                            src={formData.thumbnail} 
+                            alt="Preview" 
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                      
+                      {/* URL превью */}
+                      <input
+                        type="text"
+                        name="thumbnail"
+                        value={formData.thumbnail}
+                        onChange={handleChange}
+                        placeholder="URL превью (заполнится автоматически или вставьте свой)"
+                        className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      />
+                      
+                      {/* Загрузка файла */}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          id="thumbnail-upload"
+                        />
+                        <label 
+                          htmlFor="thumbnail-upload"
+                          className="cursor-pointer bg-[#3d4759] hover:bg-[#4d5769] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          📁 Загрузить с устройства
+                        </label>
+                        <span className="text-xs text-gray-400">
+                          Опционально: загрузите своё превью
+                        </span>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Описание */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-2">Описание</label>
+                    <textarea
+                      name="description"
+                      value={formData.description}
+                      onChange={handleChange}
+                      rows={3}
+                      placeholder="Опишите видео: цели, особенности, кому подходит..."
+                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    />
+                  </div>
+
+                </div>
+              </fieldset>
+
+              {/* 🎯 Категоризация */}
+              <fieldset className="border border-green-500/30 rounded-lg p-4 md:p-6 bg-green-900/5">
+                <legend className="px-3 text-base font-bold text-green-300">🎯 Категория и классификация</legend>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+
+                  {/* Категория */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Категория *</label>
+                    <select
+                      name="category"
+                      value={formData.category}
+                      onChange={handleChange}
+                      required
+                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
+                    >
+                      <option value="STRENGTH">Сила</option>
+                      <option value="ENDURANCE">Выносливость</option>
+                      <option value="SPEED">Скорость</option>
+                      <option value="TECHNIQUE">Техника</option>
+                      <option value="SKATING">Катание</option>
+                      <option value="SHOOTING">Броски</option>
+                      <option value="PASSING">Пас</option>
+                      <option value="CHECKING">Силовая борьба</option>
+                      <option value="GOALKEEPER">Вратарь</option>
+                      <option value="TACTICAL">Тактика</option>
+                      <option value="GENERAL">Общая</option>
+                    </select>
+                  </div>
+
+                  {/* Сложность */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Сложность *</label>
+                    <select
+                      name="difficulty"
+                      value={formData.difficulty}
+                      onChange={handleChange}
+                      required
+                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
+                    >
+                      <option value="BEGINNER">Начальный</option>
+                      <option value="INTERMEDIATE">Средний</option>
+                      <option value="ADVANCED">Продвинутый</option>
+                      <option value="EXPERT">Эксперт</option>
+                    </select>
+                  </div>
+
+                  {/* Тренер */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-2">Тренер *</label>
+                    <select
+                      name="trainerId"
+                      value={formData.trainerId}
+                      onChange={handleChange}
+                      required
+                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
+                    >
+                      {trainers.map(trainer => (
+                        <option key={trainer.id} value={trainer.id}>
+                          {trainer.name} {trainer.lastName} - {trainer.speciality}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Теги */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-2">Теги</label>
+                    <MultiLevelTagFilter 
+                      selectedTags={selectedTagIds}
+                      onTagsChange={setSelectedTagIds}
+                    />
+                  </div>
+
+                  {/* Оборудование */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-2">Необходимое оборудование</label>
+                    <input
+                      type="text"
+                      name="equipment"
+                      value={formData.equipment}
+                      onChange={handleChange}
+                      placeholder="Коньки, Шлем, Клюшка, Шайба (через запятую)"
+                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
+                    />
+                  </div>
+
+                </div>
+              </fieldset>
+
+              {/* ⚙️ Параметры для алгоритма тренировок */}
+              <fieldset className="border border-purple-500/30 rounded-lg p-4 md:p-6 bg-purple-900/10">
+                <legend className="px-3 text-base font-bold text-purple-300">⚙️ Параметры для умного алгоритма</legend>
+                
+                {/* Подсказка */}
+                <div className="bg-purple-900/20 border border-purple-500/20 rounded-lg p-3 mb-4">
+                  <p className="text-xs text-gray-300">
+                    💡 Эти параметры используются алгоритмом для автоматического подбора видео в персональные тренировки
+                  </p>
                 </div>
 
-                {/* Категория */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Категория *</label>
-                  <select
-                    name="category"
-                    value={formData.category}
-                    onChange={handleChange}
-                    required
-                    className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  >
-                    <option value="STRENGTH">Сила</option>
-                    <option value="ENDURANCE">Выносливость</option>
-                    <option value="SPEED">Скорость</option>
-                    <option value="TECHNIQUE">Техника</option>
-                    <option value="SKATING">Катание</option>
-                    <option value="SHOOTING">Броски</option>
-                    <option value="PASSING">Пас</option>
-                    <option value="CHECKING">Силовая борьба</option>
-                    <option value="GOALKEEPER">Вратарь</option>
-                    <option value="TACTICAL">Тактика</option>
-                    <option value="GENERAL">Общая</option>
-                  </select>
-                </div>
+                <div className="space-y-6">
+                  
+                  {/* Строка 1: Тип модуля и сложность */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    {/* Тип модуля */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Тип модуля в тренировке
+                        <span className="text-purple-400 ml-1">*</span>
+                      </label>
+                      <select
+                        name="типМодуля"
+                        value={formData.типМодуля}
+                        onChange={handleChange}
+                        className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                      >
+                        <option value="">Не указано</option>
+                        <option value="Разминка">🔥 Разминка</option>
+                        <option value="ОФП">💪 ОФП (физподготовка)</option>
+                        <option value="Техника">🎯 Техника</option>
+                        <option value="Заминка">🧘 Заминка</option>
+                      </select>
+                      <p className="text-xs text-gray-400 mt-1">В какой части тренировки используется</p>
+                    </div>
 
-                {/* Сложность */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Сложность *</label>
-                  <select
-                    name="difficulty"
-                    value={formData.difficulty}
-                    onChange={handleChange}
-                    required
-                    className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  >
-                    <option value="BEGINNER">Начальный</option>
-                    <option value="INTERMEDIATE">Средний</option>
-                    <option value="ADVANCED">Продвинутый</option>
-                    <option value="EXPERT">Эксперт</option>
-                  </select>
-                </div>
+                    {/* Сложность для алгоритма */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Уровень подготовки
+                        <span className="text-purple-400 ml-1">*</span>
+                      </label>
+                      <select
+                        name="сложность"
+                        value={formData.сложность}
+                        onChange={handleChange}
+                        className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                      >
+                        <option value="">Не указано</option>
+                        <option value="Новичок">🟢 Новичок</option>
+                        <option value="Любитель">🔵 Любитель</option>
+                        <option value="Продвинутый">🟠 Продвинутый</option>
+                        <option value="Профи">🔴 Профи</option>
+                      </select>
+                      <p className="text-xs text-gray-400 mt-1">Для кого подходит упражнение</p>
+                    </div>
 
-                {/* Тренер */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Тренер *</label>
-                  <select
-                    name="trainerId"
-                    value={formData.trainerId}
-                    onChange={handleChange}
-                    required
-                    className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  >
-                    {trainers.map(trainer => (
-                      <option key={trainer.id} value={trainer.id}>
-                        {trainer.name} {trainer.lastName} - {trainer.speciality}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  </div>
 
-                {/* Уровень */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Уровень</label>
-                  <input
-                    type="text"
-                    name="level"
-                    value={formData.level}
-                    onChange={handleChange}
-                    placeholder="Например: Начальный, Средний"
-                    className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  />
-                </div>
+                  {/* Строка 2: Тип нагрузки и группа мышц */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    {/* Тип нагрузки */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Тип физической нагрузки
+                        <span className="text-purple-400 ml-1">*</span>
+                      </label>
+                      <select
+                        name="типНагрузки"
+                        value={formData.типНагрузки}
+                        onChange={handleChange}
+                        className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                      >
+                        <option value="">Не указано</option>
+                        <optgroup label="Сила и мощность">
+                          <option value="Сила">Максимальная сила</option>
+                          <option value="Мощность">Мощность</option>
+                          <option value="Скорость">Скорость</option>
+                        </optgroup>
+                        <optgroup label="Выносливость">
+                          <option value="Силовая выносливость">Силовая выносливость</option>
+                          <option value="Анаэробная выносливость">Анаэробная выносливость</option>
+                          <option value="Аэробная выносливость">Аэробная выносливость</option>
+                        </optgroup>
+                        <optgroup label="Функциональные качества">
+                          <option value="Ловкость">Ловкость</option>
+                          <option value="Мобильность">Мобильность</option>
+                          <option value="Техника">Технические навыки</option>
+                        </optgroup>
+                        <optgroup label="Восстановление">
+                          <option value="Статическая растяжка">Статическая растяжка</option>
+                          <option value="Динамическая растяжка">Динамическая растяжка</option>
+                          <option value="ЛФК">ЛФК (профилактика травм)</option>
+                        </optgroup>
+                      </select>
+                      <p className="text-xs text-gray-400 mt-1">Какое физическое качество развивает</p>
+                    </div>
 
-                {/* Теги */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-2">Теги</label>
-                  <MultiLevelTagFilter 
-                    selectedTags={selectedTagIds}
-                    onTagsChange={setSelectedTagIds}
-                  />
-                </div>
+                    {/* Группа мышц */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Целевая группа мышц
+                      </label>
+                      <select
+                        name="группаМышц"
+                        value={formData.группаМышц}
+                        onChange={handleChange}
+                        className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                      >
+                        <option value="">Не указано</option>
+                        <option value="Все тело">🔄 Все тело</option>
+                        <option value="Низ тела">🦵 Низ тела (ноги)</option>
+                        <option value="Верх тяга">💪 Верх тела (тяга)</option>
+                        <option value="Верх жим">🏋️ Верх тела (жим)</option>
+                        <option value="Кор стабилизация">⚖️ Кор стабилизация</option>
+                        <option value="Кор динамика">🔥 Кор динамика</option>
+                        <option value="ЛФК плечо">🩹 ЛФК плечо</option>
+                        <option value="ЛФК колено">🩹 ЛФК колено</option>
+                        <option value="ЛФК спина">🩹 ЛФК спина</option>
+                      </select>
+                      <p className="text-xs text-gray-400 mt-1">На какие мышцы воздействует</p>
+                    </div>
 
-                {/* Оборудование */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-2">Оборудование (через запятую)</label>
-                  <input
-                    type="text"
-                    name="equipment"
-                    value={formData.equipment}
-                    onChange={handleChange}
-                    placeholder="Коньки, Шлем, Защита"
-                    className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  />
-                </div>
+                  </div>
 
-                {/* Описание */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-2">Описание</label>
-                  <textarea
-                    name="description"
-                    value={formData.description}
-                    onChange={handleChange}
-                    rows={4}
-                    className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  />
-                </div>
+                  {/* Строка 3: RPE диапазон */}
+                  <div>
+                    <label className="block text-sm font-medium mb-3">
+                      Диапазон интенсивности (RPE)
+                      <span className="text-purple-400 ml-1">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-4">
+                      
+                      {/* RPE Min */}
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-2">Минимум (начало)</label>
+                        <input
+                          type="number"
+                          name="rpeМин"
+                          value={formData.rpeМин}
+                          onChange={handleChange}
+                          min="1"
+                          max="10"
+                          className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                        />
+                      </div>
 
-              </div>
+                      {/* RPE Max */}
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-2">Максимум (пик)</label>
+                        <input
+                          type="number"
+                          name="rpeМакс"
+                          value={formData.rpeМакс}
+                          onChange={handleChange}
+                          min="1"
+                          max="10"
+                          className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                        />
+                      </div>
+
+                    </div>
+                    
+                    {/* Подсказка про RPE */}
+                    <div className="mt-4 p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                      <h4 className="text-sm font-semibold text-blue-300 mb-2">ℹ️ Что такое RPE?</h4>
+                      <p className="text-xs text-gray-300 mb-3">
+                        <strong>RPE (Rate of Perceived Exertion)</strong> — шкала воспринимаемого усилия от 1 до 10
+                      </p>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-400 font-bold">1-2</span>
+                          <span className="text-gray-300">Очень легко 😌</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-400 font-bold">3-4</span>
+                          <span className="text-gray-300">Легко 🙂</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-yellow-400 font-bold">5-6</span>
+                          <span className="text-gray-300">Средне 😊</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-orange-400 font-bold">7-8</span>
+                          <span className="text-gray-300">Тяжело 😓</span>
+                        </div>
+                        <div className="col-span-2 flex items-center gap-2">
+                          <span className="text-red-400 font-bold">9-10</span>
+                          <span className="text-gray-300">Максимум 🥵 (на грани возможностей)</span>
+                        </div>
+                      </div>
+                      
+                      <div className="border-t border-blue-500/20 pt-3 mt-3">
+                        <p className="text-xs font-semibold text-blue-200 mb-2">📊 Как указывать диапазон:</p>
+                        <ul className="text-xs text-gray-300 space-y-1.5">
+                          <li className="flex items-start gap-2">
+                            <span className="text-blue-400 mt-0.5">•</span>
+                            <span><strong>RPE Минимум</strong> — самое легкое ощущение в упражнении (начало, разминка)</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-blue-400 mt-0.5">•</span>
+                            <span><strong>RPE Максимум</strong> — пиковая нагрузка в упражнении (основная часть, финиш)</span>
+                          </li>
+                        </ul>
+                        <div className="mt-3 p-2 bg-blue-900/30 rounded border border-blue-500/20">
+                          <p className="text-xs text-gray-300">
+                            <strong className="text-blue-200">Пример:</strong> Разминка может начинаться с RPE 2 (очень легко), 
+                            но к концу достигать RPE 5 (средне). Интервальный спринт: от RPE 6 (средне) до RPE 9 (максимум).
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <p className="text-xs text-purple-300 mt-3 pt-3 border-t border-blue-500/20 font-medium">
+                        💡 Алгоритм использует RPE для подбора нагрузки под текущее состояние пользователя
+                      </p>
+                    </div>
+
+                  </div>
+
+                </div>
+              </fieldset>
 
               <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
                 <button
@@ -649,6 +868,25 @@ const AdminVideosPage = () => {
                   
                   {/* Название видео */}
                   <h3 className="font-semibold text-base md:text-lg mb-2 pr-28">{video.title}</h3>
+                  
+                  {/* Тип модуля (если указан) */}
+                  {video.типМодуля && (
+                    <div className="mb-2">
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
+                        video.типМодуля === 'Разминка' ? 'bg-orange-600/20 text-orange-300 border border-orange-500/30' :
+                        video.типМодуля === 'ОФП' ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30' :
+                        video.типМодуля === 'Техника' ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30' :
+                        video.типМодуля === 'Заминка' ? 'bg-green-600/20 text-green-300 border border-green-500/30' :
+                        'bg-gray-600/20 text-gray-300 border border-gray-500/30'
+                      }`}>
+                        {video.типМодуля === 'Разминка' ? '🔥' :
+                         video.типМодуля === 'ОФП' ? '💪' :
+                         video.типМодуля === 'Техника' ? '🎯' :
+                         video.типМодуля === 'Заминка' ? '🧘' : '📹'}
+                        {video.типМодуля}
+                      </span>
+                    </div>
+                  )}
                   
                   {/* Информация о тренере */}
                   <p className="text-xs md:text-sm text-gray-400 mb-2 truncate">

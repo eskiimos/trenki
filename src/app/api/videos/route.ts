@@ -62,6 +62,14 @@ export async function GET(request: NextRequest) {
         speciality: video.trainer.speciality,
       },
       createdAt: video.createdAt,
+      isPublished: video.isPublished,
+      // Поля для алгоритма
+      типМодуля: video.типМодуля,
+      типНагрузки: video.типНагрузки,
+      группаМышц: video.группаМышц,
+      сложность: video.сложность,
+      rpeМин: video.rpeМин,
+      rpeМакс: video.rpeМакс,
     }));
 
     return NextResponse.json({ videos: formattedVideos });
@@ -95,7 +103,14 @@ export async function POST(request: NextRequest) {
       tags,
       equipment,
       level,
-      isPublished 
+      isPublished,
+      // Новые поля для алгоритма
+      типМодуля,
+      типНагрузки,
+      группаМышц,
+      сложность,
+      rpeМин,
+      rpeМакс,
     } = body;
 
     if (!title || !videoUrl || !category || !difficulty || !trainerId) {
@@ -106,6 +121,10 @@ export async function POST(request: NextRequest) {
 
     // Преобразуем duration в число
     const durationNum = parseInt(duration) || 0;
+    
+    // Преобразуем RPE в числа
+    const rpeМинNum = rpeМин ? parseInt(rpeМин.toString()) : null;
+    const rpeМаксNum = rpeМакс ? parseInt(rpeМакс.toString()) : null;
 
     console.log('isPublished value:', isPublished, 'type:', typeof isPublished);
 
@@ -123,6 +142,13 @@ export async function POST(request: NextRequest) {
         equipment: equipment || [],
         level: level || null,
         isPublished: isPublished ?? false,
+        // Поля для алгоритма
+        типМодуля: типМодуля || null,
+        типНагрузки: типНагрузки || null,
+        группаМышц: группаМышц || null,
+        сложность: сложность || null,
+        rpeМин: rpeМинNum,
+        rpeМакс: rpeМаксNum,
       },
       include: {
         trainer: true

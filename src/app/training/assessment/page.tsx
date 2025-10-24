@@ -9,15 +9,20 @@ type LastTrainingTime = 'TODAY' | 'YESTERDAY' | 'TWO_DAYS_AGO' | 'THREE_PLUS_DAY
 
 export default function TrainingAssessmentPage() {
   const router = useRouter();
-  const { user, webApp } = useTelegram();
+  const { user, webApp, isLoading: userLoading } = useTelegram();
   
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Состояние формы
   const [formData, setFormData] = useState({
     lastTrainingTime: '' as LastTrainingTime | '',
     energyLevel: 0,
   });
+
+  // Логирование состояния пользователя
+  useEffect(() => {
+    console.log('👤 User state changed:', { user, userLoading });
+  }, [user, userLoading]);
 
   useEffect(() => {
     if (webApp) {
@@ -31,8 +36,12 @@ export default function TrainingAssessmentPage() {
   }, [webApp, router]);
 
   const handleSubmit = async () => {
+    console.log('🎯 Assessment submit - User:', user);
+    console.log('🔍 User loading state:', userLoading);
+    
     if (!user?.id) {
-      alert('Ошибка: пользователь не авторизован');
+      console.error('❌ No user ID found');
+      alert('Ошибка: пользователь не авторизован. Попробуйте перезагрузить страницу.');
       return;
     }
 
@@ -41,51 +50,64 @@ export default function TrainingAssessmentPage() {
       return;
     }
 
-    setIsLoading(true);
+    setIsSubmitting(true);
 
     try {
+      const assessmentPayload = {
+        userId: user.id.toString(),
+        ...formData,
+        // Добавляем значения по умолчанию для удаленных полей
+        muscleReadiness: 5,
+        motivation: 5,
+        availableTime: 30,
+      };
+      
+      console.log('📤 Sending assessment:', assessmentPayload);
+      
       const response = await fetch('/api/training/assessment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id.toString(),
-          ...formData,
-          // Добавляем значения по умолчанию для удаленных полей
-          muscleReadiness: 5,
-          motivation: 5,
-          availableTime: 30,
-        }),
+        body: JSON.stringify(assessmentPayload),
       });
 
       const data = await response.json();
+      console.log('📥 Assessment response:', data);
 
       if (data.success) {
         // Сразу генерируем тренировку
+        const generatePayload = {
+          userId: user.id.toString(),
+          assessmentId: data.assessment.id,
+        };
+        
+        console.log('📤 Generating workout:', generatePayload);
+        
         const generateResponse = await fetch('/api/training/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: user.id.toString(),
-            assessmentId: data.assessment.id,
-          }),
+          body: JSON.stringify(generatePayload),
         });
 
         const generateData = await generateResponse.json();
+        console.log('📥 Generate response:', generateData);
 
         if (generateData.success) {
+          console.log('✅ Workout generated, redirecting...');
           // Переходим на страницу тренировки
           router.push('/training/workout');
         } else {
+          console.error('❌ Generate error:', generateData.error);
           alert('Ошибка генерации тренировки: ' + generateData.error);
         }
       } else {
+        console.error('❌ Assessment error:', data.error);
         alert('Ошибка: ' + data.error);
       }
     } catch (error) {
-      console.error('Ошибка отправки оценки:', error);
+      console.error('❌ Exception during assessment:', error);
       alert('Произошла ошибка. Попробуйте снова.');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -282,22 +304,22 @@ export default function TrainingAssessmentPage() {
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={!formData.lastTrainingTime || isLoading}
+          disabled={!formData.lastTrainingTime || isSubmitting || userLoading}
           className="w-full rounded-full font-medium transition-all uppercase flex items-center justify-center"
           style={{
             backgroundColor: '#A1FF4A',
             color: '#060919',
-            opacity: (!formData.lastTrainingTime || isLoading) ? 0.2 : 1,
+            opacity: (!formData.lastTrainingTime || isSubmitting || userLoading) ? 0.2 : 1,
             fontFamily: 'Overpass, sans-serif',
             fontWeight: 700,
             fontSize: '16px',
             letterSpacing: '0.5px',
-            cursor: (!formData.lastTrainingTime || isLoading) ? 'not-allowed' : 'pointer',
+            cursor: (!formData.lastTrainingTime || isSubmitting || userLoading) ? 'not-allowed' : 'pointer',
             height: '56px',
             padding: '0 16px',
           }}
         >
-          {isLoading ? (
+          {isSubmitting ? (
             <img 
               src="/icons/loading.svg" 
               alt="Загрузка" 
@@ -307,6 +329,8 @@ export default function TrainingAssessmentPage() {
                 animation: 'spin 1s linear infinite'
               }}
             />
+          ) : userLoading ? (
+            'Загрузка...'
           ) : (
             'Вперед'
           )}

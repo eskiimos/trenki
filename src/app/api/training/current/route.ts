@@ -27,11 +27,11 @@ export async function GET(request: NextRequest) {
         },
       },
       include: {
-        modules: {
+        videos: {
           include: {
-            module: {
+            video: {
               include: {
-                video: true,
+                trainer: true,
               },
             },
           },
@@ -42,16 +42,13 @@ export async function GET(request: NextRequest) {
     });
 
     if (!workout) {
-      return NextResponse.json(
-        { error: 'Активная тренировка не найдена' },
-        { status: 404 }
-      );
+      return NextResponse.json({ workout: null });
     }
 
     // Рассчитываем прогресс
-    const totalModules = workout.modules.length;
-    const completedModules = workout.modules.filter((m) => m.completed).length;
-    const progress = totalModules > 0 ? (completedModules / totalModules) * 100 : 0;
+    const totalVideos = workout.totalVideos;
+    const completedVideos = workout.videos.filter((v) => v.completed).length;
+    const progress = totalVideos > 0 ? (completedVideos / totalVideos) * 100 : 0;
 
     return NextResponse.json({
       success: true,
@@ -61,20 +58,32 @@ export async function GET(request: NextRequest) {
         targetDuration: workout.targetDuration,
         targetRPE: workout.targetRPE,
         loadDirection: workout.loadDirection,
+        currentVideoIndex: workout.currentVideoIndex,
+        totalVideos: workout.totalVideos,
         progress: Math.round(progress),
+        startedAt: workout.startedAt,
         createdAt: workout.createdAt,
-        modules: workout.modules.map((wm) => ({
-          id: wm.id,
-          moduleId: wm.module.id,
-          name: wm.module.name,
-          description: wm.module.description,
-          type: wm.module.type,
-          duration: wm.module.duration,
-          rpeRange: `${wm.module.rpeMin}-${wm.module.rpeMax}`,
-          video: wm.module.video,
-          order: wm.order,
-          completed: wm.completed,
-          actualRPE: wm.actualRPE,
+        modules: workout.videos.map((wsVideo) => ({
+          id: wsVideo.video.id,
+          sessionVideoId: wsVideo.id,
+          title: wsVideo.video.title,
+          description: wsVideo.video.description,
+          типМодуля: wsVideo.video.типМодуля,
+          типНагрузки: wsVideo.video.типНагрузки,
+          duration: wsVideo.video.duration,
+          rpeRange: `${wsVideo.video.rpeМин}-${wsVideo.video.rpeМакс}`,
+          videoUrl: wsVideo.video.videoUrl,
+          thumbnail: wsVideo.video.thumbnail,
+          trainer: {
+            id: wsVideo.video.trainer.id,
+            name: wsVideo.video.trainer.name,
+            lastName: wsVideo.video.trainer.lastName,
+          },
+          order: wsVideo.order,
+          completed: wsVideo.completed,
+          startedAt: wsVideo.startedAt,
+          completedAt: wsVideo.completedAt,
+          watchedDuration: wsVideo.watchedDuration,
         })),
       },
     });
@@ -90,11 +99,13 @@ export async function GET(request: NextRequest) {
 /**
  * PATCH /api/training/current
  * Обновляет статус текущей тренировки (начать/завершить)
+ * 
+ * DEPRECATED: Используйте /api/training/update вместо этого
  */
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { workoutId, action, moduleId, actualRPE } = body;
+    const { workoutId, action, videoId, actualRPE } = body;
 
     if (!workoutId) {
       return NextResponse.json(
@@ -107,7 +118,10 @@ export async function PATCH(request: NextRequest) {
     if (action === 'start') {
       const workout = await prisma.workoutSession.update({
         where: { id: workoutId },
-        data: { status: WorkoutStatus.IN_PROGRESS },
+        data: { 
+          status: WorkoutStatus.IN_PROGRESS,
+          startedAt: new Date(),
+        },
       });
 
       return NextResponse.json({
@@ -117,36 +131,24 @@ export async function PATCH(request: NextRequest) {
       });
     }
 
-    // Завершить модуль
-    if (action === 'completeModule' && moduleId) {
-      const workoutModule = await prisma.workoutSessionModule.update({
-        where: { id: moduleId },
+    // Завершить видео
+    if (action === 'completeVideo' && videoId) {
+      const workoutVideo = await prisma.workoutSessionVideo.updateMany({
+        where: { 
+          sessionId: workoutId,
+          videoId: videoId,
+        },
         data: {
           completed: true,
+          completedAt: new Date(),
           actualRPE: actualRPE || null,
         },
       });
 
-      // Добавляем в историю пользователя
-      const workout = await prisma.workoutSession.findUnique({
-        where: { id: workoutId },
-        select: { userId: true },
-      });
-
-      if (workout) {
-        await prisma.userModuleHistory.create({
-          data: {
-            userId: workout.userId,
-            moduleId: workoutModule.moduleId,
-            rpe: actualRPE || null,
-          },
-        });
-      }
-
       return NextResponse.json({
         success: true,
-        module: workoutModule,
-        message: 'Модуль завершен',
+        video: workoutVideo,
+        message: 'Видео завершено',
       });
     }
 
@@ -163,9 +165,9 @@ export async function PATCH(request: NextRequest) {
           actualRPE: workoutActualRPE || null,
         },
         include: {
-          modules: {
+          videos: {
             include: {
-              module: true,
+              video: true,
             },
           },
         },

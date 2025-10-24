@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { LastTrainingTime, LoadDirection } from '@/generated/prisma';
+import { ensureDevUser } from '@/lib/dev-user';
 
 /**
  * POST /api/training/assessment
@@ -25,6 +26,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    
+    // DEV MODE: автоматически создаём пользователя, если его нет
+    await ensureDevUser(userId);
 
     if (!lastTrainingTime || !LastTrainingTime[lastTrainingTime as keyof typeof LastTrainingTime]) {
       return NextResponse.json(
@@ -51,29 +55,59 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Алгоритм определения направления нагрузки (п.3)
-    const avgScore = (energyLevel + muscleReadiness + motivation) / 3;
+    // Алгоритм определения состояния (п.5 документа)
     
+    // 1. Коэффициент свежести (на основе lastTrainingTime)
+    let freshnessCoefficient = 1;
+    switch (lastTrainingTime) {
+      case 'TODAY':
+        freshnessCoefficient = 1;
+        break;
+      case 'YESTERDAY':
+        freshnessCoefficient = 2;
+        break;
+      case 'TWO_DAYS_AGO':
+      case 'THREE_PLUS_DAYS':
+        freshnessCoefficient = 3;
+        break;
+      case 'WEEK_PLUS':
+        freshnessCoefficient = 1;
+        break;
+    }
+
+    // 2. Уровень готовности = Коэффициент свежести + Energy
+    const readinessLevel = freshnessCoefficient + energyLevel;
+
+    // 3. Определяем статус и направление нагрузки
     let loadDirection: LoadDirection;
     let recommendedRPE: number;
+    let trainingStatus: 'RECOVERY' | 'DEVELOPMENT' | 'PEAK';
 
-    if (lastTrainingTime === 'TODAY' || lastTrainingTime === 'YESTERDAY') {
-      // Недавно тренировался - легкая нагрузка
+    if (readinessLevel >= 2 && readinessLevel <= 6) {
+      // Статус: Восстановление
+      trainingStatus = 'RECOVERY';
       loadDirection = LoadDirection.LIGHT;
-      recommendedRPE = Math.min(4, Math.round(avgScore * 0.4));
-    } else if (avgScore >= 8) {
-      // Высокая энергия и готовность - высокая нагрузка
-      loadDirection = LoadDirection.HIGH;
-      recommendedRPE = Math.max(8, Math.round(avgScore * 1.0));
-    } else if (avgScore >= 5) {
-      // Средняя готовность - средняя нагрузка
+      recommendedRPE = Math.min(4, Math.max(2, readinessLevel - 1));
+    } else if (readinessLevel >= 7 && readinessLevel <= 10) {
+      // Статус: Развитие
+      trainingStatus = 'DEVELOPMENT';
       loadDirection = LoadDirection.MEDIUM;
-      recommendedRPE = Math.round(avgScore * 0.7);
+      recommendedRPE = Math.min(7, Math.max(5, readinessLevel - 2));
     } else {
-      // Низкая энергия - легкая нагрузка
-      loadDirection = LoadDirection.LIGHT;
-      recommendedRPE = Math.min(4, Math.round(avgScore * 0.4));
+      // Статус: Пик (11-13)
+      trainingStatus = 'PEAK';
+      loadDirection = LoadDirection.HIGH;
+      recommendedRPE = Math.min(10, Math.max(8, readinessLevel - 3));
     }
+
+    console.log('📊 Assessment calculation:', {
+      freshnessCoefficient,
+      energyLevel,
+      readinessLevel,
+      trainingStatus,
+      loadDirection,
+      recommendedRPE,
+    });
 
     // Создаем оценку состояния
     const assessment = await prisma.userStateAssessment.create({
@@ -95,7 +129,9 @@ export async function POST(request: NextRequest) {
       recommendation: {
         loadDirection,
         recommendedRPE,
-        message: getRecommendationMessage(loadDirection, recommendedRPE),
+        trainingStatus,
+        readinessLevel,
+        message: getRecommendationMessage(loadDirection, recommendedRPE, trainingStatus),
       },
     });
   } catch (error) {
@@ -155,12 +191,23 @@ export async function GET(request: NextRequest) {
 }
 
 // Вспомогательная функция для генерации сообщения
-function getRecommendationMessage(loadDirection: LoadDirection, rpe: number): string {
-  const messages = {
+function getRecommendationMessage(
+  loadDirection: LoadDirection, 
+  rpe: number, 
+  trainingStatus?: 'RECOVERY' | 'DEVELOPMENT' | 'PEAK'
+): string {
+  const statusMessages = {
+    'RECOVERY': 'Статус: Восстановление. ',
+    'DEVELOPMENT': 'Статус: Развитие. ',
+    'PEAK': 'Статус: Пик формы. ',
+  };
+
+  const loadMessages = {
     [LoadDirection.LIGHT]: `Легкая тренировка (RPE ${rpe}/10). Фокус на восстановлении и технике.`,
     [LoadDirection.MEDIUM]: `Средняя тренировка (RPE ${rpe}/10). Сбалансированная нагрузка для развития.`,
     [LoadDirection.HIGH]: `Интенсивная тренировка (RPE ${rpe}/10). Высокая нагрузка для максимального прогресса.`,
   };
 
-  return messages[loadDirection] || 'Тренировка подобрана под ваше состояние.';
+  const statusText = trainingStatus ? statusMessages[trainingStatus] : '';
+  return statusText + (loadMessages[loadDirection] || 'Тренировка подобрана под ваше состояние.');
 }

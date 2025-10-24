@@ -20,10 +20,10 @@ model User {
   updatedAt     DateTime          @updatedAt
   favorites     FavoriteVideo[]
   profile       Profile?
+  shortComments ShortComment[]
+  shortLikes    ShortLike[]
   sessions      TrainingSession[]
   videoLikes    VideoLike[]
-  shortLikes    ShortLike[]
-  shortComments ShortComment[]
 
   @@map("users")
 }
@@ -72,29 +72,40 @@ model Trainer {
 }
 
 model Video {
-  id          String            @id @default(cuid())
-  title       String
-  description String?
-  duration    Int               // продолжительность в секундах
-  videoUrl    String            // URL видео со стороннего сервиса (например, YouTube, Vimeo, или CDN)
-  thumbnail   String?           // URL превью изображения
-  category    VideoCategory
-  difficulty  VideoDifficulty
-  trainerId   String
-  tags        String[]          // массив тегов для фильтрации
-  equipment   String[]          // необходимое оборудование
-  level       String?           // уровень подготовки
-  isPublished Boolean           @default(false) // опубликовано ли видео
-  viewsCount  Int               @default(0)     // количество просмотров
-  likesCount  Int               @default(0)     // количество лайков
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  favorites   FavoriteVideo[]
-  sessions    TrainingSession[]
-  likes       VideoLike[]
-  trainer     Trainer           @relation(fields: [trainerId], references: [id])
-  videoTags   VideoTag[]        // связь с тегами
-  trainingModules TrainingModule[] // связь с модулями тренировок
+  id              String                @id @default(cuid())
+  title           String
+  description     String?
+  duration        Int
+  videoUrl        String
+  thumbnail       String?
+  category        VideoCategory
+  difficulty      VideoDifficulty
+  trainerId       String
+  tags            String[]
+  equipment       String[]
+  level           String?
+  isPublished     Boolean               @default(false)
+  viewsCount      Int                   @default(0)
+  likesCount      Int                   @default(0)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  rpeМакс     Int?
+  rpeМин       Int?
+  /// This field was commented out because of an invalid name. Please provide a valid one that matches [a-zA-Z][a-zA-Z0-9_]*
+  // группаМышц String?
+  /// This field was commented out because of an invalid name. Please provide a valid one that matches [a-zA-Z][a-zA-Z0-9_]*
+  // сложность String?
+  /// This field was commented out because of an invalid name. Please provide a valid one that matches [a-zA-Z][a-zA-Z0-9_]*
+  // типМодуля String?
+  /// This field was commented out because of an invalid name. Please provide a valid one that matches [a-zA-Z][a-zA-Z0-9_]*
+  // типНагрузки String?
+  favorites       FavoriteVideo[]
+  trainingModules TrainingModule[]
+  sessions        TrainingSession[]
+  likes           VideoLike[]
+  videoTags       VideoTag[]
+  trainer         Trainer               @relation(fields: [trainerId], references: [id])
+  workoutSessions WorkoutSessionVideo[]
 
   @@map("videos")
 }
@@ -138,22 +149,22 @@ model VideoLike {
 }
 
 model Short {
-  id          String        @id @default(cuid())
+  id          String         @id @default(cuid())
   title       String
   description String?
-  videoUrl    String        // URL короткого видео
-  thumbnail   String?       // URL превью изображения
-  trainerId   String?       // опционально - может быть без тренера
-  tags        String[]      // массив тегов
-  isPublished Boolean       @default(false)
-  viewsCount  Int           @default(0)
-  likesCount  Int           @default(0) // количество лайков
-  order       Int           @default(0) // порядок отображения
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  likes       ShortLike[]   // связь с лайками
-  comments    ShortComment[] // связь с комментариями
-  shortTags   ShortTag[]    // связь с тегами
+  videoUrl    String
+  thumbnail   String?
+  trainerId   String?
+  tags        String[]
+  isPublished Boolean        @default(false)
+  viewsCount  Int            @default(0)
+  likesCount  Int            @default(0)
+  order       Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  comments    ShortComment[]
+  likes       ShortLike[]
+  shortTags   ShortTag[]
 
   @@map("shorts")
 }
@@ -163,8 +174,8 @@ model ShortLike {
   userId    String
   shortId   String
   createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   short     Short    @relation(fields: [shortId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, shortId])
   @@map("short_likes")
@@ -177,10 +188,171 @@ model ShortComment {
   text      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   short     Short    @relation(fields: [shortId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("short_comments")
+}
+
+model Tag {
+  id           String        @id @default(cuid())
+  name         String        @unique
+  displayName  String
+  description  String?
+  tagType      TagType
+  loadType     LoadType?
+  muscleGroup  MuscleGroup?
+  complexity   Complexity?
+  trainingGoal TrainingGoal?
+  icon         String?
+  color        String?
+  order        Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  shorts       ShortTag[]
+  videos       VideoTag[]
+
+  @@map("tags")
+}
+
+model VideoTag {
+  id        String   @id @default(cuid())
+  videoId   String
+  tagId     String
+  createdAt DateTime @default(now())
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, tagId])
+  @@map("video_tags")
+}
+
+model ShortTag {
+  id        String   @id @default(cuid())
+  shortId   String
+  tagId     String
+  createdAt DateTime @default(now())
+  short     Short    @relation(fields: [shortId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([shortId, tagId])
+  @@map("short_tags")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String?
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("push_subscriptions")
+}
+
+model PushNotification {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  icon      String?
+  url       String?
+  sentCount Int      @default(0)
+  createdAt DateTime @default(now())
+  sentBy    String?
+
+  @@map("push_notifications")
+}
+
+model TrainingModule {
+  id          String              @id @default(cuid())
+  name        String
+  description String?
+  type        ModuleType
+  duration    Int
+  videoId     String?
+  order       Int                 @default(0)
+  loadType    LoadType?
+  muscleGroup MuscleGroup?
+  complexity  Complexity          @default(BEGINNER)
+  rpeMin      Int?
+  rpeMax      Int?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  video       Video?              @relation(fields: [videoId], references: [id])
+  userHistory UserModuleHistory[]
+
+  @@map("training_modules")
+}
+
+model UserStateAssessment {
+  id               String           @id @default(cuid())
+  userId           String
+  lastTrainingTime LastTrainingTime
+  energyLevel      Int
+  muscleReadiness  Int
+  motivation       Int
+  availableTime    Int
+  loadDirection    LoadDirection
+  recommendedRPE   Int
+  createdAt        DateTime         @default(now())
+
+  @@index([userId, createdAt])
+  @@map("user_state_assessments")
+}
+
+model WorkoutSession {
+  id                String                @id @default(cuid())
+  userId            String
+  assessmentId      String?
+  targetDuration    Int
+  targetRPE         Int
+  loadDirection     LoadDirection
+  status            WorkoutStatus         @default(PENDING)
+  completedAt       DateTime?
+  actualDuration    Int?
+  actualRPE         Int?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  currentVideoIndex Int                   @default(0)
+  startedAt         DateTime?
+  totalVideos       Int                   @default(0)
+  videos            WorkoutSessionVideo[]
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@map("workout_sessions")
+}
+
+model WorkoutSessionVideo {
+  id              String         @id @default(cuid())
+  sessionId       String
+  videoId         String
+  order           Int
+  completed       Boolean        @default(false)
+  startedAt       DateTime?
+  completedAt     DateTime?
+  watchedDuration Int?
+  actualRPE       Int?
+  session         WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  video           Video          @relation(fields: [videoId], references: [id])
+
+  @@unique([sessionId, videoId])
+  @@map("workout_session_videos")
+}
+
+model UserModuleHistory {
+  id          String         @id @default(cuid())
+  userId      String
+  moduleId    String
+  completedAt DateTime       @default(now())
+  rpe         Int?
+  module      TrainingModule @relation(fields: [moduleId], references: [id])
+
+  @@index([userId, completedAt])
+  @@index([userId, moduleId])
+  @@map("user_module_history")
 }
 
 enum VideoCategory {
@@ -220,278 +392,77 @@ enum Gender {
   NOT_SPECIFIED
 }
 
-// Типы нагрузки для тегов
 enum LoadType {
-  SPEED                  // Скорость - 30-45" интервальной работы
-  POWER                  // Мощность (взрывная сила) - взрывные упражнения с плиометрикой
-  MAX_STRENGTH           // Сила (максимальная сила) - статическая/изометрическая нагрузка
-  STRENGTH_ENDURANCE     // Выносливость: силовая
-  ANAEROBIC_ENDURANCE    // Выносливость: анаэробная
-  AEROBIC_ENDURANCE      // Выносливость: аэробная
-  AGILITY                // Ловкость (координация, баланс-равновесие)
-  MOBILITY               // Мобильность (вращательные функции суставов и мышц)
-  STATIC_STRETCH         // Растяжка: статическая
-  DYNAMIC_STRETCH        // Растяжка: динамическая
-  PREHAB                 // ЛФК (восстановление и предотвращение травм)
-  TECHNICAL_SKILL        // Техника (технические элементы)
+  SPEED
+  POWER
+  MAX_STRENGTH
+  STRENGTH_ENDURANCE
+  ANAEROBIC_ENDURANCE
+  AEROBIC_ENDURANCE
+  AGILITY
+  MOBILITY
+  STATIC_STRETCH
+  DYNAMIC_STRETCH
+  PREHAB
+  TECHNICAL_SKILL
 }
 
-// Направление нагрузки (какие мышцы)
 enum MuscleGroup {
-  LOWER_BODY             // Низ тела: ноги, ягодицы, колени, голеностоп
-  UPPER_PULL             // Верх тела тяга: спина, бицепс, задние дельты
-  UPPER_PUSH             // Верх тела жим: грудь, трицепс, передние/средние дельты
-  CORE_STABILITY         // Кор стабилизация: статическая работа кора
-  CORE_DYNAMICS          // Кор динамика: динамическая работа кора, ротационные движения
-  PREHAB_SHOULDER        // ЛФК плечо: ротаторы плеча, профилактика, растяжка и мобильность
-  PREHAB_KNEE            // ЛФК колено: профилактика травм коленей, укрепление связок
-  PREHAB_BACK            // ЛФК спина: профилактика болей в спине, стречинг
-  FULL_BODY              // Все тело: упражнения, комплексно нагружающие организм
+  LOWER_BODY
+  UPPER_PULL
+  UPPER_PUSH
+  CORE_STABILITY
+  CORE_DYNAMICS
+  PREHAB_SHOULDER
+  PREHAB_KNEE
+  PREHAB_BACK
+  FULL_BODY
 }
 
-// Сложность упражнения
 enum Complexity {
-  BEGINNER               // Новичок
-  AMATEUR                // Любитель
-  ADVANCED               // Продвинутый
-  PRO                    // Профессионал
+  BEGINNER
+  AMATEUR
+  ADVANCED
+  PRO
 }
 
-// Цель тренировки / состояние спортсмена
 enum TrainingGoal {
-  RECOVERY               // Восстановление
-  DEVELOPMENT            // Развитие
-  PEAK                   // Пик формы
+  RECOVERY
+  DEVELOPMENT
+  PEAK
 }
 
-// Тип тега (для группировки)
 enum TagType {
-  LOAD                   // Тип нагрузки
-  MUSCLE                 // Направление нагрузки (мышечные группы)
-  COMPLEXITY             // Сложность
-  GOAL                   // Цель/состояние
+  LOAD
+  MUSCLE
+  COMPLEXITY
+  GOAL
 }
 
-model Tag {
-  id          String        @id @default(cuid())
-  name        String        @unique // уникальное имя тега (например, "speed")
-  displayName String        // отображаемое имя (например, "Скорость")
-  description String?       // описание тега
-  tagType     TagType       // тип тега (load, muscle, complexity, goal)
-  
-  // Опциональные поля в зависимости от типа
-  loadType     LoadType?     // для tagType = LOAD
-  muscleGroup  MuscleGroup?  // для tagType = MUSCLE
-  complexity   Complexity?   // для tagType = COMPLEXITY
-  trainingGoal TrainingGoal? // для tagType = GOAL
-  
-  icon        String?       // иконка/эмодзи для визуализации
-  color       String?       // цвет тега для UI
-  order       Int           @default(0) // порядок отображения
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  
-  // Связи Many-to-Many
-  videos      VideoTag[]
-  shorts      ShortTag[]
-
-  @@map("tags")
-}
-
-// Many-to-Many связь Video <-> Tag
-model VideoTag {
-  id        String   @id @default(cuid())
-  videoId   String
-  tagId     String
-  createdAt DateTime @default(now())
-  
-  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
-  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-  @@unique([videoId, tagId])
-  @@map("video_tags")
-}
-
-// Many-to-Many связь Short <-> Tag
-model ShortTag {
-  id        String   @id @default(cuid())
-  shortId   String
-  tagId     String
-  createdAt DateTime @default(now())
-  
-  short     Short    @relation(fields: [shortId], references: [id], onDelete: Cascade)
-  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-  @@unique([shortId, tagId])
-  @@map("short_tags")
-}
-
-// Push Subscriptions для уведомлений
-model PushSubscription {
-  id         String   @id @default(cuid())
-  userId     String?  // Опционально - для неавторизованных пользователей
-  endpoint   String   @unique
-  p256dh     String
-  auth       String
-  userAgent  String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@map("push_subscriptions")
-}
-
-// История отправленных уведомлений
-model PushNotification {
-  id        String   @id @default(cuid())
-  title     String
-  body      String
-  icon      String?
-  url       String?
-  sentCount Int      @default(0)
-  createdAt DateTime @default(now())
-  sentBy    String?  // ID администратора
-
-  @@map("push_notifications")
-}
-
-// ========================================
-// МОДУЛЬ ГЕНЕРАЦИИ ПЕРСОНАЛЬНЫХ ТРЕНИРОВОК
-// ========================================
-
-// Модуль тренировки (1 из 4 типов)
-model TrainingModule {
-  id                String                    @id @default(cuid())
-  name              String                    // название модуля
-  description       String?                   // описание
-  type              ModuleType                // тип модуля (разминка, основная, заминка, восстановление)
-  duration          Int                       // длительность в секундах
-  videoId           String?                   // ID видео (если есть)
-  order             Int                       @default(0) // порядок в последовательности
-  
-  // Характеристики модуля для алгоритма
-  loadType          LoadType?                 // тип нагрузки
-  muscleGroup       MuscleGroup?              // целевая мышечная группа
-  complexity        Complexity                @default(BEGINNER)
-  rpeMin            Int?                      // минимальный RPE (1-10)
-  rpeMax            Int?                      // максимальный RPE (1-10)
-  
-  createdAt         DateTime                  @default(now())
-  updatedAt         DateTime                  @updatedAt
-  
-  video             Video?                    @relation(fields: [videoId], references: [id])
-  workoutSessions   WorkoutSessionModule[]    // связь с тренировками
-  userHistory       UserModuleHistory[]       // история выполнения
-
-  @@map("training_modules")
-}
-
-// Оценка текущего состояния пользователя
-model UserStateAssessment {
-  id                String                @id @default(cuid())
-  userId            String
-  
-  // Ответы на вопросы (п.2 алгоритма)
-  lastTrainingTime  LastTrainingTime      // когда была последняя тренировка
-  energyLevel       Int                   // уровень энергии 1-10
-  muscleReadiness   Int                   // готовность мышц 1-10
-  motivation        Int                   // уровень мотивации 1-10
-  availableTime     Int                   // доступное время в минутах
-  
-  // Рассчитанные значения
-  loadDirection     LoadDirection         // направление нагрузки (легкая/средняя/высокая)
-  recommendedRPE    Int                   // рекомендуемый RPE
-  
-  createdAt         DateTime              @default(now())
-
-  @@index([userId, createdAt])
-  @@map("user_state_assessments")
-}
-
-// Сессия тренировки (сгенерированная тренировка)
-model WorkoutSession {
-  id                String                    @id @default(cuid())
-  userId            String
-  
-  // Параметры генерации
-  assessmentId      String?                   // ID оценки состояния
-  targetDuration    Int                       // целевая длительность в минутах
-  targetRPE         Int                       // целевой RPE
-  loadDirection     LoadDirection             // направление нагрузки
-  
-  // Статус выполнения
-  status            WorkoutStatus             @default(PENDING)
-  completedAt       DateTime?
-  actualDuration    Int?                      // фактическая длительность
-  actualRPE         Int?                      // фактический RPE (оценка после)
-  
-  createdAt         DateTime                  @default(now())
-  updatedAt         DateTime                  @updatedAt
-  
-  modules           WorkoutSessionModule[]    // модули в тренировке
-
-  @@index([userId, createdAt])
-  @@map("workout_sessions")
-}
-
-// Many-to-Many связь WorkoutSession <-> TrainingModule
-model WorkoutSessionModule {
-  id                String                @id @default(cuid())
-  sessionId         String
-  moduleId          String
-  order             Int                   // порядок модуля в тренировке
-  completed         Boolean               @default(false)
-  actualRPE         Int?                  // фактический RPE для этого модуля
-  
-  session           WorkoutSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  module            TrainingModule        @relation(fields: [moduleId], references: [id])
-
-  @@unique([sessionId, moduleId])
-  @@map("workout_session_modules")
-}
-
-// История выполнения модулей пользователем (п.6 - предотвращение повторов)
-model UserModuleHistory {
-  id                String                @id @default(cuid())
-  userId            String
-  moduleId          String
-  completedAt       DateTime              @default(now())
-  rpe               Int?                  // оценка RPE после выполнения
-  
-  module            TrainingModule        @relation(fields: [moduleId], references: [id])
-
-  @@index([userId, completedAt])
-  @@index([userId, moduleId])
-  @@map("user_module_history")
-}
-
-// Типы модулей (4 типа по алгоритму)
 enum ModuleType {
-  WARMUP           // Разминка
-  FITNESS          // Физическая подготовка (ОФП/СФП)
-  TECHNIQUE        // Техника (работа с клюшкой)
-  COOLDOWN         // Заминка
+  WARMUP
+  FITNESS
+  TECHNIQUE
+  COOLDOWN
 }
 
-// Направление нагрузки (п.3 алгоритма)
 enum LoadDirection {
-  LIGHT            // Легкая нагрузка (RPE 2-4)
-  MEDIUM           // Средняя нагрузка (RPE 5-7)
-  HIGH             // Высокая нагрузка (RPE 8-10)
+  LIGHT
+  MEDIUM
+  HIGH
 }
 
-// Время последней тренировки (п.2 опрос)
 enum LastTrainingTime {
-  TODAY            // Сегодня
-  YESTERDAY        // Вчера
-  TWO_DAYS_AGO     // 2 дня назад
-  THREE_PLUS_DAYS  // 3+ дня назад
-  WEEK_PLUS        // Неделя+ назад
+  TODAY
+  YESTERDAY
+  TWO_DAYS_AGO
+  THREE_PLUS_DAYS
+  WEEK_PLUS
 }
 
-// Статус тренировки
 enum WorkoutStatus {
-  PENDING          // Создана, не начата
-  IN_PROGRESS      // Выполняется
-  COMPLETED        // Завершена
-  SKIPPED          // Пропущена
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
 }

@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Heart, MessageCircle, Share, Download, CheckCircle } from 'lucide-react';
 import TagsSection from '@/components/TagsSection';
 import BottomNavigation from '@/components/BottomNavigation';
@@ -46,6 +46,9 @@ interface VideoData {
 
 export default function VideoPage({ params }: VideoPageProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromWorkout = searchParams.get('fromWorkout') === 'true';
+  const sessionId = searchParams.get('sessionId');
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
@@ -124,6 +127,108 @@ export default function VideoPage({ params }: VideoPageProps) {
     };
     checkDownloadStatus();
   }, [videoId]);
+
+  // Отслеживание завершения видео (90% или конец)
+  const videoCompletedRef = useRef(false);
+  const lastProgressUpdateRef = useRef(0);
+
+  // Отмечаем начало видео в тренировке
+  useEffect(() => {
+    const notifyVideoStart = async () => {
+      if (fromWorkout && sessionId && videoId) {
+        try {
+          console.log('🎬 Starting video in workout:', { sessionId, videoId });
+          await fetch('/api/training/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId,
+              videoId,
+              action: 'start',
+            }),
+          });
+        } catch (error) {
+          console.error('Ошибка отметки начала видео:', error);
+        }
+      }
+    };
+
+    if (videoId) {
+      notifyVideoStart();
+      videoCompletedRef.current = false; // Сброс флага при новом видео
+    }
+  }, [videoId, fromWorkout, sessionId]);
+
+  // Отслеживание прогресса просмотра видео
+  const handleVideoProgress = useCallback(async (currentTime: number, duration: number) => {
+    if (!fromWorkout || !sessionId || !videoId || !duration) return;
+    
+    const progressPercent = (currentTime / duration) * 100;
+    
+    // Отправляем обновление прогресса каждые 5 секунд
+    const now = Date.now();
+    if (now - lastProgressUpdateRef.current > 5000) {
+      lastProgressUpdateRef.current = now;
+      
+      try {
+        await fetch('/api/training/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId,
+            videoId,
+            action: 'progress',
+            watchedDuration: Math.floor(currentTime),
+          }),
+        });
+      } catch (error) {
+        console.error('Ошибка обновления прогресса:', error);
+      }
+    }
+
+    // Проверяем достижение 90% или завершение видео
+    if (!videoCompletedRef.current && progressPercent >= 90) {
+      console.log('🎯 Video reached 90%, completing...', { currentTime, duration, progressPercent });
+      videoCompletedRef.current = true;
+      await completeVideoInWorkout();
+    }
+  }, [fromWorkout, sessionId, videoId]);
+
+  // Завершение видео в тренировке
+  const completeVideoInWorkout = async () => {
+    if (!fromWorkout || !sessionId || !videoId) {
+      console.log('⚠️ Cannot complete video - missing params:', { fromWorkout, sessionId, videoId });
+      return;
+    }
+    
+    try {
+      console.log('✅ Completing video in workout:', { sessionId, videoId });
+      const response = await fetch('/api/training/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          videoId,
+          action: 'complete',
+        }),
+      });
+
+      const data = await response.json();
+      console.log('📊 Video completed response:', data);
+
+      if (response.ok) {
+        // Возвращаем на страницу тренировки
+        console.log('🔄 Redirecting to workout page...');
+        setTimeout(() => {
+          router.push(`/training/workout?id=${sessionId}`);
+        }, 1000); // Небольшая задержка для плавности
+      } else {
+        console.error('❌ Failed to complete video:', data);
+      }
+    } catch (error) {
+      console.error('Ошибка завершения видео:', error);
+    }
+  };
 
   // Загружаем прямую ссылку для Kinescope видео
   useEffect(() => {
@@ -485,8 +590,16 @@ export default function VideoPage({ params }: VideoPageProps) {
 
   // Все обработчики событий видео (timeupdate, progress, canplay и т.д.) теперь inline на video элементе
 
-  const handleVideoEnded = () => {
+  const handleVideoEnded = async () => {
     setIsPlaying(false);
+    
+    // Завершаем видео в тренировке, если ещё не завершено
+    if (fromWorkout && sessionId && !videoCompletedRef.current) {
+      videoCompletedRef.current = true;
+      await completeVideoInWorkout();
+      return; // Не запускаем autoplay, возвращаемся к тренировке
+    }
+    
     if (autoplayEnabled && nextVideo) {
       // Показываем превью и запускаем обратный отсчёт
       startCountdown();
@@ -685,7 +798,15 @@ export default function VideoPage({ params }: VideoPageProps) {
   <header className={`flex items-center justify-between p-4 bg-[#101530] shadow-sm border-b border-gray-700 ${isLandscape ? 'hidden' : ''}`} style={{ paddingTop: '90px' }}>
         <div className="flex items-center space-x-2">
           <button 
-            onClick={() => autoplayEnabled ? router.push('/video') : router.back()} 
+            onClick={() => {
+              if (fromWorkout) {
+                router.push('/training/workout');
+              } else if (autoplayEnabled) {
+                router.push('/video');
+              } else {
+                router.back();
+              }
+            }} 
             className="text-white hover:text-gray-300"
           >
             <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
@@ -750,6 +871,11 @@ export default function VideoPage({ params }: VideoPageProps) {
                     const bufferedEnd = video.buffered.end(video.buffered.length - 1);
                     const bufferedPercent = (bufferedEnd / video.duration) * 100;
                     setBuffered(bufferedPercent);
+                  }
+
+                  // Отслеживаем прогресс для тренировки
+                  if (video.duration) {
+                    handleVideoProgress(video.currentTime, video.duration);
                   }
                 }}
                 onLoadedMetadata={(e) => {

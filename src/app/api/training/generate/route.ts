@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { LoadDirection, WorkoutStatus, ModuleType } from '@/generated/prisma';
+import { LoadDirection, WorkoutStatus } from '@/generated/prisma';
+import { ensureDevUser } from '@/lib/dev-user';
+
+// Маппинг русских названий типов модулей
+const MODULE_TYPE_MAP: Record<string, string> = {
+  'Разминка': 'WARMUP',
+  'ОФП': 'FITNESS',
+  'Техника': 'TECHNIQUE',
+  'Заминка': 'COOLDOWN',
+};
 
 /**
  * POST /api/training/generate
@@ -17,6 +26,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    
+    // DEV MODE: автоматически создаём пользователя, если его нет
+    await ensureDevUser(userId);
 
     // Получаем последнюю оценку состояния
     let assessment;
@@ -51,23 +63,27 @@ export async function POST(request: NextRequest) {
 
     const recentModuleIds = recentHistory.map((h) => h.moduleId);
 
-    // Подбираем модули по алгоритму
-    const selectedModules = await selectModulesForWorkout(
+    // Подбираем видео по алгоритму
+    const selectedVideos = await selectModulesForWorkout(
       assessment.loadDirection,
       assessment.recommendedRPE,
       assessment.availableTime,
-      recentModuleIds
+      recentModuleIds,
+      assessment // передаём assessment для определения статуса
     );
 
-    if (selectedModules.length === 0) {
+    if (selectedVideos.length === 0) {
       return NextResponse.json(
-        { error: 'Не удалось подобрать подходящие модули для тренировки' },
+        { error: 'Не удалось подобрать подходящие видео для тренировки' },
         { status: 404 }
       );
     }
 
-    // Создаем сессию тренировки
-    const workout = await prisma.workoutSession.create({
+    // Рассчитываем общую длительность
+    const totalDuration = selectedVideos.reduce((sum, v) => sum + v.duration, 0);
+
+    // Создаём тренировку в БД
+    const workoutSession = await prisma.workoutSession.create({
       data: {
         userId,
         assessmentId: assessment.id,
@@ -75,19 +91,22 @@ export async function POST(request: NextRequest) {
         targetRPE: assessment.recommendedRPE,
         loadDirection: assessment.loadDirection,
         status: WorkoutStatus.PENDING,
-        modules: {
-          create: selectedModules.map((module, index) => ({
-            moduleId: module.id,
+        totalVideos: selectedVideos.length,
+        currentVideoIndex: 0,
+        videos: {
+          create: selectedVideos.map((video, index) => ({
+            videoId: video.id,
             order: index,
+            completed: false,
           })),
         },
       },
       include: {
-        modules: {
+        videos: {
           include: {
-            module: {
+            video: {
               include: {
-                video: true,
+                trainer: true,
               },
             },
           },
@@ -96,27 +115,35 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Рассчитываем общую длительность
-    const totalDuration = selectedModules.reduce((sum, m) => sum + m.duration, 0);
+    console.log('✅ Workout session created:', workoutSession.id);
 
     return NextResponse.json({
       success: true,
       workout: {
-        id: workout.id,
-        targetDuration: workout.targetDuration,
+        id: workoutSession.id,
+        targetDuration: assessment.availableTime,
         actualDuration: Math.round(totalDuration / 60), // в минутах
-        targetRPE: workout.targetRPE,
-        loadDirection: workout.loadDirection,
-        modulesCount: selectedModules.length,
-        modules: workout.modules.map((wm) => ({
-          id: wm.module.id,
-          name: wm.module.name,
-          description: wm.module.description,
-          type: wm.module.type,
-          duration: wm.module.duration,
-          rpeRange: `${wm.module.rpeMin}-${wm.module.rpeMax}`,
-          video: wm.module.video,
-          order: wm.order,
+        targetRPE: assessment.recommendedRPE,
+        loadDirection: assessment.loadDirection,
+        status: workoutSession.status,
+        modulesCount: selectedVideos.length,
+        modules: workoutSession.videos.map((wsVideo) => ({
+          id: wsVideo.video.id,
+          title: wsVideo.video.title,
+          description: wsVideo.video.description,
+          типМодуля: wsVideo.video.типМодуля,
+          типНагрузки: wsVideo.video.типНагрузки,
+          duration: wsVideo.video.duration,
+          rpeRange: `${wsVideo.video.rpeМин}-${wsVideo.video.rpeМакс}`,
+          videoUrl: wsVideo.video.videoUrl,
+          thumbnail: wsVideo.video.thumbnail,
+          trainer: {
+            id: wsVideo.video.trainer.id,
+            name: wsVideo.video.trainer.name,
+            lastName: wsVideo.video.trainer.lastName,
+          },
+          order: wsVideo.order,
+          completed: wsVideo.completed,
         })),
       },
     });
@@ -130,90 +157,168 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Подбор модулей для тренировки
- * Алгоритм по документу:
- * 1. Разминка (WARMUP) - 1 модуль
- * 2. Физическая подготовка (FITNESS) - 1 модуль (стержневой)
- * 3. Техника (TECHNIQUE) - 1 модуль
- * 4. Заминка (COOLDOWN) - 1 модуль
+ * Подбор видео для тренировки
+ * Упрощённая версия: подбираем по типу модуля и RPE
  */
 async function selectModulesForWorkout(
   loadDirection: LoadDirection,
   targetRPE: number,
   availableTime: number,
-  excludeModuleIds: string[]
+  excludeModuleIds: string[],
+  assessment?: any
 ) {
-  const modules: any[] = [];
+  const videos: any[] = [];
 
-  // 1. РАЗМИНКА (обязательна)
-  const warmup = await prisma.trainingModule.findFirst({
+  // Определяем статус тренировки из assessment
+  const trainingStatus = getTrainingStatus(assessment);
+  
+  console.log('🎯 Selecting videos:', { loadDirection, targetRPE, trainingStatus });
+
+  // ШАГ 1: Подбираем РАЗМИНКУ
+  const warmup = await prisma.video.findFirst({
     where: {
-      type: ModuleType.WARMUP,
+      типМодуля: 'Разминка',
+      isPublished: true,
       id: { notIn: excludeModuleIds },
-      rpeMax: { lte: 5 }, // разминка всегда легкая
+      rpeМакс: { lte: 5 }, // разминка всегда легкая
+    },
+    include: {
+      trainer: true,
     },
     orderBy: { createdAt: 'desc' },
   });
 
   if (warmup) {
-    modules.push(warmup);
+    videos.push(warmup);
+    console.log('✅ Selected WARMUP:', {
+      title: warmup.title,
+      типНагрузки: warmup.типНагрузки,
+    });
   }
 
-  // 2. ФИЗИЧЕСКАЯ ПОДГОТОВКА (стержневой модуль)
-  // Подбираем по loadDirection и targetRPE
-  const fitness = await prisma.trainingModule.findFirst({
+  // ШАГ 2: Подбираем ОФП (основной модуль)
+  const fitness = await prisma.video.findFirst({
     where: {
-      type: ModuleType.FITNESS,
-      id: { notIn: [...excludeModuleIds, ...(warmup ? [warmup.id] : [])] },
-      rpeMin: { lte: targetRPE + 2 },
-      rpeMax: { gte: targetRPE - 2 },
+      типМодуля: 'ОФП',
+      isPublished: true,
+      id: { 
+        notIn: [
+          ...excludeModuleIds,
+          ...(warmup ? [warmup.id] : []),
+        ] 
+      },
+      rpeМин: { lte: targetRPE + 2 },
+      rpeМакс: { gte: targetRPE - 2 },
+    },
+    include: {
+      trainer: true,
     },
     orderBy: { createdAt: 'desc' },
   });
 
   if (fitness) {
-    modules.push(fitness);
+    videos.push(fitness);
+    console.log('✅ Selected FITNESS:', {
+      title: fitness.title,
+      типНагрузки: fitness.типНагрузки,
+      группаМышц: fitness.группаМышц,
+    });
   }
 
-  // 3. ТЕХНИКА
-  // Подбираем совместимую с физ подготовкой
-  const technique = await prisma.trainingModule.findFirst({
+  // ШАГ 3: Подбираем ТЕХНИКУ
+  const technique = await prisma.video.findFirst({
     where: {
-      type: ModuleType.TECHNIQUE,
+      типМодуля: 'Техника',
+      isPublished: true,
       id: { 
         notIn: [
           ...excludeModuleIds,
-          ...modules.map((m) => m.id),
+          ...videos.map((v) => v.id),
         ] 
       },
-      rpeMin: { lte: targetRPE + 2 },
-      rpeMax: { gte: targetRPE - 2 },
+      rpeМин: { lte: targetRPE + 2 },
+      rpeМакс: { gte: targetRPE - 2 },
+    },
+    include: {
+      trainer: true,
     },
     orderBy: { createdAt: 'desc' },
   });
 
   if (technique) {
-    modules.push(technique);
+    videos.push(technique);
+    console.log('✅ Selected TECHNIQUE:', {
+      title: technique.title,
+      типНагрузки: technique.типНагрузки,
+    });
   }
 
-  // 4. ЗАМИНКА (обязательна)
-  const cooldown = await prisma.trainingModule.findFirst({
+  // ШАГ 4: Подбираем ЗАМИНКУ
+  const cooldown = await prisma.video.findFirst({
     where: {
-      type: ModuleType.COOLDOWN,
+      типМодуля: 'Заминка',
+      isPublished: true,
       id: {
         notIn: [
           ...excludeModuleIds,
-          ...modules.map((m) => m.id),
+          ...videos.map((v) => v.id),
         ],
       },
-      rpeMax: { lte: 4 }, // заминка всегда легкая
+      rpeМакс: { lte: 5 }, // заминка легкая (до 5 RPE)
+    },
+    include: {
+      trainer: true,
     },
     orderBy: { createdAt: 'desc' },
   });
 
   if (cooldown) {
-    modules.push(cooldown);
+    videos.push(cooldown);
+    console.log('✅ Selected COOLDOWN:', {
+      title: cooldown.title,
+      типНагрузки: cooldown.типНагрузки,
+    });
+  } else {
+    console.log('⚠️ COOLDOWN (Заминка) не найдена!');
   }
 
-  return modules;
+  console.log(`📊 Итого подобрано видео: ${videos.length}`);
+  return videos;
+}
+
+/**
+ * Определяет статус тренировки из assessment
+ */
+function getTrainingStatus(assessment?: any): 'RECOVERY' | 'DEVELOPMENT' | 'PEAK' {
+  if (!assessment) {
+    return 'DEVELOPMENT'; // по умолчанию
+  }
+
+  // Используем формулу из п.5
+  let freshnessCoefficient = 1;
+  switch (assessment.lastTrainingTime) {
+    case 'TODAY':
+      freshnessCoefficient = 1;
+      break;
+    case 'YESTERDAY':
+      freshnessCoefficient = 2;
+      break;
+    case 'TWO_DAYS_AGO':
+    case 'THREE_PLUS_DAYS':
+      freshnessCoefficient = 3;
+      break;
+    case 'WEEK_PLUS':
+      freshnessCoefficient = 1;
+      break;
+  }
+
+  const readinessLevel = freshnessCoefficient + assessment.energyLevel;
+
+  if (readinessLevel >= 2 && readinessLevel <= 6) {
+    return 'RECOVERY';
+  } else if (readinessLevel >= 7 && readinessLevel <= 10) {
+    return 'DEVELOPMENT';
+  } else {
+    return 'PEAK';
+  }
 }

@@ -1,7 +1,7 @@
 // Service Worker для PWA
-const CACHE_NAME = 'trenki-v1';
-const RUNTIME_CACHE = 'trenki-runtime-v1';
-const VIDEO_CACHE_NAME = 'trenki-videos-v1';
+const CACHE_NAME = 'trenki-v2';
+const RUNTIME_CACHE = 'trenki-runtime-v2';
+const VIDEO_CACHE_NAME = 'trenki-videos-v2';
 
 // Ресурсы для кэширования при установке
 const STATIC_CACHE_URLS = [
@@ -56,6 +56,11 @@ self.addEventListener('fetch', (event) => {
   // Пропускаем API запросы к внешним сервисам (кроме видео)
   if (url.hostname.includes('telegram.org') ||
       url.hostname.includes('prisma-data.net')) {
+    return;
+  }
+
+  // Пропускаем внутренние API запросы - они должны идти напрямую без кэширования
+  if (url.pathname.startsWith('/api/')) {
     return;
   }
 

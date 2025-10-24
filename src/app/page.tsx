@@ -9,6 +9,7 @@ import { useTelegram } from '../hooks/useTelegram';
 import { apiCache } from '../lib/cache';
 import { getTelegramId } from '@/lib/auth';
 import BottomNavigation from '@/components/BottomNavigation';
+import WorkoutReminder from '@/components/WorkoutReminder';
 
 // Компонент для короткого видео
 interface ShortVideoPlayerProps {
@@ -82,6 +83,11 @@ const HomePage = () => {
   return (
     <div className="bg-[#060919] min-h-screen text-white pb-32">
       <Header />
+      
+      {/* Напоминание о незавершенной тренировке */}
+      <div className="px-4 mt-4">
+        <WorkoutReminder />
+      </div>
       
       {/* Секция с короткими видео (треньки) */}
       <TrenkiSection />

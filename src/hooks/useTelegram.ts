@@ -89,6 +89,31 @@ export const useTelegram = () => {
           setUser(userData);
         } else {
           console.log('⚠️ No user found in storage');
+          
+          // DEV MODE: Если в режиме разработки и нет пользователя, создаём тестового
+          if (process.env.NODE_ENV === 'development' && !isTelegramApp) {
+            let devTelegramId = localStorage.getItem('dev_telegram_id');
+            
+            if (!devTelegramId) {
+              devTelegramId = `dev_${Date.now()}`;
+              localStorage.setItem('dev_telegram_id', devTelegramId);
+              console.log('🔧 DEV MODE: Created new test user ID:', devTelegramId);
+            } else {
+              console.log('🔧 DEV MODE: Using existing test user ID:', devTelegramId);
+            }
+            
+            const devUser = {
+              id: devTelegramId,
+              telegramId: devTelegramId,
+              firstName: 'Dev',
+              lastName: 'User',
+              username: 'dev_user',
+              needsOnboarding: false,
+            };
+            
+            setUser(devUser);
+            console.log('🔧 DEV MODE: Loaded test user:', devUser);
+          }
         }
         
         setIsLoading(false);

@@ -21,7 +21,14 @@ export async function PUT(
       tags,
       equipment,
       level,
-      isPublished 
+      isPublished,
+      // Новые поля для алгоритма
+      типМодуля,
+      типНагрузки,
+      группаМышц,
+      сложность,
+      rpeМин,
+      rpeМакс,
     } = body;
 
     if (!title || !videoUrl || !category || !difficulty || !trainerId) {
@@ -29,6 +36,10 @@ export async function PUT(
         error: 'title, videoUrl, category, difficulty, and trainerId are required' 
       }, { status: 400 });
     }
+
+        // Преобразуем RPE в числа
+    const rpeМинNum = rpeМин ? parseInt(rpeМин.toString()) : null;
+    const rpeМаксNum = rpeМакс ? parseInt(rpeМакс.toString()) : null;
 
     // Обновляем видео
     const video = await prisma.video.update({
@@ -46,6 +57,13 @@ export async function PUT(
         equipment: equipment || [],
         level: level || '',
         isPublished: isPublished !== undefined ? isPublished : true,
+        // Поля для алгоритма
+        типМодуля: типМодуля || null,
+        типНагрузки: типНагрузки || null,
+        группаМышц: группаМышц || null,
+        сложность: сложность || null,
+        rpeМин: rpeМинNum,
+        rpeМакс: rpeМаксNum,
       },
       include: {
         trainer: {
