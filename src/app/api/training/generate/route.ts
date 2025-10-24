@@ -174,13 +174,13 @@ async function selectModulesForWorkout(
   
   console.log('🎯 Selecting videos:', { loadDirection, targetRPE, trainingStatus });
 
-  // ШАГ 1: Подбираем РАЗМИНКУ
+  // ШАГ 1: Подбираем РАЗМИНКУ (любое видео с низким RPE)
   const warmup = await prisma.video.findFirst({
     where: {
-      типМодуля: 'Разминка',
       isPublished: true,
       id: { notIn: excludeModuleIds },
       rpeМакс: { lte: 5 }, // разминка всегда легкая
+      category: { in: ['GENERAL', 'TECHNIQUE', 'SKATING'] }, // подходящие для разминки
     },
     include: {
       trainer: true,
@@ -192,15 +192,16 @@ async function selectModulesForWorkout(
     videos.push(warmup);
     console.log('✅ Selected WARMUP:', {
       title: warmup.title,
-      типНагрузки: warmup.типНагрузки,
+      category: warmup.category,
+      difficulty: warmup.difficulty,
     });
   }
 
-  // ШАГ 2: Подбираем ОФП (основной модуль)
+  // ШАГ 2: Подбираем ОФП (основной модуль - силовые или выносливость)
   const fitness = await prisma.video.findFirst({
     where: {
-      типМодуля: 'ОФП',
       isPublished: true,
+      category: { in: ['STRENGTH', 'ENDURANCE', 'POWER_PLAY'] }, // ОФП категории
       id: { 
         notIn: [
           ...excludeModuleIds,
@@ -220,16 +221,16 @@ async function selectModulesForWorkout(
     videos.push(fitness);
     console.log('✅ Selected FITNESS:', {
       title: fitness.title,
-      типНагрузки: fitness.типНагрузки,
-      группаМышц: fitness.группаМышц,
+      category: fitness.category,
+      difficulty: fitness.difficulty,
     });
   }
 
-  // ШАГ 3: Подбираем ТЕХНИКУ
+    // ШАГ 3: Подбираем ТЕХНИКУ
   const technique = await prisma.video.findFirst({
     where: {
-      типМодуля: 'Техника',
       isPublished: true,
+      category: { in: ['TECHNIQUE', 'SKATING', 'SHOOTING', 'PASSING', 'CHECKING'] }, // Технические категории
       id: { 
         notIn: [
           ...excludeModuleIds,
@@ -249,15 +250,16 @@ async function selectModulesForWorkout(
     videos.push(technique);
     console.log('✅ Selected TECHNIQUE:', {
       title: technique.title,
-      типНагрузки: technique.типНагрузки,
+      category: technique.category,
+      difficulty: technique.difficulty,
     });
   }
 
-  // ШАГ 4: Подбираем ЗАМИНКУ
+  // ШАГ 4: Подбираем ЗАМИНКУ (легкое видео для завершения)
   const cooldown = await prisma.video.findFirst({
     where: {
-      типМодуля: 'Заминка',
       isPublished: true,
+      category: { in: ['GENERAL', 'TECHNIQUE'] }, // Легкие категории для заминки
       id: {
         notIn: [
           ...excludeModuleIds,
@@ -276,7 +278,8 @@ async function selectModulesForWorkout(
     videos.push(cooldown);
     console.log('✅ Selected COOLDOWN:', {
       title: cooldown.title,
-      типНагрузки: cooldown.типНагрузки,
+      category: cooldown.category,
+      difficulty: cooldown.difficulty,
     });
   } else {
     console.log('⚠️ COOLDOWN (Заминка) не найдена!');
