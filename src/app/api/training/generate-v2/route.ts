@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { LoadDirection, VideoDifficulty, LoadType } from '@/generated/prisma/client';
+import { LoadDirection, VideoDifficulty, LoadType, WorkoutStatus } from '@/generated/prisma/client';
 
 /**
  * НОВЫЙ АЛГОРИТМ ГЕНЕРАЦИИ ТРЕНИРОВОК v2.0
@@ -88,9 +88,43 @@ export async function POST(request: NextRequest) {
       availableTime: availableTime || 45,
     });
 
+    // Если нет модулей, возвращаем ошибку
+    if (!workout.modules || workout.modules.length === 0) {
+      return NextResponse.json({
+        error: 'No suitable videos found for workout generation',
+        suggestion: 'Try different difficulty level or add more videos to the database'
+      }, { status: 404 });
+    }
+
+    // Создаём WorkoutSession в БД
+    const workoutSession = await prisma.workoutSession.create({
+      data: {
+        userId: user.id, // Используем внутренний ID пользователя
+        targetDuration: availableTime || 45,
+        targetRPE: 5, // Средний RPE для LoadType системы
+        loadDirection: loadDirection as LoadDirection,
+        status: WorkoutStatus.PENDING,
+        totalVideos: workout.modules.length,
+        currentVideoIndex: 0,
+        videos: {
+          create: workout.modules.map((module: any, index: number) => ({
+            videoId: module.id,
+            order: index,
+            completed: false,
+          })),
+        },
+      },
+    });
+
+    console.log('✅ WorkoutSession created:', workoutSession.id);
+
     return NextResponse.json({
       success: true,
-      workout,
+      workoutId: workoutSession.id,
+      workout: {
+        id: workoutSession.id,
+        ...workout,
+      },
       meta: {
         focusArea: weakest,
         difficulty: loadDirection,
