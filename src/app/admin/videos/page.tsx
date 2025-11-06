@@ -410,18 +410,18 @@ const AdminVideosPage = () => {
                     <p className="text-sm font-bold text-white">
                       {(() => {
                         const charMap: any = {
-                          'Сила': '💪 Силу',
-                          'Мощность': '💪 Силу',
-                          'Скорость': '⚡ Скорость',
-                          'Силовая выносливость': '🫀 Выносливость',
-                          'Анаэробная выносливость': '🫀 Выносливость',
-                          'Аэробная выносливость': '🫀 Выносливость',
-                          'Ловкость': '🎯 Технику',
-                          'Мобильность': '🤸 Гибкость',
-                          'Техника': '🎯 Технику',
-                          'Статическая растяжка': '🤸 Гибкость',
-                          'Динамическая растяжка': '🤸 Гибкость',
-                          'ЛФК': '🤸 Гибкость',
+                          'MAX_STRENGTH': '💪 Силу',
+                          'POWER': '💪 Силу',
+                          'SPEED': '⚡ Скорость',
+                          'STRENGTH_ENDURANCE': '🫀 Выносливость',
+                          'ANAEROBIC_ENDURANCE': '🫀 Выносливость',
+                          'AEROBIC_ENDURANCE': '🫀 Выносливость',
+                          'AGILITY': '🎯 Технику',
+                          'MOBILITY': '🤸 Гибкость',
+                          'TECHNICAL_SKILL': '🎯 Технику',
+                          'STATIC_STRETCH': '🤸 Гибкость',
+                          'DYNAMIC_STRETCH': '🤸 Гибкость',
+                          'PREHAB': '🤸 Гибкость',
                         };
                         return charMap[formData.типНагрузки] || '—';
                       })()}
@@ -662,24 +662,24 @@ const AdminVideosPage = () => {
                       >
                         <option value="">⚠️ Выберите тип нагрузки</option>
                         <optgroup label="💪 Сила и мощность">
-                          <option value="Сила">Максимальная сила</option>
-                          <option value="Мощность">Мощность</option>
-                          <option value="Скорость">Скорость</option>
+                          <option value="MAX_STRENGTH">Максимальная сила</option>
+                          <option value="POWER">Мощность</option>
+                          <option value="SPEED">Скорость</option>
                         </optgroup>
                         <optgroup label="🫀 Выносливость">
-                          <option value="Силовая выносливость">Силовая выносливость</option>
-                          <option value="Анаэробная выносливость">Анаэробная выносливость</option>
-                          <option value="Аэробная выносливость">Аэробная выносливость</option>
+                          <option value="STRENGTH_ENDURANCE">Силовая выносливость</option>
+                          <option value="ANAEROBIC_ENDURANCE">Анаэробная выносливость</option>
+                          <option value="AEROBIC_ENDURANCE">Аэробная выносливость</option>
                         </optgroup>
                         <optgroup label="🎯 Функциональные качества">
-                          <option value="Ловкость">Ловкость</option>
-                          <option value="Мобильность">Мобильность</option>
-                          <option value="Техника">Технические навыки</option>
+                          <option value="AGILITY">Ловкость</option>
+                          <option value="MOBILITY">Мобильность</option>
+                          <option value="TECHNICAL_SKILL">Технические навыки</option>
                         </optgroup>
                         <optgroup label="🤸 Восстановление">
-                          <option value="Статическая растяжка">Статическая растяжка</option>
-                          <option value="Динамическая растяжка">Динамическая растяжка</option>
-                          <option value="ЛФК">ЛФК (профилактика травм)</option>
+                          <option value="STATIC_STRETCH">Статическая растяжка</option>
+                          <option value="DYNAMIC_STRETCH">Динамическая растяжка</option>
+                          <option value="PREHAB">ЛФК (профилактика травм)</option>
                         </optgroup>
                       </select>
                       <p className="text-sm text-purple-200 mt-2 font-medium">
@@ -707,7 +707,7 @@ const AdminVideosPage = () => {
                             gains: { char: string; multiplier: number }[];
                           } 
                         } = {
-                          'Сила': { 
+                          'MAX_STRENGTH': { 
                             char: 'Сила', 
                             emoji: '💪', 
                             description: 'Развивает максимальную силу мышц',
@@ -716,7 +716,7 @@ const AdminVideosPage = () => {
                               { char: 'Сила', multiplier: 1.5 }
                             ]
                           },
-                          'Мощность': { 
+                          'POWER': { 
                             char: 'Сила', 
                             emoji: '💪', 
                             description: 'Развивает взрывную силу и мощность',
@@ -726,7 +726,7 @@ const AdminVideosPage = () => {
                               { char: 'Скорость', multiplier: 0.75 }
                             ]
                           },
-                          'Скорость': { 
+                          'SPEED': { 
                             char: 'Скорость', 
                             emoji: '⚡', 
                             description: 'Развивает скоростные качества',
@@ -736,7 +736,7 @@ const AdminVideosPage = () => {
                               { char: 'Выносливость', multiplier: 1.5 }
                             ]
                           },
-                          'Силовая выносливость': { 
+                          'STRENGTH_ENDURANCE': { 
                             char: 'Выносливость', 
                             emoji: '🫀', 
                             description: 'Развивает силовую выносливость',
@@ -745,7 +745,7 @@ const AdminVideosPage = () => {
                               { char: 'Выносливость', multiplier: 1.5 }
                             ]
                           },
-                          'Анаэробная выносливость': { 
+                          'ANAEROBIC_ENDURANCE': { 
                             char: 'Выносливость', 
                             emoji: '🫀', 
                             description: 'Развивает анаэробную выносливость',
@@ -754,7 +754,7 @@ const AdminVideosPage = () => {
                               { char: 'Выносливость', multiplier: 1.5 }
                             ]
                           },
-                          'Аэробная выносливость': { 
+                          'AEROBIC_ENDURANCE': { 
                             char: 'Выносливость', 
                             emoji: '🫀', 
                             description: 'Развивает аэробную выносливость',
@@ -763,7 +763,7 @@ const AdminVideosPage = () => {
                               { char: 'Выносливость', multiplier: 1.5 }
                             ]
                           },
-                          'Ловкость': { 
+                          'AGILITY': { 
                             char: 'Техника', 
                             emoji: '🎯', 
                             description: 'Развивает ловкость и координацию',
@@ -772,7 +772,7 @@ const AdminVideosPage = () => {
                               { char: 'Техника', multiplier: 1.5 }
                             ]
                           },
-                          'Мобильность': { 
+                          'MOBILITY': { 
                             char: 'Гибкость', 
                             emoji: '🤸', 
                             description: 'Улучшает подвижность суставов',
@@ -782,7 +782,7 @@ const AdminVideosPage = () => {
                               { char: 'Техника', multiplier: 0.75 }
                             ]
                           },
-                          'Техника': { 
+                          'TECHNICAL_SKILL': { 
                             char: 'Техника', 
                             emoji: '🎯', 
                             description: 'Совершенствует технические навыки',
@@ -791,7 +791,7 @@ const AdminVideosPage = () => {
                               { char: 'Техника', multiplier: 1.5 }
                             ]
                           },
-                          'Статическая растяжка': { 
+                          'STATIC_STRETCH': { 
                             char: 'Гибкость', 
                             emoji: '🤸', 
                             description: 'Улучшает гибкость через статическую растяжку',
@@ -801,7 +801,7 @@ const AdminVideosPage = () => {
                               { char: 'Техника', multiplier: 0.75 }
                             ]
                           },
-                          'Динамическая растяжка': { 
+                          'DYNAMIC_STRETCH': { 
                             char: 'Гибкость', 
                             emoji: '🤸', 
                             description: 'Улучшает гибкость через динамическую растяжку',
@@ -811,7 +811,7 @@ const AdminVideosPage = () => {
                               { char: 'Техника', multiplier: 0.75 }
                             ]
                           },
-                          'ЛФК': { 
+                          'PREHAB': { 
                             char: 'Гибкость', 
                             emoji: '🤸', 
                             description: 'Профилактика травм и восстановление',

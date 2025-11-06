@@ -71,22 +71,8 @@ export async function PUT(
     if (body.типНагрузки) {
       console.log('Updating LoadType tag for:', body.типНагрузки);
       
-      // Маппинг типов нагрузки на LoadType enum (из prisma/schema.prisma)
-      const loadTypeMapping: { [key: string]: string } = {
-        'Сила': 'MAX_STRENGTH',
-        'Мощность': 'POWER',
-        'Скорость': 'SPEED',
-        'Силовая выносливость': 'STRENGTH_ENDURANCE',
-        'Анаэробная выносливость': 'ANAEROBIC_ENDURANCE',
-        'Аэробная выносливость': 'AEROBIC_ENDURANCE',
-        'Ловкость': 'AGILITY',
-        'Мобильность': 'MOBILITY',
-        'Техника': 'TECHNICAL_SKILL',
-        'Статическая растяжка': 'STATIC_STRETCH',
-        'Динамическая растяжка': 'DYNAMIC_STRETCH',
-      };
-
-      const loadTypeEnum = loadTypeMapping[body.типНагрузки];
+      // Теперь типНагрузки приходит уже в формате enum (MAX_STRENGTH, POWER, etc)
+      const loadTypeEnum = body.типНагрузки;
       
       if (loadTypeEnum) {
         // Удаляем старые LoadType теги
