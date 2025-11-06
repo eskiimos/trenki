@@ -216,7 +216,8 @@ async function buildWorkout(params: {
   // 2. ОСНОВНАЯ ЧАСТЬ (20-30 минут) - Развиваем СЛАБУЮ характеристику
   const mainLoadTypes = getMainLoadTypes(weakest);
   
-  const mainWorkout: any = await prisma.video.findFirst({
+  // Пытаемся найти идеальное видео (20-30 минут, нужный LoadType)
+  let mainWorkout: any = await prisma.video.findFirst({
     where: {
       isPublished: true,
       difficulty: { in: allowedDifficulties },
@@ -251,6 +252,45 @@ async function buildWorkout(params: {
     },
     orderBy: { createdAt: 'desc' }
   });
+
+  // Если не нашли идеальное видео, берём любое с LoadType (кроме WARMUP/COOLDOWN типов)
+  if (!mainWorkout) {
+    console.log('⚠️ Не найдено идеальное видео для MAIN, ищем запасной вариант...');
+    mainWorkout = await prisma.video.findFirst({
+      where: {
+        isPublished: true,
+        difficulty: { in: allowedDifficulties },
+        duration: { gte: 300 }, // хотя бы 5 минут
+        id: { notIn: modules.map((m: any) => m.id) },
+        videoTags: {
+          some: {
+            tag: {
+              tagType: 'LOAD',
+              loadType: { 
+                notIn: [LoadType.STATIC_STRETCH, LoadType.PREHAB] // Исключаем только типы для заминки
+              }
+            }
+          }
+        }
+      },
+      include: {
+        trainer: {
+          select: {
+            id: true,
+            name: true,
+            lastName: true,
+            avatar: true,
+          }
+        },
+        videoTags: {
+          include: {
+            tag: true
+          }
+        }
+      },
+      orderBy: { duration: 'desc' } // Берём самое длинное
+    });
+  }
 
   if (mainWorkout) {
     modules.push({
