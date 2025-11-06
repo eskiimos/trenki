@@ -367,6 +367,17 @@ async function buildWorkout(params: {
     totalDuration += cooldown.duration;
   }
 
+  // Проверяем, что у нас есть хотя бы 1 модуль
+  if (modules.length === 0) {
+    throw new Error('No suitable videos found for workout generation. Try different difficulty level or add more videos to the database.');
+  }
+
+  console.log(`✅ Собрано модулей: ${modules.length}`, {
+    warmup: warmup?.title || '❌ Не найдена',
+    main: mainWorkout?.title || '❌ Не найдена', 
+    cooldown: cooldown?.title || '❌ Не найдена'
+  });
+
   return {
     modules,
     totalDuration,
