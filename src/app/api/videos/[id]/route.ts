@@ -24,6 +24,9 @@ export async function PUT(
       isPublished,
       rpeМин,
       rpeМакс,
+      типМодуля,
+      сложность,
+      группаМышц,
     } = body;
 
     if (!title || !videoUrl || !category || !difficulty || !trainerId) {
@@ -54,6 +57,9 @@ export async function PUT(
         isPublished: isPublished !== undefined ? isPublished : true,
         rpeМин: rpeМинNum,
         rpeМакс: rpeМаксNum,
+        moduleType: типМодуля || null,
+        complexity: сложность || null,
+        muscleGroup: группаМышц || null,
       },
       include: {
         trainer: {

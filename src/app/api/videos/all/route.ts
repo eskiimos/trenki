@@ -63,6 +63,10 @@ export async function GET(request: NextRequest) {
       rpeМакс: video.rpeМакс,
       // Добавляем LoadType для обратной совместимости с админкой
       типНагрузки: getLoadType(video.videoTags),
+      // Новые поля для алгоритма
+      типМодуля: video.moduleType,
+      сложность: video.complexity,
+      группаМышц: video.muscleGroup,
     }));    return NextResponse.json({ videos: formattedVideos });
   } catch (error) {
     console.error('Error fetching all videos:', error);

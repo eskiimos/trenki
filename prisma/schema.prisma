@@ -115,16 +115,12 @@ model Video {
   likesCount      Int                   @default(0)
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
-  rpeМакс     Int?
-  rpeМин       Int?
-  /// This field was commented out because of an invalid name. Please provide a valid one that matches [a-zA-Z][a-zA-Z0-9_]*
-  // группаМышц String?
-  /// This field was commented out because of an invalid name. Please provide a valid one that matches [a-zA-Z][a-zA-Z0-9_]*
-  // сложность String?
-  /// This field was commented out because of an invalid name. Please provide a valid one that matches [a-zA-Z][a-zA-Z0-9_]*
-  // типМодуля String?
-  /// This field was commented out because of an invalid name. Please provide a valid one that matches [a-zA-Z][a-zA-Z0-9_]*
-  // типНагрузки String?
+  rpeМакс         Int?
+  rpeМин          Int?
+  muscleGroup     String?           @map("группаМышц")
+  complexity      String?           @map("сложность")
+  moduleType      String?           @map("типМодуля")
+  loadTypeOld     String?           @map("типНагрузки")
   favorites       FavoriteVideo[]
   trainingModules TrainingModule[]
   sessions        TrainingSession[]

@@ -101,6 +101,9 @@ export async function POST(request: NextRequest) {
       isPublished,
       rpeМин,
       rpeМакс,
+      типМодуля,
+      сложность,
+      группаМышц,
     } = body;
 
     if (!title || !videoUrl || !category || !difficulty || !trainerId) {
@@ -134,6 +137,9 @@ export async function POST(request: NextRequest) {
         isPublished: isPublished ?? false,
         rpeМин: rpeМинNum,
         rpeМакс: rpeМаксNum,
+        moduleType: типМодуля || null,
+        complexity: сложность || null,
+        muscleGroup: группаМышц || null,
       },
       include: {
         trainer: true
