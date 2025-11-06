@@ -72,11 +72,11 @@ export async function POST(request: NextRequest) {
     // Определяем сложность на основе loadDirection
     const difficultyMap: Record<LoadDirection, VideoDifficulty[]> = {
       [LoadDirection.LIGHT]: [VideoDifficulty.BEGINNER, VideoDifficulty.INTERMEDIATE],
-      [LoadDirection.MEDIUM]: [VideoDifficulty.INTERMEDIATE, VideoDifficulty.ADVANCED],
-      [LoadDirection.HIGH]: [VideoDifficulty.ADVANCED, VideoDifficulty.EXPERT],
+      [LoadDirection.MEDIUM]: [VideoDifficulty.BEGINNER, VideoDifficulty.INTERMEDIATE, VideoDifficulty.ADVANCED],
+      [LoadDirection.HIGH]: [VideoDifficulty.INTERMEDIATE, VideoDifficulty.ADVANCED, VideoDifficulty.EXPERT],
     };
 
-    const allowedDifficulties = difficultyMap[loadDirection as LoadDirection] || [VideoDifficulty.INTERMEDIATE];
+    const allowedDifficulties = difficultyMap[loadDirection as LoadDirection] || [VideoDifficulty.BEGINNER, VideoDifficulty.INTERMEDIATE];
 
     // Формируем тренировку: РАЗМИНКА → ОСНОВНАЯ ЧАСТЬ → ЗАМИНКА
     const workout = await buildWorkout({
