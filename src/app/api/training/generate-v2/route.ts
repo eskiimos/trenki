@@ -21,24 +21,33 @@ export async function POST(request: NextRequest) {
 
     console.log('🎯 Generating workout with LoadType algorithm:', { userId, loadDirection, availableTime });
 
-    // Загружаем профиль пользователя с характеристиками
-    const profile = await prisma.profile.findUnique({
-      where: { userId },
-      select: {
-        ratingPower: true,
-        ratingSpeed: true,
-        ratingEndurance: true,
-        ratingTechnique: true,
-        ratingFlexibility: true,
-        potential: true,
-        modulesToday: true,
-        trainingsToday: true,
+    // Находим пользователя по telegramId
+    const user = await prisma.user.findUnique({
+      where: { telegramId: userId },
+      include: {
+        profile: {
+          select: {
+            ratingPower: true,
+            ratingSpeed: true,
+            ratingEndurance: true,
+            ratingTechnique: true,
+            ratingFlexibility: true,
+            potential: true,
+            modulesToday: true,
+            trainingsToday: true,
+          }
+        }
       }
     });
 
-    if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    if (!user || !user.profile) {
+      return NextResponse.json({ 
+        error: 'Profile not found. Please complete the onboarding survey first.',
+        redirectTo: '/onboarding/characteristics'
+      }, { status: 404 });
     }
+
+    const profile = user.profile;
 
     // Анализируем характеристики: находим слабую и сильную
     const characteristics = {

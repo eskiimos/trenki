@@ -97,6 +97,14 @@ export default function TrainingAssessmentPage() {
           router.push('/training/workout');
         } else {
           console.error('❌ Generate error:', generateData.error);
+          
+          // Если профиль не найден, редиректим на стартовый опрос
+          if (generateData.redirectTo) {
+            alert('Пожалуйста, пройди стартовый опрос для определения твоих характеристик');
+            router.push(generateData.redirectTo);
+            return;
+          }
+          
           alert('Ошибка генерации тренировки: ' + generateData.error);
         }
       } else {
