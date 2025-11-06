@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTelegram } from '@/hooks/useTelegram';
+import CharacteristicsGainModal from '@/components/CharacteristicsGainModal';
+import Toast from '@/components/Toast';
 
 interface WorkoutModule {
   id: string;
@@ -51,6 +53,14 @@ export default function WorkoutPage() {
   const [showInfoBlock, setShowInfoBlock] = useState(true);
   const [isClosing, setIsClosing] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
+  
+  // Состояние для модалки прироста характеристик
+  const [showGainsModal, setShowGainsModal] = useState(false);
+  const [characteristicsGains, setCharacteristicsGains] = useState<any>(null);
+  const [newCharacteristics, setNewCharacteristics] = useState<any>(null);
+  
+  // Состояние для Toast уведомлений
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
 
   useEffect(() => {
     if (webApp) {
@@ -164,18 +174,55 @@ export default function WorkoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId: workout?.id,
-          userId: user?.id,
+          userId: user?.id?.toString(),
         }),
       });
 
       if (response.ok) {
-        console.log('✅ Workout completed successfully');
-        // Перенаправляем на главную страницу или страницу истории тренировок
-        router.push('/');
+        const data = await response.json();
+        console.log('✅ Workout completed successfully', data);
+        
+        // Проверяем, есть ли прирост характеристик
+        if (data.success && data.gains && data.newCharacteristics) {
+          // Показываем модалку прироста
+          setCharacteristicsGains(data.gains);
+          setNewCharacteristics(data.newCharacteristics);
+          setShowGainsModal(true);
+        } else if (data.limitReached) {
+          // Показываем Toast о лимите
+          setToast({
+            message: data.error || 'Достигнут дневной лимит тренировок. Приходи завтра! 💪',
+            type: 'warning'
+          });
+          setTimeout(() => router.push('/'), 3000);
+        } else {
+          // Просто перенаправляем
+          setToast({ message: '✨ Тренировка завершена!', type: 'success' });
+          setTimeout(() => router.push('/'), 2000);
+        }
+      } else {
+        const errorData = await response.json();
+        console.error('❌ Error response:', errorData);
+        
+        if (errorData.limitReached) {
+          setToast({
+            message: errorData.error || 'Достигнут дневной лимит тренировок. Приходи завтра! 💪',
+            type: 'warning'
+          });
+        } else {
+          setToast({ message: 'Ошибка при завершении тренировки', type: 'error' });
+        }
       }
     } catch (error) {
       console.error('❌ Error completing workout:', error);
+      setToast({ message: 'Ошибка при завершении тренировки', type: 'error' });
     }
+  };
+  
+  // Закрытие модалки прироста и переход на главную
+  const handleGainsModalClose = () => {
+    setShowGainsModal(false);
+    router.push('/');
   };
 
   if (isLoading) {
@@ -672,6 +719,24 @@ export default function WorkoutPage() {
             </button>
           </div>
         </div>
+      )}
+      
+      {/* Модалка прироста характеристик */}
+      {showGainsModal && characteristicsGains && newCharacteristics && (
+        <CharacteristicsGainModal
+          gains={characteristicsGains}
+          newCharacteristics={newCharacteristics}
+          onClose={handleGainsModalClose}
+        />
+      )}
+      
+      {/* Toast уведомления */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );

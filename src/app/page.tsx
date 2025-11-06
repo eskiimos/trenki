@@ -754,19 +754,21 @@ const TrainersSection = () => {
                 display: 'inline-flex'
             }}>
                 {trainers.map((trainer) => (
-                  <div key={trainer.id} style={{
-                    width: '50%', 
-                    height: 202, 
-                    paddingBottom: 8, 
-                    background: '#060919', 
-                    overflow: 'hidden', 
-                    borderRadius: 8, 
-                    flexDirection: 'column', 
-                    justifyContent: 'flex-start', 
-                    alignItems: 'flex-start', 
-                    display: 'inline-flex'
-                }}>
+                  <Link key={trainer.id} href={`/trainers/${trainer.id}`}>
                     <div style={{
+                      width: '50%', 
+                      height: 202, 
+                      paddingBottom: 8, 
+                      background: '#060919', 
+                      overflow: 'hidden', 
+                      borderRadius: 8, 
+                      flexDirection: 'column', 
+                      justifyContent: 'flex-start', 
+                      alignItems: 'flex-start', 
+                      display: 'inline-flex',
+                      cursor: 'pointer'
+                    }}>
+                      <div style={{
                         width: '100%', 
                         height: 112, 
                         position: 'relative', 
@@ -879,7 +881,8 @@ const TrainersSection = () => {
                             letterSpacing: 0.50
                         }}>{trainer.speciality}</div>
                     </div>
-                </div>
+                  </div>
+                  </Link>
                 ))}
             </div>
         </div>

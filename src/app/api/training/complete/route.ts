@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { WorkoutStatus } from '@/generated/prisma';
+import { 
+  calculateWorkoutGains, 
+  calculatePotential,
+  CharacteristicType 
+} from '@/lib/characteristics';
 
 /**
  * POST /api/training/complete
- * Завершает тренировку и обновляет статус
+ * Завершает тренировку, обновляет статус и рассчитывает прогресс за всю тренировку
  */
 export async function POST(request: NextRequest) {
   try {
@@ -22,7 +27,19 @@ export async function POST(request: NextRequest) {
     const session = await prisma.workoutSession.findUnique({
       where: { id: sessionId },
       include: {
-        videos: true,
+        videos: {
+          include: {
+            video: {
+              include: {
+                videoTags: {
+                  include: {
+                    tag: true,
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -49,6 +66,103 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Находим пользователя с профилем
+    const user = await prisma.user.findFirst({
+      where: { id: session.userId },
+      include: { profile: true },
+    });
+
+    if (!user || !user.profile) {
+      return NextResponse.json(
+        { error: 'Профиль пользователя не найден' },
+        { status: 404 }
+      );
+    }
+
+    // Собираем все теги LoadType из всех видео тренировки
+    const moduleTags = session.videos.map(wsVideo => {
+      return wsVideo.video.videoTags
+        .filter(vt => vt.tag.tagType === 'LOAD' && vt.tag.loadType)
+        .map(vt => vt.tag.loadType as string);
+    });
+
+    console.log('🎯 Workout completed - calculating progress:', {
+      sessionId,
+      modulesCount: moduleTags.length,
+      moduleTags,
+    });
+
+    // Текущие характеристики
+    const currentCharacteristics: Record<CharacteristicType, number> = {
+      ratingPower: user.profile.ratingPower,
+      ratingSpeed: user.profile.ratingSpeed,
+      ratingEndurance: user.profile.ratingEndurance,
+      ratingTechnique: user.profile.ratingTechnique,
+      ratingFlexibility: user.profile.ratingFlexibility,
+    };
+
+    // Рассчитываем прирост за всю тренировку
+    const gains = calculateWorkoutGains(moduleTags, currentCharacteristics);
+
+    console.log('📈 Total workout gains:', gains);
+
+    // Обновляем характеристики
+    const newCharacteristics: Record<CharacteristicType, number> = {
+      ratingPower: currentCharacteristics.ratingPower + gains.ratingPower,
+      ratingSpeed: currentCharacteristics.ratingSpeed + gains.ratingSpeed,
+      ratingEndurance: currentCharacteristics.ratingEndurance + gains.ratingEndurance,
+      ratingTechnique: currentCharacteristics.ratingTechnique + gains.ratingTechnique,
+      ratingFlexibility: currentCharacteristics.ratingFlexibility + gains.ratingFlexibility,
+    };
+
+    // Ограничиваем максимум 100
+    Object.keys(newCharacteristics).forEach(key => {
+      const charKey = key as CharacteristicType;
+      newCharacteristics[charKey] = Math.min(100, newCharacteristics[charKey]);
+    });
+
+    // Пересчитываем potential
+    const newPotential = calculatePotential(newCharacteristics);
+
+    // Проверяем лимит тренировок в день
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const lastTrainingDate = user.profile.lastTrainingDate 
+      ? new Date(user.profile.lastTrainingDate) 
+      : null;
+    
+    let trainingsToday = user.profile.trainingsToday;
+    
+    // Сбрасываем счетчик если новый день
+    if (!lastTrainingDate || lastTrainingDate < today) {
+      trainingsToday = 0;
+    }
+
+    // Проверяем лимит (2 тренировки в день)
+    if (trainingsToday >= 2) {
+      return NextResponse.json({
+        success: false,
+        error: 'Достигнут дневной лимит тренировок (2). Отдохни и возвращайся завтра! 💪',
+        limitReached: true,
+      });
+    }
+
+    // Обновляем профиль
+    await prisma.profile.update({
+      where: { id: user.profile.id },
+      data: {
+        ratingPower: parseFloat(newCharacteristics.ratingPower.toFixed(1)),
+        ratingSpeed: parseFloat(newCharacteristics.ratingSpeed.toFixed(1)),
+        ratingEndurance: parseFloat(newCharacteristics.ratingEndurance.toFixed(1)),
+        ratingTechnique: parseFloat(newCharacteristics.ratingTechnique.toFixed(1)),
+        ratingFlexibility: parseFloat(newCharacteristics.ratingFlexibility.toFixed(1)),
+        potential: newPotential,
+        trainingsToday: trainingsToday + 1,
+        lastTrainingDate: new Date(),
+      },
+    });
+
     // Обновляем статус тренировки на COMPLETED
     const updatedSession = await prisma.workoutSession.update({
       where: { id: sessionId },
@@ -61,13 +175,24 @@ export async function POST(request: NextRequest) {
     console.log('✅ Workout completed:', {
       sessionId: updatedSession.id,
       status: updatedSession.status,
-      completedAt: updatedSession.completedAt,
+      newPotential,
+      trainingsToday: trainingsToday + 1,
     });
 
     return NextResponse.json({
       success: true,
       message: 'Тренировка успешно завершена!',
       workout: updatedSession,
+      gains,
+      newCharacteristics: {
+        ratingPower: newCharacteristics.ratingPower,
+        ratingSpeed: newCharacteristics.ratingSpeed,
+        ratingEndurance: newCharacteristics.ratingEndurance,
+        ratingTechnique: newCharacteristics.ratingTechnique,
+        ratingFlexibility: newCharacteristics.ratingFlexibility,
+        potential: newPotential,
+      },
+      trainingsToday: trainingsToday + 1,
     });
 
   } catch (error) {

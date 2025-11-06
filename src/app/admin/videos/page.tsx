@@ -29,13 +29,11 @@ interface Video {
   equipment: string[];
   level?: string;
   isPublished: boolean;
-  // Поля для алгоритма
+  // Поля для алгоритма LoadType
   типМодуля?: string;
   типНагрузки?: string;
   группаМышц?: string;
   сложность?: string;
-  rpeМин?: number;
-  rpeМакс?: number;
 }
 
 const AdminVideosPage = () => {
@@ -57,13 +55,11 @@ const AdminVideosPage = () => {
     trainerId: '',
     tags: '', // Оставляем для обратной совместимости (старые текстовые теги)
     equipment: '',
-    // Поля для алгоритма тренировок
+    // Поля для алгоритма тренировок (LoadType-based)
     типМодуля: '',
-    типНагрузки: '',
+    типНагрузки: '', // Основное поле - создаёт LoadType тег автоматически
     группаМышц: '',
     сложность: '',
-    rpeМин: 3,
-    rpeМакс: 5,
   };
   
   // Данные формы
@@ -314,13 +310,11 @@ const AdminVideosPage = () => {
       trainerId: video.trainer.id,
       tags: video.tags.join(', '), // Старые текстовые теги
       equipment: video.equipment.join(', '),
-      // Поля для алгоритма
+      // Поля для алгоритма (LoadType-based)
       типМодуля: video.типМодуля || '',
-      типНагрузки: video.типНагрузки || '',
+      типНагрузки: video.типНагрузки || '', // Основное поле - LoadType тег
       группаМышц: video.группаМышц || '',
       сложность: video.сложность || '',
-      rpeМин: video.rpeМин || 3,
-      rpeМакс: video.rpeМакс || 5,
     });
     
     // Загружаем теги из базы данных для этого видео
@@ -400,9 +394,42 @@ const AdminVideosPage = () => {
         {/* Форма добавления/редактирования видео */}
         {showForm && (
           <div className="bg-[#1a1f3a] rounded-lg p-4 md:p-6 mb-6 md:mb-8 border border-white/5">
-            <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">
-              {editingVideoId ? 'Редактировать видео' : 'Новое видео'}
-            </h2>
+            <div className="flex items-start justify-between mb-4 md:mb-6">
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold">
+                  {editingVideoId ? 'Редактировать видео' : 'Новое видео'}
+                </h2>
+                <p className="text-sm text-gray-400 mt-1">
+                  LoadType теги создаются автоматически на основе "Типа физической нагрузки"
+                </p>
+              </div>
+              {formData.типНагрузки && (
+                <div className="hidden md:block">
+                  <div className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg shadow-lg">
+                    <p className="text-xs text-white/70">Развивает</p>
+                    <p className="text-sm font-bold text-white">
+                      {(() => {
+                        const charMap: any = {
+                          'Сила': '💪 Силу',
+                          'Мощность': '💪 Силу',
+                          'Скорость': '⚡ Скорость',
+                          'Силовая выносливость': '🫀 Выносливость',
+                          'Анаэробная выносливость': '🫀 Выносливость',
+                          'Аэробная выносливость': '🫀 Выносливость',
+                          'Ловкость': '🎯 Технику',
+                          'Мобильность': '🤸 Гибкость',
+                          'Техника': '🎯 Технику',
+                          'Статическая растяжка': '🤸 Гибкость',
+                          'Динамическая растяжка': '🤸 Гибкость',
+                          'ЛФК': '🤸 Гибкость',
+                        };
+                        return charMap[formData.типНагрузки] || '—';
+                      })()}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
             <form onSubmit={handleSubmit} className="space-y-6">
               
               {/* 📹 Основная информация о видео */}
@@ -618,14 +645,246 @@ const AdminVideosPage = () => {
 
                 <div className="space-y-6">
                   
-                  {/* Строка 1: Тип модуля и сложность */}
+                  {/* Строка 1: ТИП НАГРУЗКИ (ГЛАВНОЕ!) */}
+                  <div className="space-y-4">
+                    
+                    {/* Тип нагрузки - ГЛАВНОЕ ПОЛЕ */}
+                    <div className="bg-purple-900/20 border-2 border-purple-500/50 rounded-lg p-4">
+                      <label className="block text-base font-bold mb-2 text-purple-300">
+                        🎯 Тип физической нагрузки
+                        <span className="text-yellow-400 ml-1">★</span>
+                      </label>
+                      <select
+                        name="типНагрузки"
+                        value={formData.типНагрузки}
+                        onChange={handleChange}
+                        className="w-full bg-[#2d3448] text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 font-medium text-base"
+                      >
+                        <option value="">⚠️ Выберите тип нагрузки</option>
+                        <optgroup label="💪 Сила и мощность">
+                          <option value="Сила">Максимальная сила</option>
+                          <option value="Мощность">Мощность</option>
+                          <option value="Скорость">Скорость</option>
+                        </optgroup>
+                        <optgroup label="🫀 Выносливость">
+                          <option value="Силовая выносливость">Силовая выносливость</option>
+                          <option value="Анаэробная выносливость">Анаэробная выносливость</option>
+                          <option value="Аэробная выносливость">Аэробная выносливость</option>
+                        </optgroup>
+                        <optgroup label="🎯 Функциональные качества">
+                          <option value="Ловкость">Ловкость</option>
+                          <option value="Мобильность">Мобильность</option>
+                          <option value="Техника">Технические навыки</option>
+                        </optgroup>
+                        <optgroup label="🤸 Восстановление">
+                          <option value="Статическая растяжка">Статическая растяжка</option>
+                          <option value="Динамическая растяжка">Динамическая растяжка</option>
+                          <option value="ЛФК">ЛФК (профилактика травм)</option>
+                        </optgroup>
+                      </select>
+                      <p className="text-sm text-purple-200 mt-2 font-medium">
+                        ⭐ Это главное поле! Определяет какие характеристики развивает видео
+                      </p>
+                    </div>
+
+                  </div>
+
+                  {/* Информация о влиянии на характеристики - СРАЗУ ПОСЛЕ ВЫБОРА */}
+                  {formData.типНагрузки && (
+                    <div className="p-4 bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 rounded-lg animate-in fade-in slide-in-from-top-2 duration-300">
+                      <h4 className="text-sm font-semibold text-purple-300 mb-3 flex items-center gap-2">
+                        ✨ Влияние на характеристики пользователя
+                      </h4>
+                      
+                      {(() => {
+                        // Определяем, какая характеристика развивается
+                        const loadTypeImpact: { 
+                          [key: string]: { 
+                            char: string; 
+                            emoji: string; 
+                            description: string;
+                            loadTypeName: string;
+                            gains: { char: string; multiplier: number }[];
+                          } 
+                        } = {
+                          'Сила': { 
+                            char: 'Сила', 
+                            emoji: '💪', 
+                            description: 'Развивает максимальную силу мышц',
+                            loadTypeName: 'Максимальная сила',
+                            gains: [
+                              { char: 'Сила', multiplier: 1.5 }
+                            ]
+                          },
+                          'Мощность': { 
+                            char: 'Сила', 
+                            emoji: '💪', 
+                            description: 'Развивает взрывную силу и мощность',
+                            loadTypeName: 'Мощность',
+                            gains: [
+                              { char: 'Сила', multiplier: 1.5 },
+                              { char: 'Скорость', multiplier: 0.75 }
+                            ]
+                          },
+                          'Скорость': { 
+                            char: 'Скорость', 
+                            emoji: '⚡', 
+                            description: 'Развивает скоростные качества',
+                            loadTypeName: 'Скорость',
+                            gains: [
+                              { char: 'Скорость', multiplier: 1.5 },
+                              { char: 'Выносливость', multiplier: 1.5 }
+                            ]
+                          },
+                          'Силовая выносливость': { 
+                            char: 'Выносливость', 
+                            emoji: '🫀', 
+                            description: 'Развивает силовую выносливость',
+                            loadTypeName: 'Силовая выносливость',
+                            gains: [
+                              { char: 'Выносливость', multiplier: 1.5 }
+                            ]
+                          },
+                          'Анаэробная выносливость': { 
+                            char: 'Выносливость', 
+                            emoji: '🫀', 
+                            description: 'Развивает анаэробную выносливость',
+                            loadTypeName: 'Анаэробная выносливость',
+                            gains: [
+                              { char: 'Выносливость', multiplier: 1.5 }
+                            ]
+                          },
+                          'Аэробная выносливость': { 
+                            char: 'Выносливость', 
+                            emoji: '🫀', 
+                            description: 'Развивает аэробную выносливость',
+                            loadTypeName: 'Аэробная выносливость',
+                            gains: [
+                              { char: 'Выносливость', multiplier: 1.5 }
+                            ]
+                          },
+                          'Ловкость': { 
+                            char: 'Техника', 
+                            emoji: '🎯', 
+                            description: 'Развивает ловкость и координацию',
+                            loadTypeName: 'Ловкость',
+                            gains: [
+                              { char: 'Техника', multiplier: 1.5 }
+                            ]
+                          },
+                          'Мобильность': { 
+                            char: 'Гибкость', 
+                            emoji: '🤸', 
+                            description: 'Улучшает подвижность суставов',
+                            loadTypeName: 'Мобильность',
+                            gains: [
+                              { char: 'Гибкость', multiplier: 1.5 },
+                              { char: 'Техника', multiplier: 0.75 }
+                            ]
+                          },
+                          'Техника': { 
+                            char: 'Техника', 
+                            emoji: '🎯', 
+                            description: 'Совершенствует технические навыки',
+                            loadTypeName: 'Технические навыки',
+                            gains: [
+                              { char: 'Техника', multiplier: 1.5 }
+                            ]
+                          },
+                          'Статическая растяжка': { 
+                            char: 'Гибкость', 
+                            emoji: '🤸', 
+                            description: 'Улучшает гибкость через статическую растяжку',
+                            loadTypeName: 'Статическая растяжка',
+                            gains: [
+                              { char: 'Гибкость', multiplier: 1.5 },
+                              { char: 'Техника', multiplier: 0.75 }
+                            ]
+                          },
+                          'Динамическая растяжка': { 
+                            char: 'Гибкость', 
+                            emoji: '🤸', 
+                            description: 'Улучшает гибкость через динамическую растяжку',
+                            loadTypeName: 'Динамическая растяжка',
+                            gains: [
+                              { char: 'Гибкость', multiplier: 1.5 },
+                              { char: 'Техника', multiplier: 0.75 }
+                            ]
+                          },
+                          'ЛФК': { 
+                            char: 'Гибкость', 
+                            emoji: '🤸', 
+                            description: 'Профилактика травм и восстановление',
+                            loadTypeName: 'ЛФК',
+                            gains: [
+                              { char: 'Гибкость', multiplier: 1.5 },
+                              { char: 'Сила', multiplier: 0.75 }
+                            ]
+                          },
+                        };
+
+                        const impact = loadTypeImpact[formData.типНагрузки];
+                        
+                        if (!impact) return null;
+
+                        // Расчёт примерного прироста для пользователя с характеристикой 70
+                        const exampleCurrentValue = 70;
+                        const baseGain = 0.5;
+                        const calculateExampleGain = (multiplier: number) => {
+                          const gain = baseGain * ((100 - exampleCurrentValue) / 100) * multiplier;
+                          return gain.toFixed(2);
+                        };
+
+                        return (
+                          <div className="space-y-3">
+                            {/* Заголовок + LoadType badge в одну строку */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="text-2xl">{impact.emoji}</div>
+                                <div>
+                                  <p className="font-semibold text-white text-sm">{impact.char}</p>
+                                  <p className="text-[10px] text-gray-400">{impact.description}</p>
+                                </div>
+                              </div>
+                              <div className="px-2 py-1 bg-purple-600/40 rounded text-[10px] text-purple-100 border border-purple-400/30 whitespace-nowrap">
+                                {impact.loadTypeName}
+                              </div>
+                            </div>
+                            
+                            {/* Прирост - компактно */}
+                            <div className="p-2 bg-black/20 rounded border border-green-500/20">
+                              <p className="text-[10px] font-semibold text-green-300 mb-1">📈 Прирост за модуль (при характеристике 70):</p>
+                              <div className="flex flex-wrap gap-2">
+                                {impact.gains.map((gain, idx) => (
+                                  <div key={idx} className="px-2 py-1 bg-green-900/20 rounded border border-green-500/30 text-xs">
+                                    <span className="text-gray-300">
+                                      {gain.char === 'Сила' && '💪'} 
+                                      {gain.char === 'Скорость' && '⚡'} 
+                                      {gain.char === 'Выносливость' && '🫀'} 
+                                      {gain.char === 'Техника' && '🎯'} 
+                                      {gain.char === 'Гибкость' && '🤸'} 
+                                    </span>
+                                    <span className="font-mono text-green-400 font-bold ml-1">
+                                      +{calculateExampleGain(gain.multiplier)}
+                                      {gain.multiplier === 1.5 && <span className="text-yellow-400 ml-0.5">⭐</span>}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Строка 2: Тип модуля и сложность */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     
                     {/* Тип модуля */}
                     <div>
                       <label className="block text-sm font-medium mb-2">
                         Тип модуля в тренировке
-                        <span className="text-purple-400 ml-1">*</span>
                       </label>
                       <select
                         name="типМодуля"
@@ -646,7 +905,6 @@ const AdminVideosPage = () => {
                     <div>
                       <label className="block text-sm font-medium mb-2">
                         Уровень подготовки
-                        <span className="text-purple-400 ml-1">*</span>
                       </label>
                       <select
                         name="сложность"
@@ -665,46 +923,9 @@ const AdminVideosPage = () => {
 
                   </div>
 
-                  {/* Строка 2: Тип нагрузки и группа мышц */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Строка 3: Группа мышц */}
+                  <div className="grid grid-cols-1 gap-4">
                     
-                    {/* Тип нагрузки */}
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Тип физической нагрузки
-                        <span className="text-purple-400 ml-1">*</span>
-                      </label>
-                      <select
-                        name="типНагрузки"
-                        value={formData.типНагрузки}
-                        onChange={handleChange}
-                        className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
-                      >
-                        <option value="">Не указано</option>
-                        <optgroup label="Сила и мощность">
-                          <option value="Сила">Максимальная сила</option>
-                          <option value="Мощность">Мощность</option>
-                          <option value="Скорость">Скорость</option>
-                        </optgroup>
-                        <optgroup label="Выносливость">
-                          <option value="Силовая выносливость">Силовая выносливость</option>
-                          <option value="Анаэробная выносливость">Анаэробная выносливость</option>
-                          <option value="Аэробная выносливость">Аэробная выносливость</option>
-                        </optgroup>
-                        <optgroup label="Функциональные качества">
-                          <option value="Ловкость">Ловкость</option>
-                          <option value="Мобильность">Мобильность</option>
-                          <option value="Техника">Технические навыки</option>
-                        </optgroup>
-                        <optgroup label="Восстановление">
-                          <option value="Статическая растяжка">Статическая растяжка</option>
-                          <option value="Динамическая растяжка">Динамическая растяжка</option>
-                          <option value="ЛФК">ЛФК (профилактика травм)</option>
-                        </optgroup>
-                      </select>
-                      <p className="text-xs text-gray-400 mt-1">Какое физическое качество развивает</p>
-                    </div>
-
                     {/* Группа мышц */}
                     <div>
                       <label className="block text-sm font-medium mb-2">
@@ -728,101 +949,6 @@ const AdminVideosPage = () => {
                         <option value="ЛФК спина">🩹 ЛФК спина</option>
                       </select>
                       <p className="text-xs text-gray-400 mt-1">На какие мышцы воздействует</p>
-                    </div>
-
-                  </div>
-
-                  {/* Строка 3: RPE диапазон */}
-                  <div>
-                    <label className="block text-sm font-medium mb-3">
-                      Диапазон интенсивности (RPE)
-                      <span className="text-purple-400 ml-1">*</span>
-                    </label>
-                    <div className="grid grid-cols-2 gap-4">
-                      
-                      {/* RPE Min */}
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-2">Минимум (начало)</label>
-                        <input
-                          type="number"
-                          name="rpeМин"
-                          value={formData.rpeМин}
-                          onChange={handleChange}
-                          min="1"
-                          max="10"
-                          className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
-                        />
-                      </div>
-
-                      {/* RPE Max */}
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-2">Максимум (пик)</label>
-                        <input
-                          type="number"
-                          name="rpeМакс"
-                          value={formData.rpeМакс}
-                          onChange={handleChange}
-                          min="1"
-                          max="10"
-                          className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
-                        />
-                      </div>
-
-                    </div>
-                    
-                    {/* Подсказка про RPE */}
-                    <div className="mt-4 p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-                      <h4 className="text-sm font-semibold text-blue-300 mb-2">ℹ️ Что такое RPE?</h4>
-                      <p className="text-xs text-gray-300 mb-3">
-                        <strong>RPE (Rate of Perceived Exertion)</strong> — шкала воспринимаемого усилия от 1 до 10
-                      </p>
-                      
-                      <div className="grid grid-cols-2 gap-2 text-xs mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-green-400 font-bold">1-2</span>
-                          <span className="text-gray-300">Очень легко 😌</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-green-400 font-bold">3-4</span>
-                          <span className="text-gray-300">Легко 🙂</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-yellow-400 font-bold">5-6</span>
-                          <span className="text-gray-300">Средне 😊</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-orange-400 font-bold">7-8</span>
-                          <span className="text-gray-300">Тяжело 😓</span>
-                        </div>
-                        <div className="col-span-2 flex items-center gap-2">
-                          <span className="text-red-400 font-bold">9-10</span>
-                          <span className="text-gray-300">Максимум 🥵 (на грани возможностей)</span>
-                        </div>
-                      </div>
-                      
-                      <div className="border-t border-blue-500/20 pt-3 mt-3">
-                        <p className="text-xs font-semibold text-blue-200 mb-2">📊 Как указывать диапазон:</p>
-                        <ul className="text-xs text-gray-300 space-y-1.5">
-                          <li className="flex items-start gap-2">
-                            <span className="text-blue-400 mt-0.5">•</span>
-                            <span><strong>RPE Минимум</strong> — самое легкое ощущение в упражнении (начало, разминка)</span>
-                          </li>
-                          <li className="flex items-start gap-2">
-                            <span className="text-blue-400 mt-0.5">•</span>
-                            <span><strong>RPE Максимум</strong> — пиковая нагрузка в упражнении (основная часть, финиш)</span>
-                          </li>
-                        </ul>
-                        <div className="mt-3 p-2 bg-blue-900/30 rounded border border-blue-500/20">
-                          <p className="text-xs text-gray-300">
-                            <strong className="text-blue-200">Пример:</strong> Разминка может начинаться с RPE 2 (очень легко), 
-                            но к концу достигать RPE 5 (средне). Интервальный спринт: от RPE 6 (средне) до RPE 9 (максимум).
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <p className="text-xs text-purple-300 mt-3 pt-3 border-t border-blue-500/20 font-medium">
-                        💡 Алгоритм использует RPE для подбора нагрузки под текущее состояние пользователя
-                      </p>
                     </div>
 
                   </div>

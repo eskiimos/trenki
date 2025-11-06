@@ -191,34 +191,118 @@ const ProfilePage = () => {
               {userProfile?.profile?.age || '--'} лет | {userProfile?.profile?.height || '--'} см | {userProfile?.profile?.weight || '--'} кг
             </div>
             
-            {/* Статистика - скрыта, будет доступна в платной версии */}
-            {/* <div className="flex flex-col gap-0.5 mt-2">
-              <StatBar label="сила" value={userProfile?.profile?.strength?.toString() || '0'} change="+7" isPositive={true} />
-              <StatBar label="выносливость" value={userProfile?.profile?.endurance?.toString() || '0'} change="-4" isPositive={false} />
-              <StatBar label="скорость" value={userProfile?.profile?.speed?.toString() || '0'} change="+4" isPositive={true} />
-              <StatBar label="техника" value={userProfile?.profile?.technique?.toString() || '0'} change="-9" isPositive={false} />
-              <StatBar label="катание" value={userProfile?.profile?.skating?.toString() || '0'} change="+2" isPositive={true} />
-              <StatBar label="броски" value={userProfile?.profile?.shooting?.toString() || '0'} change="+5" isPositive={true} />
-              <StatBar label="передачи" value={userProfile?.profile?.passing?.toString() || '0'} change="+3" isPositive={true} />
-              <StatBar label="общее" value={userProfile?.profile?.overall?.toString() || '0'} change="-9" isPositive={false} isTotal={true} />
-            </div> */}
+            {/* Потенциал - крупно */}
+            {userProfile?.profile?.potential !== undefined && userProfile?.profile?.potential > 0 && (
+              <div className="bg-gradient-to-r from-[#445CFF]/20 to-[#7B61FF]/20 rounded-lg p-2 mt-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#AEABBB] text-xs font-medium font-overpass">⚡ Потенциал</span>
+                  <span className="text-white text-2xl font-black font-overpass">
+                    {userProfile.profile.potential.toFixed(1)}
+                  </span>
+                </div>
+              </div>
+            )}
+            
+            {/* Характеристики - компактно */}
+            {userProfile?.profile?.potential !== undefined && userProfile?.profile?.potential > 0 && (
+              <div className="flex flex-col gap-0.5 mt-2">
+                <CharacteristicBar 
+                  emoji="💪" 
+                  label="Сила" 
+                  value={userProfile?.profile?.ratingPower || 0} 
+                />
+                <CharacteristicBar 
+                  emoji="⚡" 
+                  label="Скорость" 
+                  value={userProfile?.profile?.ratingSpeed || 0} 
+                />
+                <CharacteristicBar 
+                  emoji="🫀" 
+                  label="Выносливость" 
+                  value={userProfile?.profile?.ratingEndurance || 0} 
+                />
+                <CharacteristicBar 
+                  emoji="🎯" 
+                  label="Техника" 
+                  value={userProfile?.profile?.ratingTechnique || 0} 
+                />
+                <CharacteristicBar 
+                  emoji="🤸" 
+                  label="Гибкость" 
+                  value={userProfile?.profile?.ratingFlexibility || 0} 
+                />
+              </div>
+            )}
+            
+            {/* Приглашение пройти опрос, если характеристики не заполнены */}
+            {(!userProfile?.profile?.potential || userProfile?.profile?.potential === 0) && (
+              <Link href="/onboarding/characteristics" className="block mt-2">
+                <div className="bg-gradient-to-r from-[#445CFF] to-[#7B61FF] rounded-lg p-3 text-center">
+                  <div className="text-white text-xs font-medium font-overpass mb-1">
+                    📊 Пройди стартовый опрос
+                  </div>
+                  <div className="text-white/70 text-[10px] font-overpass">
+                    Узнай свой потенциал и начни расти!
+                  </div>
+                </div>
+              </Link>
+            )}
           </div>
         </div>
 
-        {/* Ежедневный прогресс - скрыт, будет доступен в платной версии */}
-        {/* <div className="flex items-center gap-2 mb-6">
-          <div className="text-white text-xs font-medium font-overpass leading-tight">
-            Ежедневный<br/>прогресс {userProfile?.profile?.dailyProgress || 0}/{userProfile?.profile?.maxDailyGoal || 10}
+        {/* Дневной прогресс */}
+        {userProfile?.profile?.potential !== undefined && userProfile?.profile?.potential > 0 && (
+          <div className="bg-[#2d3448] rounded-lg p-4 mb-6">
+            <div className="text-white text-sm font-medium font-overpass mb-3">
+              📅 Сегодня
+            </div>
+            
+            <div className="space-y-3">
+              {/* Модули */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[#AEABBB] text-xs font-overpass">Модули</span>
+                  <span className="text-white text-xs font-bold font-overpass">
+                    {userProfile?.profile?.modulesToday || 0}/4
+                  </span>
+                </div>
+                <div className="h-2 bg-[#1a1f35] rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-[#445CFF] to-[#7B61FF] rounded-full transition-all duration-300"
+                    style={{ 
+                      width: `${Math.min(100, ((userProfile?.profile?.modulesToday || 0) / 4) * 100)}%` 
+                    }}
+                  />
+                </div>
+              </div>
+              
+              {/* Тренировки */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[#AEABBB] text-xs font-overpass">Тренировки</span>
+                  <span className="text-white text-xs font-bold font-overpass">
+                    {userProfile?.profile?.trainingsToday || 0}/2
+                  </span>
+                </div>
+                <div className="h-2 bg-[#1a1f35] rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-[#A1FF4A] to-[#7DFF8C] rounded-full transition-all duration-300"
+                    style={{ 
+                      width: `${Math.min(100, ((userProfile?.profile?.trainingsToday || 0) / 2) * 100)}%` 
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {/* Предупреждение о лимите */}
+            {((userProfile?.profile?.modulesToday || 0) >= 4 || (userProfile?.profile?.trainingsToday || 0) >= 2) && (
+              <div className="mt-3 p-2 bg-[#FF6B6B]/10 border border-[#FF6B6B]/30 rounded text-[#FF6B6B] text-[10px] font-overpass text-center">
+                ⚠️ Дневной лимит достигнут. Приходи завтра!
+              </div>
+            )}
           </div>
-          <div className="flex-1 h-2 bg-[#2d3448] rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-[#A1FF4A] to-[#7DFF8C] rounded-full transition-all duration-300"
-              style={{ 
-                width: `${Math.min(100, ((userProfile?.profile?.dailyProgress || 0) / (userProfile?.profile?.maxDailyGoal || 10)) * 100)}%` 
-              }}
-            ></div>
-          </div>
-        </div> */}
+        )}
 
         {/* Меню разделы */}
         <div className="space-y-4">
@@ -335,24 +419,45 @@ const ProfilePage = () => {
   );
 };
 
-// Компонент для статистики
-const StatBar = ({ label, value, change, isPositive, isTotal = false }: {
+// Компонент для характеристик
+const CharacteristicBar = ({ emoji, label, value }: {
+  emoji: string;
   label: string;
-  value: string;
-  change: string;
-  isPositive: boolean;
-  isTotal?: boolean;
-}) => (
-  <div className={`flex justify-between items-center px-2 py-1 rounded ${isTotal ? 'bg-[#3d4759]' : 'bg-[#2d3448]'}`}>
-    <span className="text-[#AEABBB] text-xs font-medium font-overpass">{label}</span>
-    <div className="flex items-center gap-1">
-      <span className="text-white text-lg font-black font-overpass">{value}</span>
-      <span className={`text-xs font-black font-overpass ${isPositive ? 'text-[#A1FF4A]' : 'text-[#E40202]'}`}>
-        ({change})
-      </span>
+  value: number;
+}) => {
+  // Определяем цвет на основе значения
+  const getColor = (val: number) => {
+    if (val >= 80) return '#A1FF4A'; // Зеленый
+    if (val >= 60) return '#FFD700'; // Золотой
+    if (val >= 40) return '#FFA500'; // Оранжевый
+    return '#FF6B6B'; // Красный
+  };
+  
+  const color = getColor(value);
+  
+  return (
+    <div className="bg-[#2d3448] rounded px-2 py-1.5">
+      <div className="flex justify-between items-center mb-1">
+        <div className="flex items-center gap-1">
+          <span className="text-sm">{emoji}</span>
+          <span className="text-[#AEABBB] text-[10px] font-medium font-overpass">{label}</span>
+        </div>
+        <span className="text-white text-sm font-black font-overpass">
+          {value.toFixed(1)}
+        </span>
+      </div>
+      <div className="h-1.5 bg-[#1a1f35] rounded-full overflow-hidden">
+        <div 
+          className="h-full rounded-full transition-all duration-500"
+          style={{ 
+            width: `${Math.min(100, value)}%`,
+            backgroundColor: color
+          }}
+        />
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Компонент для пунктов меню
 const MenuSection = ({ title }: { title: string }) => (

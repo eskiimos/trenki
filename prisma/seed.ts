@@ -139,6 +139,14 @@ async function main() {
           gender: 'MALE',
           height: 185,
           weight: 82,
+          // Новая система характеристик
+          ratingPower: 65.5,
+          ratingSpeed: 58.3,
+          ratingEndurance: 72.1,
+          ratingTechnique: 68.9,
+          ratingFlexibility: 61.4,
+          potential: 65.2,
+          // Старые поля (deprecated, но оставляем для совместимости)
           strength: 78,
           endurance: 85,
           speed: 65,

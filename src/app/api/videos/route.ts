@@ -142,7 +142,69 @@ export async function POST(request: NextRequest) {
 
     console.log('Created video with isPublished:', video.isPublished);
 
-    return NextResponse.json({ video });
+    // Автоматически создаём LoadType тег, если указан типНагрузки
+    if (body.типНагрузки) {
+      console.log('Creating LoadType tag for:', body.типНагрузки);
+      
+      // Маппинг типов нагрузки на LoadType enum (из prisma/schema.prisma)
+      const loadTypeMapping: { [key: string]: string } = {
+        'Сила': 'MAX_STRENGTH',
+        'Мощность': 'POWER',
+        'Скорость': 'SPEED',
+        'Силовая выносливость': 'STRENGTH_ENDURANCE',
+        'Анаэробная выносливость': 'ANAEROBIC_ENDURANCE',
+        'Аэробная выносливость': 'AEROBIC_ENDURANCE',
+        'Ловкость': 'AGILITY',
+        'Мобильность': 'MOBILITY',
+        'Техника': 'TECHNICAL_SKILL',
+        'Статическая растяжка': 'STATIC_STRETCH',
+        'Динамическая растяжка': 'DYNAMIC_STRETCH',
+      };
+
+      const loadTypeEnum = loadTypeMapping[body.типНагрузки];
+      
+      if (loadTypeEnum) {
+        // Находим LoadType тег по имени
+        const tagName = `LoadType:${loadTypeEnum}`;
+        let loadTypeTag = await prisma.tag.findUnique({
+          where: { name: tagName }
+        });
+
+        // Если не найден, создаём
+        if (!loadTypeTag) {
+          loadTypeTag = await prisma.tag.create({
+            data: {
+              name: tagName,
+              displayName: loadTypeEnum,
+              tagType: 'LOAD',
+              loadType: loadTypeEnum as any,
+              order: 0,
+            }
+          });
+        }
+
+        // Создаём связь VideoTag
+        await prisma.videoTag.upsert({
+          where: {
+            videoId_tagId: {
+              videoId: video.id,
+              tagId: loadTypeTag.id,
+            }
+          },
+          create: {
+            videoId: video.id,
+            tagId: loadTypeTag.id,
+          },
+          update: {},
+        });
+
+        console.log(`✅ LoadType tag created: ${tagName} for video ${video.id}`);
+      } else {
+        console.warn(`⚠️ No LoadType mapping for: ${body.типНагрузки}`);
+      }
+    }
+
+    return NextResponse.json({ video, id: video.id });
   } catch (error: any) {
     console.error('Error creating video:', error);
     console.error('Error details:', error.message);

@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useTelegram } from '@/hooks/useTelegram';
+import CharacteristicsRadar from '@/components/CharacteristicsRadar';
 
 interface WorkoutHistoryItem {
   id: string;
@@ -25,6 +27,15 @@ interface Stats {
   currentStreak: number;
 }
 
+interface Characteristics {
+  ratingPower: number;
+  ratingSpeed: number;
+  ratingEndurance: number;
+  ratingTechnique: number;
+  ratingFlexibility: number;
+  potential: number;
+}
+
 export default function TrainingHistoryPage() {
   const router = useRouter();
   const { user, webApp } = useTelegram();
@@ -32,6 +43,8 @@ export default function TrainingHistoryPage() {
   const [workouts, setWorkouts] = useState<WorkoutHistoryItem[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [characteristics, setCharacteristics] = useState<Characteristics | null>(null);
+  const [showCharacteristics, setShowCharacteristics] = useState(false);
 
   useEffect(() => {
     if (webApp) {
@@ -47,6 +60,7 @@ export default function TrainingHistoryPage() {
   useEffect(() => {
     if (user?.id) {
       loadHistory();
+      loadCharacteristics();
     }
   }, [user]);
 
@@ -63,6 +77,26 @@ export default function TrainingHistoryPage() {
       console.error('Ошибка загрузки истории:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadCharacteristics = async () => {
+    try {
+      const response = await fetch(`/api/profile?telegramId=${user?.id}`);
+      const data = await response.json();
+
+      if (data.user?.profile) {
+        setCharacteristics({
+          ratingPower: data.user.profile.ratingPower || 0,
+          ratingSpeed: data.user.profile.ratingSpeed || 0,
+          ratingEndurance: data.user.profile.ratingEndurance || 0,
+          ratingTechnique: data.user.profile.ratingTechnique || 0,
+          ratingFlexibility: data.user.profile.ratingFlexibility || 0,
+          potential: data.user.profile.potential || 0,
+        });
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки характеристик:', error);
     }
   };
 
@@ -103,6 +137,63 @@ export default function TrainingHistoryPage() {
   return (
     <div className="min-h-screen bg-[#101530] text-white p-4 pb-24">
       <h1 className="text-3xl font-bold mb-6">История тренировок</h1>
+
+      {/* Характеристики - компактный блок */}
+      {characteristics && characteristics.potential > 0 && (
+        <div className="mb-6">
+          <button
+            onClick={() => setShowCharacteristics(!showCharacteristics)}
+            className="w-full bg-gradient-to-r from-[#445CFF] to-[#7B61FF] rounded-xl p-4 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⚡</span>
+              <div className="text-left">
+                <p className="text-sm text-white/70">Потенциал</p>
+                <p className="text-2xl font-bold">{characteristics.potential.toFixed(1)}</p>
+              </div>
+            </div>
+            <svg 
+              className={`w-6 h-6 transition-transform ${showCharacteristics ? 'rotate-180' : ''}`} 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {showCharacteristics && (
+            <div className="mt-3 bg-[#1a1f35] rounded-xl p-6 space-y-6">
+              {/* Радарный график */}
+              <div className="flex justify-center">
+                <CharacteristicsRadar characteristics={characteristics} />
+              </div>
+              
+              {/* Детальные характеристики */}
+              <div className="space-y-3 pt-4 border-t border-white/10">
+                <CharacteristicRow emoji="💪" label="Сила" value={characteristics.ratingPower} />
+                <CharacteristicRow emoji="⚡" label="Скорость" value={characteristics.ratingSpeed} />
+                <CharacteristicRow emoji="🫀" label="Выносливость" value={characteristics.ratingEndurance} />
+                <CharacteristicRow emoji="🎯" label="Техника" value={characteristics.ratingTechnique} />
+                <CharacteristicRow emoji="🤸" label="Гибкость" value={characteristics.ratingFlexibility} />
+              </div>
+              
+              <div className="mt-4 flex gap-2">
+                <Link href="/training/characteristics-stats" className="flex-1">
+                  <button className="w-full bg-gradient-to-r from-[#445CFF] to-[#7B61FF] hover:opacity-90 text-white py-3 rounded-lg text-sm font-semibold transition-opacity">
+                    📊 Статистика
+                  </button>
+                </Link>
+                <Link href="/profile" className="flex-1">
+                  <button className="w-full bg-[#2d3448] hover:bg-[#3d4558] text-white py-3 rounded-lg text-sm font-medium transition-colors">
+                    Профиль →
+                  </button>
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Статистика */}
       {stats && (
@@ -221,3 +312,40 @@ export default function TrainingHistoryPage() {
     </div>
   );
 }
+
+// Компонент для строки характеристики
+const CharacteristicRow = ({ emoji, label, value }: {
+  emoji: string;
+  label: string;
+  value: number;
+}) => {
+  const getColor = (val: number) => {
+    if (val >= 80) return '#A1FF4A';
+    if (val >= 60) return '#FFD700';
+    if (val >= 40) return '#FFA500';
+    return '#FF6B6B';
+  };
+  
+  const color = getColor(value);
+  
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-1.5">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">{emoji}</span>
+          <span className="text-sm text-[#AEABBB]">{label}</span>
+        </div>
+        <span className="text-white font-bold">{value.toFixed(1)}</span>
+      </div>
+      <div className="h-2 bg-[#0d111f] rounded-full overflow-hidden">
+        <div 
+          className="h-full rounded-full transition-all duration-500"
+          style={{ 
+            width: `${Math.min(100, value)}%`,
+            backgroundColor: color
+          }}
+        />
+      </div>
+    </div>
+  );
+};

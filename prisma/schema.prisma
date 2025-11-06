@@ -18,12 +18,13 @@ model User {
   emailVerified Boolean           @default(false)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
-  favorites     FavoriteVideo[]
-  profile       Profile?
-  shortComments ShortComment[]
-  shortLikes    ShortLike[]
-  sessions      TrainingSession[]
-  videoLikes    VideoLike[]
+  favorites            FavoriteVideo[]
+  profile              Profile?
+  shortComments        ShortComment[]
+  shortLikes           ShortLike[]
+  sessions             TrainingSession[]
+  videoLikes           VideoLike[]
+  characteristicHistory CharacteristicHistory[]
 
   @@map("users")
 }
@@ -37,6 +38,30 @@ model Profile {
   age           Int?
   height        Int?
   weight        Int?
+  
+  // Новая система характеристик (потенциал)
+  ratingPower       Float           @default(0)  // сила
+  ratingSpeed       Float           @default(0)  // скорость
+  ratingEndurance   Float           @default(0)  // выносливость
+  ratingTechnique   Float           @default(0)  // техника
+  ratingFlexibility Float           @default(0)  // гибкость
+  potential         Float           @default(0)  // средний показатель (потенциал)
+  
+  // Данные стартового опроса
+  rawPower          Int?            // самооценка силы (1-10)
+  rawSpeed          Int?            // самооценка скорости (1-10)
+  rawEndurance      Int?            // самооценка выносливости (1-10)
+  rawTechnique      Int?            // самооценка техники (1-10)
+  rawFlexibility    Int?            // самооценка гибкости (1-10)
+  kMastery          Float?          // коэффициент мастерства (5.5-9.4)
+  
+  // Ограничения и прогресс
+  trainingsToday    Int             @default(0)  // тренировок сегодня
+  modulesToday      Int             @default(0)  // модулей сегодня
+  lastTrainingDate  DateTime?       // дата последней тренировки
+  fatigue           Float           @default(0)  // усталость (0-100)
+  
+  // Старые характеристики (deprecated, оставляем для совместимости)
   strength      Int             @default(0)
   endurance     Int             @default(0)
   speed         Int             @default(0)
@@ -46,6 +71,7 @@ model Profile {
   passing       Int             @default(0)
   checking      Int             @default(0)
   overall       Int             @default(0)
+  
   dailyProgress Int             @default(0)
   maxDailyGoal  Int             @default(10)
   createdAt     DateTime        @default(now())
@@ -319,6 +345,7 @@ model WorkoutSession {
   startedAt         DateTime?
   totalVideos       Int                   @default(0)
   videos            WorkoutSessionVideo[]
+  characteristicHistory CharacteristicHistory[]
 
   @@index([userId, createdAt])
   @@index([userId, status])
@@ -353,6 +380,37 @@ model UserModuleHistory {
   @@index([userId, completedAt])
   @@index([userId, moduleId])
   @@map("user_module_history")
+}
+
+model CharacteristicHistory {
+  id                String          @id @default(cuid())
+  userId            String
+  sessionId         String?         // ID тренировки (если из тренировки)
+  
+  // Снимок характеристик после события
+  ratingPower       Float
+  ratingSpeed       Float
+  ratingEndurance   Float
+  ratingTechnique   Float
+  ratingFlexibility Float
+  potential         Float
+  
+  // Прирост за это событие
+  gainPower         Float           @default(0)
+  gainSpeed         Float           @default(0)
+  gainEndurance     Float           @default(0)
+  gainTechnique     Float           @default(0)
+  gainFlexibility   Float           @default(0)
+  
+  // Метаданные
+  eventType         String          // "WORKOUT" или "MODULE"
+  createdAt         DateTime        @default(now())
+  
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session           WorkoutSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@map("characteristic_history")
 }
 
 enum VideoCategory {

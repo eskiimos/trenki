@@ -7,6 +7,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Heart, MessageCircle, Share, Download, CheckCircle } from 'lucide-react';
 import TagsSection from '@/components/TagsSection';
 import BottomNavigation from '@/components/BottomNavigation';
+import CharacteristicsGainModal from '@/components/CharacteristicsGainModal';
+import Toast from '@/components/Toast';
 import { isKinescopeUrl, getKinescopeDirectUrl } from '@/lib/videoQuality';
 import { getTelegramId } from '@/lib/auth';
 import { 
@@ -79,6 +81,15 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [isDownloaded, setIsDownloaded] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  
+  // Состояние для модалки прироста характеристик
+  const [showGainsModal, setShowGainsModal] = useState(false);
+  const [characteristicsGains, setCharacteristicsGains] = useState<any>(null);
+  const [newCharacteristics, setNewCharacteristics] = useState<any>(null);
+  const [isCompletingModule, setIsCompletingModule] = useState(false);
+  
+  // Состояние для Toast уведомлений
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
 
   // Получаем params асинхронно и загружаем данные видео
   useEffect(() => {
@@ -420,6 +431,60 @@ export default function VideoPage({ params }: VideoPageProps) {
     } catch (error) {
       console.error('Error toggling like:', error);
     }
+  };
+
+  // Функция завершения одиночного модуля
+  const handleCompleteModule = async () => {
+    if (isCompletingModule || !videoId) return;
+    
+    const telegramId = getTelegramId();
+    if (!telegramId) {
+      alert('Пожалуйста, войдите в приложение');
+      return;
+    }
+    
+    try {
+      setIsCompletingModule(true);
+      
+      const response = await fetch('/api/training/complete-module', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: telegramId,
+          videoId: videoId,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        // Проверяем, есть ли прирост характеристик
+        if (data.gains && data.newCharacteristics) {
+          setCharacteristicsGains(data.gains);
+          setNewCharacteristics(data.newCharacteristics);
+          setShowGainsModal(true);
+        } else {
+          setToast({ message: '✅ Модуль завершен!', type: 'success' });
+        }
+      } else if (data.limitReached) {
+        setToast({
+          message: data.error || 'Достигнут дневной лимит модулей (4). Приходи завтра! 💪',
+          type: 'warning'
+        });
+      } else {
+        setToast({ message: 'Ошибка при завершении модуля', type: 'error' });
+      }
+    } catch (error) {
+      console.error('Error completing module:', error);
+      setToast({ message: 'Ошибка при завершении модуля', type: 'error' });
+    } finally {
+      setIsCompletingModule(false);
+    }
+  };
+  
+  // Закрытие модалки прироста
+  const handleGainsModalClose = () => {
+    setShowGainsModal(false);
   };
 
   // Функция скачивания видео
@@ -1233,6 +1298,31 @@ export default function VideoPage({ params }: VideoPageProps) {
               <Image src="/icons/video/action-share.svg" alt="Поделиться" width={20} height={20} />
               <span className="text-[#AEABBB] text-xs whitespace-nowrap">Поделиться</span>
             </div>
+            
+            {/* Complete Module - показываем только если не в составе тренировки */}
+            {!fromWorkout && (
+              <button
+                onClick={handleCompleteModule}
+                disabled={isCompletingModule}
+                className="bg-gradient-to-r from-[#A1FF4A] to-[#7DFF8C] hover:from-[#90ee39] hover:to-[#6cee7b] rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCompletingModule ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-[#060919] border-t-transparent rounded-full animate-spin" />
+                    <span className="text-[#060919] text-xs font-bold whitespace-nowrap">
+                      Завершение...
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={20} className="text-[#060919]" />
+                    <span className="text-[#060919] text-xs font-bold whitespace-nowrap">
+                      Завершить модуль
+                    </span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1257,6 +1347,24 @@ export default function VideoPage({ params }: VideoPageProps) {
       
       {/* Скрываем BottomNavigation в горизонтальном режиме */}
       {!isLandscape && <BottomNavigation activeTab="video" />}
+      
+      {/* Модалка прироста характеристик */}
+      {showGainsModal && characteristicsGains && newCharacteristics && (
+        <CharacteristicsGainModal
+          gains={characteristicsGains}
+          newCharacteristics={newCharacteristics}
+          onClose={handleGainsModalClose}
+        />
+      )}
+      
+      {/* Toast уведомления */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

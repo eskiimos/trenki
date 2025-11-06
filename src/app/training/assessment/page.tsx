@@ -82,7 +82,7 @@ export default function TrainingAssessmentPage() {
         
         console.log('📤 Generating workout:', generatePayload);
         
-        const generateResponse = await fetch('/api/training/generate', {
+        const generateResponse = await fetch('/api/training/generate-v2', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(generatePayload),

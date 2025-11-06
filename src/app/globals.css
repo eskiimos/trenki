@@ -194,3 +194,13 @@ body:has(.admin-layout) .mobile-layout {
 body:has(.admin-layout) .mobile-container {
   max-width: 100% !important;
 }
+
+/* Скрываем скроллбар для горизонтального скролла */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}

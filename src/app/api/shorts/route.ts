@@ -6,11 +6,19 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
+    const trainerId = searchParams.get('trainerId');
+    
+    const whereClause: any = {
+      isPublished: true,
+    };
+
+    // Фильтр по тренеру
+    if (trainerId) {
+      whereClause.trainerId = trainerId;
+    }
     
     const shorts = await prisma.short.findMany({
-      where: {
-        isPublished: true,
-      },
+      where: whereClause,
       orderBy: [
         { order: 'asc' },
         { createdAt: 'desc' }
