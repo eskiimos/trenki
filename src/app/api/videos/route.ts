@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
       equipment,
       level,
       isPublished,
-      rpeМін,
+      rpeМин,
       rpeМакс,
     } = body;
 
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     const durationNum = parseInt(duration) || 0;
     
     // Преобразуем RPE в числа
-    const rpeМинNum = rpeМін ? parseInt(rpeМін.toString()) : null;
+    const rpeМинNum = rpeМин ? parseInt(rpeМин.toString()) : null;
     const rpeМаксNum = rpeМакс ? parseInt(rpeМакс.toString()) : null;
 
     console.log('isPublished value:', isPublished, 'type:', typeof isPublished);

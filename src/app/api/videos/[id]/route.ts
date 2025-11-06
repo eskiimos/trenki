@@ -22,7 +22,7 @@ export async function PUT(
       equipment,
       level,
       isPublished,
-      rpeМін,
+      rpeМин,
       rpeМакс,
     } = body;
 
@@ -33,7 +33,7 @@ export async function PUT(
     }
 
         // Преобразуем RPE в числа
-    const rpeМинNum = rpeМін ? parseInt(rpeМін.toString()) : null;
+    const rpeМинNum = rpeМин ? parseInt(rpeМин.toString()) : null;
     const rpeМаксNum = rpeМакс ? parseInt(rpeМакс.toString()) : null;
 
     // Обновляем видео
