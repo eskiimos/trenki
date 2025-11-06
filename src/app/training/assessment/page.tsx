@@ -78,6 +78,8 @@ export default function TrainingAssessmentPage() {
         const generatePayload = {
           userId: user.id.toString(),
           assessmentId: data.assessment.id,
+          loadDirection: data.recommendation.loadDirection,
+          availableTime: data.assessment.availableTime || 45,
         };
         
         console.log('📤 Generating workout:', generatePayload);
