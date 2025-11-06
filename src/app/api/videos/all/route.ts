@@ -22,9 +22,20 @@ export async function GET(request: NextRequest) {
             speciality: true,
           },
         },
+        videoTags: {
+          include: {
+            tag: true
+          }
+        }
       },
       orderBy: { createdAt: 'desc' }
     });
+
+    // Извлекаем LoadType тег из videoTags
+    const getLoadType = (videoTags: any[]) => {
+      const loadTypeTag = videoTags.find(vt => vt.tag.tagType === 'LOAD');
+      return loadTypeTag?.tag.loadType || null;
+    };
 
     // Форматируем данные для фронтенда
     const formattedVideos = videos.map(video => ({
@@ -50,9 +61,9 @@ export async function GET(request: NextRequest) {
       createdAt: video.createdAt,
       rpeМин: video.rpeМин,
       rpeМакс: video.rpeМакс,
-    }));
-
-    return NextResponse.json({ videos: formattedVideos });
+      // Добавляем LoadType для обратной совместимости с админкой
+      типНагрузки: getLoadType(video.videoTags),
+    }));    return NextResponse.json({ videos: formattedVideos });
   } catch (error) {
     console.error('Error fetching all videos:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
