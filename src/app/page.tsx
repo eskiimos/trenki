@@ -654,14 +654,18 @@ const TrainingsSection = () => (
 const TrainersSection = () => {
   const [trainers, setTrainers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
 
   useEffect(() => {
     const fetchTrainers = async () => {
       try {
         const response = await fetch('/api/trainers');
         const data = await response.json();
-        // Берем только первых 2 тренеров для отображения
-        setTrainers((data.trainers || []).slice(0, 2));
+        const allTrainers = data.trainers || [];
+        // Берем только первых 5 тренеров для отображения
+        setTrainers(allTrainers.slice(0, 5));
+        // Проверяем, есть ли еще тренеры
+        setHasMore(allTrainers.length > 5);
       } catch (error) {
         console.error('Error loading trainers:', error);
       } finally {
@@ -702,9 +706,6 @@ const TrainersSection = () => {
     <section style={{ paddingBottom: '15px' }}>
         <div style={{
             width: '100%', 
-            height: '100%', 
-            paddingLeft: 16, 
-            paddingRight: 16, 
             paddingTop: 24, 
             paddingBottom: 24, 
             background: 'linear-gradient(180deg, #101530 0%, #060919 100%)', 
@@ -713,13 +714,16 @@ const TrainersSection = () => {
             justifyContent: 'flex-start', 
             alignItems: 'flex-start', 
             gap: 16, 
-            display: 'inline-flex'
+            display: 'flex',
+            overflow: 'visible'
         }}>
             <div style={{
-                alignSelf: 'stretch', 
+                width: '100%',
+                paddingLeft: 16,
+                paddingRight: 16,
                 justifyContent: 'space-between', 
                 alignItems: 'center', 
-                display: 'inline-flex'
+                display: 'flex'
             }}>
                 <div style={{
                     color: '#F9F8FE', 
@@ -747,16 +751,18 @@ const TrainersSection = () => {
                 </div>
             </div>
             <div style={{
-                alignSelf: 'stretch', 
-                justifyContent: 'flex-start', 
-                alignItems: 'center', 
-                gap: 16, 
-                display: 'inline-flex'
-            }}>
+                display: 'flex',
+                gap: 16,
+                overflowX: 'auto',
+                WebkitOverflowScrolling: 'touch',
+                width: '100%',
+                paddingLeft: '16px',
+                paddingRight: '16px'
+            }} className="scrollbar-hide">
                 {trainers.map((trainer) => (
-                  <Link key={trainer.id} href={`/trainers/${trainer.id}`}>
+                  <Link key={trainer.id} href={`/trainers/${trainer.id}`} style={{ flexShrink: 0 }}>
                     <div style={{
-                      width: '50%', 
+                      width: '170px', 
                       height: 202, 
                       paddingBottom: 8, 
                       background: '#060919', 
@@ -765,7 +771,7 @@ const TrainersSection = () => {
                       flexDirection: 'column', 
                       justifyContent: 'flex-start', 
                       alignItems: 'flex-start', 
-                      display: 'inline-flex',
+                      display: 'flex',
                       cursor: 'pointer'
                     }}>
                       <div style={{
@@ -812,7 +818,7 @@ const TrainersSection = () => {
                                 justifyContent: 'center', 
                                 display: 'flex', 
                                 flexDirection: 'column', 
-                                color: '#A1FF4A', 
+                                color: '#060919', 
                                 fontSize: 10, 
                                 fontFamily: 'Overpass', 
                                 fontWeight: '400', 
@@ -884,6 +890,39 @@ const TrainersSection = () => {
                   </div>
                   </Link>
                 ))}
+                {hasMore && (
+                  <Link href="/trainers" style={{ flexShrink: 0 }}>
+                    <div style={{
+                      width: '170px',
+                      height: 202,
+                      background: '#060919',
+                      borderRadius: 8,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      gap: 8,
+                      cursor: 'pointer',
+                      border: '2px dashed #445CFF'
+                    }}>
+                      <div style={{
+                        fontSize: 32,
+                        color: '#445CFF'
+                      }}>+</div>
+                      <div style={{
+                        color: '#445CFF',
+                        fontSize: 14,
+                        fontFamily: 'Overpass',
+                        fontWeight: '700',
+                        textTransform: 'uppercase',
+                        textAlign: 'center',
+                        padding: '0 16px'
+                      }}>
+                        Еще тренеры
+                      </div>
+                    </div>
+                  </Link>
+                )}
             </div>
         </div>
     </section>
