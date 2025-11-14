@@ -134,119 +134,196 @@ const ProfilePage = () => {
 
       {/* Основной контент */}
       <div className="px-4 pb-20">
-        {/* Профиль игрока */}
-        <div className="flex gap-3 mb-4">
-          {/* Большое фото - адаптируется к высоте соседнего блока */}
-          <div className="w-52 self-stretch bg-[#f6f6f6] rounded-lg overflow-hidden">
-            <Image 
-              src="/avatars/ChatGPT Image 5 сент. 2025 г., 11_46_52.png"
-              alt="Игрок" 
-              width={208} 
-              height={350} 
-              className="w-full h-full object-cover"
-            />
-          </div>
-          
-          {/* Информация об игроке */}
-          <div className="flex-1 flex flex-col gap-2">
-            {/* Аватар и иконка редактирования */}
-            <div className="flex justify-between items-start">
-              <div className="w-14 h-14 rounded bg-gradient-to-b from-[#445CFF]/20 to-[#445CFF]/60 overflow-hidden p-1">
+        {/* Профиль игрока - новый дизайн */}
+        <div className="mb-6">
+          {/* Карточка аватара */}
+          <div className="bg-[#060919] rounded-lg overflow-hidden">
+            {/* Аватар пользователя */}
+            <div className="w-full h-[235px] relative">
+              <Image 
+                src={userProfile?.avatar || "/avatars/Avatar.png"}
+                alt="Игрок" 
+                width={400} 
+                height={235} 
+                className="w-full h-full object-cover"
+              />
+              
+              {/* Номер и позиция - левый верхний угол */}
+              <div className="absolute top-3 left-3 w-16 h-16 bg-[#445CFF] rounded-lg flex flex-col items-center justify-center">
+                <div className="text-white text-2xl font-black font-overpass leading-none">
+                  {userProfile?.profile?.number || '-'}
+                </div>
+                <div className="text-white text-xs font-medium font-overpass uppercase leading-none mt-1">
+                  {userProfile?.profile?.position ? 
+                    (userProfile.profile.position === 'GOALTENDER' ? 'ВР' :
+                     userProfile.profile.position === 'DEFENSEMAN' ? 'ЗЩ' :
+                     userProfile.profile.position === 'LEFT_WING' ? 'ЛК' :
+                     userProfile.profile.position === 'CENTER' ? 'ЦН' :
+                     userProfile.profile.position === 'RIGHT_WING' ? 'ПК' : '-')
+                    : '-'
+                  }
+                </div>
+              </div>
+              
+              {/* Логотип клуба - правый верхний угол */}
+              <div className="absolute top-3 right-3 w-16 h-16 bg-white rounded-lg flex items-center justify-center overflow-hidden">
                 <Image 
-                  src="/trenki_app.jpeg"
+                  src={userProfile?.clubLogo || "/icons/icon-app.svg"}
                   alt="Логотип клуба" 
-                  width={56} 
-                  height={56} 
+                  width={64} 
+                  height={64} 
                   className="w-full h-full object-contain"
                 />
               </div>
-              <Link href="/profile/edit" className="w-6 h-6 flex items-center justify-center hover:opacity-80 transition-opacity">
-                <Image 
-                  src="/icons/tabler_edit.svg"
-                  alt="Редактировать" 
-                  width={24} 
-                  height={24} 
-                  className="w-full h-full"
-                />
-              </Link>
             </div>
             
             {/* Имя */}
-            <div className="text-white text-sm font-medium font-overpass leading-tight">
-              {isLoading ? 'Загрузка...' : (
-                <>
-                  {displayName}
-                  {displayLastName && <><br/>{displayLastName}</>}
-                </>
-              )}
-            </div>
-            
-            {/* Позиция */}
-            <div className="text-[#AEABBB] text-xs font-medium font-overpass">
-              {userProfile?.profile?.number || '--'} | {displayPosition}
-            </div>
-            
-            {/* Характеристики */}
-            <div className="text-[#AEABBB] text-xs font-medium font-overpass">
-              {userProfile?.profile?.age || '--'} лет | {userProfile?.profile?.height || '--'} см | {userProfile?.profile?.weight || '--'} кг
-            </div>
-            
-            {/* Потенциал - крупно */}
-            {userProfile?.profile?.potential !== undefined && userProfile?.profile?.potential > 0 && (
-              <div className="bg-gradient-to-r from-[#445CFF]/20 to-[#7B61FF]/20 rounded-lg p-2 mt-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[#AEABBB] text-xs font-medium font-overpass">⚡ Потенциал</span>
-                  <span className="text-white text-2xl font-black font-overpass">
-                    {userProfile.profile.potential.toFixed(1)}
-                  </span>
-                </div>
+            <div className="h-10 px-4 flex items-center border-b border-[#26252F]">
+              <div className="text-[#445CFF] text-base font-medium font-overpass uppercase">
+                {isLoading ? 'Загрузка...' : (displayName || 'ИМЯ')}
               </div>
-            )}
+            </div>
             
-            {/* Характеристики - компактно */}
-            {userProfile?.profile?.potential !== undefined && userProfile?.profile?.potential > 0 && (
-              <div className="flex flex-col gap-0.5 mt-2">
-                <CharacteristicBar 
-                  emoji="💪" 
-                  label="Сила" 
-                  value={userProfile?.profile?.ratingPower || 0} 
-                />
-                <CharacteristicBar 
-                  emoji="⚡" 
-                  label="Скорость" 
-                  value={userProfile?.profile?.ratingSpeed || 0} 
-                />
-                <CharacteristicBar 
-                  emoji="🫀" 
-                  label="Выносливость" 
-                  value={userProfile?.profile?.ratingEndurance || 0} 
-                />
-                <CharacteristicBar 
-                  emoji="🎯" 
-                  label="Техника" 
-                  value={userProfile?.profile?.ratingTechnique || 0} 
-                />
-                <CharacteristicBar 
-                  emoji="🤸" 
-                  label="Гибкость" 
-                  value={userProfile?.profile?.ratingFlexibility || 0} 
-                />
+            {/* Фамилия */}
+            <div className="h-10 px-4 flex items-center border-b border-[#26252F]">
+              <div className="text-[#445CFF] text-base font-medium font-overpass uppercase">
+                {isLoading ? '' : (displayLastName || 'ФАМИЛИЯ')}
               </div>
-            )}
+            </div>
             
-            {/* Приглашение пройти опрос, если характеристики не заполнены */}
-            {(!userProfile?.profile?.potential || userProfile?.profile?.potential === 0) && (
-              <Link href="/onboarding/characteristics" className="block mt-2">
-                <div className="bg-gradient-to-r from-[#445CFF] to-[#7B61FF] rounded-lg p-3 text-center">
-                  <div className="text-white text-xs font-medium font-overpass mb-1">
-                    📊 Пройди стартовый опрос
+            {/* Возраст, рост, вес */}
+            <div className="h-10 px-4 flex items-center">
+              <div className="text-[#AEABBB] text-sm font-medium font-overpass uppercase">
+                {userProfile?.profile?.age || '-'} ГОД | {userProfile?.profile?.height || '-'} СМ | {userProfile?.profile?.weight || '-'} КГ
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Секция потенциала */}
+        <div className="mb-6">
+          <div className="bg-[#060919] rounded-lg p-6 relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              {/* Левая часть - характеристики */}
+              <div className="flex-1 space-y-6">
+                {/* Выносливость */}
+                <div className="flex items-center gap-3">
+                  <div className="text-[#AEABBB] text-xs font-medium font-overpass uppercase tracking-wide whitespace-nowrap">
+                    ВЫНОСЛИВОСТЬ
                   </div>
-                  <div className="text-white/70 text-[10px] font-overpass">
-                    Узнай свой потенциал и начни расти!
+                  <div className="flex-1 h-[1px] bg-[#445CFF]/30"></div>
+                  <div className="w-12 h-12 rounded-full border-2 border-[#445CFF] flex items-center justify-center">
+                    <span className="text-[#445CFF] text-lg font-black font-overpass">
+                      {userProfile?.profile?.ratingEndurance?.toFixed(0) || '-'}
+                    </span>
                   </div>
                 </div>
-              </Link>
-            )}
+
+                {/* Гибкость */}
+                <div className="flex items-center gap-3">
+                  <div className="text-[#AEABBB] text-xs font-medium font-overpass uppercase tracking-wide whitespace-nowrap">
+                    ГИБКОСТЬ
+                  </div>
+                  <div className="flex-1 h-[1px] bg-[#445CFF]/30"></div>
+                  <div className="w-12 h-12 rounded-full border-2 border-[#445CFF] flex items-center justify-center">
+                    <span className="text-[#445CFF] text-lg font-black font-overpass">
+                      {userProfile?.profile?.ratingFlexibility?.toFixed(0) || '-'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Сила */}
+                <div className="flex items-center gap-3">
+                  <div className="text-[#AEABBB] text-xs font-medium font-overpass uppercase tracking-wide whitespace-nowrap">
+                    СИЛА
+                  </div>
+                  <div className="flex-1 h-[1px] bg-[#445CFF]/30"></div>
+                  <div className="w-12 h-12 rounded-full border-2 border-[#445CFF] flex items-center justify-center">
+                    <span className="text-[#445CFF] text-lg font-black font-overpass">
+                      {userProfile?.profile?.ratingPower?.toFixed(0) || '-'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Техника */}
+                <div className="flex items-center gap-3">
+                  <div className="text-[#AEABBB] text-xs font-medium font-overpass uppercase tracking-wide whitespace-nowrap">
+                    ТЕХНИКА
+                  </div>
+                  <div className="flex-1 h-[1px] bg-[#445CFF]/30"></div>
+                  <div className="w-12 h-12 rounded-full border-2 border-[#445CFF] flex items-center justify-center">
+                    <span className="text-[#445CFF] text-lg font-black font-overpass">
+                      {userProfile?.profile?.ratingTechnique?.toFixed(0) || '-'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Скорость */}
+                <div className="flex items-center gap-3">
+                  <div className="text-[#AEABBB] text-xs font-medium font-overpass uppercase tracking-wide whitespace-nowrap">
+                    СКОРОСТЬ
+                  </div>
+                  <div className="flex-1 h-[1px] bg-[#445CFF]/30"></div>
+                  <div className="w-12 h-12 rounded-full border-2 border-[#445CFF] flex items-center justify-center">
+                    <span className="text-[#445CFF] text-lg font-black font-overpass">
+                      {userProfile?.profile?.ratingSpeed?.toFixed(0) || '-'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Правая часть - общий потенциал */}
+              <div className="ml-8 relative">
+                {/* Большой круг */}
+                <div className="relative w-40 h-40">
+                  {/* Внешнее кольцо с градиентом */}
+                  <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 160 160">
+                    <circle
+                      cx="80"
+                      cy="80"
+                      r="72"
+                      fill="none"
+                      stroke="#445CFF"
+                      strokeWidth="3"
+                      opacity="0.2"
+                    />
+                    <circle
+                      cx="80"
+                      cy="80"
+                      r="72"
+                      fill="none"
+                      stroke="url(#gradient)"
+                      strokeWidth="6"
+                      strokeLinecap="round"
+                      strokeDasharray={`${(userProfile?.profile?.potential || 0) * 4.52} 1000`}
+                    />
+                    <defs>
+                      <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#A1FF4A" />
+                        <stop offset="100%" stopColor="#7DFF8C" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  
+                  {/* Внутренний контент */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <div className="text-[#A1FF4A] text-5xl font-black font-overpass leading-none">
+                      {userProfile?.profile?.potential?.toFixed(0) || '-'}
+                    </div>
+                    <div className="text-[#AEABBB] text-xs font-medium font-overpass uppercase mt-2 text-center leading-tight">
+                      ОБЩИЙ<br/>ПОТЕНЦИАЛ
+                    </div>
+                  </div>
+                  
+                  {/* Декоративные точки вокруг */}
+                  <div className="absolute -top-1 left-1/2 w-2 h-2 rounded-full bg-[#A1FF4A]"></div>
+                  <div className="absolute top-8 -right-2 w-2 h-2 rounded-full bg-[#A1FF4A]"></div>
+                  <div className="absolute bottom-8 -right-2 w-2 h-2 rounded-full bg-[#A1FF4A]"></div>
+                  <div className="absolute top-1/4 -left-2 w-2 h-2 rounded-full bg-[#A1FF4A]"></div>
+                  <div className="absolute bottom-1/4 -left-2 w-2 h-2 rounded-full bg-[#A1FF4A]"></div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -305,75 +382,63 @@ const ProfilePage = () => {
         )}
 
         {/* Меню разделы */}
-        <div className="space-y-4">
+        <div className="space-y-3 mb-6">
           <Link href="/training/history">
-            <div className="flex justify-between items-center cursor-pointer hover:opacity-80 transition-opacity">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">🏋️</span>
-                <span className="text-[#AEABBB] text-xs font-normal font-overpass">История тренировок</span>
-              </div>
-              <div className="w-4 h-4 flex items-center justify-center">
-                <Image 
-                  src="/icons/arrow.svg" 
-                  alt="Стрелка" 
-                  width={16} 
-                  height={16}
-                  className="transform rotate-90"
-                />
-              </div>
-            </div>
-          </Link>
-          <MenuSection title="Плейлисты" />
-          <MenuSection title="Избранные тренера" />
-          <MenuSection title="Избранные видео" />
-          <MenuSection title="История просмотров" />
-          
-          {/* Скаченные видео */}
-          <Link href="/offline-videos">
-            <div className="flex justify-between items-center cursor-pointer hover:opacity-80 transition-opacity">
-              <div className="flex items-center gap-2">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="#AEABBB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M7 10L12 15L17 10" stroke="#AEABBB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M12 15V3" stroke="#AEABBB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span className="text-[#AEABBB] text-xs font-normal font-overpass">Скаченные видео</span>
-              </div>
-              <div className="w-4 h-4 flex items-center justify-center">
-                <Image 
-                  src="/icons/arrow.svg" 
-                  alt="Стрелка" 
-                  width={16} 
-                  height={16}
-                  className="transform rotate-90"
-                />
-              </div>
+            <div className="flex justify-between items-center py-3 cursor-pointer hover:opacity-80 transition-opacity">
+              <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИЗБРАННЫЕ ТРЕНЕРЫ</span>
+              <Image 
+                src="/icons/arrow.svg" 
+                alt="Стрелка" 
+                width={20} 
+                height={20}
+                className="opacity-50"
+              />
             </div>
           </Link>
           
-          {/* Баннер бота */}
-          <div className="bg-[#2d3448] rounded-lg p-4 text-center">
-            <div className="text-[#AEABBB] text-sm font-medium font-overpass mb-4">
-              подключайся к чат-боту<br/>и получи больше возможностей
-            </div>
-            <button className="bg-[#445CFF] text-white px-6 py-2 rounded-full text-xs font-medium font-overpass">
-              К боту
-            </button>
+          <div className="h-[1px] bg-[#26252F]"></div>
+          
+          <div className="flex justify-between items-center py-3">
+            <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИЗБРАННЫЕ ТРЕНИРОВКИ</span>
+            <Image 
+              src="/icons/arrow.svg" 
+              alt="Стрелка" 
+              width={20} 
+              height={20}
+              className="opacity-50"
+            />
           </div>
           
-          {/* FAQ */}
-          <div className="space-y-4">
-            <MenuSection title="Частые вопросы" />
-            <div className="space-y-1">
-              <FAQItem question="Как начать тренироваться?" />
-              <FAQItem question="Как отслеживать прогресс?" />
-              <FAQItem question="Где найти программы тренировок?" />
-              <FAQItem question="Как связаться с тренером?" />
-            </div>
-          </div>
+          <div className="h-[1px] bg-[#26252F]"></div>
           
+          <div className="flex justify-between items-center py-3">
+            <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИСТОРИЯ ПРОСМОТРОВ</span>
+            <Image 
+              src="/icons/arrow.svg" 
+              alt="Стрелка" 
+              width={20} 
+              height={20}
+              className="opacity-50"
+            />
+          </div>
+        </div>
+        
+        {/* FAQ секция */}
+        <div className="mb-6">
+          <h2 className="text-white text-sm font-medium font-overpass uppercase tracking-wide mb-4">
+            ЧАСТЫЕ ВОПРОСЫ
+          </h2>
+          <div className="space-y-2">
+            <FAQItem question="А что будет, если вот так?" />
+            <FAQItem question="А если вот так?" />
+            <FAQItem question="А вот так?" />
+          </div>
+        </div>
+
+        {/* Служебные кнопки */}
+        <div className="space-y-2">
           {/* Кнопка админки */}
-          <div className="pt-4">
+          <div>
             <Link href="/admin">
               <button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl">
                 🔧 Админка
@@ -477,17 +542,11 @@ const MenuSection = ({ title }: { title: string }) => (
 
 // Компонент для FAQ
 const FAQItem = ({ question }: { question: string }) => (
-  <div className="bg-[#2d3448]/50 rounded px-3 py-2 flex justify-between items-center">
-    <span className="text-[#AEABBB] text-xs font-medium font-overpass">{question}</span>
-    <div className="w-3 h-3 flex items-center justify-center">
-      <Image 
-        src="/icons/arrow.svg" 
-        alt="Стрелка" 
-        width={12} 
-        height={12}
-        className="transform rotate-180"
-      />
-    </div>
+  <div className="bg-[#060919] rounded-lg px-4 py-3 flex justify-between items-center cursor-pointer hover:opacity-80 transition-opacity">
+    <span className="text-white text-sm font-normal font-overpass">{question}</span>
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0">
+      <path d="M4 6L8 10L12 6" stroke="#AEABBB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
   </div>
 );
 

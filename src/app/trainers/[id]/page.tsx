@@ -31,14 +31,16 @@ interface Short {
   title: string;
 }
 
-export default function TrainerProfilePage() {
+export default function TrainerPage() {
   const params = useParams();
   const trainerId = params.id as string;
   
   const [trainer, setTrainer] = useState<Trainer | null>(null);
   const [videos, setVideos] = useState<Video[]>([]);
   const [shorts, setShorts] = useState<Short[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [userRating, setUserRating] = useState<number>(0);
+  const [hoveredRating, setHoveredRating] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,7 +57,7 @@ export default function TrainerProfilePage() {
         
         if (!trainerResponse.ok || !trainerData.trainer) {
           setError(trainerData.error || 'Тренер не найден');
-          setIsLoading(false);
+          setLoading(false);
           return;
         }
         
@@ -73,7 +75,7 @@ export default function TrainerProfilePage() {
       } catch (error) {
         console.error('Error loading trainer:', error);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
@@ -82,7 +84,7 @@ export default function TrainerProfilePage() {
     }
   }, [trainerId]);
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-[#060919] flex items-center justify-center">
         <div className="text-white text-xl">Загрузка...</div>
@@ -104,7 +106,7 @@ export default function TrainerProfilePage() {
 
   // TypeScript теперь знает, что trainer точно существует
   return (
-    <div className="min-h-screen bg-[#060919] text-white pb-20">
+    <div className="min-h-screen text-white pb-20" style={{ background: 'linear-gradient(182.77deg, #101530 69.24%, #060919 97.69%)' }}>
       {/* Шапка с кнопкой назад */}
       <div className="px-4 pt-4 mb-4">
         <Link href="/" className="inline-block">
@@ -121,19 +123,19 @@ export default function TrainerProfilePage() {
 
       {/* Фрейм с информацией о тренере */}
       <div className="px-4 mb-6">
-        <div className="bg-[#111631] rounded-lg p-4">
+        <div className="bg-[#060919] rounded-lg overflow-hidden">
           {/* Профиль: аватар + инфо */}
-          <div className="mb-4">
-            <div className="flex items-stretch gap-0 rounded-lg overflow-hidden" style={{ background: 'linear-gradient(180deg, #111631 0%, #111631 100%)' }}>
+          <div>
+            <div className="flex items-stretch gap-0">
               {/* Левая часть: Аватар с рейтингом */}
-              <div className="relative w-[35%] flex-shrink-0 bg-gradient-to-br from-[#2d3e8f] to-[#1a2456]">
+              <div className="relative w-[112px] h-[112px] flex-shrink-0 bg-gradient-to-br from-[#2d3e8f] to-[#1a2456]">
                 <div className="w-full h-full">
                   {trainer.avatar ? (
                     <Image 
                       src={trainer.avatar} 
                       alt={trainer.name}
-                      width={280}
-                      height={280}
+                      width={112}
+                      height={112}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -148,55 +150,184 @@ export default function TrainerProfilePage() {
                   )}
                 </div>
                 {/* Рейтинг - зеленый шестиугольник в левом верхнем углу */}
-                <div className="absolute top-3 left-3 w-10 h-10 flex items-center justify-center">
+                <div className="absolute top-2 left-2 w-8 h-8 flex items-center justify-center">
                   <Image 
                     src="/icons/star-6.svg" 
                     alt="Рейтинг" 
-                    width={40} 
-                    height={40}
+                    width={32} 
+                    height={32}
                   />
-                  <span className="absolute text-[#0a1628] text-base font-bold" style={{ fontFamily: 'Overpass' }}>
+                  <span 
+                    className="absolute text-[#0a1628] font-bold uppercase"
+                    style={{ 
+                      fontFamily: 'Overpass',
+                      fontSize: '14px',
+                      lineHeight: '120%',
+                      letterSpacing: '0.5px',
+                      verticalAlign: 'middle'
+                    }}
+                  >
                     {trainer.rating}
                   </span>
                 </div>
               </div>
 
               {/* Правая часть: Информация */}
-              <div className="flex-1 bg-[#0a1628] flex flex-col justify-between p-4">
+              <div className="flex-1 flex flex-col justify-between p-4">
                 <div>
-                  <h1 className="text-[#445CFF] text-xl font-bold uppercase leading-tight mb-1">
+                  <h1 
+                    className="text-[#445CFF] font-bold uppercase mb-1"
+                    style={{ 
+                      fontFamily: 'Overpass', 
+                      fontSize: '14px', 
+                      lineHeight: '120%', 
+                      letterSpacing: '0.5px' 
+                    }}
+                  >
                     {trainer.name}
                   </h1>
-                  <h2 className="text-[#445CFF] text-xl font-bold uppercase leading-tight mb-3">
+                  <h2 
+                    className="text-[#445CFF] font-bold uppercase mb-3"
+                    style={{ 
+                      fontFamily: 'Overpass', 
+                      fontSize: '14px', 
+                      lineHeight: '120%', 
+                      letterSpacing: '0.5px' 
+                    }}
+                  >
                     {trainer.lastName}
                   </h2>
+                  {/* Горизонтальный разделитель */}
+                  <div className="w-full h-[1px] bg-[#101530] mb-3"></div>
                 </div>
-                <p className="text-white text-sm uppercase leading-tight">
+                <p 
+                  className="text-white uppercase"
+                  style={{ 
+                    fontFamily: 'Overpass', 
+                    fontWeight: 700,
+                    fontSize: '12px', 
+                    lineHeight: '100%', 
+                    letterSpacing: '0.5px',
+                    verticalAlign: 'middle'
+                  }}
+                >
                   {trainer.speciality}
                 </p>
               </div>
             </div>
           </div>
 
+          {/* Горизонтальный разделитель */}
+          <div className="w-full h-[1px] bg-[#101530]"></div>
+
           {/* Статистика */}
-          <div className="flex items-center justify-start gap-8 mb-4">
-            <div>
-              <div className="text-[#A1FF4A] text-2xl font-bold">{trainer.experience}</div>
-              <div className="text-white/70 text-xs uppercase">лет опыта</div>
+          <div className="flex items-center justify-start gap-4 p-3">
+            <div className="whitespace-nowrap">
+              <div 
+                className="text-[#A1FF4A] font-bold uppercase"
+                style={{ 
+                  fontFamily: 'Overpass', 
+                  fontSize: '12px', 
+                  lineHeight: '100%', 
+                  letterSpacing: '0.5px',
+                  verticalAlign: 'middle'
+                }}
+              >
+                {trainer.experience}
+              </div>
+              <div 
+                className="text-[#f9f9f9] uppercase"
+                style={{ 
+                  fontFamily: 'Overpass', 
+                  fontWeight: 700,
+                  fontSize: '12px', 
+                  lineHeight: '100%', 
+                  letterSpacing: '0.5px',
+                  verticalAlign: 'middle'
+                }}
+              >
+                лет опыта
+              </div>
             </div>
-            <div>
-              <div className="text-[#A1FF4A] text-2xl font-bold">{videos.length}</div>
-              <div className="text-white/70 text-xs uppercase">тренировок</div>
+            
+            {/* Вертикальный разделитель */}
+            <div className="w-[1px] h-8 bg-[#101530] flex-shrink-0"></div>
+            
+            <div className="whitespace-nowrap">
+              <div 
+                className="text-[#A1FF4A] font-bold uppercase"
+                style={{ 
+                  fontFamily: 'Overpass', 
+                  fontSize: '12px', 
+                  lineHeight: '100%', 
+                  letterSpacing: '0.5px',
+                  verticalAlign: 'middle'
+                }}
+              >
+                {videos.length}
+              </div>
+              <div 
+                className="text-[#f9f9f9] uppercase"
+                style={{ 
+                  fontFamily: 'Overpass', 
+                  fontWeight: 700,
+                  fontSize: '12px', 
+                  lineHeight: '100%', 
+                  letterSpacing: '0.5px',
+                  verticalAlign: 'middle'
+                }}
+              >
+                тренировок
+              </div>
             </div>
-            <div>
-              <div className="text-[#A1FF4A] text-2xl font-bold">{shorts.length}</div>
-              <div className="text-white/70 text-xs uppercase">треньки</div>
+            
+            {/* Вертикальный разделитель */}
+            <div className="w-[1px] h-8 bg-[#101530] flex-shrink-0"></div>
+            
+            <div className="whitespace-nowrap">
+              <div 
+                className="text-[#A1FF4A] font-bold uppercase"
+                style={{ 
+                  fontFamily: 'Overpass', 
+                  fontSize: '12px', 
+                  lineHeight: '100%', 
+                  letterSpacing: '0.5px',
+                  verticalAlign: 'middle'
+                }}
+              >
+                {shorts.length}
+              </div>
+              <div 
+                className="text-[#f9f9f9] uppercase"
+                style={{ 
+                  fontFamily: 'Overpass', 
+                  fontWeight: 700,
+                  fontSize: '12px', 
+                  lineHeight: '100%', 
+                  letterSpacing: '0.5px',
+                  verticalAlign: 'middle'
+                }}
+              >
+                треньки
+              </div>
             </div>
           </div>
 
+          {/* Горизонтальный разделитель */}
+          <div className="w-full h-[1px] bg-[#101530]"></div>
+
           {/* Описание */}
           {trainer.description && (
-            <p className="text-white/70 text-sm leading-relaxed">
+            <p 
+              className="text-[#AEABBB] p-3"
+              style={{ 
+                fontFamily: 'Overpass', 
+                fontWeight: 500,
+                fontSize: '12px', 
+                lineHeight: '110%', 
+                letterSpacing: '0.5px'
+              }}
+            >
               {trainer.description}
             </p>
           )}
@@ -204,13 +335,13 @@ export default function TrainerProfilePage() {
       </div>
 
       {/* ТРЕНЬКИ (Шортсы) */}
-      <div className="mb-8">
+      <div className="mb-4 bg-[#060919] py-4">
         <div className="px-4 mb-4 flex items-center justify-between">
           <h3 className="text-white text-sm font-bold uppercase">
             треньки
           </h3>
           <div className="flex items-center gap-2">
-            <span className="text-white/50 text-sm">({shorts.length})</span>
+            <span className="text-[#f9f9f9] text-sm">({shorts.length})</span>
             <Image 
               src="/icons/arrow.svg" 
               alt="Показать все" 
@@ -252,13 +383,13 @@ export default function TrainerProfilePage() {
       </div>
 
       {/* ТРЕНЕРОВКИ (Длинные видео) */}
-      <div className="mb-8">
+      <div className="mb-8 bg-[#060919] py-4">
         <div className="px-4 mb-4 flex items-center justify-between">
           <h3 className="text-white text-sm font-bold uppercase">
             тренеровки
           </h3>
           <div className="flex items-center gap-2">
-            <span className="text-white/50 text-sm">({videos.length})</span>
+            <span className="text-[#f9f9f9] text-sm">({videos.length})</span>
             <Image 
               src="/icons/arrow.svg" 
               alt="Показать все" 
@@ -329,21 +460,26 @@ export default function TrainerProfilePage() {
           
           {/* Звезды рейтинга */}
           <div className="flex items-center justify-center gap-4">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button 
-                key={star}
-                className="w-12 h-12 flex items-center justify-center opacity-30 hover:opacity-100 transition-opacity"
-              >
-                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                  <path 
-                    d="M24 4L28.944 18.528H44.472L31.764 27.944L36.708 42.472L24 33.056L11.292 42.472L16.236 27.944L3.528 18.528H19.056L24 4Z" 
-                    stroke="#445CFF" 
-                    strokeWidth="2"
-                    fill="none"
+            {[1, 2, 3, 4, 5].map((star) => {
+              const isActive = star <= (hoveredRating || userRating);
+              return (
+                <button 
+                  key={star}
+                  onClick={() => setUserRating(star)}
+                  onMouseEnter={() => setHoveredRating(star)}
+                  onMouseLeave={() => setHoveredRating(0)}
+                  className="w-8 h-8 flex items-center justify-center transition-all"
+                  style={{ opacity: isActive ? 1 : 0.3 }}
+                >
+                  <Image 
+                    src={isActive ? "/icons/star-6.svg" : "/icons/star-6-null.svg"}
+                    alt={`Звезда ${star}`}
+                    width={32}
+                    height={32}
                   />
-                </svg>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
