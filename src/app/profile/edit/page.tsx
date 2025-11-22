@@ -14,6 +14,10 @@ const ProfileEditPage = () => {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -21,7 +25,9 @@ const ProfileEditPage = () => {
     number: '',
     age: '',
     height: '',
-    weight: ''
+    weight: '',
+    avatarUrl: '',
+    clubLogoUrl: ''
   });
 
   useEffect(() => {
@@ -56,8 +62,18 @@ const ProfileEditPage = () => {
             number: data.user?.profile?.number?.toString() || '',
             age: data.user?.profile?.age?.toString() || '',
             height: data.user?.profile?.height?.toString() || '',
-            weight: data.user?.profile?.weight?.toString() || ''
+            weight: data.user?.profile?.weight?.toString() || '',
+            avatarUrl: data.user?.profile?.avatarUrl || '',
+            clubLogoUrl: data.user?.profile?.clubLogoUrl || ''
           });
+          
+          // Устанавливаем превью если есть URL
+          if (data.user?.profile?.avatarUrl) {
+            setAvatarPreview(data.user.profile.avatarUrl);
+          }
+          if (data.user?.profile?.clubLogoUrl) {
+            setLogoPreview(data.user.profile.clubLogoUrl);
+          }
         }
       } catch (error) {
         if (!cancelled) {
@@ -88,6 +104,84 @@ const ProfileEditPage = () => {
       ...prev,
       [field]: value
     }));
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Показываем превью
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    // Загружаем на сервер
+    setIsUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/upload/avatar', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.url) {
+        setFormData(prev => ({ ...prev, avatarUrl: data.url }));
+        console.log('Avatar uploaded:', data.url);
+      } else {
+        throw new Error(data.error || 'Ошибка загрузки');
+      }
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      alert('Ошибка при загрузке фото. Попробуйте еще раз.');
+      setAvatarPreview(null);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Показываем превью
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setLogoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    // Загружаем на сервер
+    setIsUploadingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/upload/logo', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.url) {
+        setFormData(prev => ({ ...prev, clubLogoUrl: data.url }));
+        console.log('Logo uploaded:', data.url);
+      } else {
+        throw new Error(data.error || 'Ошибка загрузки');
+      }
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      alert('Ошибка при загрузке логотипа. Попробуйте еще раз.');
+      setLogoPreview(null);
+    } finally {
+      setIsUploadingLogo(false);
+    }
   };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -132,6 +226,8 @@ const ProfileEditPage = () => {
           age: formData.age ? parseInt(formData.age) : null,
           height: formData.height ? parseInt(formData.height) : null,
           weight: formData.weight ? parseInt(formData.weight) : null,
+          avatarUrl: formData.avatarUrl || null,
+          clubLogoUrl: formData.clubLogoUrl || null,
         },
       };
       
@@ -199,182 +295,315 @@ const ProfileEditPage = () => {
   }
 
   return (
-    <div className="bg-[#101530] min-h-screen text-white">
+    <div className="bg-[#101530] min-h-screen text-white pb-24">
       {/* Шапка */}
-      <div className="flex items-center justify-between p-4 pt-[100px] border-b border-gray-700">
-        <div className="flex items-center gap-4">
-          <Link href="/profile" className="inline-block">
-            <div className="w-4 h-4 flex items-center justify-center">
-              <Image 
-                src="/icons/arrow.svg" 
-                alt="Назад" 
-                width={16} 
-                height={16}
-                style={{ transform: 'rotate(180deg)' }}
-              />
-            </div>
-          </Link>
-          <h1 className="text-white text-lg font-semibold">Редактировать профиль</h1>
-        </div>
+      <div className="flex items-center justify-between p-4 pt-[100px]">
+        <Link href="/profile" className="inline-block">
+          <div className="w-8 h-8 flex items-center justify-center">
+            <Image 
+              src="/icons/icon-action-back.svg" 
+              alt="Назад" 
+              width={32} 
+              height={32}
+            />
+          </div>
+        </Link>
         <button
           onClick={handleSubmit}
           disabled={isSaving}
-          className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg text-sm font-medium"
+          className="bg-[#445CFF] hover:bg-[#3a4edb] disabled:bg-[#445CFF]/50 text-white px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wide"
         >
           {isSaving ? 'Сохранение...' : 'Сохранить'}
         </button>
       </div>
 
       {/* Основной контент */}
-      <div className="px-4 py-6 pb-32">
-        <div className="space-y-6">
-          {/* Личная информация */}
-          <div className="bg-[#1a1e3a] rounded-lg p-4">
-            <h2 className="text-white text-base font-semibold mb-4">Личная информация</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">
-                  Имя
-                </label>
-                <input
-                  type="text"
-                  value={formData.firstName}
-                  onChange={(e) => handleInputChange('firstName', e.target.value)}
-                  className="w-full bg-[#2a2e4a] text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-blue-500 focus:outline-none"
-                  placeholder="Введите имя"
+      <div className="px-4 py-6 space-y-6">
+        {/* Загрузка фотографии */}
+        <div>
+          <input
+            type="file"
+            id="avatar-upload"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarUpload}
+            disabled={isUploadingAvatar}
+          />
+          <label
+            htmlFor="avatar-upload"
+            className="bg-gradient-to-b from-[#2A3B8F] to-[#1a2563] rounded-xl h-40 flex flex-col items-center justify-center cursor-pointer hover:opacity-90 transition-opacity relative overflow-hidden"
+          >
+            {avatarPreview ? (
+              <>
+                <Image
+                  src={avatarPreview}
+                  alt="Avatar preview"
+                  fill
+                  className="object-cover"
                 />
-              </div>
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                  <div className="text-[#A1FF4A] text-xs font-bold uppercase tracking-wide">
+                    {isUploadingAvatar ? 'Загрузка...' : 'Изменить фото'}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-12 h-12 mb-3">
+                  <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M24 32V16M24 16L18 22M24 16L30 22" stroke="#A1FF4A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M38 28V38H10V28" stroke="#A1FF4A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div className="text-[#A1FF4A] text-xs font-bold uppercase tracking-wide">
+                  {isUploadingAvatar ? 'Загрузка...' : 'Выбрать фотографию'}
+                </div>
+              </>
+            )}
+          </label>
+          <p className="text-[#AEABBB] text-xs text-center mt-3 leading-relaxed px-4">
+            Загрузи фото без фона в формате PNG хорошего качества или на контрастном однотонном фоне для лучшего результата в формате JPG
+          </p>
+        </div>
 
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">
-                  Фамилия
-                </label>
-                <input
-                  type="text"
-                  value={formData.lastName}
-                  onChange={(e) => handleInputChange('lastName', e.target.value)}
-                  className="w-full bg-[#2a2e4a] text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-blue-500 focus:outline-none"
-                  placeholder="Введите фамилию"
-                />
-              </div>
-            </div>
+        {/* Имя */}
+        <div>
+          <label className="text-white text-sm mb-2 block uppercase">ИМЯ</label>
+          <input
+            type="text"
+            value={formData.firstName}
+            onChange={(e) => handleInputChange('firstName', e.target.value)}
+            placeholder="ИМЯ"
+            className="w-full text-white placeholder-gray-400 px-4 border focus:outline-none transition-colors"
+            style={{
+              background: '#AEABBB33',
+              borderRadius: '32px',
+              border: '1px solid transparent',
+              height: '44px',
+            }}
+            onFocus={(e) => (e.target.style.border = '1px solid #A1FF4A')}
+            onBlur={(e) => (e.target.style.border = '1px solid transparent')}
+          />
+        </div>
+
+        {/* Фамилия */}
+        <div>
+          <input
+            type="text"
+            value={formData.lastName}
+            onChange={(e) => handleInputChange('lastName', e.target.value)}
+            placeholder="ФАМИЛИЯ"
+            className="w-full text-white placeholder-gray-400 px-4 border focus:outline-none transition-colors"
+            style={{
+              background: '#AEABBB33',
+              borderRadius: '32px',
+              border: '1px solid transparent',
+              height: '44px',
+            }}
+            onFocus={(e) => (e.target.style.border = '1px solid #A1FF4A')}
+            onBlur={(e) => (e.target.style.border = '1px solid transparent')}
+          />
+        </div>
+
+        {/* Дата рождения */}
+        <div>
+          <label className="text-white text-sm mb-2 block uppercase">ДАТА РОЖДЕНИЯ</label>
+          <input
+            type="text"
+            value={formData.age}
+            onChange={(e) => handleInputChange('age', e.target.value)}
+            placeholder="ДД/ММ/ГГ"
+            className="w-full text-white placeholder-gray-400 px-4 border focus:outline-none transition-colors"
+            style={{
+              background: '#AEABBB33',
+              borderRadius: '32px',
+              border: '1px solid transparent',
+              height: '44px',
+            }}
+            onFocus={(e) => (e.target.style.border = '1px solid #A1FF4A')}
+            onBlur={(e) => (e.target.style.border = '1px solid transparent')}
+          />
+        </div>
+
+        {/* Пол */}
+        <div>
+          <label className="text-white text-sm mb-2 block uppercase">ПОЛ</label>
+          <div className="flex gap-3 flex-wrap">
+            <button
+              type="button"
+              className="px-6 py-3 rounded-full font-medium transition-all bg-[#AEABBB33] text-white hover:bg-[#A1FF4A] hover:text-[#0A0E1A]"
+            >
+              М
+            </button>
+            <button
+              type="button"
+              className="px-6 py-3 rounded-full font-medium transition-all bg-[#AEABBB33] text-white hover:bg-[#A1FF4A] hover:text-[#0A0E1A]"
+            >
+              Ж
+            </button>
+            <button
+              type="button"
+              className="px-6 py-3 rounded-full font-medium text-sm transition-all bg-[#AEABBB33] text-white hover:bg-[#A1FF4A] hover:text-[#0A0E1A]"
+            >
+              Не хочу указывать
+            </button>
           </div>
+        </div>
 
-          {/* Хоккейная информация */}
-          <div className="bg-[#1a1e3a] rounded-lg p-4">
-            <h2 className="text-white text-base font-semibold mb-4">Хоккейная информация</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">
-                  Позиция
-                </label>
-                <select
-                  value={formData.position}
-                  onChange={(e) => handleInputChange('position', e.target.value)}
-                  className="w-full bg-[#2a2e4a] text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-blue-500 focus:outline-none"
-                >
-                  <option value="">Выберите позицию</option>
-                  <option value="GOALTENDER">Вратарь</option>
-                  <option value="DEFENSEMAN">Защитник</option>
-                  <option value="LEFT_WING">Левый крайний</option>
-                  <option value="CENTER">Центральный нападающий</option>
-                  <option value="RIGHT_WING">Правый крайний</option>
-                </select>
-              </div>
+        {/* Рост */}
+        <div>
+          <label className="text-white text-sm mb-2 block uppercase">РОСТ</label>
+          <input
+            type="number"
+            min="100"
+            max="230"
+            value={formData.height}
+            onChange={(e) => handleInputChange('height', e.target.value)}
+            placeholder="СМ"
+            className="w-full text-white placeholder-gray-400 px-4 border focus:outline-none transition-colors"
+            style={{
+              background: '#AEABBB33',
+              borderRadius: '32px',
+              border: '1px solid transparent',
+              height: '44px',
+            }}
+            onFocus={(e) => (e.target.style.border = '1px solid #A1FF4A')}
+            onBlur={(e) => (e.target.style.border = '1px solid transparent')}
+          />
+        </div>
 
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">
-                  Номер игрока
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="99"
-                  value={formData.number}
-                  onChange={(e) => handleInputChange('number', e.target.value)}
-                  className="w-full bg-[#2a2e4a] text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-blue-500 focus:outline-none"
-                  placeholder="Введите номер (1-99)"
+        {/* Вес */}
+        <div>
+          <label className="text-white text-sm mb-2 block uppercase">ВЕС</label>
+          <input
+            type="number"
+            min="30"
+            max="150"
+            value={formData.weight}
+            onChange={(e) => handleInputChange('weight', e.target.value)}
+            placeholder="КГ"
+            className="w-full text-white placeholder-gray-400 px-4 border focus:outline-none transition-colors"
+            style={{
+              background: '#AEABBB33',
+              borderRadius: '32px',
+              border: '1px solid transparent',
+              height: '44px',
+            }}
+            onFocus={(e) => (e.target.style.border = '1px solid #A1FF4A')}
+            onBlur={(e) => (e.target.style.border = '1px solid transparent')}
+          />
+        </div>
+
+        {/* Загрузка логотипа клуба */}
+        <div>
+          <input
+            type="file"
+            id="logo-upload"
+            accept="image/*"
+            className="hidden"
+            onChange={handleLogoUpload}
+            disabled={isUploadingLogo}
+          />
+          <label
+            htmlFor="logo-upload"
+            className="bg-[#3A3955] rounded-xl h-32 flex flex-col items-center justify-center cursor-pointer hover:opacity-90 transition-opacity relative overflow-hidden"
+          >
+            {logoPreview ? (
+              <>
+                <Image
+                  src={logoPreview}
+                  alt="Logo preview"
+                  fill
+                  className="object-contain p-4"
                 />
-              </div>
-            </div>
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                  <div className="text-[#A1FF4A] text-xs font-bold uppercase tracking-wide">
+                    {isUploadingLogo ? 'Загрузка...' : 'Изменить лого'}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-12 h-12 mb-3">
+                  <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M24 32V16M24 16L18 22M24 16L30 22" stroke="#A1FF4A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M38 28V38H10V28" stroke="#A1FF4A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div className="text-[#A1FF4A] text-xs font-bold uppercase tracking-wide">
+                  {isUploadingLogo ? 'Загрузка...' : 'Загрузить лого клуба'}
+                </div>
+              </>
+            )}
+          </label>
+          <p className="text-[#AEABBB] text-xs text-center mt-3 leading-relaxed px-4">
+            Загрузи логотип в формате png/jpg с максимальным разрешением 2500x2500px
+          </p>
+        </div>
+
+        {/* Игровое амплуа */}
+        <div>
+          <label className="text-white text-sm mb-2 block uppercase">ИГРОВОЕ АМПЛУА</label>
+          <div className="flex gap-3 flex-wrap">
+            <button 
+              type="button"
+              onClick={() => handleInputChange('position', 'FORWARD')}
+              className={`px-6 py-3 rounded-full font-medium transition-all ${
+                formData.position === 'FORWARD' ? 'bg-[#A1FF4A] text-[#f8f8f8]' : 'bg-[#AEABBB33] text-white'
+              }`}
+            >
+              Нападающий
+            </button>
+            <button 
+              type="button"
+              onClick={() => handleInputChange('position', 'DEFENSEMAN')}
+              className={`px-6 py-3 rounded-full font-medium transition-all ${
+                formData.position === 'DEFENSEMAN' ? 'bg-[#A1FF4A] text-[#f8f8f8]' : 'bg-[#AEABBB33] text-white'
+              }`}
+            >
+              Защитник
+            </button>
+            <button 
+              type="button"
+              onClick={() => handleInputChange('position', 'GOALTENDER')}
+              className={`px-6 py-3 rounded-full font-medium transition-all ${
+                formData.position === 'GOALTENDER' ? 'bg-[#A1FF4A] text-[#f8f8f8]' : 'bg-[#AEABBB33] text-white'
+              }`}
+            >
+              Вратарь
+            </button>
+            <button 
+              type="button"
+              onClick={() => handleInputChange('position', 'UNDECIDED')}
+              className={`px-6 py-3 rounded-full font-medium text-sm transition-all ${
+                formData.position === 'UNDECIDED' ? 'bg-[#A1FF4A] text-[#f8f8f8]' : 'bg-[#AEABBB33] text-white'
+              }`}
+            >
+              Пока не определился
+            </button>
           </div>
+        </div>
 
-          {/* Физические характеристики */}
-          <div className="bg-[#1a1e3a] rounded-lg p-4">
-            <h2 className="text-white text-base font-semibold mb-4">Физические характеристики</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">
-                  Возраст (лет)
-                </label>
-                <input
-                  type="number"
-                  min="5"
-                  max="50"
-                  value={formData.age}
-                  onChange={(e) => handleInputChange('age', e.target.value)}
-                  className="w-full bg-[#2a2e4a] text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-blue-500 focus:outline-none"
-                  placeholder="Введите возраст"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">
-                  Рост (см)
-                </label>
-                <input
-                  type="number"
-                  min="100"
-                  max="230"
-                  value={formData.height}
-                  onChange={(e) => handleInputChange('height', e.target.value)}
-                  className="w-full bg-[#2a2e4a] text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-blue-500 focus:outline-none"
-                  placeholder="Введите рост в см"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-300 text-sm font-medium mb-2">
-                  Вес (кг)
-                </label>
-                <input
-                  type="number"
-                  min="30"
-                  max="150"
-                  value={formData.weight}
-                  onChange={(e) => handleInputChange('weight', e.target.value)}
-                  className="w-full bg-[#2a2e4a] text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-blue-500 focus:outline-none"
-                  placeholder="Введите вес в кг"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Информационная секция */}
-          <div className="bg-[#1a1e3a] rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-5 h-5 mt-1">
-                <Image 
-                  src="/icons/ant-design-thunderbolt-filled.svg" 
-                  alt="Информация" 
-                  width={20} 
-                  height={20}
-                  className="opacity-70"
-                />
-              </div>
-              <div>
-                <p className="text-gray-300 text-sm">
-                  <span className="font-medium">Статистика и прогресс</span> будут доступны в платной версии приложения
-                </p>
-                <p className="text-gray-400 text-xs mt-1">
-                  Детальная аналитика, отслеживание прогресса и персональные рекомендации
-                </p>
-              </div>
-            </div>
-          </div>
+        {/* Игровой номер */}
+        <div>
+          <label className="text-white text-sm mb-2 block uppercase">ИГРОВОЙ НОМЕР</label>
+          <input
+            type="number"
+            min="1"
+            max="99"
+            value={formData.number}
+            onChange={(e) => handleInputChange('number', e.target.value)}
+            placeholder="00"
+            className="w-full text-white placeholder-gray-400 px-4 border focus:outline-none transition-colors"
+            style={{
+              background: '#AEABBB33',
+              borderRadius: '32px',
+              border: '1px solid transparent',
+              height: '44px',
+            }}
+            onFocus={(e) => (e.target.style.border = '1px solid #A1FF4A')}
+            onBlur={(e) => (e.target.style.border = '1px solid transparent')}
+          />
         </div>
       </div>
 

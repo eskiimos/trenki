@@ -38,6 +38,8 @@ model Profile {
   age           Int?
   height        Int?
   weight        Int?
+  avatarUrl     String?
+  clubLogoUrl   String?
   
   // Новая система характеристик (потенциал)
   ratingPower       Float           @default(0)  // сила

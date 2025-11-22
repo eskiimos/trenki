@@ -115,21 +115,32 @@ const ProfilePage = () => {
   return (
     <div className="bg-[#101530] min-h-screen text-white">
       {/* Шапка с кнопкой назад */}
-      <div className="flex items-center p-4 pt-[100px]">
+      <div className="flex items-center justify-between p-4 pt-[100px]">
         <div className="flex items-center gap-4">
           <Link href="/" className="inline-block">
-            <div className="w-4 h-4 flex items-center justify-center">
+            <div className="w-8 h-8 flex items-center justify-center">
               <Image 
-                src="/icons/arrow.svg" 
+                src="/icons/icon-action-back.svg" 
                 alt="Назад" 
-                width={16} 
-                height={16}
-                style={{ transform: 'rotate(180deg)' }}
+                width={32} 
+                height={32}
               />
             </div>
           </Link>
-          <h1 className="text-white text-xs font-normal font-overpass">Профиль</h1>
+          <h1 className="text-white text-xs font-bold font-overpass leading-[120%] tracking-[0.5px] align-middle uppercase">Профиль</h1>
         </div>
+        
+        {/* Кнопка редактирования */}
+        <Link href="/profile/edit" className="inline-block">
+          <div className="w-8 h-8 flex items-center justify-center hover:opacity-80 transition-opacity">
+            <Image 
+              src="/icons/icon-edit.svg" 
+              alt="Редактировать профиль" 
+              width={32} 
+              height={32}
+            />
+          </div>
+        </Link>
       </div>
 
       {/* Основной контент */}
