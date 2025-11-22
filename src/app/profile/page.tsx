@@ -214,7 +214,7 @@ const ProfilePage = () => {
         {/* Секция потенциала */}
         <div className="mb-6">
           <div className="bg-[#060919] rounded-lg p-4 relative overflow-hidden">
-            <div className="flex items-center justify-between gap-6">
+            <div className="flex items-center justify-between">
               {/* Левая часть - характеристики */}
               <div className="flex-1 space-y-3">
                 {/* Выносливость */}
@@ -390,7 +390,7 @@ const ProfilePage = () => {
                     <div className="text-[#A1FF4A] text-[42px] font-black font-overpass leading-none">
                       {userProfile?.profile?.potential?.toFixed(0) || '99'}
                     </div>
-                    <div className="text-[#AEABBB] text-[10px] font-normal font-overpass lowercase mt-1 text-center leading-tight">
+                    <div className="text-[#AEABBB] text-xs font-extrabold font-overpass uppercase mt-1 text-center leading-[100%] tracking-[0.5px] italic">
                       общий<br/>потенциал
                     </div>
                   </div>
@@ -455,9 +455,9 @@ const ProfilePage = () => {
         )}
 
         {/* Меню разделы */}
-        <div className="space-y-3 mb-6">
+        <div className="bg-[#060919] rounded-lg px-4 mb-6">
           <Link href="/training/history">
-            <div className="flex justify-between items-center py-3 cursor-pointer hover:opacity-80 transition-opacity">
+            <div className="flex justify-between items-center py-4 cursor-pointer hover:opacity-80 transition-opacity">
               <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИЗБРАННЫЕ ТРЕНЕРЫ</span>
               <Image 
                 src="/icons/arrow.svg" 
@@ -471,7 +471,7 @@ const ProfilePage = () => {
           
           <div className="h-[1px] bg-[#26252F]"></div>
           
-          <div className="flex justify-between items-center py-3">
+          <div className="flex justify-between items-center py-4">
             <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИЗБРАННЫЕ ТРЕНИРОВКИ</span>
             <Image 
               src="/icons/arrow.svg" 
@@ -484,7 +484,7 @@ const ProfilePage = () => {
           
           <div className="h-[1px] bg-[#26252F]"></div>
           
-          <div className="flex justify-between items-center py-3">
+          <div className="flex justify-between items-center py-4">
             <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИСТОРИЯ ПРОСМОТРОВ</span>
             <Image 
               src="/icons/arrow.svg" 
@@ -502,9 +502,22 @@ const ProfilePage = () => {
             ЧАСТЫЕ ВОПРОСЫ
           </h2>
           <div className="space-y-2">
-            <FAQItem question="А что будет, если вот так?" />
-            <FAQItem question="А если вот так?" />
-            <FAQItem question="А вот так?" />
+            <FAQItem 
+              question="Как часто можно тренироваться?" 
+              answer="Рекомендуется тренироваться 3-5 раз в неделю с днями отдыха для восстановления. В приложении доступно до 2 тренировок в день."
+            />
+            <FAQItem 
+              question="Как растет мой потенциал?" 
+              answer="Потенциал растет по мере выполнения тренировок и модулей. Система анализирует ваш прогресс и автоматически обновляет характеристики: силу, выносливость, скорость, технику и гибкость."
+            />
+            <FAQItem 
+              question="Что такое модули тренировок?" 
+              answer="Модули — это короткие тренировочные блоки по 10-15 минут, сфокусированные на конкретных навыках. Вы можете выполнить до 4 модулей в день."
+            />
+            <FAQItem 
+              question="Можно ли тренироваться без инвентаря?" 
+              answer="Да! В приложении есть тренировки с собственным весом и минимальным инвентарем. Фильтруйте тренировки по доступному оборудованию."
+            />
           </div>
         </div>
 
@@ -614,13 +627,36 @@ const MenuSection = ({ title }: { title: string }) => (
 );
 
 // Компонент для FAQ
-const FAQItem = ({ question }: { question: string }) => (
-  <div className="bg-[#060919] rounded-lg px-4 py-3 flex justify-between items-center cursor-pointer hover:opacity-80 transition-opacity">
-    <span className="text-white text-sm font-normal font-overpass">{question}</span>
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0">
-      <path d="M4 6L8 10L12 6" stroke="#AEABBB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  </div>
-);
+const FAQItem = ({ question, answer }: { question: string; answer: string }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  return (
+    <div className="bg-[#060919] rounded-lg overflow-hidden">
+      <div 
+        className="px-4 py-3 flex justify-between items-center cursor-pointer hover:opacity-80 transition-opacity"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="text-white text-sm font-normal font-overpass">{question}</span>
+        <svg 
+          width="16" 
+          height="16" 
+          viewBox="0 0 16 16" 
+          fill="none" 
+          xmlns="http://www.w3.org/2000/svg" 
+          className={`flex-shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
+        >
+          <path d="M4 6L8 10L12 6" stroke="#AEABBB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+      {isOpen && (
+        <div className="px-4 pb-3 pt-0">
+          <p className="text-[#AEABBB] text-xs font-normal font-overpass leading-relaxed">
+            {answer}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default ProfilePage;
