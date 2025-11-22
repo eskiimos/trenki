@@ -213,133 +213,195 @@ const ProfilePage = () => {
 
         {/* Секция потенциала */}
         <div className="mb-6">
-          <div className="bg-[#060919] rounded-lg p-6 relative overflow-hidden">
-            <div className="flex items-center justify-between">
+          <div className="bg-[#060919] rounded-lg p-4 relative overflow-hidden">
+            <div className="flex items-center justify-between gap-6">
               {/* Левая часть - характеристики */}
-              <div className="flex-1 space-y-6">
+              <div className="flex-1 space-y-3">
                 {/* Выносливость */}
-                <div className="flex items-center gap-3">
-                  <div className="text-[#AEABBB] text-xs font-medium font-overpass uppercase tracking-wide whitespace-nowrap">
-                    ВЫНОСЛИВОСТЬ
+                <div className="flex items-center">
+                  <div className="pr-1 text-white text-xs font-bold font-overpass uppercase leading-[100%] tracking-[0.5px]">
+                    выносливость
                   </div>
-                  <div className="flex-1 h-[1px] bg-[#445CFF]/30"></div>
-                  <div className="w-12 h-12 rounded-full border-2 border-[#445CFF] flex items-center justify-center">
-                    <span className="text-[#445CFF] text-lg font-black font-overpass">
-                      {userProfile?.profile?.ratingEndurance?.toFixed(0) || '-'}
-                    </span>
+                  <Image 
+                    src="/icons/Line - 1.svg"
+                    alt=""
+                    width={40}
+                    height={20}
+                    className="flex-shrink-0"
+                  />
+                  <div className="relative w-14 h-14 flex-shrink-0">
+                    <Image 
+                      src="/icons/Ellipse-care.svg"
+                      alt=""
+                      width={56}
+                      height={56}
+                      className="absolute inset-0"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-[#445CFF] text-sm font-black font-overpass">
+                        {userProfile?.profile?.ratingEndurance?.toFixed(0) || '99'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Гибкость */}
-                <div className="flex items-center gap-3">
-                  <div className="text-[#AEABBB] text-xs font-medium font-overpass uppercase tracking-wide whitespace-nowrap">
-                    ГИБКОСТЬ
+                <div className="flex items-center">
+                  <div className="pr-1 text-white text-xs font-bold font-overpass uppercase leading-[100%] tracking-[0.5px]">
+                    гибкость
                   </div>
-                  <div className="flex-1 h-[1px] bg-[#445CFF]/30"></div>
-                  <div className="w-12 h-12 rounded-full border-2 border-[#445CFF] flex items-center justify-center">
-                    <span className="text-[#445CFF] text-lg font-black font-overpass">
-                      {userProfile?.profile?.ratingFlexibility?.toFixed(0) || '-'}
-                    </span>
+                  <Image 
+                    src="/icons/Line - 2.svg"
+                    alt=""
+                    width={52}
+                    height={20}
+                    className="flex-shrink-0"
+                  />
+                  <div className="relative w-14 h-14 flex-shrink-0">
+                    <Image 
+                      src="/icons/Ellipse-care.svg"
+                      alt=""
+                      width={56}
+                      height={56}
+                      className="absolute inset-0"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-[#445CFF] text-sm font-black font-overpass">
+                        {userProfile?.profile?.ratingFlexibility?.toFixed(0) || '99'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Сила */}
-                <div className="flex items-center gap-3">
-                  <div className="text-[#AEABBB] text-xs font-medium font-overpass uppercase tracking-wide whitespace-nowrap">
-                    СИЛА
+                <div className="flex items-center">
+                  <div className="pr-1 text-white text-xs font-bold font-overpass uppercase leading-[100%] tracking-[0.5px]">
+                    сила
                   </div>
-                  <div className="flex-1 h-[1px] bg-[#445CFF]/30"></div>
-                  <div className="w-12 h-12 rounded-full border-2 border-[#445CFF] flex items-center justify-center">
-                    <span className="text-[#445CFF] text-lg font-black font-overpass">
-                      {userProfile?.profile?.ratingPower?.toFixed(0) || '-'}
-                    </span>
+                  <Image 
+                    src="/icons/Line - 3.svg"
+                    alt=""
+                    width={51}
+                    height={20}
+                    className="flex-shrink-0"
+                  />
+                  <div className="relative w-14 h-14 flex-shrink-0">
+                    <Image 
+                      src="/icons/Ellipse-care.svg"
+                      alt=""
+                      width={56}
+                      height={56}
+                      className="absolute inset-0"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-[#445CFF] text-sm font-black font-overpass">
+                        {userProfile?.profile?.ratingPower?.toFixed(0) || '99'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Техника */}
-                <div className="flex items-center gap-3">
-                  <div className="text-[#AEABBB] text-xs font-medium font-overpass uppercase tracking-wide whitespace-nowrap">
-                    ТЕХНИКА
+                <div className="flex items-center">
+                  <div className="pr-1 text-white text-xs font-bold font-overpass uppercase leading-[100%] tracking-[0.5px]">
+                    техника
                   </div>
-                  <div className="flex-1 h-[1px] bg-[#445CFF]/30"></div>
-                  <div className="w-12 h-12 rounded-full border-2 border-[#445CFF] flex items-center justify-center">
-                    <span className="text-[#445CFF] text-lg font-black font-overpass">
-                      {userProfile?.profile?.ratingTechnique?.toFixed(0) || '-'}
-                    </span>
+                  <Image 
+                    src="/icons/Line - 4.svg"
+                    alt=""
+                    width={56}
+                    height={20}
+                    className="flex-shrink-0"
+                  />
+                  <div className="relative w-14 h-14 flex-shrink-0">
+                    <Image 
+                      src="/icons/Ellipse-care.svg"
+                      alt=""
+                      width={56}
+                      height={56}
+                      className="absolute inset-0"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-[#445CFF] text-sm font-black font-overpass">
+                        {userProfile?.profile?.ratingTechnique?.toFixed(0) || '99'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Скорость */}
-                <div className="flex items-center gap-3">
-                  <div className="text-[#AEABBB] text-xs font-medium font-overpass uppercase tracking-wide whitespace-nowrap">
-                    СКОРОСТЬ
+                <div className="flex items-center">
+                  <div className="pr-1 text-white text-xs font-bold font-overpass uppercase leading-[100%] tracking-[0.5px]">
+                    скорость
                   </div>
-                  <div className="flex-1 h-[1px] bg-[#445CFF]/30"></div>
-                  <div className="w-12 h-12 rounded-full border-2 border-[#445CFF] flex items-center justify-center">
-                    <span className="text-[#445CFF] text-lg font-black font-overpass">
-                      {userProfile?.profile?.ratingSpeed?.toFixed(0) || '-'}
-                    </span>
+                  <Image 
+                    src="/icons/Line - 5.svg"
+                    alt=""
+                    width={80}
+                    height={20}
+                    className="flex-shrink-0"
+                  />
+                  <div className="relative w-14 h-14 flex-shrink-0">
+                    <Image 
+                      src="/icons/Ellipse-care.svg"
+                      alt=""
+                      width={56}
+                      height={56}
+                      className="absolute inset-0"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-[#445CFF] text-sm font-black font-overpass">
+                        {userProfile?.profile?.ratingSpeed?.toFixed(0) || '99'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Правая часть - общий потенциал */}
-              <div className="ml-8 relative">
+              <div className="relative flex-shrink-0">
                 {/* Большой круг */}
-                <div className="relative w-40 h-40">
+                <div className="relative w-36 h-36">
                   {/* Внешнее кольцо с градиентом */}
-                  <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 160 160">
+                  <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 144 144">
                     <circle
-                      cx="80"
-                      cy="80"
-                      r="72"
+                      cx="72"
+                      cy="72"
+                      r="65"
                       fill="none"
                       stroke="#445CFF"
-                      strokeWidth="3"
+                      strokeWidth="2"
                       opacity="0.2"
                     />
                     <circle
-                      cx="80"
-                      cy="80"
-                      r="72"
+                      cx="72"
+                      cy="72"
+                      r="65"
                       fill="none"
-                      stroke="url(#gradient)"
-                      strokeWidth="6"
+                      stroke="#A1FF4A"
+                      strokeWidth="4"
                       strokeLinecap="round"
-                      strokeDasharray={`${(userProfile?.profile?.potential || 0) * 4.52} 1000`}
+                      strokeDasharray={`${(userProfile?.profile?.potential || 0) * 4.08} 1000`}
                     />
-                    <defs>
-                      <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#A1FF4A" />
-                        <stop offset="100%" stopColor="#7DFF8C" />
-                      </linearGradient>
-                    </defs>
                   </svg>
                   
                   {/* Внутренний контент */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <div className="text-[#A1FF4A] text-5xl font-black font-overpass leading-none">
-                      {userProfile?.profile?.potential?.toFixed(0) || '-'}
+                    <div className="text-[#A1FF4A] text-[42px] font-black font-overpass leading-none">
+                      {userProfile?.profile?.potential?.toFixed(0) || '99'}
                     </div>
-                    <div className="text-[#AEABBB] text-xs font-medium font-overpass uppercase mt-2 text-center leading-tight">
-                      ОБЩИЙ<br/>ПОТЕНЦИАЛ
+                    <div className="text-[#AEABBB] text-[10px] font-normal font-overpass lowercase mt-1 text-center leading-tight">
+                      общий<br/>потенциал
                     </div>
                   </div>
-                  
-                  {/* Декоративные точки вокруг */}
-                  <div className="absolute -top-1 left-1/2 w-2 h-2 rounded-full bg-[#A1FF4A]"></div>
-                  <div className="absolute top-8 -right-2 w-2 h-2 rounded-full bg-[#A1FF4A]"></div>
-                  <div className="absolute bottom-8 -right-2 w-2 h-2 rounded-full bg-[#A1FF4A]"></div>
-                  <div className="absolute top-1/4 -left-2 w-2 h-2 rounded-full bg-[#A1FF4A]"></div>
-                  <div className="absolute bottom-1/4 -left-2 w-2 h-2 rounded-full bg-[#A1FF4A]"></div>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Дневной прогресс */}
-        {userProfile?.profile?.potential !== undefined && userProfile?.profile?.potential > 0 && (
+        {/* Дневной прогресс - временно скрыто */}
+        {false && userProfile?.profile?.potential !== undefined && userProfile?.profile?.potential > 0 && (
           <div className="bg-[#2d3448] rounded-lg p-4 mb-6">
             <div className="text-white text-sm font-medium font-overpass mb-3">
               📅 Сегодня
