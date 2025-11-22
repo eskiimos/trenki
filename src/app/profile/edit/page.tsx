@@ -549,7 +549,7 @@ const ProfileEditPage = () => {
               type="button"
               onClick={() => handleInputChange('position', 'FORWARD')}
               className={`px-6 py-3 rounded-full font-medium transition-all ${
-                formData.position === 'FORWARD' ? 'bg-[#A1FF4A] text-[#f8f8f8]' : 'bg-[#AEABBB33] text-white'
+                formData.position === 'FORWARD' ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#AEABBB33] text-white'
               }`}
             >
               Нападающий
@@ -558,7 +558,7 @@ const ProfileEditPage = () => {
               type="button"
               onClick={() => handleInputChange('position', 'DEFENSEMAN')}
               className={`px-6 py-3 rounded-full font-medium transition-all ${
-                formData.position === 'DEFENSEMAN' ? 'bg-[#A1FF4A] text-[#f8f8f8]' : 'bg-[#AEABBB33] text-white'
+                formData.position === 'DEFENSEMAN' ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#AEABBB33] text-white'
               }`}
             >
               Защитник
@@ -567,7 +567,7 @@ const ProfileEditPage = () => {
               type="button"
               onClick={() => handleInputChange('position', 'GOALTENDER')}
               className={`px-6 py-3 rounded-full font-medium transition-all ${
-                formData.position === 'GOALTENDER' ? 'bg-[#A1FF4A] text-[#f8f8f8]' : 'bg-[#AEABBB33] text-white'
+                formData.position === 'GOALTENDER' ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#AEABBB33] text-white'
               }`}
             >
               Вратарь
@@ -576,7 +576,7 @@ const ProfileEditPage = () => {
               type="button"
               onClick={() => handleInputChange('position', 'UNDECIDED')}
               className={`px-6 py-3 rounded-full font-medium text-sm transition-all ${
-                formData.position === 'UNDECIDED' ? 'bg-[#A1FF4A] text-[#f8f8f8]' : 'bg-[#AEABBB33] text-white'
+                formData.position === 'UNDECIDED' ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#AEABBB33] text-white'
               }`}
             >
               Пока не определился

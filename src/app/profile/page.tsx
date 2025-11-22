@@ -152,7 +152,7 @@ const ProfilePage = () => {
             {/* Аватар пользователя */}
             <div className="w-full h-[235px] relative">
               <Image 
-                src={userProfile?.avatar || "/avatars/Avatar.png"}
+                src={userProfile?.profile?.avatarUrl || "/avatars/Avatar.png"}
                 alt="Игрок" 
                 width={400} 
                 height={235} 
@@ -179,7 +179,7 @@ const ProfilePage = () => {
               {/* Логотип клуба - правый верхний угол */}
               <div className="absolute top-3 right-3 w-16 h-16 bg-white rounded-lg flex items-center justify-center overflow-hidden">
                 <Image 
-                  src={userProfile?.clubLogo || "/icons/icon-app.svg"}
+                  src={userProfile?.profile?.clubLogoUrl || "/icons/icon-app.svg"}
                   alt="Логотип клуба" 
                   width={64} 
                   height={64} 
