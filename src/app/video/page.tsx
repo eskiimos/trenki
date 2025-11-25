@@ -65,8 +65,6 @@ const VideoPage = () => {
   const filters = [
     { id: 'all', label: 'Все видео' },
     { id: 'TECHNIQUE', label: 'Техника' },
-    { id: 'PASSING', label: 'Пас' },
-    { id: 'GOALKEEPER', label: 'Вратарь' },
     { id: 'STRENGTH', label: 'Сила' },
     { id: 'ENDURANCE', label: 'Выносливость' },
     { id: 'SPEED', label: 'Скорость' },
