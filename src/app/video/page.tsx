@@ -64,9 +64,7 @@ const VideoPage = () => {
 
   const filters = [
     { id: 'all', label: 'Все видео' },
-    { id: 'SKATING', label: 'Катание' },
     { id: 'TECHNIQUE', label: 'Техника' },
-    { id: 'SHOOTING', label: 'Броски' },
     { id: 'PASSING', label: 'Пас' },
     { id: 'GOALKEEPER', label: 'Вратарь' },
     { id: 'STRENGTH', label: 'Сила' },
@@ -163,7 +161,7 @@ const VideoPage = () => {
           <Link href="/" className="text-white hover:text-gray-300">
             <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
           </Link>
-          <h1 className="text-lg font-semibold text-white">Тренеровки</h1>
+          <h1 className="text-lg font-semibold text-white">Тренировки</h1>
         </div>
         <div className="flex items-center space-x-4">
           <button className="text-white hover:text-gray-300">
