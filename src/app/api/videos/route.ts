@@ -34,38 +34,51 @@ export async function GET(request: NextRequest) {
             speciality: true,
           },
         },
+        videoTags: {
+          include: {
+            tag: true
+          }
+        }
       },
       orderBy: { createdAt: 'desc' }
     });
 
     // Форматируем данные для фронтенда
-    const formattedVideos = videos.map(video => ({
-      id: video.id,
-      title: video.title,
-      description: video.description,
-      duration: video.duration, // Возвращаем как число (секунды)
-      durationFormatted: formatDuration(video.duration), // Форматированная строка для отображения
-      videoUrl: video.videoUrl,
-      thumbnail: video.thumbnail,
-      category: video.category,
-      difficulty: video.difficulty,
-      tags: video.tags,
-      equipment: video.equipment,
-      level: video.level,
-      viewsCount: video.viewsCount,
-      likesCount: video.likesCount,
-      trainer: {
-        id: video.trainer.id,
-        name: video.trainer.name,
-        lastName: video.trainer.lastName,
-        avatar: video.trainer.avatar || '/images/avatars/trainer-avatar-1.png',
-        speciality: video.trainer.speciality,
-      },
-      createdAt: video.createdAt,
-      isPublished: video.isPublished,
-      rpeМин: video.rpeМин,
-      rpeМакс: video.rpeМакс,
-    }));
+    const formattedVideos = videos.map(video => {
+      // Extract load types from video tags
+      const loadTypes = video.videoTags
+        .filter(vt => vt.tag.tagType === 'LOAD' && vt.tag.loadType)
+        .map(vt => vt.tag.loadType);
+
+      return {
+        id: video.id,
+        title: video.title,
+        description: video.description,
+        duration: video.duration, // Возвращаем как число (секунды)
+        durationFormatted: formatDuration(video.duration), // Форматированная строка для отображения
+        videoUrl: video.videoUrl,
+        thumbnail: video.thumbnail,
+        category: video.category,
+        difficulty: video.difficulty,
+        tags: video.tags,
+        loadTypes, // Add load types to response
+        equipment: video.equipment,
+        level: video.level,
+        viewsCount: video.viewsCount,
+        likesCount: video.likesCount,
+        trainer: {
+          id: video.trainer.id,
+          name: video.trainer.name,
+          lastName: video.trainer.lastName,
+          avatar: video.trainer.avatar || '/images/avatars/trainer-avatar-1.png',
+          speciality: video.trainer.speciality,
+        },
+        createdAt: video.createdAt,
+        isPublished: video.isPublished,
+        rpeМин: video.rpeМин,
+        rpeМакс: video.rpeМакс,
+      };
+    });
 
     return NextResponse.json({ videos: formattedVideos });
   } catch (error) {

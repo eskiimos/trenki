@@ -331,7 +331,7 @@ const ProfileEditPage = () => {
           />
           <label
             htmlFor="avatar-upload"
-            className="bg-gradient-to-b from-[#2A3B8F] to-[#1a2563] rounded-xl h-40 flex flex-col items-center justify-center cursor-pointer hover:opacity-90 transition-opacity relative overflow-hidden"
+            className="bg-gradient-to-b from-[#2A3B8F] to-[#1a2563] rounded-xl w-40 h-40 mx-auto flex flex-col items-center justify-center cursor-pointer hover:opacity-90 transition-opacity relative overflow-hidden"
           >
             {avatarPreview ? (
               <>

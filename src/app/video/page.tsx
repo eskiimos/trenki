@@ -6,6 +6,8 @@ import Image from 'next/image';
 import BottomNavigation from '@/components/BottomNavigation';
 import { Skeleton } from '@/components/Skeleton';
 import MultiLevelTagFilter from '@/components/MultiLevelTagFilter';
+import { getTelegramId } from '@/lib/auth';
+import { calculateWorkoutGains, CharacteristicType } from '@/lib/characteristics';
 
 // Функция для форматирования длительности видео
 const formatDuration = (seconds: number): string => {
@@ -24,6 +26,7 @@ interface Video {
   category: string;
   difficulty: string;
   tags: string[];
+  loadTypes: string[];
   equipment: string[];
   level?: string;
   viewsCount: number;
@@ -43,23 +46,60 @@ const VideoPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showTagsModal, setShowTagsModal] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [userProfile, setUserProfile] = useState<any>(null);
 
-  // Загружаем видео при монтировании компонента
+  // Загружаем видео и профиль при монтировании компонента
   useEffect(() => {
-    fetchVideos();
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Fetch videos
+        const videosResponse = await fetch('/api/videos');
+        const videosData = await videosResponse.json();
+        setVideos(videosData.videos || []);
+
+        // Fetch profile
+        const telegramId = getTelegramId();
+        if (telegramId) {
+          const profileResponse = await fetch(`/api/profile?telegramId=${telegramId}`);
+          if (profileResponse.ok) {
+            const profileData = await profileResponse.json();
+            setUserProfile(profileData.user?.profile);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
 
-  const fetchVideos = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch('/api/videos');
-      const data = await response.json();
-      setVideos(data.videos || []);
-    } catch (error) {
-      console.error('Error fetching videos:', error);
-    } finally {
-      setIsLoading(false);
-    }
+  const calculateVideoGain = (loadTypes: string[]) => {
+    if (!userProfile || !loadTypes || loadTypes.length === 0) return null;
+
+    const currentCharacteristics: Record<CharacteristicType, number> = {
+      ratingPower: userProfile.ratingPower || 0,
+      ratingSpeed: userProfile.ratingSpeed || 0,
+      ratingEndurance: userProfile.ratingEndurance || 0,
+      ratingTechnique: userProfile.ratingTechnique || 0,
+      ratingFlexibility: userProfile.ratingFlexibility || 0,
+    };
+
+    const gains = calculateWorkoutGains(
+      [loadTypes],
+      currentCharacteristics
+    );
+
+    // Суммируем все приросты
+    const totalGain = Object.values(gains).reduce((sum, val) => sum + val, 0);
+    
+    if (totalGain === 0) return null;
+    
+    return `+${totalGain.toFixed(2)}`;
   };
 
   const filters = [
@@ -259,6 +299,18 @@ const VideoPage = () => {
                 }}
               >
                 <div className="flex gap-2 w-max">
+                  {/* Gain Tag */}
+                  {calculateVideoGain(video.loadTypes) && (
+                    <span
+                      className="px-3 py-1 rounded-full text-xs whitespace-nowrap font-bold"
+                      style={{
+                        backgroundColor: '#A1FF4A',
+                        color: '#060919',
+                      }}
+                    >
+                      {calculateVideoGain(video.loadTypes)}
+                    </span>
+                  )}
                   {video.tags.map((tag) => (
                     <span
                       key={tag}
