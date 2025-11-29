@@ -8,6 +8,7 @@ import { Heart, MessageCircle, Share, Download, CheckCircle } from 'lucide-react
 import TagsSection from '@/components/TagsSection';
 import BottomNavigation from '@/components/BottomNavigation';
 import CharacteristicsGainModal from '@/components/CharacteristicsGainModal';
+import ScheduleModal from '@/components/ScheduleModal';
 import Toast from '@/components/Toast';
 import { isKinescopeUrl, getKinescopeDirectUrl } from '@/lib/videoQuality';
 import { getTelegramId } from '@/lib/auth';
@@ -87,6 +88,7 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [characteristicsGains, setCharacteristicsGains] = useState<any>(null);
   const [newCharacteristics, setNewCharacteristics] = useState<any>(null);
   const [isCompletingModule, setIsCompletingModule] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   
   // Состояние для Toast уведомлений
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
@@ -580,6 +582,7 @@ export default function VideoPage({ params }: VideoPageProps) {
 
   // Проверка поддержки Fullscreen API
   const isFullscreenSupported = () => {
+    if (typeof document === 'undefined') return false;
     return !!(
       document.fullscreenEnabled ||
       (document as any).webkitFullscreenEnabled ||
@@ -1258,10 +1261,13 @@ export default function VideoPage({ params }: VideoPageProps) {
             </button>
             
             {/* Calendar */}
-            <div className="bg-[#AEABBB33] rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0">
-              <Image src="/icons/video/action-calendar.svg" alt="Календарь" width={20} height={20} />
+            <button 
+              onClick={() => setShowScheduleModal(true)}
+              className="bg-[#AEABBB33] rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0 hover:opacity-80 transition-opacity"
+            >
+              <Image src="/icons/video/Type=calendar, Active=No.svg" alt="Календарь" width={20} height={20} />
               <span className="text-[#AEABBB] text-xs whitespace-nowrap">Календарь</span>
-            </div>
+            </button>
             
             {/* Download */}
             <button
@@ -1357,6 +1363,13 @@ export default function VideoPage({ params }: VideoPageProps) {
         />
       )}
       
+      {/* Модалка планирования тренировки */}
+      <ScheduleModal
+        isOpen={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        videoId={videoId}
+      />
+
       {/* Toast уведомления */}
       {toast && (
         <Toast

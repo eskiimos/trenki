@@ -25,6 +25,7 @@ model User {
   sessions             TrainingSession[]
   videoLikes           VideoLike[]
   characteristicHistory CharacteristicHistory[]
+  scheduledWorkouts    ScheduledWorkout[]
 
   @@map("users")
 }
@@ -130,6 +131,7 @@ model Video {
   videoTags       VideoTag[]
   trainer         Trainer               @relation(fields: [trainerId], references: [id])
   workoutSessions WorkoutSessionVideo[]
+  scheduledWorkouts ScheduledWorkout[]
 
   @@map("videos")
 }
@@ -521,4 +523,20 @@ enum WorkoutStatus {
   IN_PROGRESS
   COMPLETED
   SKIPPED
+}
+
+model ScheduledWorkout {
+  id        String   @id @default(cuid())
+  userId    String
+  videoId   String
+  date      DateTime
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("scheduled_workouts")
 }

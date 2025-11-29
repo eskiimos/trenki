@@ -113,6 +113,8 @@ export function isAuthenticated(): boolean {
  * Получает Telegram ID из сохранённых данных или из WebApp
  */
 export function getTelegramId(): string | null {
+  if (typeof window === 'undefined') return null;
+  
   // Сначала пытаемся получить из Telegram WebApp
   const telegramUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
   if (telegramUser?.id) {

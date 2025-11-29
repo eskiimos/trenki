@@ -56,14 +56,14 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' 
           />
         </Link>
         
-        <button className="flex items-center justify-center p-2">
+        <Link href="/calendar" className="flex items-center justify-center p-2">
           <Image 
             src={`/icons/tapbar/icon-type-calendar-active-${activeTab === 'calendar' ? 'yes' : 'no'}.svg`}
             alt="Расписание" 
             width={28} 
             height={28} 
           />
-        </button>
+        </Link>
         
         <Link href="/profile" className="flex items-center justify-center p-2">
           <Image 
