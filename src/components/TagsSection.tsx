@@ -45,6 +45,7 @@ interface TagsSectionProps {
   multiSelect?: boolean;
   showFilterTags?: boolean; // показывать теги из базы для фильтрации
   tagFilterType?: 'load' | 'muscle' | 'complexity' | 'goal' | 'all'; // тип тегов для фильтрации
+  gainTag?: React.ReactNode;
 }
 
 const TagsSection: React.FC<TagsSectionProps> = ({ 
@@ -61,6 +62,7 @@ const TagsSection: React.FC<TagsSectionProps> = ({
   multiSelect = true,
   showFilterTags = false,
   tagFilterType = 'all',
+  gainTag,
 }) => {
   const [dbTags, setDbTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(false);
@@ -183,6 +185,11 @@ const TagsSection: React.FC<TagsSectionProps> = ({
           <h2 className="text-white text-lg font-semibold leading-snug">
             {title}
           </h2>
+          {gainTag && (
+            <div className="mt-2">
+              {gainTag}
+            </div>
+          )}
         </div>
       )}
       

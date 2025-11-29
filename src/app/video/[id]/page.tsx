@@ -12,6 +12,7 @@ import ScheduleModal from '@/components/ScheduleModal';
 import Toast from '@/components/Toast';
 import { isKinescopeUrl, getKinescopeDirectUrl } from '@/lib/videoQuality';
 import { getTelegramId } from '@/lib/auth';
+import { calculateWorkoutGains, CharacteristicType } from '@/lib/characteristics';
 import { 
   downloadVideo, 
   isVideoDownloaded, 
@@ -41,6 +42,7 @@ interface VideoData {
     avatar: string | null;
   };
   tags: string[];
+  loadTypes?: string[];
   equipment: string[];
   category: string;
   difficulty: string;
@@ -69,6 +71,7 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [kinescopeDirectUrl, setKinescopeDirectUrl] = useState<string | null>(null);
   const [isKinescopeLoading, setIsKinescopeLoading] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
   
   // Для автоплея следующего видео
   const [allVideos, setAllVideos] = useState<VideoData[]>([]);
@@ -119,6 +122,16 @@ export default function VideoPage({ params }: VideoPageProps) {
           } else {
             // Если это последнее видео, берем первое (цикл)
             setNextVideo(videos[0]);
+          }
+        }
+
+        // Fetch profile
+        const telegramId = getTelegramId();
+        if (telegramId) {
+          const profileResponse = await fetch(`/api/profile?telegramId=${telegramId}`);
+          if (profileResponse.ok) {
+            const profileData = await profileResponse.json();
+            setUserProfile(profileData.user?.profile);
           }
         }
       } catch (error) {
@@ -860,6 +873,30 @@ export default function VideoPage({ params }: VideoPageProps) {
   // Контейнер с адаптацией для ландшафтного режима на мобильных
   const containerClass = `min-h-screen bg-[#101530] pb-20 ${isLandscape ? 'overflow-hidden h-screen' : ''}`;
 
+  const calculateVideoGain = () => {
+    if (!userProfile || !videoData?.loadTypes || videoData.loadTypes.length === 0) return null;
+
+    const currentCharacteristics: Record<CharacteristicType, number> = {
+      ratingPower: userProfile.ratingPower || 0,
+      ratingSpeed: userProfile.ratingSpeed || 0,
+      ratingEndurance: userProfile.ratingEndurance || 0,
+      ratingTechnique: userProfile.ratingTechnique || 0,
+      ratingFlexibility: userProfile.ratingFlexibility || 0,
+    };
+
+    const gains = calculateWorkoutGains(
+      [videoData.loadTypes],
+      currentCharacteristics
+    );
+
+    // Суммируем все приросты
+    const totalGain = Object.values(gains).reduce((sum, val) => sum + val, 0);
+    
+    if (totalGain === 0) return null;
+    
+    return `+${totalGain.toFixed(2)}`;
+  };
+
   return (
     <div className={containerClass}>{/* pb-20 для отступа под таб-бар */}
       {/* Header */}
@@ -1348,6 +1385,23 @@ export default function VideoPage({ params }: VideoPageProps) {
           lastName: videoData.trainer.lastName,
           avatar: videoData.trainer.avatar
         } : null}
+        gainTag={calculateVideoGain() && (
+          <div
+            className="px-3 py-1 rounded-full text-xs whitespace-nowrap font-bold flex items-center gap-1 w-fit"
+            style={{
+              backgroundColor: 'rgba(161, 255, 74, 0.2)',
+              color: '#FFFFFF',
+            }}
+          >
+            <Image
+              src="/icons/video/energy-active.svg"
+              alt="Energy"
+              width={12}
+              height={12}
+            />
+            {calculateVideoGain()}
+          </div>
+        )}
       />
       </div>
       

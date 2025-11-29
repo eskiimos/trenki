@@ -301,15 +301,21 @@ const VideoPage = () => {
                 <div className="flex gap-2 w-max">
                   {/* Gain Tag */}
                   {calculateVideoGain(video.loadTypes) && (
-                    <span
-                      className="px-3 py-1 rounded-full text-xs whitespace-nowrap font-bold"
+                    <div
+                      className="px-3 py-1 rounded-full text-xs whitespace-nowrap font-bold flex items-center gap-1"
                       style={{
-                        backgroundColor: '#A1FF4A',
-                        color: '#060919',
+                        backgroundColor: 'rgba(161, 255, 74, 0.2)',
+                        color: '#FFFFFF',
                       }}
                     >
+                      <Image
+                        src="/icons/video/energy-active.svg"
+                        alt="Energy"
+                        width={12}
+                        height={12}
+                      />
                       {calculateVideoGain(video.loadTypes)}
-                    </span>
+                    </div>
                   )}
                   {video.tags.map((tag) => (
                     <span
