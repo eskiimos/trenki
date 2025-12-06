@@ -159,7 +159,7 @@ const VideoPage = () => {
     return (
       <div className="min-h-screen bg-[#101530] pb-20">
         {/* Header */}
-        <header className="flex items-center justify-between p-4 bg-[#101530]" style={{ paddingTop: '90px' }}>
+        <header className="flex items-center justify-between p-4 bg-[#101530]" style={{ paddingTop: '16px' }}>
           <div className="flex items-center space-x-2">
             <Skeleton width="w-6" height="h-6" />
             <Skeleton width="w-32" height="h-5" />
@@ -194,7 +194,7 @@ const VideoPage = () => {
   return (
     <div className="min-h-screen bg-[#101530] pb-20">
       {/* Header */}
-      <header className="flex items-center justify-between p-4 bg-[#101530]" style={{ paddingTop: '90px' }}>
+      <header className="flex items-center justify-between p-4 bg-[#101530]" style={{ paddingTop: '16px' }}>
         <div className="flex items-center space-x-2">
           <Link href="/" className="text-white hover:text-gray-300">
             <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />

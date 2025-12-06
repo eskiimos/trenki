@@ -52,7 +52,7 @@ const TrainersPage = () => {
   return (
     <div className="bg-[#101530] min-h-screen text-white">
       {/* Верхняя панель с кнопками */}
-      <div className="p-4 pt-[100px]">
+      <div className="p-4 pt-4">
         <div className="flex items-center gap-3 justify-between">
           {/* Кнопка назад */}
           <Link href="/" className="inline-block flex-shrink-0">

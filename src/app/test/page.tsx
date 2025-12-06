@@ -96,7 +96,7 @@ const TestPage = () => {
   return (
     <div className="bg-[#101530] min-h-screen text-white">
       {/* Header */}
-      <div className="pt-[90px] px-6">
+      <div className="pt-4 px-6">
         <h1 className="text-xl font-bold mb-6">Тест API базы данных</h1>
       </div>
       

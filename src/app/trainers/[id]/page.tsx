@@ -325,7 +325,8 @@ export default function TrainerPage() {
                 fontWeight: 500,
                 fontSize: '12px', 
                 lineHeight: '110%', 
-                letterSpacing: '0.5px'
+                letterSpacing: '0.5px',
+                whiteSpace: 'pre-wrap'
               }}
             >
               {trainer.description}

@@ -900,7 +900,7 @@ export default function VideoPage({ params }: VideoPageProps) {
   return (
     <div className={containerClass}>{/* pb-20 для отступа под таб-бар */}
       {/* Header */}
-  <header className={`flex items-center justify-between p-4 bg-[#101530] shadow-sm border-b border-gray-700 ${isLandscape ? 'hidden' : ''}`} style={{ paddingTop: '90px' }}>
+  <header className={`flex items-center justify-between p-4 bg-[#101530] shadow-sm border-b border-gray-700 ${isLandscape ? 'hidden' : ''}`} style={{ paddingTop: '16px' }}>
         <div className="flex items-center space-x-2">
           <button 
             onClick={() => {
@@ -1341,31 +1341,6 @@ export default function VideoPage({ params }: VideoPageProps) {
               <Image src="/icons/video/action-share.svg" alt="Поделиться" width={20} height={20} />
               <span className="text-[#AEABBB] text-xs whitespace-nowrap">Поделиться</span>
             </div>
-            
-            {/* Complete Module - показываем только если не в составе тренировки */}
-            {!fromWorkout && (
-              <button
-                onClick={handleCompleteModule}
-                disabled={isCompletingModule}
-                className="bg-gradient-to-r from-[#A1FF4A] to-[#7DFF8C] hover:from-[#90ee39] hover:to-[#6cee7b] rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isCompletingModule ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-[#060919] border-t-transparent rounded-full animate-spin" />
-                    <span className="text-[#060919] text-xs font-bold whitespace-nowrap">
-                      Завершение...
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle size={20} className="text-[#060919]" />
-                    <span className="text-[#060919] text-xs font-bold whitespace-nowrap">
-                      Завершить модуль
-                    </span>
-                  </>
-                )}
-              </button>
-            )}
           </div>
         </div>
       </div>

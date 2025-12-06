@@ -297,7 +297,7 @@ const ProfileEditPage = () => {
   return (
     <div className="bg-[#101530] min-h-screen text-white pb-24">
       {/* Шапка */}
-      <div className="flex items-center justify-between p-4 pt-[100px]">
+      <div className="flex items-center justify-between p-4 pt-4">
         <Link href="/profile" className="inline-block">
           <div className="w-8 h-8 flex items-center justify-center">
             <Image 

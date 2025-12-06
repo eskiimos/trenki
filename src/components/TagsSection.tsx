@@ -20,7 +20,7 @@ interface TagProps {
 
 const SimpleTag: React.FC<TagProps> = ({ text }) => {
   return (
-    <div className="bg-[#AEABBB33] text-[#AEABBB] text-xs rounded-full px-4 py-2">
+    <div className="bg-[#AEABBB33] text-white text-xs rounded-full px-4 py-2">
       {text}
     </div>
   );
