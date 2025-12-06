@@ -1,4 +1,3 @@
-const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 
@@ -7,6 +6,22 @@ const inputSvg = path.join(__dirname, '../public/icons/icon-app.svg');
 const outputDir = path.join(__dirname, '../public/icons');
 
 async function generateIcons() {
+  // Проверяем наличие sharp
+  let sharp;
+  try {
+    sharp = require('sharp');
+  } catch (error) {
+    console.log('⚠️  Sharp не установлен, пропускаем генерацию иконок');
+    console.log('   (Иконки уже существуют или будут созданы вручную)');
+    return;
+  }
+
+  // Проверяем наличие исходного SVG
+  if (!fs.existsSync(inputSvg)) {
+    console.log('⚠️  Исходный SVG не найден, пропускаем генерацию иконок');
+    return;
+  }
+
   console.log('Генерация PWA иконок...');
   
   for (const size of sizes) {
@@ -30,4 +45,7 @@ async function generateIcons() {
   console.log('\n🎉 Генерация иконок завершена!');
 }
 
-generateIcons();
+generateIcons().catch(error => {
+  console.error('Ошибка при генерации иконок:', error.message);
+  // Не прерываем сборку - иконки не критичны
+});

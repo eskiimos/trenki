@@ -17,9 +17,10 @@
   "dependencies": {
     "@prisma/client": "^6.16.1",
     "@prisma/extension-accelerate": "^2.0.2",
+    "@react-email/render": "^2.0.0",
     "cloudinary": "^2.8.0",
     "lucide-react": "^0.542.0",
-    "next": "15.5.2",
+    "next": "^16.0.7",
     "prisma": "^6.16.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -34,7 +35,7 @@
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
     "eslint": "^9",
-    "eslint-config-next": "15.5.2",
+    "eslint-config-next": "^16.0.7",
     "tailwindcss": "^4",
     "tsx": "^4.20.5",
     "typescript": "^5"

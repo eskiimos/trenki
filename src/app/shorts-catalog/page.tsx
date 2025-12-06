@@ -66,14 +66,12 @@ export default function ShortsCatalogPage() {
 
     setIsLoadingMore(true);
     
-    // Имитируем небольшую задержку для плавности
-    setTimeout(() => {
-      const nextPage = page + 1;
-      const newShorts = allShorts.slice(0, nextPage * ITEMS_PER_PAGE);
-      setDisplayedShorts(newShorts);
-      setPage(nextPage);
-      setIsLoadingMore(false);
-    }, 300);
+    // Без задержки - мгновенная загрузка
+    const nextPage = page + 1;
+    const newShorts = allShorts.slice(0, nextPage * ITEMS_PER_PAGE);
+    setDisplayedShorts(newShorts);
+    setPage(nextPage);
+    setIsLoadingMore(false);
   }, [isLoadingMore, displayedShorts.length, allShorts, page]);
 
   // Intersection Observer для автозагрузки
@@ -99,14 +97,6 @@ export default function ShortsCatalogPage() {
       }
     };
   }, [isLoading, displayedShorts.length, allShorts.length, isLoadingMore, loadMore]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#060919] flex items-center justify-center">
-        <div className="text-white text-xl">Загрузка...</div>
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -142,23 +132,41 @@ export default function ShortsCatalogPage() {
               letterSpacing: '0.5px' 
             }}
           >
-            Треньки
+            Треньки {!isLoading && allShorts.length > 0 && (
+              <span className="text-white/60 font-normal ml-1">({allShorts.length})</span>
+            )}
           </h1>
         </div>
       </div>
 
       {/* Сетка шортсов */}
       <div className="px-0">
-        {displayedShorts.length > 0 ? (
+        {isLoading ? (
+          // Skeleton loader
+          <div className="grid grid-cols-3 gap-[1px]">
+            {[...Array(12)].map((_, i) => (
+              <div 
+                key={i} 
+                className="relative aspect-[9/16] bg-gray-800/50 animate-pulse"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-gray-700/30 to-gray-800/30" />
+              </div>
+            ))}
+          </div>
+        ) : displayedShorts.length > 0 ? (
           <>
             <div className="grid grid-cols-3 gap-[1px]">
               {displayedShorts.map((short, index) => (
                 <Link 
                   key={short.id} 
                   href={`/shorts?index=${index}`}
-                  className="block"
+                  className="block animate-fadeIn"
+                  style={{ 
+                    animationDelay: `${Math.min(index * 30, 300)}ms`,
+                    animationFillMode: 'both'
+                  }}
                 >
-                  <div className="relative aspect-[9/16] bg-gray-800 overflow-hidden cursor-pointer">
+                  <div className="relative aspect-[9/16] bg-gray-800 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity">
                     {/* Thumbnail */}
                     {short.thumbnail ? (
                       <Image 
