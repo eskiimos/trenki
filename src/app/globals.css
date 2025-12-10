@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Russo+One&display=swap');
 
 :root {
   --background: #060919;
@@ -188,6 +187,34 @@ input:focus, button:focus, textarea:focus, select:focus {
 
 .animate-fadeOut {
   animation: fadeOut 0.3s ease-out forwards;
+}
+
+/* Heart beat animation for double tap like */
+@keyframes heartBeat {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  15% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  30% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  45% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  60% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
 }
 
 /* Админка - полноэкранный режим на десктопе */

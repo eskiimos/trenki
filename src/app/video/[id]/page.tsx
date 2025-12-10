@@ -916,7 +916,7 @@ export default function VideoPage({ params }: VideoPageProps) {
           >
             <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
           </button>
-          <h1 className="text-lg font-semibold text-white">ТРЕНЕРОВКА</h1>
+          <h1 className="text-lg font-semibold text-white">ТРЕНИРОВКА</h1>
         </div>
       </header>
 
@@ -1157,9 +1157,9 @@ export default function VideoPage({ params }: VideoPageProps) {
           {/* Next Video Preview with Countdown - Overlay */}
           {showNextVideoPreview && nextVideo && (
             <div className="absolute inset-0 bg-[#0A0E1A] p-4 md:p-8 z-50">
-              {/* Header - "ДАЛЬШЕ" слева, крестик справа */}
+              {/* Header - "ДАЛЕЕ" слева, крестик справа */}
               <div className="flex items-center justify-between mb-6 md:mb-8">
-                <h2 className="text-white text-xl md:text-4xl font-bold tracking-wider">ДАЛЬШЕ</h2>
+                <h2 className="text-white text-xl md:text-4xl font-bold tracking-wider">ДАЛЕЕ</h2>
                 
                 {/* Close Button */}
                 <button
