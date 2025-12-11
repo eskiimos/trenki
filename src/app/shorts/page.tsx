@@ -276,9 +276,14 @@ const ShortsContent = () => {
 
       {/* Touch/Swipe Area for Navigation */}
       <div 
-        className="fixed inset-0 pointer-events-auto z-[60]"
-        style={{ touchAction: 'pan-y' }}
+        className="fixed inset-0 z-[60]"
+        style={{ touchAction: 'pan-y', pointerEvents: 'auto' }}
         onTouchStart={(e) => {
+          // Игнорируем события на кнопках и интерактивных элементах
+          const target = e.target as HTMLElement;
+          if (target.closest('button') || target.closest('a') || target.closest('[role="button"]')) {
+            return;
+          }
           touchStartYRef.current = e.touches[0].clientY;
           touchStartXRef.current = e.touches[0].clientX;
           
@@ -293,6 +298,12 @@ const ShortsContent = () => {
           }, 200);
         }}
         onTouchEnd={(e) => {
+          // Игнорируем события на кнопках и интерактивных элементах
+          const target = e.target as HTMLElement;
+          if (target.closest('button') || target.closest('a') || target.closest('[role="button"]')) {
+            return;
+          }
+          
           // Отменяем таймер зажатия
           if (pressTimerRef.current) {
             clearTimeout(pressTimerRef.current);

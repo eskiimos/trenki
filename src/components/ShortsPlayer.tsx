@@ -153,11 +153,11 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
 
       {/* Video Container */}
       <div 
-        className="relative w-full h-full flex items-center justify-center overflow-hidden bg-black pointer-events-none"
+        className="relative w-full h-full flex items-center justify-center overflow-hidden bg-black"
       >
         <video
           ref={videoRef}
-          className="w-full h-full object-cover pointer-events-auto"
+          className="w-full h-full object-cover"
           src={videoUrl}
           poster={short.thumbnail}
           autoPlay={autoPlay}
