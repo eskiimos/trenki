@@ -48,13 +48,31 @@ export async function POST(
       return NextResponse.json({ error: 'Telegram ID is required' }, { status: 400 });
     }
 
-    // Находим пользователя по telegramId
-    const user = await prisma.user.findUnique({
+    // Находим или создаём пользователя по telegramId
+    let user = await prisma.user.findUnique({
       where: { telegramId }
     });
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      // Создаём нового пользователя, если не существует
+      user = await prisma.user.create({
+        data: {
+          telegramId,
+          firstName: 'User',
+          // Добавляем начальные характеристики
+          characteristics: {
+            create: {
+              strength: 0,
+              endurance: 0,
+              flexibility: 0,
+              speed: 0,
+            }
+          }
+        },
+        include: {
+          characteristics: true
+        }
+      });
     }
 
     // Проверяем, существует ли уже лайк

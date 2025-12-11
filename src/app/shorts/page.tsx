@@ -179,26 +179,50 @@ const ShortsContent = () => {
   };
 
   // Поделиться
-  const handleShare = () => {
+  const handleShare = async () => {
     if (!currentShort) return;
     
     const shareUrl = `${window.location.origin}/shorts/${currentShort.id}`;
     const shareText = `${currentShort.title}${currentShort.description ? ` - ${currentShort.description}` : ''}`;
     
-    // Telegram Web App share
-    if (window.Telegram?.WebApp) {
-      window.Telegram.WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`);
-    } else if (navigator.share) {
-      // Web Share API
-      navigator.share({
-        title: currentShort.title,
-        text: shareText,
-        url: shareUrl,
-      }).catch(console.error);
-    } else {
-      // Fallback - копируем в буфер
-      navigator.clipboard.writeText(shareUrl);
-      alert('Ссылка скопирована!');
+    try {
+      // 1. Telegram Web App (приоритет для Telegram)
+      if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
+        window.Telegram.WebApp.openTelegramLink(
+          `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`
+        );
+        return;
+      }
+      
+      // 2. Web Share API (нативная функция поделиться)
+      if (navigator.share) {
+        await navigator.share({
+          title: currentShort.title,
+          text: shareText,
+          url: shareUrl,
+        });
+        return;
+      }
+      
+      // 3. Fallback - копируем в буфер обмена
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        alert('✓ Ссылка скопирована в буфер обмена');
+      } else {
+        // Старый метод для браузеров без Clipboard API
+        const textArea = document.createElement('textarea');
+        textArea.value = shareUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('✓ Ссылка скопирована');
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+      alert('Не удалось поделиться видео');
     }
   };
 
@@ -245,7 +269,7 @@ const ShortsContent = () => {
 
       {/* Touch/Swipe Area for Navigation */}
       <div 
-        className="absolute inset-0 pointer-events-auto z-40"
+        className="fixed inset-0 pointer-events-auto z-[60]"
         style={{ touchAction: 'pan-y' }}
         onTouchStart={(e) => {
           const startY = e.touches[0].clientY;

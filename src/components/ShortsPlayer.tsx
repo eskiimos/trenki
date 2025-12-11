@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { Heart } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { isKinescopeUrl, getKinescopeDirectUrl } from '@/lib/videoQuality';
 
 interface ShortData {
@@ -45,20 +45,22 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
   showSwipeHint = false,
   autoPlay = true,
 }) => {
+  const router = useRouter();
   const [isMuted, setIsMuted] = useState(true);
-  const [showHeartAnimation, setShowHeartAnimation] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string>(short.videoUrl);
+  const [isVideoReady, setIsVideoReady] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
-  const lastTapRef = useRef<number>(0);
 
   // Загрузка Kinescope URL
   useEffect(() => {
+    setIsVideoReady(false);
     const loadKinescopeUrl = async () => {
       if (!isKinescopeUrl(short.videoUrl)) {
         setVideoUrl(short.videoUrl);
+        setIsVideoReady(true);
         return;
       }
       
@@ -70,19 +72,28 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
       } catch (error) {
         console.error('Error loading Kinescope URL:', error);
         setVideoUrl(short.videoUrl);
+      } finally {
+        setIsVideoReady(true);
       }
     };
     
     loadKinescopeUrl();
   }, [short.videoUrl]);
 
-  // Автоплей
+  // Автоплей - запускаем только когда URL готов
   useEffect(() => {
-    if (videoRef.current && autoPlay) {
-      videoRef.current.currentTime = 0;
-      videoRef.current.play().catch(console.error);
+    if (videoRef.current && autoPlay && isVideoReady) {
+      const playVideo = async () => {
+        try {
+          videoRef.current!.currentTime = 0;
+          await videoRef.current!.play();
+        } catch (error) {
+          console.error('Autoplay failed:', error);
+        }
+      };
+      playVideo();
     }
-  }, [short.id, autoPlay]);
+  }, [short.id, autoPlay, isVideoReady]);
 
   const toggleMute = () => {
     if (videoRef.current) {
@@ -91,23 +102,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
     }
   };
 
-  // Double tap to like
-  const handleDoubleTap = (e: React.TouchEvent | React.MouseEvent) => {
-    const now = Date.now();
-    const DOUBLE_TAP_DELAY = 300;
-    
-    if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
-      e.preventDefault();
-      if (!short.isLiked) {
-        onLike();
-      }
-      setShowHeartAnimation(true);
-      setTimeout(() => setShowHeartAnimation(false), 1000);
-    }
-    
-    lastTapRef.current = now;
-  };
-
+  // Начало нажатия - запоминаем позицию и время
   const handleVideoEnd = () => {
     if (videoRef.current) {
       videoRef.current.currentTime = 0;
@@ -134,8 +129,8 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
   return (
     <div className="fixed inset-0 bg-black z-50 flex">
       {/* Back Button (Top Left) */}
-      <Link 
-        href={backUrl}
+      <button 
+        onClick={() => router.back()}
         className="absolute top-4 left-4 z-30 w-10 h-10 flex items-center justify-center"
       >
         <img 
@@ -145,13 +140,12 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
           height={24}
           className="drop-shadow-lg"
         />
-      </Link>
+      </button>
 
       {/* Video Container */}
       <div 
         className="relative w-full h-full flex items-center justify-center overflow-hidden bg-black"
-        onTouchEnd={handleDoubleTap}
-        onClick={handleDoubleTap}
+        onClick={toggleMute}
       >
         <video
           ref={videoRef}
@@ -166,22 +160,6 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
           onTimeUpdate={handleTimeUpdate}
         />
 
-        {/* Double Tap Heart Animation */}
-        {showHeartAnimation && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="animate-ping">
-              <Heart 
-                size={120} 
-                className="text-white fill-white opacity-80" 
-                style={{
-                  filter: 'drop-shadow(0 0 20px rgba(255, 255, 255, 0.8))',
-                  animation: 'heartBeat 1s ease-out'
-                }}
-              />
-            </div>
-          </div>
-        )}
-
         {/* UI Overlay */}
         <div className="absolute inset-0">
           {/* Right Side Actions */}
@@ -192,7 +170,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
               className="w-14 h-14 rounded-full bg-[#0A0B0F]/20 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform"
             >
               <img 
-                src={short.isLiked ? "/icons/video/shorts/icon-like-active.svg" : "/icons/video/shorts/Like-def.svg"} 
+                src={short.isLiked ? "/icons/video/shorts/Like.svg" : "/icons/video/shorts/Like-def.svg"} 
                 alt="Лайк" 
                 width={24} 
                 height={24}
@@ -263,15 +241,15 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
                     isDescriptionExpanded ? '' : 'line-clamp-2'
                   }`}>
                     {short.description}
+                    {!isDescriptionExpanded && short.description.length > 80 && (
+                      <button 
+                        onClick={() => setIsDescriptionExpanded(true)}
+                        className="text-white/70 text-xs ml-1 inline"
+                      >
+                        ...
+                      </button>
+                    )}
                   </p>
-                  {!isDescriptionExpanded && short.description.length > 80 && (
-                    <button 
-                      onClick={() => setIsDescriptionExpanded(true)}
-                      className="text-white/70 text-xs ml-1"
-                    >
-                      ...
-                    </button>
-                  )}
                 </div>
               )}
             </div>

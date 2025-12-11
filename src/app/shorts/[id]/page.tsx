@@ -55,7 +55,7 @@ export default function ShortPage({ params }: ShortPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   
   // Комментарии
-  const [showComments, setShowComments] = useState(true);
+  const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isLoadingComments, setIsLoadingComments] = useState(false);
@@ -78,7 +78,7 @@ export default function ShortPage({ params }: ShortPageProps) {
         
         if (response.ok) {
           const data = await response.json();
-          setShort(data);
+          setShort(data.short);
         } else {
           console.error('Failed to load short');
           router.push('/');
@@ -172,23 +172,50 @@ export default function ShortPage({ params }: ShortPageProps) {
   };
 
   // Поделиться
-  const handleShare = () => {
+  const handleShare = async () => {
     if (!short) return;
     
     const shareUrl = `${window.location.origin}/shorts/${short.id}`;
     const shareText = `${short.title}${short.description ? ` - ${short.description}` : ''}`;
     
-    if (window.Telegram?.WebApp) {
-      window.Telegram.WebApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`);
-    } else if (navigator.share) {
-      navigator.share({
-        title: short.title,
-        text: shareText,
-        url: shareUrl,
-      }).catch(console.error);
-    } else {
-      navigator.clipboard.writeText(shareUrl);
-      alert('Ссылка скопирована!');
+    try {
+      // 1. Telegram Web App (приоритет для Telegram)
+      if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
+        window.Telegram.WebApp.openTelegramLink(
+          `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`
+        );
+        return;
+      }
+      
+      // 2. Web Share API (нативная функция поделиться)
+      if (navigator.share) {
+        await navigator.share({
+          title: short.title,
+          text: shareText,
+          url: shareUrl,
+        });
+        return;
+      }
+      
+      // 3. Fallback - копируем в буфер обмена
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        alert('✓ Ссылка скопирована в буфер обмена');
+      } else {
+        // Старый метод для браузеров без Clipboard API
+        const textArea = document.createElement('textarea');
+        textArea.value = shareUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('✓ Ссылка скопирована');
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+      alert('Не удалось поделиться видео');
     }
   };
 
