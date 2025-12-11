@@ -37,6 +37,12 @@ const ShortsContent = () => {
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const wasPlayingRef = useRef(false);
+  const touchStartYRef = useRef(0);
+  const touchStartXRef = useRef(0);
+  
   const userId = getTelegramId();
 
   // Загрузка shorts из API
@@ -264,6 +270,7 @@ const ShortsContent = () => {
           onComment={openComments}
           onShare={handleShare}
           backUrl="/"
+          videoRef={videoRef}
         />
       </div>
 
@@ -272,30 +279,47 @@ const ShortsContent = () => {
         className="fixed inset-0 pointer-events-auto z-[60]"
         style={{ touchAction: 'pan-y' }}
         onTouchStart={(e) => {
-          const startY = e.touches[0].clientY;
-          const startX = e.touches[0].clientX;
+          touchStartYRef.current = e.touches[0].clientY;
+          touchStartXRef.current = e.touches[0].clientX;
           
-          const handleTouchEnd = (endEvent: TouchEvent) => {
-            const endY = endEvent.changedTouches[0].clientY;
-            const endX = endEvent.changedTouches[0].clientX;
-            const deltaY = endY - startY;
-            const deltaX = Math.abs(endX - startX);
-            
-            // Проверяем что свайп вертикальный (не горизонтальный)
-            if (deltaX < 50) {
-              if (deltaY > 80) {
-                // Swipe down - previous video
-                handleSwipeDown();
-              } else if (deltaY < -80) {
-                // Swipe up - next video
-                handleSwipeUp();
+          // Запускаем таймер для определения зажатия
+          pressTimerRef.current = setTimeout(() => {
+            if (videoRef.current) {
+              wasPlayingRef.current = !videoRef.current.paused;
+              if (wasPlayingRef.current) {
+                videoRef.current.pause();
               }
             }
-            
-            document.removeEventListener('touchend', handleTouchEnd);
-          };
+          }, 200);
+        }}
+        onTouchEnd={(e) => {
+          // Отменяем таймер зажатия
+          if (pressTimerRef.current) {
+            clearTimeout(pressTimerRef.current);
+            pressTimerRef.current = null;
+          }
           
-          document.addEventListener('touchend', handleTouchEnd);
+          // Возобновляем воспроизведение если было зажатие
+          if (wasPlayingRef.current && videoRef.current) {
+            videoRef.current.play();
+            wasPlayingRef.current = false;
+          }
+          
+          const endY = e.changedTouches[0].clientY;
+          const endX = e.changedTouches[0].clientX;
+          const deltaY = endY - touchStartYRef.current;
+          const deltaX = Math.abs(endX - touchStartXRef.current);
+          
+          // Проверяем что свайп вертикальный (не горизонтальный)
+          if (deltaX < 50) {
+            if (deltaY > 80) {
+              // Swipe down - previous video
+              handleSwipeDown();
+            } else if (deltaY < -80) {
+              // Swipe up - next video
+              handleSwipeUp();
+            }
+          }
         }}
       />
     </div>

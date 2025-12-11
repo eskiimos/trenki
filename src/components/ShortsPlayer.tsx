@@ -34,6 +34,7 @@ interface ShortsPlayerProps {
   backUrl?: string;
   showSwipeHint?: boolean;
   autoPlay?: boolean;
+  videoRef?: React.RefObject<HTMLVideoElement | null>;
 }
 
 export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
@@ -44,15 +45,17 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
   backUrl = '/',
   showSwipeHint = false,
   autoPlay = true,
+  videoRef: externalVideoRef,
 }) => {
   const router = useRouter();
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string>(short.videoUrl);
   const [isVideoReady, setIsVideoReady] = useState(false);
   
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const internalVideoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = externalVideoRef || internalVideoRef;
 
   // Загрузка Kinescope URL
   useEffect(() => {
@@ -102,7 +105,6 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
     }
   };
 
-  // Начало нажатия - запоминаем позицию и время
   const handleVideoEnd = () => {
     if (videoRef.current) {
       videoRef.current.currentTime = 0;
@@ -131,7 +133,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
       {/* Back Button (Top Left) */}
       <button 
         onClick={() => router.back()}
-        className="absolute top-4 left-4 z-30 w-10 h-10 flex items-center justify-center"
+        className="absolute top-4 left-4 z-30 w-10 h-10 flex items-center justify-center pointer-events-auto"
       >
         <img 
           src="/icons/icon-action-back.svg" 
@@ -144,8 +146,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
 
       {/* Video Container */}
       <div 
-        className="relative w-full h-full flex items-center justify-center overflow-hidden bg-black"
-        onClick={toggleMute}
+        className="relative w-full h-full flex items-center justify-center overflow-hidden bg-black pointer-events-none"
       >
         <video
           ref={videoRef}
@@ -161,13 +162,13 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
         />
 
         {/* UI Overlay */}
-        <div className="absolute inset-0">
+        <div className="absolute inset-0 pointer-events-none">
           {/* Right Side Actions */}
           <div className="absolute right-4 bottom-24 flex flex-col items-center space-y-3">
             {/* Like Button */}
             <button
               onClick={onLike}
-              className="w-14 h-14 rounded-full bg-[#0A0B0F]/20 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform"
+              className="w-14 h-14 rounded-full bg-[#0A0B0F]/20 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform pointer-events-auto"
             >
               <img 
                 src={short.isLiked ? "/icons/video/shorts/Like.svg" : "/icons/video/shorts/Like-def.svg"} 
@@ -180,7 +181,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
             {/* Comment Button */}
             <button 
               onClick={onComment}
-              className="w-14 h-14 rounded-full bg-[#0A0B0F]/20 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform"
+              className="w-14 h-14 rounded-full bg-[#0A0B0F]/20 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform pointer-events-auto"
             >
               <img 
                 src="/icons/video/shorts/action-coment.svg" 
@@ -193,7 +194,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
             {/* Share Button */}
             <button 
               onClick={onShare}
-              className="w-14 h-14 rounded-full bg-[#0A0B0F]/20 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform"
+              className="w-14 h-14 rounded-full bg-[#0A0B0F]/20 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform pointer-events-auto"
             >
               <img 
                 src="/icons/video/shorts/action-share.svg" 
@@ -211,7 +212,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
               {short.trainer && (
                 <Link 
                   href={`/trainers/${short.trainer.id}`}
-                  className="flex items-center space-x-2"
+                  className="flex items-center space-x-2 pointer-events-auto"
                 >
                   <div className="w-6 h-6 rounded-full overflow-hidden">
                     {short.trainer.avatar ? (
@@ -244,7 +245,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
                     {!isDescriptionExpanded && short.description.length > 80 && (
                       <button 
                         onClick={() => setIsDescriptionExpanded(true)}
-                        className="text-white/70 text-xs ml-1 inline"
+                        className="text-white/70 text-xs ml-1 inline pointer-events-auto"
                       >
                         ...
                       </button>
@@ -258,7 +259,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
           {/* Video Timeline (Bottom) */}
           <div className="absolute bottom-0 left-0 right-0 h-12 px-4 flex items-center bg-black/20">
             <div 
-              className="w-full h-1 bg-white/30 rounded-full cursor-pointer relative"
+              className="w-full h-1 bg-white/30 rounded-full cursor-pointer relative pointer-events-auto"
               onClick={handleSeek}
             >
               <div 
