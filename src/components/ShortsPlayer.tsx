@@ -48,7 +48,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
   videoRef: externalVideoRef,
 }) => {
   const router = useRouter();
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string>(short.videoUrl);
@@ -90,6 +90,13 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
         try {
           videoRef.current!.currentTime = 0;
           await videoRef.current!.play();
+          // Автоматически включаем звук после начала воспроизведения
+          setTimeout(() => {
+            if (videoRef.current) {
+              videoRef.current.muted = false;
+              setIsMuted(false);
+            }
+          }, 100);
         } catch (error) {
           console.error('Autoplay failed:', error);
         }
@@ -150,7 +157,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
       >
         <video
           ref={videoRef}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover pointer-events-auto"
           src={videoUrl}
           poster={short.thumbnail}
           autoPlay={autoPlay}
