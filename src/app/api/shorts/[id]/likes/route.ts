@@ -54,23 +54,27 @@ export async function POST(
     });
 
     if (!user) {
-      // Создаём нового пользователя, если не существует
+      // Создаём нового пользователя с профилем
       user = await prisma.user.create({
         data: {
           telegramId,
           firstName: 'User',
-          // Добавляем начальные характеристики
-          characteristics: {
+          profile: {
             create: {
               strength: 0,
               endurance: 0,
-              flexibility: 0,
               speed: 0,
+              technique: 0,
+              skating: 0,
+              shooting: 0,
+              passing: 0,
+              checking: 0,
+              overall: 0,
             }
           }
         },
         include: {
-          characteristics: true
+          profile: true
         }
       });
     }
