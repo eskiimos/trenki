@@ -162,25 +162,32 @@ export default function SwipeableWorkoutItem({
 
             {/* Info */}
             <div className="flex-1 flex flex-col justify-between py-1">
-              {/* Trainer */}
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-5 h-5 rounded-full overflow-hidden bg-gray-700 relative">
-                  {workout.video.trainer.avatar ? (
-                    <Image
-                      src={workout.video.trainer.avatar}
-                      alt={workout.video.trainer.name}
-                      fill
-                      className="object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[8px] text-white">
-                      {workout.video.trainer.name[0]}
-                    </div>
-                  )}
+              {/* Trainer and Start Time */}
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-full overflow-hidden bg-gray-700 relative">
+                    {workout.video.trainer.avatar ? (
+                      <Image
+                        src={workout.video.trainer.avatar}
+                        alt={workout.video.trainer.name}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-[8px] text-white">
+                        {workout.video.trainer.name[0]}
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-white text-xs font-bold uppercase">
+                    {workout.video.trainer.name} {workout.video.trainer.lastName}
+                  </span>
                 </div>
-                <span className="text-white text-xs font-bold uppercase">
-                  {workout.video.trainer.name} {workout.video.trainer.lastName}
-                </span>
+                {workout.date && (
+                  <span className="text-[#A1FF4A] text-xs font-bold">
+                    {new Date(workout.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
               </div>
 
               {/* Tags */}

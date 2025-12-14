@@ -1,6 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    
+    const video = await prisma.video.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        videoUrl: true,
+        thumbnail: true,
+        duration: true,
+        likesCount: true,
+        category: true,
+        difficulty: true,
+        level: true,
+        equipment: true,
+        trainer: {
+          select: {
+            id: true,
+            name: true,
+            lastName: true,
+            speciality: true,
+            avatar: true,
+          }
+        },
+        tags: {
+          select: {
+            name: true,
+          }
+        }
+      }
+    });
+
+    if (!video) {
+      return NextResponse.json({ error: 'Video not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(video);
+  } catch (error: any) {
+    console.error('Error fetching video:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error', 
+      details: error.message 
+    }, { status: 500 });
+  }
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

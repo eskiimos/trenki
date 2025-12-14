@@ -45,3 +45,10 @@ next-env.d.ts
 # uploaded files
 /public/images/thumbnails/*
 !/public/images/thumbnails/.gitkeep
+
+# deployment
+logs/
+*.log
+
+# PM2
+.pm2/

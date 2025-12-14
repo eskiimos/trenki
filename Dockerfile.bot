@@ -1,0 +1,15 @@
+# Dockerfile для Telegram бота
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Копирование файлов зависимостей
+COPY telegram-bot/package*.json ./
+RUN npm install --omit=dev
+
+# Копирование кода бота
+COPY telegram-bot/ ./
+
+ENV NODE_ENV=production
+
+CMD ["node", "index.js"]

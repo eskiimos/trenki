@@ -1,0 +1,26 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+set password "o4Qa1jibVGnxXMHk"
+set server "root@83.166.245.178"
+
+puts "🔨 Запускаю сборку в фоне на сервере...\n"
+
+spawn ssh $server "cd /opt/trenki && screen -dmS docker-build bash -c 'docker compose build 2>&1 | tee /tmp/build.log && docker compose up -d 2>&1 | tee -a /tmp/build.log && echo COMPLETED >> /tmp/build.log'"
+
+expect {
+    "password:" {
+        send "$password\r"
+        exp_continue
+    }
+    "yes/no" {
+        send "yes\r"
+        exp_continue
+    }
+    eof
+}
+
+puts "✅ Сборка запущена в screen сессии docker-build\n"
+puts "Проверить статус: ./deploy/check-status.sh\n"
+
+wait

@@ -1,0 +1,35 @@
+#!/usr/bin/expect -f
+
+set timeout -1
+set server_ip "83.166.245.178"
+set server_user "root"
+set server_pass "o4Qa1jibVGnxXMHk"
+set server_path "/opt/trenki"
+
+puts "\n🚀 Запуск Docker контейнеров...\n"
+
+# Подключаемся и запускаем Docker
+spawn ssh $server_user@$server_ip "cd $server_path && docker compose down ; docker compose build --no-cache && docker compose up -d && docker compose ps"
+expect {
+    "password:" {
+        send "$server_pass\r"
+        exp_continue
+    }
+    eof
+}
+
+puts "\n✅ Контейнеры запущены!\n"
+puts "Проверяем логи...\n"
+
+spawn ssh $server_user@$server_ip "cd $server_path && docker compose logs --tail=20"
+expect {
+    "password:" {
+        send "$server_pass\r"
+        exp_continue
+    }
+    eof
+}
+
+puts "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+puts "✅ Приложение запущено на trenki.app!\n"
+puts "Теперь нужно настроить Nginx и SSL...\n"

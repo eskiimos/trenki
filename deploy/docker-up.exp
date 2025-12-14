@@ -1,0 +1,36 @@
+#!/usr/bin/expect -f
+
+set timeout 600
+set password "o4Qa1jibVGnxXMHk"
+set server "root@83.166.245.178"
+
+puts "🚀 Запускаю контейнеры (может занять 5-10 минут)...\n"
+
+spawn ssh $server "cd /opt/trenki && docker compose up -d"
+
+expect {
+    "password:" {
+        send "$password\r"
+        exp_continue
+    }
+    "yes/no" {
+        send "yes\r"
+        exp_continue
+    }
+    eof
+}
+
+puts "\n✅ Контейнеры запущены!\n"
+puts "Проверяем статус...\n"
+
+spawn ssh $server "cd /opt/trenki && docker compose ps"
+
+expect {
+    "password:" {
+        send "$password\r"
+        exp_continue
+    }
+    eof
+}
+
+wait

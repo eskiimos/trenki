@@ -166,6 +166,7 @@ const Header = () => {
             profileData.number = cachedData.user.profile.number;
             profileData.position = positionMap[cachedData.user.profile.position] || cachedData.user.profile.position;
             profileData.potential = 'высокий';
+            profileData.clubLogoUrl = cachedData.user.profile.clubLogoUrl;
           }
           
           setUserProfile(profileData);
@@ -230,6 +231,7 @@ const Header = () => {
             profileData.number = data.user.profile.number;
             profileData.position = positionMap[data.user.profile.position] || data.user.profile.position;
             profileData.potential = 'высокий';
+            profileData.clubLogoUrl = data.user.profile.clubLogoUrl;
           }
           
           setUserProfile(profileData);
@@ -414,13 +416,13 @@ const Header = () => {
           )}
         </div>
         
-        {/* Логотип клуба - в будущем пользователь сможет загрузить свой логотип */}
+        {/* Логотип клуба или логотип приложения */}
         <Image 
-          src="/trenki_app.jpeg" 
-          alt="Логотип клуба" 
+          src={userProfile?.clubLogoUrl || "/icons/icon-app.svg"} 
+          alt={userProfile?.clubLogoUrl ? "Логотип клуба" : "Треньки"} 
           width={48} 
           height={48} 
-          style={{borderRadius: 1}}
+          style={{borderRadius: 4}}
           className="object-cover"
         />
       </div>
@@ -627,24 +629,28 @@ const TrainingsSection = () => (
                     </div>
                 </Link>
                 <div style={{flex: '1 1 0', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 8, display: 'inline-flex'}}>
-                    <div style={{alignSelf: 'stretch', paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 8, display: 'flex'}}>
-                        <Image 
-                            src="/icons/ant-design-thunderbolt-filled_f.svg" 
-                            alt="Потенциал" 
-                            width={16} 
-                            height={16}
-                        />
-                        <div style={{width: 146, color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>повышение потенциала</div>
-                    </div>
-                    <div style={{alignSelf: 'stretch', paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 8, display: 'flex'}}>
-                        <Image 
-                            src="/icons/icon-cards-kl.svg" 
-                            alt="Треньки" 
-                            width={16} 
-                            height={16}
-                        />
-                        <div style={{alignSelf: 'stretch', color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>треньки, советы профи, разборы</div>
-                    </div>
+                    <Link href="/video" style={{width: '100%'}}>
+                        <div style={{alignSelf: 'stretch', paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 8, display: 'flex'}}>
+                            <Image 
+                                src="/icons/ant-design-thunderbolt-filled_f.svg" 
+                                alt="Потенциал" 
+                                width={16} 
+                                height={16}
+                            />
+                            <div style={{width: 146, color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>повышение потенциала</div>
+                        </div>
+                    </Link>
+                    <Link href="/shorts-catalog" style={{width: '100%'}}>
+                        <div style={{alignSelf: 'stretch', paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 8, display: 'flex'}}>
+                            <Image 
+                                src="/icons/icon-cards-kl.svg" 
+                                alt="Треньки" 
+                                width={16} 
+                                height={16}
+                            />
+                            <div style={{alignSelf: 'stretch', color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>треньки, советы профи, разборы</div>
+                        </div>
+                    </Link>
                 </div>
             </div>
         </div>

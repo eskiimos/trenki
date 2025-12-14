@@ -1,0 +1,17 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+set password "o4Qa1jibVGnxXMHk"
+
+puts "Подключаюсь к screen сессии docker-build...\n"
+puts "Нажмите Ctrl+A затем D чтобы отключиться\n"
+
+spawn ssh -t root@83.166.245.178 "screen -r docker-build"
+
+expect {
+    "password:" {
+        send "$password\r"
+        interact
+    }
+    eof
+}

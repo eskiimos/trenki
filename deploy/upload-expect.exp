@@ -1,0 +1,46 @@
+#!/usr/bin/expect -f
+
+set timeout -1
+set server_ip "83.166.245.178"
+set server_user "root"
+set server_pass "o4Qa1jibVGnxXMHk"
+set server_path "/opt/trenki"
+set archive "/tmp/trenki-deploy.tar.gz"
+
+puts "🚀 Загрузка проекта на сервер...\n"
+
+# Создаем директорию на сервере
+spawn ssh $server_user@$server_ip "mkdir -p $server_path"
+expect {
+    "password:" {
+        send "$server_pass\r"
+        exp_continue
+    }
+    eof
+}
+
+puts "\n📤 Загружаю архив...\n"
+
+# Загружаем архив
+spawn scp $archive $server_user@$server_ip:$server_path/
+expect {
+    "password:" {
+        send "$server_pass\r"
+        exp_continue
+    }
+    eof
+}
+
+puts "\n📦 Распаковываю на сервере...\n"
+
+# Распаковываем
+spawn ssh $server_user@$server_ip "cd $server_path && tar -xzf trenki-deploy.tar.gz && rm trenki-deploy.tar.gz && cp .env.production .env && ls -lh"
+expect {
+    "password:" {
+        send "$server_pass\r"
+        exp_continue
+    }
+    eof
+}
+
+puts "\n✅ Проект загружен!\n"

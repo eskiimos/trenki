@@ -1,0 +1,21 @@
+#!/usr/bin/expect -f
+
+set timeout -1
+set server_ip "83.166.245.178"
+set server_user "root"
+set server_pass "o4Qa1jibVGnxXMHk"
+set server_path "/opt/trenki"
+
+puts "\n🚀 Установка Docker на сервере...\n"
+
+# Подключаемся и устанавливаем Docker
+spawn ssh $server_user@$server_ip "cd $server_path && ./deploy/deploy-on-server.sh"
+expect {
+    "password:" {
+        send "$server_pass\r"
+        exp_continue
+    }
+    eof
+}
+
+puts "\n✅ Готово!\n"
