@@ -22,6 +22,7 @@ export async function GET(
         difficulty: true,
         level: true,
         equipment: true,
+        tags: true,
         trainer: {
           select: {
             id: true,
@@ -29,11 +30,6 @@ export async function GET(
             lastName: true,
             speciality: true,
             avatar: true,
-          }
-        },
-        tags: {
-          select: {
-            name: true,
           }
         }
       }
