@@ -1092,9 +1092,9 @@ export default function VideoPage({ params }: VideoPageProps) {
                   onClick={() => setShowFullscreenHint(false)}
                 >
                   {/* Иконка сверху */}
-                  <div className="mb-8 relative">
-                    <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 w-16 h-16 bg-[#A1FF4A] rounded-full flex items-center justify-center">
-                      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <div className="mb-4 md:mb-6">
+                    <div className="w-12 h-12 md:w-16 md:h-16 bg-[#A1FF4A] rounded-full flex items-center justify-center">
+                      <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M8 10L2 4M2 4H8M2 4V10" stroke="#060919" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                         <path d="M24 22L30 28M30 28H24M30 28V22" stroke="#060919" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
@@ -1103,14 +1103,14 @@ export default function VideoPage({ params }: VideoPageProps) {
                   
                   {/* Текстовое сообщение */}
                   <div className="text-center max-w-xs px-4">
-                    <h2 className="text-white text-lg font-bold mb-4">Полноэкранный режим</h2>
-                    <p className="text-white/80 text-sm leading-relaxed">
-                      Переверни телефон в горизонтальное положение для выхода в полноэкранный режим
+                    <h2 className="text-white text-base md:text-lg font-bold mb-2 md:mb-4">Полноэкранный режим</h2>
+                    <p className="text-white/80 text-xs md:text-sm leading-relaxed">
+                      Переверни телефон в горизонтальное положение
                     </p>
                   </div>
                   
                   {/* Стрелка вниз для закрытия */}
-                  <div className="mt-8 text-white/60 text-xs">
+                  <div className="mt-4 md:mt-6 text-white/60 text-[10px] md:text-xs">
                     Нажми чтобы закрыть
                   </div>
                 </div>
@@ -1123,11 +1123,6 @@ export default function VideoPage({ params }: VideoPageProps) {
                 </div>
               )}
               
-              {/* Debug Info - Качество видео */}
-              <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-full text-white text-xs flex items-center space-x-2">
-                <span>Качества: {Object.keys(availableQualities).length}</span>
-                {selectedQuality && <span className="text-[#A1FF4A] font-bold">{selectedQuality}</span>}
-              </div>
               
               {/* Play/Pause Overlay */}
               <div className={`absolute inset-0 bg-gradient-to-b from-transparent to-black/50 flex items-center justify-center transition-opacity duration-300 ${
@@ -1238,18 +1233,12 @@ export default function VideoPage({ params }: VideoPageProps) {
                   <button
                     onClick={() => setShowQualityMenu(!showQualityMenu)}
                     className="transition-opacity hover:opacity-80"
-                    title={Object.keys(availableQualities).length > 0 ? "Выбрать качество видео: " + (selectedQuality || 'HD') + ` (доступно ${Object.keys(availableQualities).length})` : "Качество видео не доступно"}
+                    title={Object.keys(availableQualities).length > 0 ? "Выбрать качество видео" : "Качество видео не доступно"}
                   >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#A1FF4A]/20 hover:bg-[#A1FF4A]/30">
-                      <span className="text-xs font-bold text-[#A1FF4A] uppercase">
-                        {selectedQuality && selectedQuality.replace('p', '') || 'HD'}
-                      </span>
-                      {Object.keys(availableQualities).length > 0 && (
-                        <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#A1FF4A] rounded-full text-[8px] flex items-center justify-center text-[#060919] font-bold">
-                          {Object.keys(availableQualities).length > 9 ? '9+' : Object.keys(availableQualities).length}
-                        </span>
-                      )}
-                    </div>
+                    <svg width={isLandscape ? 28 : 24} height={isLandscape ? 28 : 24} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="12" cy="12" r="2.5" stroke="white" strokeWidth="2"/>
+                      <path d="M12 6.5V5M12 19V17.5M6.5 12H5M19 12H17.5M7.93 7.93L7.05 7.05M16.95 16.95L16.07 16.07M16.07 7.93L16.95 7.05M7.05 16.95L7.93 16.07" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                   </button>
                   
                   {/* Quality Menu Dropdown */}
