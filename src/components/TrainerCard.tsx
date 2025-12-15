@@ -18,7 +18,7 @@ export default function TrainerCard({ trainer }: TrainerProps) {
   return (
     <div style={{
       width: '50%', 
-      height: 202, 
+      height: 'auto',
       paddingBottom: 8, 
       background: '#060919', 
       overflow: 'hidden', 
@@ -30,23 +30,23 @@ export default function TrainerCard({ trainer }: TrainerProps) {
     }}>
       <div style={{
         width: '100%', 
-        height: 112, 
+        height: 'auto',
+        paddingBottom: '100%',
         position: 'relative', 
         background: 'linear-gradient(180deg, rgba(87, 108, 255, 0) 0%, rgba(87, 108, 255, 0.50) 100%)', 
         overflow: 'hidden',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center'
+        borderRadius: 8
       }}>
         <Image 
           src={avatarSrc} 
           alt={`${trainer.name} ${trainer.lastName}`} 
-          width={100}
-          height={100}
+          fill
+          sizes="200px"
           style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover'
+            objectFit: 'cover',
+            position: 'absolute',
+            top: 0,
+            left: 0
           }}
         />
         <div style={{

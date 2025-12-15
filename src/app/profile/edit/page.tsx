@@ -407,12 +407,14 @@ const ProfileEditPage = () => {
 
         {/* Дата рождения */}
         <div>
-          <label className="text-white text-sm mb-2 block uppercase">ДАТА РОЖДЕНИЯ</label>
+          <label className="text-white text-sm mb-2 block uppercase">ВОЗРАСТ</label>
           <input
-            type="text"
+            type="number"
+            min="1"
+            max="120"
             value={formData.age}
             onChange={(e) => handleInputChange('age', e.target.value)}
-            placeholder="ДД/ММ/ГГ"
+            placeholder="ЛЕТ"
             className="w-full text-white placeholder-gray-400 px-4 border focus:outline-none transition-colors"
             style={{
               background: '#AEABBB33',
@@ -547,12 +549,30 @@ const ProfileEditPage = () => {
           <div className="flex gap-3 flex-wrap">
             <button 
               type="button"
-              onClick={() => handleInputChange('position', 'FORWARD')}
+              onClick={() => handleInputChange('position', 'LEFT_WING')}
               className={`px-6 py-3 rounded-full font-medium transition-all ${
-                formData.position === 'FORWARD' ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#AEABBB33] text-white'
+                formData.position === 'LEFT_WING' ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#AEABBB33] text-white'
               }`}
             >
-              Нападающий
+              Левый край
+            </button>
+            <button 
+              type="button"
+              onClick={() => handleInputChange('position', 'CENTER')}
+              className={`px-6 py-3 rounded-full font-medium transition-all ${
+                formData.position === 'CENTER' ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#AEABBB33] text-white'
+              }`}
+            >
+              Центр
+            </button>
+            <button 
+              type="button"
+              onClick={() => handleInputChange('position', 'RIGHT_WING')}
+              className={`px-6 py-3 rounded-full font-medium transition-all ${
+                formData.position === 'RIGHT_WING' ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#AEABBB33] text-white'
+              }`}
+            >
+              Правый край
             </button>
             <button 
               type="button"
@@ -574,9 +594,9 @@ const ProfileEditPage = () => {
             </button>
             <button 
               type="button"
-              onClick={() => handleInputChange('position', 'UNDECIDED')}
+              onClick={() => handleInputChange('position', '')}
               className={`px-6 py-3 rounded-full font-medium text-sm transition-all ${
-                formData.position === 'UNDECIDED' ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#AEABBB33] text-white'
+                formData.position === '' ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#AEABBB33] text-white'
               }`}
             >
               Пока не определился
@@ -605,6 +625,21 @@ const ProfileEditPage = () => {
             onBlur={(e) => (e.target.style.border = '1px solid transparent')}
           />
         </div>
+
+        {/* Кнопка сохранения */}
+        <button
+          onClick={handleSubmit}
+          disabled={isSaving}
+          className="w-full py-3 rounded-full font-bold uppercase transition-all mt-6"
+          style={{
+            background: isSaving ? '#AEABBB66' : '#A1FF4A',
+            color: isSaving ? '#AEABBB' : '#060919',
+            opacity: isSaving ? 0.6 : 1,
+            cursor: isSaving ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {isSaving ? 'Сохранение...' : 'Сохранить'}
+        </button>
       </div>
 
       {/* Нижнее меню */}

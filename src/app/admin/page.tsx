@@ -58,6 +58,14 @@ const AdminPage = () => {
             </div>
           </Link>
 
+          {/* Модерация отзывов */}
+          <Link href="/admin/reviews">
+            <div className="bg-gradient-to-br from-orange-600 to-red-600 rounded-lg p-5 md:p-6 hover:opacity-90 transition-opacity cursor-pointer h-full border border-white/10">
+              <h2 className="text-xl md:text-2xl font-bold mb-2">⭐ Отзывы</h2>
+              <p className="text-sm md:text-base text-gray-200">Модерация отзывов о тренерах</p>
+            </div>
+          </Link>
+
           {/* Управление тренировочными модулями */}
           <Link href="/admin/training-modules">
             <div className="bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg p-5 md:p-6 hover:opacity-90 transition-opacity cursor-pointer h-full border border-white/10">

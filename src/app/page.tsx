@@ -667,7 +667,9 @@ const TrainersSection = () => {
       try {
         const response = await fetch('/api/trainers');
         const data = await response.json();
-        const allTrainers = data.trainers || [];
+        let allTrainers = data.trainers || [];
+        // Перемешиваем тренеров рандомно
+        allTrainers = allTrainers.sort(() => Math.random() - 0.5);
         // Берем только первых 5 тренеров для отображения
         setTrainers(allTrainers.slice(0, 5));
         // Проверяем, есть ли еще тренеры
@@ -769,7 +771,7 @@ const TrainersSection = () => {
                   <Link key={trainer.id} href={`/trainers/${trainer.id}`} style={{ flexShrink: 0 }}>
                     <div style={{
                       width: '170px', 
-                      height: 202, 
+                      height: 'auto',
                       paddingBottom: 8, 
                       background: '#060919', 
                       overflow: 'hidden', 
@@ -781,23 +783,19 @@ const TrainersSection = () => {
                       cursor: 'pointer'
                     }}>
                       <div style={{
-                        width: '100%', 
-                        height: 112, 
+                        width: '170px', 
+                        height: '170px',
                         position: 'relative', 
                         background: 'linear-gradient(180deg, rgba(87, 108, 255, 0) 0%, rgba(87, 108, 255, 0.50) 100%)', 
                         overflow: 'hidden',
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center'
+                        borderRadius: 8
                     }}>
                         <Image 
                             src={trainer.avatar || '/avatars/af9e5de293f8ce1c351f480e9af666a6453ed701.png'} 
                             alt={trainer.name} 
-                            width={100}
-                            height={100}
+                            fill
+                            sizes="170px"
                             style={{
-                                width: '100%',
-                                height: '100%',
                                 objectFit: 'cover'
                             }}
                         />

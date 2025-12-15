@@ -113,6 +113,19 @@ export async function POST(request: NextRequest) {
     console.log('POST /api/profile - username:', username);
     console.log('POST /api/profile - profile:', profile);
 
+    // Нормализуем данные профиля (преобразуем пустые строки в null)
+    let normalizedProfile = null;
+    if (profile) {
+      normalizedProfile = {
+        ...profile,
+        position: profile.position ? profile.position : null,
+        number: profile.number ? parseInt(profile.number) : null,
+        age: profile.age ? parseInt(profile.age) : null,
+        height: profile.height ? parseInt(profile.height) : null,
+        weight: profile.weight ? parseInt(profile.weight) : null,
+      };
+    }
+
     // Проверим подключение к базе данных
     try {
       await prisma.$connect();
@@ -129,10 +142,10 @@ export async function POST(request: NextRequest) {
         firstName,
         lastName,
         username,
-        profile: profile ? {
+        profile: normalizedProfile ? {
           upsert: {
-            create: profile,
-            update: profile
+            create: normalizedProfile,
+            update: normalizedProfile
           }
         } : undefined
       },
@@ -141,8 +154,8 @@ export async function POST(request: NextRequest) {
         firstName,
         lastName,
         username,
-        profile: profile ? {
-          create: profile
+        profile: normalizedProfile ? {
+          create: normalizedProfile
         } : {
           create: {
             strength: 16,

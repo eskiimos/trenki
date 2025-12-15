@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import ReviewModal from '@/components/ReviewModal';
 
 interface Trainer {
   id: string;
@@ -38,10 +39,12 @@ export default function TrainerPage() {
   const [trainer, setTrainer] = useState<Trainer | null>(null);
   const [videos, setVideos] = useState<Video[]>([]);
   const [shorts, setShorts] = useState<Short[]>([]);
+  const [reviewsCount, setReviewsCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [userRating, setUserRating] = useState<number>(0);
   const [hoveredRating, setHoveredRating] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchTrainerData = async () => {
@@ -72,6 +75,13 @@ export default function TrainerPage() {
         const shortsResponse = await fetch(`/api/shorts?trainerId=${trainerId}`);
         const shortsData = await shortsResponse.json();
         setShorts(shortsData.shorts || []);
+
+        // Загружаем отзывы тренера
+        const reviewsResponse = await fetch(`/api/trainers/${trainerId}/reviews`);
+        const reviewsData = await reviewsResponse.json();
+        if (reviewsData.reviews) {
+          setReviewsCount(reviewsData.reviews.length);
+        }
       } catch (error) {
         console.error('Error loading trainer:', error);
       } finally {
@@ -437,20 +447,22 @@ export default function TrainerPage() {
 
       {/* ОТЗЫВЫ */}
       <div className="px-4">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-white text-sm font-bold uppercase">
-            отзывы
-          </h3>
-          <div className="flex items-center gap-2">
-            <span className="text-white/50 text-sm">(99)</span>
-            <Image 
-              src="/icons/arrow.svg" 
-              alt="Показать все" 
-              width={16} 
-              height={16}
-            />
+        <Link href={`/trainers/${trainerId}/reviews`}>
+          <div className="mb-4 flex items-center justify-between cursor-pointer">
+            <h3 className="text-white text-sm font-bold uppercase">
+              отзывы
+            </h3>
+            <div className="flex items-center gap-2">
+              <span className="text-white/50 text-sm">({reviewsCount})</span>
+              <Image 
+                src="/icons/arrow.svg" 
+                alt="Показать все" 
+                width={16} 
+                height={16}
+              />
+            </div>
           </div>
-        </div>
+        </Link>
 
         {/* Блок с призывом оставить отзыв */}
         <div className="text-center py-8">
@@ -466,7 +478,10 @@ export default function TrainerPage() {
               return (
                 <button 
                   key={star}
-                  onClick={() => setUserRating(star)}
+                  onClick={() => {
+                    setUserRating(star);
+                    setIsReviewModalOpen(true);
+                  }}
                   onMouseEnter={() => setHoveredRating(star)}
                   onMouseLeave={() => setHoveredRating(0)}
                   className="w-8 h-8 flex items-center justify-center transition-all"
@@ -484,6 +499,29 @@ export default function TrainerPage() {
           </div>
         </div>
       </div>
+
+      {/* Модальное окно отзыва */}
+      {trainer && (
+        <ReviewModal
+          isOpen={isReviewModalOpen}
+          onClose={() => {
+            setIsReviewModalOpen(false);
+            setUserRating(0);
+          }}
+          trainerId={trainerId}
+          trainerName={`${trainer.name} ${trainer.lastName}`}
+          onSubmitSuccess={() => {
+            // Обновляем количество отзывов
+            fetch(`/api/trainers/${trainerId}/reviews`)
+              .then(res => res.json())
+              .then(data => {
+                if (data.reviews) {
+                  setReviewsCount(data.reviews.length);
+                }
+              });
+          }}
+        />
+      )}
     </div>
   );
 }

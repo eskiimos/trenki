@@ -954,7 +954,7 @@ export default function VideoPage({ params }: VideoPageProps) {
             <>
               <video
                 ref={videoRef}
-                className="w-full h-full object-cover"
+                className={`w-full h-full ${isLandscape ? 'object-contain' : 'object-cover'}`}
                 src={kinescopeDirectUrl || videoData?.videoUrl || '/video/trenka.mp4'}
                 poster={videoData?.thumbnail}
                 autoPlay

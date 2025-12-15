@@ -26,6 +26,7 @@ model User {
   videoLikes           VideoLike[]
   characteristicHistory CharacteristicHistory[]
   scheduledWorkouts    ScheduledWorkout[]
+  trainerReviews       TrainerReview[]
 
   @@map("users")
 }
@@ -85,19 +86,35 @@ model Profile {
 }
 
 model Trainer {
-  id          String   @id @default(cuid())
+  id          String          @id @default(cuid())
   name        String
   lastName    String
   speciality  String
   experience  Int
-  rating      Float    @default(5.0)
+  rating      Float           @default(5.0)
   avatar      String?
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
   videos      Video[]
+  reviews     TrainerReview[]
 
   @@map("trainers")
+}
+
+model TrainerReview {
+  id         String   @id @default(cuid())
+  trainerId  String
+  userId     String
+  rating     Int
+  comment    String?
+  isApproved Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  trainer    Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([trainerId, userId])
+  @@map("trainer_reviews")
 }
 
 model Video {
