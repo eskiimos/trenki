@@ -110,9 +110,12 @@ export default function ShortsCatalogPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#060919] text-white pb-24 pt-safe">
+    <div className="min-h-screen bg-[#060919] text-white pb-24">
       {/* Шапка */}
-      <div className="px-4 pt-4 pb-6 bg-gradient-to-b from-[#101530] to-[#060919]">
+      <div
+        className="px-4 pb-6 bg-gradient-to-b from-[#101530] to-[#060919]"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
+      >
         <div className="flex items-center gap-2">
           <Link href="/" className="inline-block">
             <div className="w-10 h-10 flex items-center justify-center">

@@ -315,7 +315,7 @@ const Header = () => {
       paddingBottom: 24, 
       paddingLeft: 16, 
       paddingRight: 16, 
-      paddingTop: 16,
+      paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)',
       borderBottom: '1px #101530 solid', 
       flexDirection: 'column', 
       justifyContent: 'flex-start', 

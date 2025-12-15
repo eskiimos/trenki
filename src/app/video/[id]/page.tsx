@@ -963,7 +963,7 @@ export default function VideoPage({ params }: VideoPageProps) {
   return (
     <div className={containerClass}>{/* pb-20 для отступа под таб-бар */}
       {/* Header */}
-  <header className={`flex items-center justify-between p-4 bg-[#101530] shadow-sm border-b border-gray-700 ${isLandscape ? 'hidden' : ''}`} style={{ paddingTop: '16px' }}>
+  <header className={`flex items-center justify-between p-4 bg-[#101530] shadow-sm border-b border-gray-700 ${isLandscape ? 'hidden' : ''}`} style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
         <div className="flex items-center space-x-2">
           <button 
             onClick={() => {

@@ -32,9 +32,7 @@ body {
   position: relative;
   min-height: 100vh;
   -webkit-overflow-scrolling: touch;
-  /* Safe area для вырезов экрана */
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
+  /* Safe area применяется точечно в хедерах/нижнем меню */
 }
 
 /* Утилиты для safe-area */
