@@ -215,7 +215,7 @@ export default function CalendarPage() {
       style={{ background: 'linear-gradient(182.77deg, #101530 69.24%, #060919 97.69%)' }}
     >
       {/* Header */}
-      <header className="flex items-center p-4">
+      <header className="flex items-center p-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
         <button onClick={() => router.back()} className="mr-4 text-white/60 hover:text-white">
           <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
         </button>

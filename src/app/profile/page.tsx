@@ -115,7 +115,7 @@ const ProfilePage = () => {
   return (
     <div className="bg-[#101530] min-h-screen text-white">
       {/* Шапка с кнопкой назад */}
-      <div className="flex items-center justify-between p-4 pt-4">
+      <div className="flex items-center justify-between p-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
         <div className="flex items-center gap-4">
           <Link href="/" className="inline-block">
             <div className="w-8 h-8 flex items-center justify-center">
