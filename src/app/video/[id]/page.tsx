@@ -95,6 +95,14 @@ export default function VideoPage({ params }: VideoPageProps) {
   
   // Состояние для Toast уведомлений
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
+  
+  // Состояние для попытки полноэкранного режима на PWA
+  const [showFullscreenHint, setShowFullscreenHint] = useState(false);
+  
+  // Состояние для управления качеством видео
+  const [availableQualities, setAvailableQualities] = useState<Record<string, string>>({});
+  const [selectedQuality, setSelectedQuality] = useState<string>('');
+  const [showQualityMenu, setShowQualityMenu] = useState(false);
 
   // Получаем params асинхронно и загружаем данные видео
   useEffect(() => {
@@ -282,6 +290,14 @@ export default function VideoPage({ params }: VideoPageProps) {
             if (Date.now() - cachedData.timestamp < 3600000) {
               if (!ignore) {
                 setKinescopeDirectUrl(cachedData.url);
+                if (cachedData.availableQualities) {
+                  setAvailableQualities(cachedData.availableQualities);
+                  // Устанавливаем первое (лучшее) качество по умолчанию
+                  const qualityKeys = Object.keys(cachedData.availableQualities);
+                  if (qualityKeys.length > 0) {
+                    setSelectedQuality(qualityKeys[0]);
+                  }
+                }
                 console.log('Using cached Kinescope URL');
               }
               return;
@@ -294,11 +310,31 @@ export default function VideoPage({ params }: VideoPageProps) {
         setIsKinescopeLoading(true);
         try {
           const result = await getKinescopeDirectUrl(videoData.videoUrl);
+          console.log('Kinescope result:', {
+            directUrl: result.directUrl ? 'found' : 'not found',
+            availableQualities: Object.keys(result.availableQualities || {}),
+            qualitiesLength: Object.keys(result.availableQualities || {}).length
+          });
+          
           if (!ignore && result.directUrl) {
             setKinescopeDirectUrl(result.directUrl);
-            // Кэшируем URL
+            // Сохраняем доступные качества
+            if (result.availableQualities && Object.keys(result.availableQualities).length > 0) {
+              console.log('Setting available qualities:', result.availableQualities);
+              setAvailableQualities(result.availableQualities);
+              // Устанавливаем первое (лучшее) качество по умолчанию
+              const qualityKeys = Object.keys(result.availableQualities);
+              if (qualityKeys.length > 0) {
+                setSelectedQuality(qualityKeys[0]);
+                console.log('Selected default quality:', qualityKeys[0]);
+              }
+            } else {
+              console.warn('No available qualities returned from API');
+            }
+            // Кэшируем URL и качества
             sessionStorage.setItem(cacheKey, JSON.stringify({
               url: result.directUrl,
+              availableQualities: result.availableQualities,
               timestamp: Date.now()
             }));
             console.log('Kinescope URL cached');
@@ -594,7 +630,7 @@ export default function VideoPage({ params }: VideoPageProps) {
   };
 
   // Проверка поддержки Fullscreen API
-  const isFullscreenSupported = () => {
+  const checkFullscreenSupport = () => {
     if (typeof document === 'undefined') return false;
     return !!(
       document.fullscreenEnabled ||
@@ -606,8 +642,12 @@ export default function VideoPage({ params }: VideoPageProps) {
 
   // Универсальная функция для fullscreen с кроссбраузерной поддержкой
   const toggleFullscreen = () => {
-    if (!isFullscreenSupported()) {
-      console.warn('Fullscreen API не поддерживается в этом браузере');
+    const supported = checkFullscreenSupport();
+    
+    if (!supported) {
+      // Если fullscreen не поддерживается, показываем сообщение о повороте телефона
+      setShowFullscreenHint(true);
+      console.warn('Fullscreen API не поддерживается, показываем подсказку');
       return;
     }
 
@@ -631,6 +671,7 @@ export default function VideoPage({ params }: VideoPageProps) {
           return;
         } catch (err) {
           console.error('iOS fullscreen failed:', err);
+          setShowFullscreenHint(true);
         }
       }
 
@@ -639,13 +680,15 @@ export default function VideoPage({ params }: VideoPageProps) {
       if (!element) return;
 
       if (element.requestFullscreen) {
-        element.requestFullscreen().catch(console.error);
+        element.requestFullscreen().catch(() => setShowFullscreenHint(true));
       } else if ((element as any).webkitRequestFullscreen) {
         (element as any).webkitRequestFullscreen();
       } else if ((element as any).mozRequestFullScreen) {
         (element as any).mozRequestFullScreen();
       } else if ((element as any).msRequestFullscreen) {
         (element as any).msRequestFullscreen();
+      } else {
+        setShowFullscreenHint(true);
       }
     }
     showControlsTemporarily();
@@ -714,6 +757,26 @@ export default function VideoPage({ params }: VideoPageProps) {
     }
     setShowNextVideoPreview(false);
     setAutoplayEnabled(false);
+  };
+
+  // Функция для смены качества видео
+  const handleQualityChange = (quality: string) => {
+    if (availableQualities[quality] && videoRef.current) {
+      const newUrl = availableQualities[quality];
+      const currentTime = videoRef.current.currentTime;
+      
+      // Обновляем URL видео
+      setSelectedQuality(quality);
+      setKinescopeDirectUrl(newUrl);
+      
+      // После обновления src, пытаемся восстановить позицию
+      if (videoRef.current) {
+        videoRef.current.currentTime = currentTime;
+      }
+      
+      setShowQualityMenu(false);
+      console.log('Video quality changed to:', quality);
+    }
   };
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -1022,12 +1085,49 @@ export default function VideoPage({ params }: VideoPageProps) {
                 onEnded={handleVideoEnded}
               />
               
+              {/* Fullscreen Hint Overlay - Подсказка для PWA */}
+              {showFullscreenHint && (
+                <div 
+                  className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-50"
+                  onClick={() => setShowFullscreenHint(false)}
+                >
+                  {/* Иконка сверху */}
+                  <div className="mb-8 relative">
+                    <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 w-16 h-16 bg-[#A1FF4A] rounded-full flex items-center justify-center">
+                      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M8 10L2 4M2 4H8M2 4V10" stroke="#060919" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M24 22L30 28M30 28H24M30 28V22" stroke="#060919" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                  </div>
+                  
+                  {/* Текстовое сообщение */}
+                  <div className="text-center max-w-xs px-4">
+                    <h2 className="text-white text-lg font-bold mb-4">Полноэкранный режим</h2>
+                    <p className="text-white/80 text-sm leading-relaxed">
+                      Переверни телефон в горизонтальное положение для выхода в полноэкранный режим
+                    </p>
+                  </div>
+                  
+                  {/* Стрелка вниз для закрытия */}
+                  <div className="mt-8 text-white/60 text-xs">
+                    Нажми чтобы закрыть
+                  </div>
+                </div>
+              )}
+              
               {/* Buffering Indicator */}
               {buffered < 100 && buffered > 0 && (
                 <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-full text-white text-xs">
                   Загружено: {Math.round(buffered)}%
                 </div>
               )}
+              
+              {/* Debug Info - Качество видео */}
+              <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-full text-white text-xs flex items-center space-x-2">
+                <span>Качества: {Object.keys(availableQualities).length}</span>
+                {selectedQuality && <span className="text-[#A1FF4A] font-bold">{selectedQuality}</span>}
+              </div>
               
               {/* Play/Pause Overlay */}
               <div className={`absolute inset-0 bg-gradient-to-b from-transparent to-black/50 flex items-center justify-center transition-opacity duration-300 ${
@@ -1133,12 +1233,50 @@ export default function VideoPage({ params }: VideoPageProps) {
                   />
                 </button>
                 
+                {/* Quality Toggle - Кнопка качества */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowQualityMenu(!showQualityMenu)}
+                    className="transition-opacity hover:opacity-80"
+                    title={Object.keys(availableQualities).length > 0 ? "Выбрать качество видео: " + (selectedQuality || 'HD') + ` (доступно ${Object.keys(availableQualities).length})` : "Качество видео не доступно"}
+                  >
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#A1FF4A]/20 hover:bg-[#A1FF4A]/30">
+                      <span className="text-xs font-bold text-[#A1FF4A] uppercase">
+                        {selectedQuality && selectedQuality.replace('p', '') || 'HD'}
+                      </span>
+                      {Object.keys(availableQualities).length > 0 && (
+                        <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#A1FF4A] rounded-full text-[8px] flex items-center justify-center text-[#060919] font-bold">
+                          {Object.keys(availableQualities).length > 9 ? '9+' : Object.keys(availableQualities).length}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                  
+                  {/* Quality Menu Dropdown */}
+                  {showQualityMenu && Object.keys(availableQualities).length > 0 && (
+                    <div className="absolute bottom-full right-0 mb-2 bg-[#101530] border border-[#A1FF4A] rounded-lg overflow-hidden z-50 min-w-max shadow-xl">
+                      {Object.entries(availableQualities).map(([quality, url]) => (
+                        <button
+                          key={quality}
+                          onClick={() => handleQualityChange(quality)}
+                          className={`w-full px-4 py-2 text-left text-xs font-medium transition-colors ${
+                            selectedQuality === quality
+                              ? 'bg-[#A1FF4A] text-[#060919]'
+                              : 'text-white hover:bg-[#A1FF4A]/20'
+                          }`}
+                        >
+                          {quality}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
                 {/* Fullscreen Button */}
                 <button 
                   onClick={toggleFullscreen}
-                  className="transition-opacity hover:opacity-80 disabled:opacity-50"
+                  className="transition-opacity hover:opacity-80"
                   title={isFullscreen ? 'Выход из полноэкранного режима' : 'Полноэкранный режим'}
-                  disabled={!isFullscreenSupported()}
                 >
                   <Image
                     src={isFullscreen 
