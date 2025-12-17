@@ -209,14 +209,28 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    await prisma.video.delete({
-      where: { id },
-    });
+    // Удаляем/отвязываем все связанные записи, чтобы не падать на ограничениях FK
+    await prisma.$transaction([
+      // Лайки к видео
+      prisma.videoLike.deleteMany({ where: { videoId: id } }),
+      // Избранные
+      prisma.favoriteVideo.deleteMany({ where: { videoId: id } }),
+      // Сессии тренировок по видео
+      prisma.trainingSession.deleteMany({ where: { videoId: id } }),
+      // Видео в активных/прошлых сессиях тренировок
+      prisma.workoutSessionVideo.deleteMany({ where: { videoId: id } }),
+      // Теги видео (на всякий случай, хотя стоит CASCADE)
+      prisma.videoTag.deleteMany({ where: { videoId: id } }),
+      // Запланированные тренировки с этим видео (на всякий случай, стоит CASCADE)
+      prisma.scheduledWorkout.deleteMany({ where: { videoId: id } }),
+      // Модули, ссылающиеся на это видео — отвязываем
+      prisma.trainingModule.updateMany({ where: { videoId: id }, data: { videoId: null } }),
+    ]);
 
-    return NextResponse.json({ 
-      success: true,
-      message: 'Video deleted successfully' 
-    });
+    // И только после этого удаляем саму запись видео
+    await prisma.video.delete({ where: { id } });
+
+    return NextResponse.json({ success: true, message: 'Video deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting video:', error);
     return NextResponse.json({ 
