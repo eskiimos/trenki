@@ -9,11 +9,16 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Установка с увеличенными таймаутами для сетевых проблем
-RUN npm config set fetch-retries 10
-RUN npm config set fetch-retry-mintimeout 20000
-RUN npm config set fetch-retry-maxtimeout 120000
-RUN npm install --legacy-peer-deps
+# Установка curl для скачивания
+RUN apk add --no-cache curl
+
+# Установка с отключением Prisma postinstall (скачаем engines вручную)
+ENV PRISMA_ENGINES_MIRROR=https://binaries.prisma.sh
+ENV PRISMA_SKIP_POSTINSTALL_GENERATE=1
+RUN npm install --legacy-peer-deps --ignore-scripts
+
+# Вручную скачиваем и генерируем Prisma
+RUN npx prisma generate
 
 FROM base AS builder
 WORKDIR /app
