@@ -8,7 +8,10 @@ WORKDIR /app
 # Копирование файлов зависимостей и prisma схемы (нужна для postinstall)
 COPY package*.json ./
 COPY prisma ./prisma/
-    RUN npm install --legacy-peer-deps || npm install --legacy-peer-deps || npm install --legacy-peer-deps
+# Установка без генерации Prisma
+ENV PRISMA_SKIP_POSTINSTALL_GENERATE=1
+RUN npm install --legacy-peer-deps
+
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
