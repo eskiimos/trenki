@@ -4,8 +4,8 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  // Включаем standalone режим для Docker
-  output: 'standalone',
+  // Standalone режим отключен для стабильности сборки
+  // output: 'standalone',
   images: {
     remotePatterns: [
       {
