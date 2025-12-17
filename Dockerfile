@@ -8,8 +8,11 @@ WORKDIR /app
 # Копирование файлов зависимостей и prisma схемы (нужна для postinstall)
 COPY package*.json ./
 COPY prisma ./prisma/
-# Установка без генерации Prisma
-ENV PRISMA_SKIP_POSTINSTALL_GENERATE=1
+
+# Установка с увеличенными таймаутами для сетевых проблем
+RUN npm config set fetch-retries 10
+RUN npm config set fetch-retry-mintimeout 20000
+RUN npm config set fetch-retry-maxtimeout 120000
 RUN npm install --legacy-peer-deps
 
 FROM base AS builder
