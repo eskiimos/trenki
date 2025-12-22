@@ -30,7 +30,7 @@ trenki.vercel.app
 
 ### Шаг 5: BotFather подтвердит:
 ```
-✅ Success! Domain trenki.vercel.app has been set for @trenkibot
+✅ Success! Domain trenki.vercel.app has been set for @trenkiapp_bot
 ```
 
 ## 🧪 Тестирование

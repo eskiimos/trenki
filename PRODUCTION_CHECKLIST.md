@@ -6,7 +6,7 @@
 
 - [x] `.env.local` содержит:
   - `BOT_TOKEN="your_bot_token_from_botfather"  # ⚠️ Получите у @BotFather`
-  - `NEXT_PUBLIC_BOT_USERNAME="trenkibot"`
+  - `NEXT_PUBLIC_BOT_USERNAME="trenkiapp_bot"`
 - [x] Компонент `TelegramLogin.tsx` корректно работает в production
 - [x] API endpoint `/api/auth/telegram/route.ts` проверяет подпись
 - [x] Страница `/login` правильно обрабатывает авторизацию
@@ -40,7 +40,7 @@
 
 1. Откройте [@BotFather](https://t.me/botfather)
 2. Отправьте команду: `/setdomain`
-3. Выберите бота: `@trenkibot`
+3. Выберите бота: `@trenkiapp_bot`
 4. Укажите домен: `trenki.vercel.app` (без https:// и путей!)
 5. Дождитесь подтверждения от BotFather
 
@@ -50,7 +50,7 @@
 You: /setdomain
 BotFather: Choose a bot to set domain.
 
-You: @trenkibot
+You: @trenkiapp_bot
 BotFather: Send me the domain name...
 
 You: trenki.vercel.app
@@ -105,7 +105,7 @@ BotFather: ✅ Success! Users will be able to log in from:
 **Решение:**
 - Проверьте консоль браузера на ошибки
 - Убедитесь, что `NEXT_PUBLIC_BOT_USERNAME` установлен в Vercel
-- Проверьте, что используется правильный username: `trenkibot`
+- Проверьте, что используется правильный username: `trenkiapp_bot`
 
 #### Проблема: "Invalid signature"
 **Решение:**
@@ -149,7 +149,7 @@ curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getMe"
     "id": 8124848980,
     "is_bot": true,
     "first_name": "Треньки",
-    "username": "trenkibot",
+    "username": "trenkiapp_bot",
     ...
   }
 }
