@@ -12,7 +12,7 @@
 - Показывается кнопка **"Войти через Telegram"**
 
 ### 2. Клик на кнопку
-- Открывается deep link: `https://t.me/trenkibot?start=login_{token}`
+- Опрывается deep link: `https://t.me/trenkiapp_bot?start=login_{token}`
 - Пользователь переходит в Telegram бота
 - Начинается polling на веб-странице (проверка каждые 2 секунды)
 
@@ -161,7 +161,7 @@ await redis.setEx(`login:${token}`, 300, JSON.stringify({
 
 Убедитесь, что установлены:
 - `BOT_TOKEN` - токен бота
-- `NEXT_PUBLIC_BOT_USERNAME` - имя бота (trenkibot)
+- `NEXT_PUBLIC_BOT_USERNAME` - имя бота (trenkiapp_bot)
 - `WEB_APP_URL` - URL приложения (https://trenki.vercel.app)
 
 ### 3. Webhook
