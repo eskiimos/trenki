@@ -184,7 +184,7 @@ export default function LoginPage() {
       console.log('🔑 Login token created:', token);
 
       // Открываем бота с токеном в новой вкладке
-      const botUrl = `https://t.me/trenkibot?start=${token}`;
+      const botUrl = `https://t.me/trenkiapp_bot?start=${token}`;
       
       console.log('🤖 Opening bot URL in new tab:', botUrl);
       
@@ -321,7 +321,7 @@ export default function LoginPage() {
                 
                 {/* Ссылка для ручного открытия */}
                 <a
-                  href={`https://t.me/trenkibot?start=${loginToken}`}
+                  href={`https://t.me/trenkiapp_bot?start=${loginToken}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block w-full text-center py-2 px-4 bg-[#0088cc] hover:bg-[#006699] text-white text-sm rounded-lg transition-colors"

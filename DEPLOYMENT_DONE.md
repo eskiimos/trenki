@@ -98,7 +98,7 @@ sudo systemctl status trenki-bot
 DATABASE_URL=prisma+postgres://accelerate.prisma-data.net/?api_key=YOUR_API_KEY
 KINESCOPE_API_KEY=your_kinescope_api_key_here
 BOT_TOKEN=your_bot_token_from_botfather  # ⚠️ НИКОГДА НЕ ПУБЛИКУЙТЕ РЕАЛЬНЫЙ ТОКЕН!
-NEXT_PUBLIC_BOT_USERNAME=trenkibot
+NEXT_PUBLIC_BOT_USERNAME=trenkiapp_bot
 NEXT_PUBLIC_APP_URL=https://yourdomain.com
 NODE_ENV=production
 ```
@@ -155,7 +155,7 @@ sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
 
 1. Откройте [@BotFather](https://t.me/botfather)
 2. Отправьте: `/setdomain`
-3. Выберите бота: `@trenkibot`
+3. Выберите бота: `@trenkiapp_bot`
 4. Укажите домен: `yourdomain.com` (без https://)
 
 ---

@@ -47,7 +47,7 @@ export default function TelegramTestPage() {
   const testOpenLink = () => {
     const tg = (window as any).Telegram?.WebApp;
     if (tg) {
-      tg.openTelegramLink('https://t.me/trenkibot?start=test');
+      tg.openTelegramLink('https://t.me/trenkiapp_bot?start=test');
       setTestResults(prev => [...prev, '🔗 Попытка открыть ссылку...']);
     } else {
       setTestResults(prev => [...prev, '❌ WebApp API недоступен']);
@@ -108,7 +108,7 @@ export default function TelegramTestPage() {
           </button>
 
           <button
-            onClick={() => window.location.href = 'https://t.me/trenkibot?start=test'}
+            onClick={() => window.location.href = 'https://t.me/trenkiapp_bot?start=test'}
             className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 px-6 rounded-xl"
           >
             🔗 Test: window.location.href

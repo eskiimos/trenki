@@ -17,7 +17,7 @@
 
 1. Откройте Telegram и найдите **@BotFather**
 2. Отправьте команду: `/mybots`
-3. Выберите вашего бота (trenkibot)
+3. Выберите вашего бота (trenkiapp_bot)
 4. Нажмите **"API Token"**
 5. Нажмите **"Revoke current token"** ⚠️ ВАЖНО!
 6. Подтвердите отзыв токена
@@ -43,7 +43,7 @@
 ```env
 # Telegram Bot
 BOT_TOKEN="ваш_новый_токен_от_botfather"
-NEXT_PUBLIC_BOT_USERNAME="trenkibot"
+NEXT_PUBLIC_BOT_USERNAME="trenkiapp_bot"
 NEXT_PUBLIC_APP_URL="https://trenki.app"
 
 # Kinescope

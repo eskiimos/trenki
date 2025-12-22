@@ -12,7 +12,7 @@ export default function LoginSimple() {
     if (!scriptLoaded.current) {
       const script = document.createElement('script');
       script.src = 'https://telegram.org/js/telegram-widget.js?22';
-      script.setAttribute('data-telegram-login', 'trenkibot');
+      script.setAttribute('data-telegram-login', 'trenkiapp_bot');
       script.setAttribute('data-size', 'large');
       script.setAttribute('data-radius', '8');
       script.setAttribute('data-auth-url', 'https://trenki.vercel.app/api/auth/telegram-callback');

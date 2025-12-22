@@ -24,7 +24,7 @@
 
 BotFather ответит списком ваших ботов или попросит выбрать бота.
 
-### Шаг 3: Выберите бота `@trenkibot`
+### Шаг 3: Выберите бота `@trenkiapp_bot`
 
 Отправьте:
 
@@ -71,7 +71,7 @@ trenki.vercel.app
 ```
 1️⃣ Вы: /setdomain
 2️⃣ BotFather: Choose a bot...
-3️⃣ Вы: @trenkibot
+3️⃣ Вы: @trenkiapp_bot
 4️⃣ BotFather: Send me the domain...
 5️⃣ Вы: trenki.vercel.app
 6️⃣ BotFather: ✅ Success!
@@ -144,9 +144,9 @@ You: /setdomain
 BotFather: Choose a bot to set domain.
 Send one of the following commands:
 /done - finish this conversation
-@trenkibot - Треньки
+@trenkiapp_bot - Треньки
 
-You: @trenkibot
+You: @trenkiapp_bot
 
 BotFather: Send me the domain name where your users 
 will be able to log in via Telegram.
@@ -165,7 +165,7 @@ trenki.vercel.app
 1. Открой Telegram
 2. Найди @BotFather
 3. Отправь `/setdomain`
-4. Отправь `@trenkibot`
+4. Отправь `@trenkiapp_bot`
 5. Отправь `trenki.vercel.app`
 6. Дождись подтверждения ✅
 

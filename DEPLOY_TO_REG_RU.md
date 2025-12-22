@@ -219,7 +219,7 @@ ufw status
 
 1. Откройте [@BotFather](https://t.me/botfather) в Telegram
 2. Отправьте: `/setdomain`
-3. Выберите бота: `@trenkibot`
+3. Выберите бота: `@trenkiapp_bot`
 4. Укажите домен: `trenki.app` (без https://)
 
 Подтверждение:
