@@ -232,9 +232,11 @@ const Header = () => {
             profileData.position = positionMap[data.user.profile.position] || data.user.profile.position;
             profileData.potential = 'высокий';
             profileData.clubLogoUrl = data.user.profile.clubLogoUrl;
+            console.log('🏢 Club logo URL from API:', data.user.profile.clubLogoUrl);
           }
           
           setUserProfile(profileData);
+          console.log('👤 Final userProfile set:', profileData);
           
           // Обновляем authData если данные из базы отличаются
           if (authData && (authData.firstName !== data.user.firstName || authData.lastName !== data.user.lastName)) {
@@ -424,6 +426,10 @@ const Header = () => {
           height={48} 
           style={{borderRadius: 4}}
           className="object-cover"
+          onError={(e) => {
+            console.log('❌ Image load error, clubLogoUrl:', userProfile?.clubLogoUrl);
+            e.currentTarget.src = "/icons/icon-app.svg";
+          }}
         />
       </div>
       
