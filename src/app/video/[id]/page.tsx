@@ -608,6 +608,7 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [showControls, setShowControls] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasShownHintRef = useRef(false); // Флаг для показа подсказки только один раз
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -615,6 +616,15 @@ export default function VideoPage({ params }: VideoPageProps) {
         videoRef.current.pause();
       } else {
         videoRef.current.play();
+        
+        // Показываем подсказку о полноэкранном режиме на 3 секунды при первом запуске
+        if (!hasShownHintRef.current) {
+          hasShownHintRef.current = true;
+          setShowFullscreenHint(true);
+          setTimeout(() => {
+            setShowFullscreenHint(false);
+          }, 3000);
+        }
       }
       setIsPlaying(!isPlaying);
     }
