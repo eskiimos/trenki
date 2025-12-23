@@ -523,15 +523,6 @@ const ProfilePage = () => {
 
         {/* Служебные кнопки */}
         <div className="space-y-2">
-          {/* Кнопка админки */}
-          <div>
-            <Link href="/admin">
-              <button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl">
-                🔧 Админка
-              </button>
-            </Link>
-          </div>
-          
           {/* Кнопка push-уведомлений */}
           {isSupported && (
             <div className="pt-2">
