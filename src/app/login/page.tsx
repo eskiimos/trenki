@@ -187,6 +187,7 @@ export default function LoginPage() {
       const botUrl = `https://t.me/trenkiapp_bot?start=${token}`;
       
       console.log('🤖 Opening bot URL in new tab:', botUrl);
+      console.log('🆕 Using new bot: trenkiapp_bot');
       
       // ВСЕГДА открываем в новой вкладке через createElement
       // Это работает и в PWA, и в обычном браузере
