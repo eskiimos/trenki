@@ -22,13 +22,19 @@ export default function AdminLayout({
     // Проверяем аутентификацию для остальных страниц
     const checkAuth = async () => {
       try {
+        console.log('🔐 Checking admin auth for path:', pathname);
         const response = await fetch('/api/admin/auth', {
           method: 'GET',
+          credentials: 'include', // Важно для отправки cookies
         });
 
+        console.log('🔐 Auth response status:', response.status);
+        
         if (response.ok) {
+          console.log('✅ Admin authenticated');
           setIsAuthenticated(true);
         } else {
+          console.log('❌ Admin not authenticated, redirecting to login');
           setIsAuthenticated(false);
           router.push('/admin/login');
         }

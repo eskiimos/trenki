@@ -32,8 +32,9 @@ export default function AdminLoginPage() {
         return;
       }
 
-      // Успешный вход
-      router.push('/admin');
+      // Успешный вход - используем window.location для hard redirect
+      // это гарантирует, что cookie будет установлен перед проверкой
+      window.location.href = '/admin';
     } catch (err) {
       console.error('Login error:', err);
       setError('Ошибка при попытке входа');
