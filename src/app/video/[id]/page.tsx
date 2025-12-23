@@ -1155,11 +1155,9 @@ export default function VideoPage({ params }: VideoPageProps) {
                   </button>
                 </div>
               )}
-            </>
-          )}
-          
-          {/* Video Controls - для всех видео */}
-          {!showFullscreenHint && (
+              
+              {/* Video Controls - для всех видео */}
+              {!showFullscreenHint && (
             <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pt-12 ${isLandscape ? 'pb-8 px-6' : 'pb-4 px-4'} transition-opacity duration-300 ${
             showControls ? 'opacity-100' : 'opacity-0'
           }`}>
@@ -1293,6 +1291,9 @@ export default function VideoPage({ params }: VideoPageProps) {
               </div>
             </div>
           </div>
+          )}
+            </>
+          )}
 
           {/* Next Video Preview with Countdown - Overlay */}
           {showNextVideoPreview && nextVideo && (
