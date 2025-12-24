@@ -107,11 +107,15 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
 
     const handleCanPlay = () => {
       setIsLoading(false);
-      // Автовоспроизведение с muted (браузеры разрешают это)
+      // Сначала запускаем с muted для гарантированного автовоспроизведения
       video.muted = true;
       video.play().then(() => {
         setIsPlaying(true);
-        setIsMuted(true);
+        // После успешного воспроизведения включаем звук
+        setTimeout(() => {
+          video.muted = false;
+          setIsMuted(false);
+        }, 100);
       }).catch(err => {
         console.log('Autoplay blocked:', err);
         setIsPlaying(false);
@@ -122,6 +126,11 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
     const handlePlaying = () => {
       setIsLoading(false);
       setIsPlaying(true);
+      // Еще раз убеждаемся что звук включен
+      if (video.muted) {
+        video.muted = false;
+        setIsMuted(false);
+      }
     };
     const handlePause = () => setIsPlaying(false);
     const handleEnded = () => {
