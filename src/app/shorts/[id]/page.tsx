@@ -1,10 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, Send } from 'lucide-react';
 import { getTelegramId } from '@/lib/auth';
 import { ShortsPlayer } from '@/components/ShortsPlayer';
+
+// Swiper
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Virtual, Mousewheel, Keyboard } from 'swiper/modules';
+import type { Swiper as SwiperType } from 'swiper';
+
+// Swiper styles
+import 'swiper/css';
+import 'swiper/css/virtual';
 
 interface ShortPageProps {
   params: Promise<{ id: string }>;
@@ -209,27 +218,16 @@ export default function ShortPage({ params }: ShortPageProps) {
     }
   };
 
-  // Свайп вверх
-  const handleSwipeUp = () => {
-    if (currentIndex < shorts.length - 1) {
-      const nextShort = shorts[currentIndex + 1];
-      setCurrentIndex(prev => prev + 1);
-      setShort(nextShort);
-      setShortId(nextShort.id);
-      window.history.replaceState(null, '', `/shorts/${nextShort.id}`);
+  // Обработка смены слайда
+  const handleSlideChange = useCallback((swiper: SwiperType) => {
+    const newIndex = swiper.activeIndex;
+    if (newIndex !== currentIndex && shorts[newIndex]) {
+      setCurrentIndex(newIndex);
+      setShort(shorts[newIndex]);
+      setShortId(shorts[newIndex].id);
+      window.history.replaceState(null, '', `/shorts/${shorts[newIndex].id}`);
     }
-  };
-
-  // Свайп вниз
-  const handleSwipeDown = () => {
-    if (currentIndex > 0) {
-      const prevShort = shorts[currentIndex - 1];
-      setCurrentIndex(prev => prev - 1);
-      setShort(prevShort);
-      setShortId(prevShort.id);
-      window.history.replaceState(null, '', `/shorts/${prevShort.id}`);
-    }
-  };
+  }, [currentIndex, shorts]);
 
   if (isLoading || !short) {
     return (
@@ -240,18 +238,56 @@ export default function ShortPage({ params }: ShortPageProps) {
   }
 
   return (
-    <div className="relative">
-      <ShortsPlayer
-        key={short.id}
-        short={short}
-        onLike={handleLike}
-        onComment={handleOpenComments}
-        onShare={handleShare}
-        onSwipeUp={handleSwipeUp}
-        onSwipeDown={handleSwipeDown}
-        canSwipeUp={currentIndex < shorts.length - 1}
-        canSwipeDown={currentIndex > 0}
-      />
+    <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-black">
+      <Swiper
+        modules={[Virtual, Mousewheel, Keyboard]}
+        direction="vertical"
+        slidesPerView={1}
+        spaceBetween={0}
+        initialSlide={currentIndex}
+        virtual={{
+          enabled: true,
+          addSlidesAfter: 2,
+          addSlidesBefore: 2,
+        }}
+        mousewheel={{
+          sensitivity: 1,
+          thresholdDelta: 30,
+        }}
+        keyboard={{
+          enabled: true,
+        }}
+        speed={400}
+        resistance={true}
+        resistanceRatio={0.85}
+        threshold={10}
+        touchRatio={1}
+        touchAngle={45}
+        onSlideChange={handleSlideChange}
+        className="w-full h-full"
+        style={{ touchAction: 'pan-y' }}
+      >
+        {shorts.map((s, index) => (
+          <SwiperSlide key={s.id} virtualIndex={index} className="!h-full">
+            <ShortsPlayer
+              short={s}
+              onLike={handleLike}
+              onComment={handleOpenComments}
+              onShare={handleShare}
+              canSwipeUp={index < shorts.length - 1}
+              canSwipeDown={index > 0}
+            />
+          </SwiperSlide>
+        ))}
+      </Swiper>
+
+      {/* Полоска прогресса */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-white/20 z-50 pointer-events-none">
+        <div 
+          className="h-full bg-white transition-all duration-300"
+          style={{ width: `${((currentIndex + 1) / shorts.length) * 100}%` }}
+        />
+      </div>
 
       {/* Comments Modal */}
       {showComments && (

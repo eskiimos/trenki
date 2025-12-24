@@ -1,10 +1,19 @@
 'use client';
 
-import React, { useState, useEffect, Suspense, useRef, useCallback } from 'react';
+import React, { useState, useEffect, Suspense, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getTelegramId } from '@/lib/auth';
 import { ShortsPlayer } from '@/components/ShortsPlayer';
+
+// Swiper
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Virtual, Mousewheel, Keyboard } from 'swiper/modules';
+import type { Swiper as SwiperType } from 'swiper';
+
+// Swiper styles
+import 'swiper/css';
+import 'swiper/css/virtual';
 
 interface ShortData {
   id: string;
@@ -37,13 +46,7 @@ const ShortsContent = () => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const touchStartY = useRef(0);
-  const touchStartTime = useRef(0);
-  const isScrolling = useRef(false);
-  const loadMoreTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const swiperRef = useRef<SwiperType | null>(null);
   
   const userId = getTelegramId();
 
@@ -76,7 +79,7 @@ const ShortsContent = () => {
       }
     };
     loadShorts();
-  }, [userId]);
+  }, [userId, startIndex]);
 
   // Загрузка рекомендаций при приближении к концу
   const loadRecommendations = useCallback(async () => {
@@ -208,101 +211,16 @@ const ShortsContent = () => {
     }
   };
 
-  // Свайп вверх - следующее видео
-  const handleSwipeUp = useCallback(() => {
-    if (isScrolling.current) return;
-    isScrolling.current = true;
+  // Обработка смены слайда
+  const handleSlideChange = useCallback((swiper: SwiperType) => {
+    const newIndex = swiper.activeIndex;
+    setCurrentIndex(newIndex);
     
-    const nextIndex = currentIndex + 1;
-    setCurrentIndex(nextIndex);
-    setDragOffset(0);
-
     // Загружаем рекомендации когда приближаемся к концу (3 видео до конца)
-    if (nextIndex >= shorts.length - 3) {
-      if (loadMoreTimeoutRef.current) {
-        clearTimeout(loadMoreTimeoutRef.current);
-      }
-      loadMoreTimeoutRef.current = setTimeout(() => {
-        loadRecommendations();
-      }, 300);
+    if (newIndex >= shorts.length - 3) {
+      loadRecommendations();
     }
-
-    setTimeout(() => { isScrolling.current = false; }, 600);
-  }, [currentIndex, shorts.length, loadRecommendations]);
-
-  // Свайп вниз - предыдущее видео
-  const handleSwipeDown = useCallback(() => {
-    if (isScrolling.current || currentIndex <= 0) return;
-    isScrolling.current = true;
-    
-    setCurrentIndex(prev => prev - 1);
-    setDragOffset(0);
-    setTimeout(() => { isScrolling.current = false; }, 600);
-  }, [currentIndex]);
-
-  // Обработка touch событий для свайпа с плавным перемещением
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (isScrolling.current) return;
-    touchStartY.current = e.changedTouches[0].screenY;
-    touchStartTime.current = Date.now();
-    setIsDragging(true);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || isScrolling.current) return;
-    
-    const currentY = e.changedTouches[0].screenY;
-    const offset = currentY - touchStartY.current;
-    
-    // Ограничиваем смещение половиной экрана для превью
-    const maxOffset = window.innerHeight * 0.5;
-    const limitedOffset = Math.max(-maxOffset, Math.min(maxOffset, offset));
-    
-    setDragOffset(limitedOffset);
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!isDragging) return;
-    setIsDragging(false);
-    
-    const currentY = e.changedTouches[0].screenY;
-    const diff = touchStartY.current - currentY;
-    const duration = Date.now() - touchStartTime.current;
-    const velocity = Math.abs(diff) / duration;
-    
-    // Свайп вверх (diff > 0) - нужна минимальная дистанция или скорость
-    if ((diff > 80 || (diff > 40 && velocity > 0.5)) && currentIndex < shorts.length - 1) {
-      handleSwipeUp();
-    }
-    // Свайп вниз (diff < 0)
-    else if ((diff < -80 || (diff < -40 && velocity > 0.5)) && currentIndex > 0) {
-      handleSwipeDown();
-    }
-    else {
-      // Возврат на место
-      setDragOffset(0);
-    }
-  };
-
-  // Обработка клавиатуры (стрелки вверх/вниз)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (isScrolling.current) return;
-      
-      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        e.preventDefault();
-      }
-      
-      if (e.key === 'ArrowUp') {
-        handleSwipeUp();
-      } else if (e.key === 'ArrowDown') {
-        handleSwipeDown();
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSwipeUp, handleSwipeDown]);
+  }, [shorts.length, loadRecommendations]);
 
   // Загрузка
   if (isLoading) {
@@ -330,82 +248,71 @@ const ShortsContent = () => {
     );
   }
 
-  if (!currentShort) return null;
-
   return (
-    <div 
-      ref={containerRef}
-      className="fixed inset-0 w-screen h-screen overflow-hidden bg-black"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-    >
-      {/* Контейнер со слайдом */}
-      <div 
-        className="relative w-full h-full transition-transform duration-300"
+    <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-black">
+      <Swiper
+        modules={[Virtual, Mousewheel, Keyboard]}
+        direction="vertical"
+        slidesPerView={1}
+        spaceBetween={0}
+        initialSlide={startIndex}
+        virtual={{
+          enabled: true,
+          addSlidesAfter: 2,
+          addSlidesBefore: 2,
+        }}
+        mousewheel={{
+          sensitivity: 1,
+          thresholdDelta: 30,
+        }}
+        keyboard={{
+          enabled: true,
+        }}
+        speed={400}
+        resistance={true}
+        resistanceRatio={0.85}
+        threshold={10}
+        touchRatio={1}
+        touchAngle={45}
+        grabCursor={false}
+        cssMode={false}
+        onSwiper={(swiper) => {
+          swiperRef.current = swiper;
+        }}
+        onSlideChange={handleSlideChange}
+        className="w-full h-full"
         style={{ 
-          transform: `translateY(${dragOffset}px)`,
-          transitionDuration: isDragging ? '0ms' : '400ms'
+          touchAction: 'pan-y',
         }}
       >
-        {/* Предыдущее видео (чтобы было видно при свайпе вниз) */}
-        {currentIndex > 0 && (
-          <div className="absolute top-0 left-0 w-full h-full -translate-y-full">
+        {shorts.map((short, index) => (
+          <SwiperSlide 
+            key={short.id} 
+            virtualIndex={index}
+            className="!h-full"
+          >
             <ShortsPlayer
-              short={shorts[currentIndex - 1]}
+              short={short}
               onLike={handleLike}
               onComment={handleComment}
               onShare={handleShare}
-              onSwipeUp={handleSwipeUp}
-              onSwipeDown={handleSwipeDown}
-              canSwipeUp={currentIndex < shorts.length}
-              canSwipeDown={currentIndex > 1}
+              canSwipeUp={index < shorts.length - 1}
+              canSwipeDown={index > 0}
             />
-          </div>
-        )}
-
-        {/* Основное видео */}
-        <div className="relative w-full h-full">
-          <ShortsPlayer
-            key={currentShort.id}
-            short={currentShort}
-            onLike={handleLike}
-            onComment={handleComment}
-            onShare={handleShare}
-            onSwipeUp={handleSwipeUp}
-            onSwipeDown={handleSwipeDown}
-            canSwipeUp={currentIndex < shorts.length - 1}
-            canSwipeDown={currentIndex > 0}
-          />
-        </div>
-
-        {/* Следующее видео (чтобы было видно при свайпе вверх) */}
-        {currentIndex < shorts.length - 1 && (
-          <div className="absolute top-full left-0 w-full h-full translate-y-0">
-            <ShortsPlayer
-              short={shorts[currentIndex + 1]}
-              onLike={handleLike}
-              onComment={handleComment}
-              onShare={handleShare}
-              onSwipeUp={handleSwipeUp}
-              onSwipeDown={handleSwipeDown}
-              canSwipeUp={currentIndex + 1 < shorts.length - 1}
-              canSwipeDown={currentIndex + 1 > 0}
-            />
-          </div>
-        )}
-      </div>
+          </SwiperSlide>
+        ))}
+      </Swiper>
 
       {/* Полоска прогресса */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-white/20 z-50">
+      <div className="absolute top-0 left-0 right-0 h-1 bg-white/20 z-50 pointer-events-none">
         <div 
           className="h-full bg-white transition-all duration-300"
           style={{ width: `${((currentIndex + 1) / shorts.length) * 100}%` }}
         />
       </div>
 
-      {/* Индикатор позиции + подсказки */}
-      <div className="absolute bottom-4 right-4 z-40 text-white text-xs bg-black/50 px-3 py-1.5 rounded-full">
+      {/* Индикатор позиции */}
+      <div className="absolute bottom-4 right-4 z-40 text-white text-xs bg-black/50 px-3 py-1.5 rounded-full pointer-events-none">
         <div className="flex items-center gap-2">
           <span>{currentIndex + 1} / {shorts.length}</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -416,7 +323,7 @@ const ShortsContent = () => {
 
       {/* Индикатор загрузки рекомендаций */}
       {isLoadingMore && (
-        <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-40">
+        <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-40 pointer-events-none">
           <div className="flex items-center gap-2 text-white text-xs bg-black/50 px-3 py-2 rounded-full">
             <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
             <span>Загрузка рекомендаций...</span>

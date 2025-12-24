@@ -31,8 +31,6 @@ interface ShortsPlayerProps {
   onLike: () => void;
   onComment: () => void;
   onShare: () => void;
-  onSwipeUp?: () => void;
-  onSwipeDown?: () => void;
   canSwipeUp?: boolean;
   canSwipeDown?: boolean;
 }
@@ -42,8 +40,6 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
   onLike,
   onComment,
   onShare,
-  onSwipeUp,
-  onSwipeDown,
   canSwipeUp = false,
   canSwipeDown = false,
 }) => {
@@ -56,15 +52,9 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
   const [showDescription, setShowDescription] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [videoUrl, setVideoUrl] = useState<string>('');
-  const [isVisible, setIsVisible] = useState(true);
-  
-  // Touch/swipe state
-  const touchStartY = useRef(0);
-  const touchStartX = useRef(0);
 
   // Загрузка URL видео (обработка Kinescope)
   useEffect(() => {
-    setIsVisible(true);
     const loadVideoUrl = async () => {
       setIsLoading(true);
       
@@ -189,32 +179,10 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
     setIsMuted(video.muted);
   };
 
-  // Обработка свайпов
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartY.current = e.touches[0].clientY;
-    touchStartX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
-    const deltaX = Math.abs(e.changedTouches[0].clientX - touchStartX.current);
-    
-    // Проверяем что это вертикальный свайп
-    if (deltaX < 50) {
-      if (deltaY < -80 && canSwipeUp && onSwipeUp) {
-        // Свайп вверх - следующее видео
-        onSwipeUp();
-      } else if (deltaY > 80 && canSwipeDown && onSwipeDown) {
-        // Свайп вниз - предыдущее видео
-        onSwipeDown();
-      }
-    }
-  };
-
   return (
     <div 
       ref={containerRef}
-      className={`fixed inset-0 bg-black flex flex-col transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+      className="relative w-full h-full bg-black flex flex-col"
     >
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center justify-between"
@@ -234,8 +202,6 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
       <div 
         className="absolute inset-0"
         onClick={togglePlay}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
       >
         <video
           ref={videoRef}
