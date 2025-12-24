@@ -33,6 +33,7 @@ interface ShortsPlayerProps {
   onShare: () => void;
   canSwipeUp?: boolean;
   canSwipeDown?: boolean;
+  isActive?: boolean;
 }
 
 export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
@@ -42,6 +43,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
   onShare,
   canSwipeUp = false,
   canSwipeDown = false,
+  isActive = true,
 }) => {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -52,6 +54,35 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
   const [showDescription, setShowDescription] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [videoUrl, setVideoUrl] = useState<string>('');
+
+  // Управление воспроизведением при смене активного слайда
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (isActive) {
+      // Слайд стал активным - запускаем воспроизведение
+      if (video.src && video.readyState >= 2) {
+        video.play().then(() => {
+          setIsPlaying(true);
+          // Включаем звук для активного видео
+          setTimeout(() => {
+            video.muted = false;
+            setIsMuted(false);
+          }, 100);
+        }).catch(err => {
+          console.log('Play on active failed:', err);
+        });
+      }
+    } else {
+      // Слайд стал неактивным - ставим на паузу и сбрасываем на начало
+      video.pause();
+      video.currentTime = 0;
+      video.muted = true;
+      setIsPlaying(false);
+      setIsMuted(true);
+    }
+  }, [isActive]);
 
   // Загрузка URL видео (обработка Kinescope)
   useEffect(() => {
@@ -100,6 +131,9 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
 
     const handleCanPlay = () => {
       setIsLoading(false);
+      // Автовоспроизведение только для активного слайда
+      if (!isActive) return;
+      
       // Сначала запускаем с muted для гарантированного автовоспроизведения
       video.muted = true;
       video.play().then(() => {

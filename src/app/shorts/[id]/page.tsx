@@ -276,6 +276,7 @@ export default function ShortPage({ params }: ShortPageProps) {
               onShare={handleShare}
               canSwipeUp={index < shorts.length - 1}
               canSwipeDown={index > 0}
+              isActive={index === currentIndex}
             />
           </SwiperSlide>
         ))}
