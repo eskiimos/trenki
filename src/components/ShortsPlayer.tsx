@@ -49,12 +49,14 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
 }) => {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true); // Начинаем с muted для автовоспроизведения
   const [showDescription, setShowDescription] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [videoUrl, setVideoUrl] = useState<string>('');
+  const [isVisible, setIsVisible] = useState(true);
   
   // Touch/swipe state
   const touchStartY = useRef(0);
@@ -62,6 +64,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
 
   // Загрузка URL видео (обработка Kinescope)
   useEffect(() => {
+    setIsVisible(true);
     const loadVideoUrl = async () => {
       setIsLoading(true);
       
@@ -210,7 +213,8 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black flex flex-col"
+      ref={containerRef}
+      className={`fixed inset-0 bg-black flex flex-col transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
     >
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center justify-between"

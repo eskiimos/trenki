@@ -132,12 +132,12 @@ const ProfilePage = () => {
         
         {/* Кнопка редактирования */}
         <Link href="/profile/edit" className="inline-block">
-          <div className="w-8 h-8 flex items-center justify-center hover:opacity-80 transition-opacity">
+          <div className="w-6 h-6 flex items-center justify-center hover:opacity-80 transition-opacity">
             <Image 
               src="/icons/icon-edit.svg" 
               alt="Редактировать профиль" 
-              width={32} 
-              height={32}
+              width={24} 
+              height={24}
             />
           </div>
         </Link>
@@ -531,9 +531,9 @@ const ProfilePage = () => {
                 disabled={pushLoading}
                 className={`w-full ${
                   isSubscribed 
-                    ? 'bg-gray-600 hover:bg-gray-700' 
-                    : 'bg-green-600 hover:bg-green-700'
-                } text-white font-semibold py-4 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    ? 'bg-white/10 hover:bg-white/15' 
+                    : 'bg-white/10 hover:bg-white/15'
+                } text-white/70 font-medium py-3 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm`}
               >
                 {pushLoading ? '⏳ Загрузка...' : isSubscribed ? '🔕 Отключить уведомления' : '🔔 Включить уведомления'}
               </button>
@@ -547,7 +547,7 @@ const ProfilePage = () => {
           <div className="pt-2">
             <button 
               onClick={handleLogout}
-              className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-4 rounded-lg transition-all duration-300"
+              className="w-full bg-white/10 hover:bg-white/15 text-white/70 font-medium py-3 rounded-lg transition-all duration-300 text-sm"
             >
               🚪 Выйти
             </button>
