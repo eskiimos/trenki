@@ -61,6 +61,10 @@ export default function WorkoutPage() {
   
   // Состояние для Toast уведомлений
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
+  
+  // Состояние для отображения заглушки при отсутствии видео
+  const [noVideosAvailable, setNoVideosAvailable] = useState(false);
+  const [missingModules, setMissingModules] = useState<string[]>([]);
 
   useEffect(() => {
     if (webApp) {
@@ -139,13 +143,20 @@ export default function WorkoutPage() {
           })),
         });
         setWorkout(data.workout);
+        setNoVideosAvailable(false);
       } else {
-        // Нет активной тренировки, перенаправляем на оценку
-        console.log('No active workout, redirecting to assessment');
-        // router.push('/training/assessment');
+        // Нет активной тренировки
+        console.log('No active workout found');
+        setNoVideosAvailable(true);
+        // Можно попробовать получить информацию об ошибке из предыдущего запроса
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка загрузки тренировки:', error);
+      setNoVideosAvailable(true);
+      // Если в ошибке есть информация о недостающих модулях
+      if (error?.missingModules) {
+        setMissingModules(error.missingModules);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -247,8 +258,105 @@ export default function WorkoutPage() {
     );
   }
 
-  if (!workout) {
-    return null;
+  // Заглушка при отсутствии видео для тренировки
+  if (noVideosAvailable || !workout) {
+    return (
+      <div className="min-h-screen bg-[#101530] text-white p-4 flex flex-col items-center justify-center">
+        <div className="max-w-md w-full text-center space-y-6">
+          {/* Иконка */}
+          <div className="flex justify-center mb-4">
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+                <path d="M2 12l10 5 10-5"/>
+              </svg>
+            </div>
+          </div>
+
+          {/* Заголовок */}
+          <h1 className="text-2xl font-bold">
+            Недостаточно видео
+          </h1>
+
+          {/* Описание */}
+          <p className="text-gray-400 text-base leading-relaxed">
+            К сожалению, в данный момент в базе недостаточно видео для генерации персональной тренировки. 
+            Наша команда уже работает над добавлением нового контента!
+          </p>
+
+          {/* Советы */}
+          <div className="bg-[#1a1f3a] rounded-lg p-4 space-y-3 text-left">
+            <p className="text-sm text-gray-300">
+              <span className="text-[#A1FF4A] font-semibold">💡 Что можно сделать:</span>
+            </p>
+            <ul className="space-y-2 text-sm text-gray-400">
+              <li className="flex items-start gap-2">
+                <span className="text-[#A1FF4A] mt-0.5">•</span>
+                <span>Попробуйте выбрать другие параметры при оценке состояния</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#A1FF4A] mt-0.5">•</span>
+                <span>Посмотрите отдельные видео в каталоге</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#A1FF4A] mt-0.5">•</span>
+                <span>Вернитесь позже - мы регулярно добавляем новый контент</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Информация для админов о недостающих модулях */}
+          {missingModules.length > 0 && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 space-y-2 text-left">
+              <p className="text-sm font-semibold text-red-400 flex items-center gap-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                Для админов: Недостающие модули
+              </p>
+              <div className="space-y-1 text-sm text-red-300">
+                {missingModules.map((module, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-red-400 rounded-full"></span>
+                    <span className="font-mono">{module}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-red-300/70 mt-2 pt-2 border-t border-red-500/20">
+                Необходимо добавить видео указанных типов в базу данных для корректной генерации тренировок
+              </p>
+            </div>
+          )}
+
+          {/* Кнопки действий */}
+          <div className="space-y-3 pt-4">
+            <button
+              onClick={() => router.push('/training/assessment')}
+              className="w-full py-3 px-6 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg font-semibold hover:opacity-90 transition-opacity"
+            >
+              Пройти оценку заново
+            </button>
+            
+            <button
+              onClick={() => router.push('/videos')}
+              className="w-full py-3 px-6 bg-[#1a1f3a] rounded-lg font-semibold hover:bg-[#2d3448] transition-colors"
+            >
+              Перейти к каталогу видео
+            </button>
+            
+            <button
+              onClick={() => router.push('/')}
+              className="w-full py-3 px-6 text-gray-400 hover:text-white transition-colors"
+            >
+              Вернуться на главную
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Маппинг русских названий на типы для UI

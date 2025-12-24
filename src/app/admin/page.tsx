@@ -66,6 +66,14 @@ const AdminPage = () => {
             </div>
           </Link>
 
+          {/* Проверка контента */}
+          <Link href="/admin/content-check">
+            <div className="bg-gradient-to-br from-yellow-600 to-orange-600 rounded-lg p-5 md:p-6 hover:opacity-90 transition-opacity cursor-pointer h-full border border-white/10">
+              <h2 className="text-xl md:text-2xl font-bold mb-2">🎯 Проверка контента</h2>
+              <p className="text-sm md:text-base text-gray-200">Контроль доступности видео для тренировок</p>
+            </div>
+          </Link>
+
           {/* Управление тренировочными модулями */}
           <Link href="/admin/training-modules">
             <div className="bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg p-5 md:p-6 hover:opacity-90 transition-opacity cursor-pointer h-full border border-white/10">

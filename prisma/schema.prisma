@@ -138,10 +138,21 @@ model Video {
   updatedAt       DateTime              @updatedAt
   rpeМакс         Int?
   rpeМин          Int?
-  muscleGroup     String?           @map("группаМышц")
-  complexity      String?           @map("сложность")
-  moduleType      String?           @map("типМодуля")
+  
+  // Старые поля (String - не трогаем, чтобы не сломать данные)
+  muscleGroupOld  String?           @map("группаМышц")
+  complexityOld   String?           @map("сложность")
+  moduleTypeOld   String?           @map("типМодуля")
   loadTypeOld     String?           @map("типНагрузки")
+  
+  // Новые поля для алгоритма «Треньки» (опциональные, enum типы)
+  loadType        LoadType?             // тип нагрузки
+  muscleGroup     MuscleGroup?          // направление нагрузки  
+  complexity      Complexity?           // сложность
+  moduleType      ModuleType?           // тип модуля (разминка/ОФП/техника/заминка)
+  trainingGoals   TrainingGoal[]        // для каких состояний подходит (массив)
+  ageGroup        AgeGroup?             // целевая возрастная группа
+  
   favorites       FavoriteVideo[]
   trainingModules TrainingModule[]
   sessions        TrainingSession[]
@@ -541,6 +552,12 @@ enum WorkoutStatus {
   IN_PROGRESS
   COMPLETED
   SKIPPED
+}
+
+enum AgeGroup {
+  CHILD      // ребенок
+  TEEN       // подросток
+  ADULT      // взрослый
 }
 
 model ScheduledWorkout {

@@ -107,6 +107,14 @@ export default function TrainingAssessmentPage() {
             return;
           }
           
+          // Если есть информация о недостающих модулях, переходим на workout page
+          // где будет показана подробная информация о том, что нужно добавить
+          if (generateData.missingModules && generateData.missingModules.length > 0) {
+            console.log('⚠️ Missing modules detected, redirecting to workout page for details');
+            router.push('/training/workout');
+            return;
+          }
+          
           alert('Ошибка генерации тренировки: ' + generateData.error);
         }
       } else {

@@ -88,11 +88,12 @@ export async function POST(request: NextRequest) {
       availableTime: availableTime || 45,
     });
 
-    // Если нет модулей, возвращаем ошибку
+    // Если нет модулей, возвращаем ошибку с информацией о недостающих
     if (!workout.modules || workout.modules.length === 0) {
       return NextResponse.json({
         error: 'No suitable videos found for workout generation',
-        suggestion: 'Try different difficulty level or add more videos to the database'
+        suggestion: 'Try different difficulty level or add more videos to the database',
+        missingModules: workout.missingModules || []
       }, { status: 404 });
     }
 
@@ -137,7 +138,8 @@ export async function POST(request: NextRequest) {
     console.error('❌ Error generating workout:', error);
     return NextResponse.json({ 
       error: 'Failed to generate workout',
-      details: error.message 
+      details: error.message,
+      missingModules: error.missingModules || []
     }, { status: 500 });
   }
 }
@@ -159,6 +161,7 @@ async function buildWorkout(params: {
   const { userId, weakest, allowedDifficulties, availableTime } = params;
   const modules: any[] = [];
   let totalDuration = 0;
+  const missingModules: string[] = [];
 
   // 1. РАЗМИНКА (5-10 минут) - MOBILITY или DYNAMIC_STRETCH
   const warmup: any = await prisma.video.findFirst({
@@ -211,6 +214,9 @@ async function buildWorkout(params: {
       loadTypes: warmup.videoTags.map((vt: any) => vt.tag.loadType).filter(Boolean),
     });
     totalDuration += warmup.duration;
+  } else {
+    console.log('⚠️ РАЗМИНКА не найдена. Требуется видео с LoadType: MOBILITY или DYNAMIC_STRETCH, длительность до 10 минут');
+    missingModules.push('РАЗМИНКА (LoadType: MOBILITY или DYNAMIC_STRETCH)');
   }
 
   // 2. ОСНОВНАЯ ЧАСТЬ (20-30 минут) - Развиваем СЛАБУЮ характеристику
@@ -311,6 +317,10 @@ async function buildWorkout(params: {
       focusArea: weakest,
     });
     totalDuration += mainWorkout.duration;
+  } else {
+    const mainLoadTypes = getMainLoadTypes(weakest);
+    console.log(`⚠️ ОСНОВНАЯ ЧАСТЬ не найдена. Требуется видео с LoadType: ${mainLoadTypes.join(' или ')}, длительность 20-30 минут для развития характеристики: ${weakest}`);
+    missingModules.push(`ОСНОВНАЯ ЧАСТЬ (LoadType: ${mainLoadTypes.join(' или ')}, фокус на ${weakest})`);
   }
 
   // 3. ЗАМИНКА (5-10 минут) - STATIC_STRETCH или FLEXIBILITY
@@ -365,11 +375,16 @@ async function buildWorkout(params: {
       loadTypes: cooldown.videoTags.map((vt: any) => vt.tag.loadType).filter(Boolean),
     });
     totalDuration += cooldown.duration;
+  } else {
+    console.log('⚠️ ЗАМИНКА не найдена. Требуется видео с LoadType: STATIC_STRETCH или MOBILITY, длительность до 10 минут');
+    missingModules.push('ЗАМИНКА (LoadType: STATIC_STRETCH или MOBILITY)');
   }
 
   // Проверяем, что у нас есть хотя бы 1 модуль
   if (modules.length === 0) {
-    throw new Error('No suitable videos found for workout generation. Try different difficulty level or add more videos to the database.');
+    const error: any = new Error('No suitable videos found for workout generation. Try different difficulty level or add more videos to the database.');
+    error.missingModules = missingModules;
+    throw error;
   }
 
   console.log(`✅ Собрано модулей: ${modules.length}`, {
@@ -381,6 +396,7 @@ async function buildWorkout(params: {
   return {
     modules,
     totalDuration,
+    missingModules,
     structure: {
       warmup: modules[0]?.title || 'Не найдена',
       main: modules[1]?.title || 'Не найдена',
