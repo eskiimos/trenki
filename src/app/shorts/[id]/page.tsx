@@ -50,6 +50,9 @@ interface Comment {
     firstName: string | null;
     lastName: string | null;
     username: string | null;
+    profile: {
+      avatarUrl: string | null;
+    } | null;
   };
 }
 
@@ -314,10 +317,18 @@ export default function ShortPage({ params }: ShortPageProps) {
             ) : (
               comments.map((comment) => (
                 <div key={comment.id} className="flex space-x-3">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                    <span className="text-white text-xs font-semibold">
-                      {comment.user.firstName?.charAt(0) || comment.user.username?.charAt(0) || 'U'}
-                    </span>
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {comment.user.profile?.avatarUrl ? (
+                      <img 
+                        src={comment.user.profile.avatarUrl} 
+                        alt="Avatar" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-white text-xs font-semibold">
+                        {comment.user.firstName?.charAt(0) || comment.user.username?.charAt(0) || 'U'}
+                      </span>
+                    )}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-1">

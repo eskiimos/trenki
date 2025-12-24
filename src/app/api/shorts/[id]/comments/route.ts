@@ -19,7 +19,12 @@ export async function GET(
             telegramId: true,
             firstName: true,
             lastName: true,
-            username: true
+            username: true,
+            profile: {
+              select: {
+                avatarUrl: true
+              }
+            }
           }
         }
       },
@@ -75,7 +80,12 @@ export async function POST(
             id: true,
             firstName: true,
             lastName: true,
-            username: true
+            username: true,
+            profile: {
+              select: {
+                avatarUrl: true
+              }
+            }
           }
         }
       }
