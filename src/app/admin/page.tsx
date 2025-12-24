@@ -44,9 +44,9 @@ const AdminPage = () => {
 
           {/* Статистика */}
           <Link href="/admin/stats">
-            <div className="bg-[#1a1f3a] rounded-lg p-5 md:p-6 hover:bg-[#2d3448] transition-colors cursor-pointer h-full border border-white/5">
-              <h2 className="text-xl md:text-2xl font-bold mb-2">Статистика</h2>
-              <p className="text-sm md:text-base text-gray-400">Просмотр аналитики</p>
+            <div className="bg-gradient-to-br from-green-600 to-teal-600 rounded-lg p-5 md:p-6 hover:opacity-90 transition-opacity cursor-pointer h-full border border-white/10">
+              <h2 className="text-xl md:text-2xl font-bold mb-2">📊 Статистика</h2>
+              <p className="text-sm md:text-base text-gray-200">Аналитика и BI-система</p>
             </div>
           </Link>
 

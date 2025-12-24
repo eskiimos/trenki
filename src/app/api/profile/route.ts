@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { updateUserActivity } from '@/lib/updateUserActivity';
 
 export async function GET(request: NextRequest) {
   try {
@@ -69,6 +70,9 @@ export async function GET(request: NextRequest) {
       });
       console.log('User refetched with profile');
     }
+
+    // Обновляем активность пользователя
+    await updateUserActivity(telegramId);
 
     console.log('=== GET /api/profile SUCCESS ===');
     return NextResponse.json({ user });

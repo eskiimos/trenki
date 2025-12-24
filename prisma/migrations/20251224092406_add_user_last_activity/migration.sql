@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "public"."users" ADD COLUMN     "lastActivity" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;

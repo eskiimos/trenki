@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { updateUserActivity } from '@/lib/updateUserActivity';
 
 // GET - Получить все лайки для short
 export async function GET(
@@ -135,6 +136,9 @@ export async function POST(
 
       isLiked = true;
     }
+
+    // Обновляем активность пользователя
+    await updateUserActivity(telegramId);
 
     return NextResponse.json({ 
       success: true,

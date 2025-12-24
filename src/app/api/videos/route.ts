@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { updateUserActivity } from '@/lib/updateUserActivity';
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,6 +8,7 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category');
     const difficulty = searchParams.get('difficulty');
     const trainerId = searchParams.get('trainerId');
+    const userId = searchParams.get('userId');
 
     const where: any = {
       isPublished: true, // показываем только опубликованные видео
@@ -79,6 +81,11 @@ export async function GET(request: NextRequest) {
         rpeМакс: video.rpeМакс,
       };
     });
+
+    // Обновляем активность пользователя, если он авторизован
+    if (userId) {
+      await updateUserActivity(userId);
+    }
 
     return NextResponse.json({ videos: formattedVideos });
   } catch (error) {

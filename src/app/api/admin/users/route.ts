@@ -43,11 +43,6 @@ export async function GET(request: NextRequest) {
         // Считаем активность
         const completedSessions = user.sessions.filter(s => s.completed).length;
         const totalSessions = user.sessions.length;
-        
-        // Последняя активность
-        const lastActivity = user.sessions.length > 0 
-          ? user.sessions[0].createdAt 
-          : user.createdAt;
 
         return {
           id: user.id,
@@ -59,7 +54,7 @@ export async function GET(request: NextRequest) {
           emailVerified: user.emailVerified,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
-          lastActivity,
+          lastActivity: user.lastActivity || user.updatedAt,
           
           // Профиль
           profile: user.profile ? {

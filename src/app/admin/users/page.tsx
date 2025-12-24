@@ -63,6 +63,7 @@ export default function AdminUsersPage() {
   const [isLive, setIsLive] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [updatedUserIds, setUpdatedUserIds] = useState<Set<string>>(new Set());
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -357,113 +358,46 @@ export default function AdminUsersPage() {
             return (
             <div
               key={user.id}
-              className={`bg-[#1a1f3a] rounded-lg p-4 md:p-6 hover:bg-[#2d3448] transition-all ${
+              onClick={() => setSelectedUser(user)}
+              className={`bg-[#1a1f3a] rounded-lg p-4 hover:bg-[#2d3448] transition-all cursor-pointer ${
                 isUpdated ? 'ring-2 ring-green-400 animate-pulse' : ''
               }`}
             >
-              <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex items-center justify-between">
                 {/* Основная информация */}
                 <div className="flex-1">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h3 className="text-lg font-semibold flex items-center gap-2 flex-wrap">
-                        {user.firstName || user.username || `User ${user.telegramId.slice(0, 8)}`}
-                        {user.lastName && ` ${user.lastName}`}
-                        
-                        {isOnlineNow(user.lastActivity) && (
-                          <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full flex items-center gap-1">
-                            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                            Online
-                          </span>
-                        )}
-                        
-                        {isNewUser(user.createdAt) && (
-                          <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-full">
-                            🆕 Новый
-                          </span>
-                        )}
-                        
-                        {user.pushNotifications.isSubscribed && (
-                          <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-1 rounded-full">
-                            🔔 Push
-                          </span>
-                        )}
-                      </h3>
-                      <p className="text-sm text-gray-400">
-                        @{user.username || 'no_username'} • ID: {user.telegramId}
-                      </p>
-                      {user.profile?.position && (
-                        <p className="text-sm text-blue-400 mt-1">
-                          {positionMap[user.profile.position] || user.profile.position}
-                          {user.profile.number && ` #${user.profile.number}`}
-                        </p>
-                      )}
-                    </div>
-                    <div className="text-right text-sm">
-                      <p className="text-gray-400">Последняя активность</p>
-                      <p className="text-white">{getTimeSince(user.lastActivity)}</p>
-                    </div>
-                  </div>
-
-                  {/* Статистика активности */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                    <div className="bg-[#2d3448] rounded-lg p-3">
-                      <p className="text-xs text-gray-400 mb-1">Тренировки</p>
-                      <p className="text-lg font-bold">
-                        {user.stats.completedSessions}/{user.stats.totalSessions}
-                      </p>
-                      {user.stats.totalSessions > 0 && (
-                        <p className="text-xs text-green-400">
-                          {user.stats.completionRate}% завершено
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="bg-[#2d3448] rounded-lg p-3">
-                      <p className="text-xs text-gray-400 mb-1">Избранное</p>
-                      <p className="text-lg font-bold">{user.stats.favoritesCount}</p>
-                    </div>
-
-                    <div className="bg-[#2d3448] rounded-lg p-3">
-                      <p className="text-xs text-gray-400 mb-1">Лайки</p>
-                      <p className="text-lg font-bold">
-                        {user.stats.videoLikesCount + user.stats.shortLikesCount}
-                      </p>
-                    </div>
-
-                    <div className="bg-[#2d3448] rounded-lg p-3">
-                      <p className="text-xs text-gray-400 mb-1">Комментарии</p>
-                      <p className="text-lg font-bold">{user.stats.shortCommentsCount}</p>
-                    </div>
-                  </div>
-
-                  {/* Профиль */}
-                  {user.profile && (
-                    <div className="flex gap-4 text-sm">
-                      {user.profile.age && (
-                        <span className="text-gray-400">Возраст: {user.profile.age}</span>
-                      )}
-                      {user.profile.height && (
-                        <span className="text-gray-400">Рост: {user.profile.height} см</span>
-                      )}
-                      {user.profile.weight && (
-                        <span className="text-gray-400">Вес: {user.profile.weight} кг</span>
-                      )}
-                      {user.profile.overall > 0 && (
-                        <span className="text-gray-400">Общий уровень: {user.profile.overall}</span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Дополнительная информация */}
-                  <div className="mt-3 pt-3 border-t border-gray-700 text-xs text-gray-400 flex flex-wrap gap-x-4 gap-y-1">
-                    <span>Регистрация: {formatDate(user.createdAt)}</span>
-                    {user.email && (
-                      <span className={user.emailVerified ? 'text-green-400' : 'text-gray-400'}>
-                        Email: {user.email} {user.emailVerified && '✓'}
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="text-lg font-semibold">
+                      {user.firstName || user.username || `User ${user.telegramId.slice(0, 8)}`}
+                      {user.lastName && ` ${user.lastName}`}
+                    </h3>
+                    
+                    {isOnlineNow(user.lastActivity) && (
+                      <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full flex items-center gap-1">
+                        <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                        Online
                       </span>
                     )}
                   </div>
+                  
+                  <div className="text-sm text-gray-400 space-y-1">
+                    <p>ID: {user.telegramId}</p>
+                    <p>Регистрация: {formatDate(user.createdAt)}</p>
+                    <p>Последняя активность: {getTimeSince(user.lastActivity)}</p>
+                  </div>
+                </div>
+
+                {/* Статус */}
+                <div className="text-right">
+                  {isOnlineNow(user.lastActivity) ? (
+                    <span className="inline-block px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium">
+                      Онлайн
+                    </span>
+                  ) : (
+                    <span className="inline-block px-4 py-2 bg-gray-700 text-gray-400 rounded-lg text-sm font-medium">
+                      Офлайн
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -477,6 +411,196 @@ export default function AdminUsersPage() {
             </div>
           )}
         </div>
+
+        {/* Модальное окно с детальной информацией */}
+        {selectedUser && (
+          <div 
+            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+            onClick={() => setSelectedUser(null)}
+          >
+            <div 
+              className="bg-[#1a1f3a] rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Заголовок модального окна */}
+              <div className="sticky top-0 bg-[#1a1f3a] border-b border-gray-700 p-6 flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold flex items-center gap-3 flex-wrap">
+                    {selectedUser.firstName || selectedUser.username || `User ${selectedUser.telegramId.slice(0, 8)}`}
+                    {selectedUser.lastName && ` ${selectedUser.lastName}`}
+                    
+                    {isOnlineNow(selectedUser.lastActivity) && (
+                      <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full flex items-center gap-1">
+                        <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                        Online
+                      </span>
+                    )}
+                    
+                    {isNewUser(selectedUser.createdAt) && (
+                      <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-full">
+                        🆕 Новый
+                      </span>
+                    )}
+                    
+                    {selectedUser.pushNotifications.isSubscribed && (
+                      <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-1 rounded-full">
+                        🔔 Push
+                      </span>
+                    )}
+                  </h2>
+                  <p className="text-sm text-gray-400 mt-1">
+                    @{selectedUser.username || 'no_username'} • ID: {selectedUser.telegramId}
+                  </p>
+                  {selectedUser.profile?.position && (
+                    <p className="text-sm text-blue-400 mt-1">
+                      {positionMap[selectedUser.profile.position] || selectedUser.profile.position}
+                      {selectedUser.profile.number && ` #${selectedUser.profile.number}`}
+                    </p>
+                  )}
+                </div>
+                
+                <button
+                  onClick={() => setSelectedUser(null)}
+                  className="w-10 h-10 rounded-full bg-[#2d3448] hover:bg-[#3a4255] flex items-center justify-center transition-colors"
+                >
+                  <span className="text-2xl">×</span>
+                </button>
+              </div>
+
+              {/* Контент модального окна */}
+              <div className="p-6 space-y-6">
+                {/* Время активности */}
+                <div className="bg-[#2d3448] rounded-lg p-4">
+                  <h3 className="text-lg font-semibold mb-3">Активность</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Последняя активность:</span>
+                      <span className="text-white">{getTimeSince(selectedUser.lastActivity)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Дата регистрации:</span>
+                      <span className="text-white">{formatDate(selectedUser.createdAt)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Статистика */}
+                <div className="bg-[#2d3448] rounded-lg p-4">
+                  <h3 className="text-lg font-semibold mb-3">Статистика</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-[#1a1f3a] rounded-lg p-3">
+                      <p className="text-xs text-gray-400 mb-1">Тренировки</p>
+                      <p className="text-lg font-bold">
+                        {selectedUser.stats.completedSessions}/{selectedUser.stats.totalSessions}
+                      </p>
+                      {selectedUser.stats.totalSessions > 0 && (
+                        <p className="text-xs text-green-400">
+                          {selectedUser.stats.completionRate}% завершено
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="bg-[#1a1f3a] rounded-lg p-3">
+                      <p className="text-xs text-gray-400 mb-1">Избранное</p>
+                      <p className="text-lg font-bold">{selectedUser.stats.favoritesCount}</p>
+                    </div>
+
+                    <div className="bg-[#1a1f3a] rounded-lg p-3">
+                      <p className="text-xs text-gray-400 mb-1">Лайки</p>
+                      <p className="text-lg font-bold">
+                        {selectedUser.stats.videoLikesCount + selectedUser.stats.shortLikesCount}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        В: {selectedUser.stats.videoLikesCount} | Ш: {selectedUser.stats.shortLikesCount}
+                      </p>
+                    </div>
+
+                    <div className="bg-[#1a1f3a] rounded-lg p-3">
+                      <p className="text-xs text-gray-400 mb-1">Комментарии</p>
+                      <p className="text-lg font-bold">{selectedUser.stats.shortCommentsCount}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Профиль */}
+                {selectedUser.profile && (
+                  <div className="bg-[#2d3448] rounded-lg p-4">
+                    <h3 className="text-lg font-semibold mb-3">Профиль игрока</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      {selectedUser.profile.age && (
+                        <div>
+                          <span className="text-gray-400">Возраст:</span>
+                          <span className="text-white ml-2">{selectedUser.profile.age} лет</span>
+                        </div>
+                      )}
+                      {selectedUser.profile.height && (
+                        <div>
+                          <span className="text-gray-400">Рост:</span>
+                          <span className="text-white ml-2">{selectedUser.profile.height} см</span>
+                        </div>
+                      )}
+                      {selectedUser.profile.weight && (
+                        <div>
+                          <span className="text-gray-400">Вес:</span>
+                          <span className="text-white ml-2">{selectedUser.profile.weight} кг</span>
+                        </div>
+                      )}
+                      {selectedUser.profile.overall > 0 && (
+                        <div>
+                          <span className="text-gray-400">Общий уровень:</span>
+                          <span className="text-white ml-2">{selectedUser.profile.overall}</span>
+                        </div>
+                      )}
+                      {selectedUser.profile.gender && (
+                        <div>
+                          <span className="text-gray-400">Пол:</span>
+                          <span className="text-white ml-2">
+                            {selectedUser.profile.gender === 'MALE' ? 'Мужской' : 'Женский'}
+                          </span>
+                        </div>
+                      )}
+                      {selectedUser.profile.dailyProgress !== undefined && (
+                        <div>
+                          <span className="text-gray-400">Прогресс дня:</span>
+                          <span className="text-white ml-2">
+                            {selectedUser.profile.dailyProgress}/{selectedUser.profile.maxDailyGoal}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Контактная информация */}
+                <div className="bg-[#2d3448] rounded-lg p-4">
+                  <h3 className="text-lg font-semibold mb-3">Контакты</h3>
+                  <div className="space-y-2 text-sm">
+                    {selectedUser.email && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400">Email:</span>
+                        <span className={selectedUser.emailVerified ? 'text-green-400' : 'text-white'}>
+                          {selectedUser.email} {selectedUser.emailVerified && '✓'}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Telegram ID:</span>
+                      <span className="text-white font-mono">{selectedUser.telegramId}</span>
+                    </div>
+                    {selectedUser.pushNotifications.isSubscribed && selectedUser.pushNotifications.subscribedAt && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Push подписка:</span>
+                        <span className="text-purple-400">
+                          {formatDate(selectedUser.pushNotifications.subscribedAt)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

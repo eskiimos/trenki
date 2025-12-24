@@ -22,6 +22,7 @@ export default function AdminTrainersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [editingTrainerId, setEditingTrainerId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   
   // Form state
   const [name, setName] = useState('');
@@ -94,6 +95,7 @@ export default function AdminTrainersPage() {
     setRating(trainer.rating);
     setAvatar(trainer.avatar || '');
     setDescription(trainer.description || '');
+    setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -172,22 +174,34 @@ export default function AdminTrainersPage() {
     setRating(5.0);
     setAvatar('');
     setDescription('');
+    setShowForm(false);
   };
 
   return (
     <div className="min-h-screen bg-[#101530] text-white p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        {/* Заголовок и кнопка назад */}
-        <div className="flex items-center gap-4 mb-6 md:mb-8">
-          <Link href="/admin">
-            <button className="text-gray-400 hover:text-white transition-colors">
-              ← Назад
-            </button>
-          </Link>
+        {/* Заголовок и кнопки */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8">
           <h1 className="text-3xl md:text-4xl font-bold">Управление тренерами</h1>
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            {!showForm && (
+              <button
+                onClick={() => setShowForm(true)}
+                className="w-full sm:w-auto px-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
+              >
+                + Добавить тренера
+              </button>
+            )}
+            <Link href="/admin" className="w-full sm:w-auto">
+              <button className="w-full px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">
+                ← Назад в админку
+              </button>
+            </Link>
+          </div>
         </div>
 
         {/* Форма добавления/редактирования */}
+        {showForm && (
         <div className="bg-[#1a1f3a] rounded-lg p-4 md:p-6 mb-6 md:mb-8">
           <h2 className="text-xl md:text-2xl font-bold mb-4">
             {editingTrainerId ? 'Редактировать тренера' : 'Добавить нового тренера'}
@@ -353,6 +367,7 @@ export default function AdminTrainersPage() {
             </div>
           </form>
         </div>
+        )}
 
         {/* Список тренеров */}
         <div className="bg-[#1a1f3a] rounded-lg p-4 md:p-6">

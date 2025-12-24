@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { updateUserActivity } from '@/lib/updateUserActivity';
 
 // GET - Получить все комментарии для short
 export async function GET(
@@ -79,6 +80,9 @@ export async function POST(
         }
       }
     });
+
+    // Обновляем активность пользователя
+    await updateUserActivity(telegramId);
 
     return NextResponse.json({ comment, success: true });
   } catch (error) {

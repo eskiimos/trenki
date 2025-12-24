@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { updateUserActivity } from '@/lib/updateUserActivity';
 
 // GET - проверить, лайкнул ли пользователь видео
 export async function GET(
@@ -128,6 +129,9 @@ export async function POST(
       isLiked = true;
       likesCount = video.likesCount + 1;
     }
+
+    // Обновляем активность пользователя
+    await updateUserActivity(telegramId);
 
     return NextResponse.json({ isLiked, likesCount });
   } catch (error) {
