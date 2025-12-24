@@ -48,9 +48,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
   videoRef: externalVideoRef,
 }) => {
   const router = useRouter();
-  const [isMuted, setIsMuted] = useState(true);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
-  const [videoProgress, setVideoProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string>(short.videoUrl);
   const [isVideoReady, setIsVideoReady] = useState(false);
   
@@ -90,13 +88,6 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
         try {
           videoRef.current!.currentTime = 0;
           await videoRef.current!.play();
-          // Автоматически включаем звук после начала воспроизведения
-          setTimeout(() => {
-            if (videoRef.current) {
-              videoRef.current.muted = false;
-              setIsMuted(false);
-            }
-          }, 100);
         } catch (error) {
           console.error('Autoplay failed:', error);
         }
@@ -105,42 +96,12 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
     }
   }, [short.id, autoPlay, isVideoReady]);
 
-  const toggleMute = () => {
-    if (videoRef.current) {
-      videoRef.current.muted = !isMuted;
-      setIsMuted(!isMuted);
-    }
-  };
-
-  const handleVideoEnd = () => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = 0;
-      videoRef.current.play();
-    }
-  };
-
-  const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      const progress = (videoRef.current.currentTime / videoRef.current.duration) * 100;
-      setVideoProgress(progress);
-    }
-  };
-
-  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (videoRef.current) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const percentage = clickX / rect.width;
-      videoRef.current.currentTime = videoRef.current.duration * percentage;
-    }
-  };
-
   return (
     <div className="fixed inset-0 bg-black z-50 flex">
       {/* Back Button (Top Left) */}
       <button 
         onClick={() => router.back()}
-        className="absolute top-4 left-4 z-30 w-10 h-10 flex items-center justify-center pointer-events-auto"
+        className="absolute top-4 left-4 z-30 w-10 h-10 flex items-center justify-center"
       >
         <img 
           src="/icons/icon-action-back.svg" 
@@ -152,30 +113,29 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
       </button>
 
       {/* Video Container */}
-      <div 
-        className="relative w-full h-full flex items-center justify-center overflow-hidden bg-black"
-      >
+      <div className="relative w-full h-full flex items-center justify-center overflow-hidden bg-black">
+        {/* Простой стандартный плеер с нативными контролами */}
         <video
           ref={videoRef}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
           src={videoUrl}
           poster={short.thumbnail}
           autoPlay={autoPlay}
-          muted={isMuted}
           loop
           playsInline
-          onEnded={handleVideoEnd}
-          onTimeUpdate={handleTimeUpdate}
+          controls
+          webkit-playsinline="true"
+          preload="auto"
         />
 
-        {/* UI Overlay */}
+        {/* UI Overlay - только кнопки действий */}
         <div className="absolute inset-0 pointer-events-none">
           {/* Right Side Actions */}
-          <div className="absolute right-4 bottom-24 flex flex-col items-center space-y-3">
+          <div className="absolute right-4 bottom-24 flex flex-col items-center space-y-3 z-10">
             {/* Like Button */}
             <button
               onClick={onLike}
-              className="w-14 h-14 rounded-full bg-[#0A0B0F]/20 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform pointer-events-auto"
+              className="w-14 h-14 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform pointer-events-auto"
             >
               <img 
                 src={short.isLiked ? "/icons/video/shorts/Like.svg" : "/icons/video/shorts/Like-def.svg"} 
@@ -188,7 +148,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
             {/* Comment Button */}
             <button 
               onClick={onComment}
-              className="w-14 h-14 rounded-full bg-[#0A0B0F]/20 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform pointer-events-auto"
+              className="w-14 h-14 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform pointer-events-auto"
             >
               <img 
                 src="/icons/video/shorts/action-coment.svg" 
@@ -201,7 +161,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
             {/* Share Button */}
             <button 
               onClick={onShare}
-              className="w-14 h-14 rounded-full bg-[#0A0B0F]/20 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform pointer-events-auto"
+              className="w-14 h-14 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform pointer-events-auto"
             >
               <img 
                 src="/icons/video/shorts/action-share.svg" 
@@ -213,13 +173,13 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
           </div>
 
           {/* Bottom Info */}
-          <div className="absolute bottom-0 left-0 right-0 p-4 pb-16 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+          <div className="absolute bottom-20 left-0 right-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none">
             <div className="space-y-2">
               {/* Trainer Info */}
               {short.trainer && (
                 <Link 
                   href={`/trainers/${short.trainer.id}`}
-                  className="flex items-center space-x-2 pointer-events-auto"
+                  className="flex items-center space-x-2 pointer-events-auto inline-flex"
                 >
                   <div className="w-6 h-6 rounded-full overflow-hidden">
                     {short.trainer.avatar ? (
@@ -244,35 +204,22 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
 
               {/* Description (expandable) */}
               {short.description && (
-                <div className="relative">
+                <div className="relative max-w-[60%]">
                   <p className={`text-xs text-white/90 drop-shadow-md leading-relaxed ${
                     isDescriptionExpanded ? '' : 'line-clamp-2'
                   }`}>
                     {short.description}
-                    {!isDescriptionExpanded && short.description.length > 80 && (
-                      <button 
-                        onClick={() => setIsDescriptionExpanded(true)}
-                        className="text-white/70 text-xs ml-1 inline pointer-events-auto"
-                      >
-                        ...
-                      </button>
-                    )}
                   </p>
+                  {!isDescriptionExpanded && short.description.length > 80 && (
+                    <button 
+                      onClick={() => setIsDescriptionExpanded(true)}
+                      className="text-white/70 text-xs mt-1 pointer-events-auto"
+                    >
+                      Ещё...
+                    </button>
+                  )}
                 </div>
               )}
-            </div>
-          </div>
-
-          {/* Video Timeline (Bottom) */}
-          <div className="absolute bottom-0 left-0 right-0 h-12 px-4 flex items-center bg-black/20">
-            <div 
-              className="w-full h-1 bg-white/30 rounded-full cursor-pointer relative pointer-events-auto"
-              onClick={handleSeek}
-            >
-              <div 
-                className="absolute top-0 left-0 h-full bg-white rounded-full transition-all"
-                style={{ width: `${videoProgress}%` }}
-              />
             </div>
           </div>
         </div>
