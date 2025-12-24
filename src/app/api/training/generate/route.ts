@@ -589,7 +589,7 @@ function getWarmupTypesByStatus(status: TrainingGoal, fitnessType: LoadType): Lo
     return [LoadType.DYNAMIC_STRETCH];
   }
 
-  const intensiveTypes = [LoadType.MAX_STRENGTH, LoadType.POWER, LoadType.SPEED];
+  const intensiveTypes: LoadType[] = [LoadType.MAX_STRENGTH, LoadType.POWER, LoadType.SPEED];
   if (intensiveTypes.includes(fitnessType)) {
     return [LoadType.AGILITY, LoadType.DYNAMIC_STRETCH];
   }
