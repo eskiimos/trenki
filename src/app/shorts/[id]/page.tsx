@@ -3,13 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, Send } from 'lucide-react';
-import { ShortsPlayer } from '@/components/ShortsPlayer';
 import { getTelegramId } from '@/lib/auth';
+import { ShortsPlayer } from '@/components/ShortsPlayer';
 
 interface ShortPageProps {
-  params: Promise<{
-    id: string;
-  }>;
+  params: Promise<{ id: string }>;
 }
 
 interface ShortData {
@@ -52,6 +50,8 @@ export default function ShortPage({ params }: ShortPageProps) {
   
   const [shortId, setShortId] = useState<string>('');
   const [short, setShort] = useState<ShortData | null>(null);
+  const [shorts, setShorts] = useState<ShortData[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   
   // Комментарии
@@ -60,37 +60,52 @@ export default function ShortPage({ params }: ShortPageProps) {
   const [newComment, setNewComment] = useState('');
   const [isLoadingComments, setIsLoadingComments] = useState(false);
 
-  // Загружаем short
+  // Загружаем short и все shorts для навигации
   useEffect(() => {
-    const loadShort = async () => {
+    const loadData = async () => {
       try {
         setIsLoading(true);
         
         const resolvedParams = await params;
-        const currentShortId = resolvedParams.id;
-        setShortId(currentShortId);
+        const currentId = resolvedParams.id;
+        setShortId(currentId);
         
-        // Загружаем данные short
-        const url = userId 
-          ? `/api/shorts/${currentShortId}?userId=${userId}`
-          : `/api/shorts/${currentShortId}`;
-        const response = await fetch(url);
+        // Загружаем все shorts
+        const allUrl = userId ? `/api/shorts?userId=${userId}` : '/api/shorts';
+        const allResponse = await fetch(allUrl);
         
-        if (response.ok) {
-          const data = await response.json();
-          setShort(data.short);
-        } else {
-          console.error('Failed to load short');
-          router.push('/');
+        if (allResponse.ok) {
+          const allData = await allResponse.json();
+          const allShorts = allData.shorts || [];
+          setShorts(allShorts);
+          
+          // Находим текущий short
+          const idx = allShorts.findIndex((s: ShortData) => s.id === currentId);
+          if (idx !== -1) {
+            setCurrentIndex(idx);
+            setShort(allShorts[idx]);
+          } else {
+            // Если не нашли, загружаем отдельно
+            const singleUrl = userId 
+              ? `/api/shorts/${currentId}?userId=${userId}`
+              : `/api/shorts/${currentId}`;
+            const singleResponse = await fetch(singleUrl);
+            if (singleResponse.ok) {
+              const singleData = await singleResponse.json();
+              setShort(singleData.short);
+            } else {
+              router.push('/shorts');
+            }
+          }
         }
       } catch (error) {
-        console.error('Error loading short:', error);
-        router.push('/');
+        console.error('Error loading:', error);
+        router.push('/shorts');
       } finally {
         setIsLoading(false);
       }
     };
-    loadShort();
+    loadData();
   }, [params, userId, router]);
 
   // Загружаем комментарии
@@ -111,7 +126,6 @@ export default function ShortPage({ params }: ShortPageProps) {
         setIsLoadingComments(false);
       }
     };
-    
     loadComments();
   }, [shortId]);
 
@@ -124,7 +138,6 @@ export default function ShortPage({ params }: ShortPageProps) {
 
     const wasLiked = short.isLiked;
     
-    // Оптимистичное обновление
     setShort(prev => prev ? {
       ...prev,
       isLiked: !wasLiked,
@@ -142,91 +155,38 @@ export default function ShortPage({ params }: ShortPageProps) {
 
       if (response.ok) {
         const data = await response.json();
-        setShort(prev => prev ? {
-          ...prev,
-          isLiked: data.isLiked,
-          likesCount: data.likesCount
-        } : null);
-      } else {
-        // Откатываем изменения
-        setShort(prev => prev ? {
-          ...prev,
-          isLiked: wasLiked,
-          likesCount: short.likesCount
-        } : null);
+        setShort(prev => prev ? { ...prev, isLiked: data.isLiked, likesCount: data.likesCount } : null);
       }
     } catch (error) {
       console.error('Error toggling like:', error);
-      // Откатываем изменения
-      setShort(prev => prev ? {
-        ...prev,
-        isLiked: wasLiked,
-        likesCount: short.likesCount
-      } : null);
+      setShort(prev => prev ? { ...prev, isLiked: wasLiked, likesCount: short.likesCount } : null);
     }
   };
 
   // Открыть комментарии
-  const handleOpenComments = () => {
-    setShowComments(true);
-  };
+  const handleOpenComments = () => setShowComments(true);
 
   // Поделиться
   const handleShare = async () => {
     if (!short) return;
     
     const shareUrl = `${window.location.origin}/shorts/${short.id}`;
-    const shareText = `${short.title}${short.description ? ` - ${short.description}` : ''}`;
     
     try {
-      // 1. Telegram Web App (приоритет для Telegram)
-      if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
-        window.Telegram.WebApp.openTelegramLink(
-          `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`
-        );
-        return;
-      }
-      
-      // 2. Web Share API (нативная функция поделиться)
       if (navigator.share) {
-        await navigator.share({
-          title: short.title,
-          text: shareText,
-          url: shareUrl,
-        });
-        return;
-      }
-      
-      // 3. Fallback - копируем в буфер обмена
-      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.share({ title: short.title, url: shareUrl });
+      } else if (navigator.clipboard) {
         await navigator.clipboard.writeText(shareUrl);
-        alert('✓ Ссылка скопирована в буфер обмена');
-      } else {
-        // Старый метод для браузеров без Clipboard API
-        const textArea = document.createElement('textarea');
-        textArea.value = shareUrl;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        alert('✓ Ссылка скопирована');
+        alert('Ссылка скопирована!');
       }
     } catch (error) {
-      console.error('Error sharing:', error);
-      alert('Не удалось поделиться видео');
+      console.log('Share error:', error);
     }
   };
 
   // Добавить комментарий
   const handleAddComment = async () => {
-    if (!newComment.trim() || !short) return;
-
-    if (!userId) {
-      alert('Пожалуйста, войдите в приложение');
-      return;
-    }
+    if (!newComment.trim() || !short || !userId) return;
 
     try {
       const response = await fetch(`/api/shorts/${short.id}/comments`, {
@@ -239,8 +199,6 @@ export default function ShortPage({ params }: ShortPageProps) {
         const data = await response.json();
         setComments(prev => [data.comment, ...prev]);
         setNewComment('');
-        
-        // Обновляем счетчик комментариев
         setShort(prev => prev ? {
           ...prev,
           commentsCount: (prev.commentsCount || 0) + 1
@@ -251,29 +209,51 @@ export default function ShortPage({ params }: ShortPageProps) {
     }
   };
 
+  // Свайп вверх
+  const handleSwipeUp = () => {
+    if (currentIndex < shorts.length - 1) {
+      const nextShort = shorts[currentIndex + 1];
+      setCurrentIndex(prev => prev + 1);
+      setShort(nextShort);
+      setShortId(nextShort.id);
+      window.history.replaceState(null, '', `/shorts/${nextShort.id}`);
+    }
+  };
+
+  // Свайп вниз
+  const handleSwipeDown = () => {
+    if (currentIndex > 0) {
+      const prevShort = shorts[currentIndex - 1];
+      setCurrentIndex(prev => prev - 1);
+      setShort(prevShort);
+      setShortId(prevShort.id);
+      window.history.replaceState(null, '', `/shorts/${prevShort.id}`);
+    }
+  };
+
   if (isLoading || !short) {
     return (
-      <div className="fixed inset-0 bg-[#101530] z-50 flex items-center justify-center">
-        <div className="text-white text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p>Загрузка...</p>
-        </div>
+      <div className="fixed inset-0 bg-black flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
     <div className="relative">
-      {/* Shorts Player */}
       <ShortsPlayer
+        key={short.id}
         short={short}
         onLike={handleLike}
         onComment={handleOpenComments}
         onShare={handleShare}
-        backUrl="/shorts?index=0"
+        onSwipeUp={handleSwipeUp}
+        onSwipeDown={handleSwipeDown}
+        canSwipeUp={currentIndex < shorts.length - 1}
+        canSwipeDown={currentIndex > 0}
       />
 
-      {/* Comments Section */}
+      {/* Comments Modal */}
       {showComments && (
         <div className="fixed bottom-0 left-0 right-0 bg-[#101530] rounded-t-3xl z-50 max-h-[70vh] flex flex-col">
           {/* Header */}
@@ -281,10 +261,7 @@ export default function ShortPage({ params }: ShortPageProps) {
             <h3 className="text-white font-semibold">
               Комментарии {comments.length > 0 && `(${comments.length})`}
             </h3>
-            <button
-              onClick={() => setShowComments(false)}
-              className="text-white/70 hover:text-white"
-            >
+            <button onClick={() => setShowComments(false)} className="text-white/70 hover:text-white">
               <X size={24} />
             </button>
           </div>
@@ -292,9 +269,7 @@ export default function ShortPage({ params }: ShortPageProps) {
           {/* Comments List */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {isLoadingComments ? (
-              <div className="text-center text-white/50 py-8">
-                Загрузка комментариев...
-              </div>
+              <div className="text-center text-white/50 py-8">Загрузка...</div>
             ) : comments.length === 0 ? (
               <div className="text-center text-white/50 py-8">
                 Пока нет комментариев.<br />Будьте первым!
@@ -323,7 +298,7 @@ export default function ShortPage({ params }: ShortPageProps) {
             )}
           </div>
 
-          {/* Add Comment Input */}
+          {/* Add Comment */}
           <div className="p-4 border-t border-white/10">
             <div className="flex items-center space-x-2">
               <input
@@ -337,7 +312,7 @@ export default function ShortPage({ params }: ShortPageProps) {
               <button
                 onClick={handleAddComment}
                 disabled={!newComment.trim()}
-                className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center disabled:opacity-50"
               >
                 <Send size={20} className="text-white" />
               </button>

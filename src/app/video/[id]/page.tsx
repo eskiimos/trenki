@@ -989,7 +989,20 @@ export default function VideoPage({ params }: VideoPageProps) {
           >
             <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
           </button>
-          <h1 className="text-lg font-semibold text-white">ТРЕНИРОВКА</h1>
+          <h1 
+            className="text-white uppercase"
+            style={{
+              fontFamily: 'Overpass',
+              fontWeight: 700,
+              fontSize: '12px',
+              lineHeight: '120%',
+              letterSpacing: '0.5px',
+              verticalAlign: 'middle',
+              textTransform: 'uppercase'
+            }}
+          >
+            ТРЕНИРОВКА
+          </h1>
         </div>
       </header>
 

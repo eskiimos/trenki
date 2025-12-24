@@ -31,10 +31,10 @@ interface ShortsPlayerProps {
   onLike: () => void;
   onComment: () => void;
   onShare: () => void;
-  backUrl?: string;
-  showSwipeHint?: boolean;
-  autoPlay?: boolean;
-  videoRef?: React.RefObject<HTMLVideoElement | null>;
+  onSwipeUp?: () => void;
+  onSwipeDown?: () => void;
+  canSwipeUp?: boolean;
+  canSwipeDown?: boolean;
 }
 
 export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
@@ -42,186 +42,313 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
   onLike,
   onComment,
   onShare,
-  backUrl = '/',
-  showSwipeHint = false,
-  autoPlay = true,
-  videoRef: externalVideoRef,
+  onSwipeUp,
+  onSwipeDown,
+  canSwipeUp = false,
+  canSwipeDown = false,
 }) => {
   const router = useRouter();
-  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
-  const [videoUrl, setVideoUrl] = useState<string>(short.videoUrl);
-  const [isVideoReady, setIsVideoReady] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   
-  const internalVideoRef = useRef<HTMLVideoElement>(null);
-  const videoRef = externalVideoRef || internalVideoRef;
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(true); // Начинаем с muted для автовоспроизведения
+  const [showDescription, setShowDescription] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [videoUrl, setVideoUrl] = useState<string>('');
+  
+  // Touch/swipe state
+  const touchStartY = useRef(0);
+  const touchStartX = useRef(0);
 
-  // Загрузка Kinescope URL
+  // Загрузка URL видео (обработка Kinescope)
   useEffect(() => {
-    setIsVideoReady(false);
-    const loadKinescopeUrl = async () => {
-      if (!isKinescopeUrl(short.videoUrl)) {
-        setVideoUrl(short.videoUrl);
-        setIsVideoReady(true);
+    const loadVideoUrl = async () => {
+      setIsLoading(true);
+      
+      if (!short.videoUrl) {
+        console.error('No video URL provided');
+        setIsLoading(false);
         return;
       }
-      
-      try {
-        const result = await getKinescopeDirectUrl(short.videoUrl);
-        if (result.directUrl) {
-          setVideoUrl(result.directUrl);
+
+      // Если это Kinescope URL - получаем прямую ссылку
+      if (isKinescopeUrl(short.videoUrl)) {
+        try {
+          console.log('Loading Kinescope URL:', short.videoUrl);
+          const result = await getKinescopeDirectUrl(short.videoUrl);
+          if (result.directUrl) {
+            console.log('Got direct URL:', result.directUrl);
+            setVideoUrl(result.directUrl);
+          } else {
+            console.error('Failed to get Kinescope direct URL');
+            setVideoUrl(short.videoUrl);
+          }
+        } catch (error) {
+          console.error('Error loading Kinescope URL:', error);
+          setVideoUrl(short.videoUrl);
         }
-      } catch (error) {
-        console.error('Error loading Kinescope URL:', error);
+      } else {
+        // Обычный URL
+        console.log('Using direct URL:', short.videoUrl);
         setVideoUrl(short.videoUrl);
-      } finally {
-        setIsVideoReady(true);
       }
     };
-    
-    loadKinescopeUrl();
-  }, [short.videoUrl]);
 
-  // Автоплей - запускаем только когда URL готов
+    loadVideoUrl();
+  }, [short.videoUrl, short.id]);
+
+  // Воспроизведение видео когда URL готов
   useEffect(() => {
-    if (videoRef.current && autoPlay && isVideoReady) {
-      const playVideo = async () => {
-        try {
-          videoRef.current!.currentTime = 0;
-          await videoRef.current!.play();
-        } catch (error) {
-          console.error('Autoplay failed:', error);
-        }
-      };
-      playVideo();
+    const video = videoRef.current;
+    if (!video || !videoUrl) return;
+
+    setIsLoading(true);
+    setIsPlaying(false);
+
+    const handleCanPlay = () => {
+      setIsLoading(false);
+      // Автовоспроизведение с muted (браузеры разрешают это)
+      video.muted = true;
+      video.play().then(() => {
+        setIsPlaying(true);
+        setIsMuted(true);
+      }).catch(err => {
+        console.log('Autoplay blocked:', err);
+        setIsPlaying(false);
+      });
+    };
+
+    const handleWaiting = () => setIsLoading(true);
+    const handlePlaying = () => {
+      setIsLoading(false);
+      setIsPlaying(true);
+    };
+    const handlePause = () => setIsPlaying(false);
+    const handleEnded = () => {
+      video.currentTime = 0;
+      video.play();
+    };
+    const handleError = (e: Event) => {
+      console.error('Video error:', e, 'URL:', videoUrl);
+      setIsLoading(false);
+    };
+
+    video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('waiting', handleWaiting);
+    video.addEventListener('playing', handlePlaying);
+    video.addEventListener('pause', handlePause);
+    video.addEventListener('ended', handleEnded);
+    video.addEventListener('error', handleError);
+
+    // Устанавливаем src и загружаем
+    video.src = videoUrl;
+    video.load();
+
+    return () => {
+      video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('waiting', handleWaiting);
+      video.removeEventListener('playing', handlePlaying);
+      video.removeEventListener('pause', handlePause);
+      video.removeEventListener('ended', handleEnded);
+      video.removeEventListener('error', handleError);
+      video.pause();
+    };
+  }, [videoUrl]);
+
+  // Пауза/воспроизведение по клику
+  const togglePlay = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    
+    if (video.paused) {
+      video.play();
+    } else {
+      video.pause();
     }
-  }, [short.id, autoPlay, isVideoReady]);
+  };
+
+  // Включить/выключить звук
+  const toggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const video = videoRef.current;
+    if (!video) return;
+    
+    video.muted = !video.muted;
+    setIsMuted(video.muted);
+  };
+
+  // Обработка свайпов
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+    const deltaX = Math.abs(e.changedTouches[0].clientX - touchStartX.current);
+    
+    // Проверяем что это вертикальный свайп
+    if (deltaX < 50) {
+      if (deltaY < -80 && canSwipeUp && onSwipeUp) {
+        // Свайп вверх - следующее видео
+        onSwipeUp();
+      } else if (deltaY > 80 && canSwipeDown && onSwipeDown) {
+        // Свайп вниз - предыдущее видео
+        onSwipeDown();
+      }
+    }
+  };
 
   return (
-    <div className="fixed inset-0 bg-black z-50 flex">
-      {/* Back Button (Top Left) */}
-      <button 
-        onClick={() => router.back()}
-        className="absolute top-4 left-4 z-30 w-10 h-10 flex items-center justify-center"
+    <div 
+      className="fixed inset-0 bg-black flex flex-col"
+    >
+      {/* Header */}
+      <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center justify-between"
+        style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
       >
-        <img 
-          src="/icons/icon-action-back.svg" 
-          alt="Назад" 
-          width={24} 
-          height={24}
-          className="drop-shadow-lg"
-        />
-      </button>
+        <button 
+          onClick={() => router.back()}
+          className="w-10 h-10 flex items-center justify-center bg-black/30 rounded-full"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M15 18L9 12L15 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+      </div>
 
-      {/* Video Container */}
-      <div className="relative w-full h-full flex items-center justify-center overflow-hidden bg-black">
-        {/* Простой стандартный плеер с нативными контролами */}
+      {/* Video Container - полноэкранный */}
+      <div 
+        className="absolute inset-0"
+        onClick={togglePlay}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         <video
           ref={videoRef}
-          className="w-full h-full object-contain"
-          src={videoUrl}
+          className="w-full h-full object-cover"
           poster={short.thumbnail}
-          autoPlay={autoPlay}
-          loop
           playsInline
-          controls
-          webkit-playsinline="true"
+          loop
+          muted
           preload="auto"
         />
 
-        {/* UI Overlay - только кнопки действий */}
-        <div className="absolute inset-0 pointer-events-none">
-          {/* Right Side Actions */}
-          <div className="absolute right-4 bottom-24 flex flex-col items-center space-y-3 z-10">
-            {/* Like Button */}
-            <button
-              onClick={onLike}
-              className="w-14 h-14 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform pointer-events-auto"
-            >
-              <img 
-                src={short.isLiked ? "/icons/video/shorts/Like.svg" : "/icons/video/shorts/Like-def.svg"} 
-                alt="Лайк" 
-                width={24} 
-                height={24}
-              />
-            </button>
-
-            {/* Comment Button */}
-            <button 
-              onClick={onComment}
-              className="w-14 h-14 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform pointer-events-auto"
-            >
-              <img 
-                src="/icons/video/shorts/action-coment.svg" 
-                alt="Комментарии" 
-                width={24} 
-                height={24}
-              />
-            </button>
-
-            {/* Share Button */}
-            <button 
-              onClick={onShare}
-              className="w-14 h-14 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform pointer-events-auto"
-            >
-              <img 
-                src="/icons/video/shorts/action-share.svg" 
-                alt="Поделиться" 
-                width={24} 
-                height={24}
-              />
-            </button>
+        {/* Loading Spinner */}
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+            <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
           </div>
+        )}
 
-          {/* Bottom Info */}
-          <div className="absolute bottom-20 left-0 right-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none">
-            <div className="space-y-2">
-              {/* Trainer Info */}
-              {short.trainer && (
-                <Link 
-                  href={`/trainers/${short.trainer.id}`}
-                  className="flex items-center space-x-2 pointer-events-auto inline-flex"
-                >
-                  <div className="w-6 h-6 rounded-full overflow-hidden">
-                    {short.trainer.avatar ? (
-                      <img 
-                        src={short.trainer.avatar} 
-                        alt={short.trainer.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                        <span className="text-white font-semibold text-[10px]">
-                          {short.trainer.name.charAt(0)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-white text-xs drop-shadow-md">
-                    {short.trainer.name} {short.trainer.lastName}
-                  </span>
-                </Link>
-              )}
-
-              {/* Description (expandable) */}
-              {short.description && (
-                <div className="relative max-w-[60%]">
-                  <p className={`text-xs text-white/90 drop-shadow-md leading-relaxed ${
-                    isDescriptionExpanded ? '' : 'line-clamp-2'
-                  }`}>
-                    {short.description}
-                  </p>
-                  {!isDescriptionExpanded && short.description.length > 80 && (
-                    <button 
-                      onClick={() => setIsDescriptionExpanded(true)}
-                      className="text-white/70 text-xs mt-1 pointer-events-auto"
-                    >
-                      Ещё...
-                    </button>
-                  )}
-                </div>
-              )}
+        {/* Play/Pause Icon */}
+        {!isPlaying && !isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-16 h-16 bg-black/50 rounded-full flex items-center justify-center">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
             </div>
           </div>
+        )}
+
+        {/* Right Side Actions */}
+        <div className="absolute right-4 bottom-32 flex flex-col items-center space-y-4 z-10">
+          {/* Mute/Unmute */}
+          <button onClick={toggleMute} className="flex flex-col items-center">
+            <div className="w-12 h-12 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center active:scale-90 transition-transform">
+              {isMuted ? (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                  <line x1="23" y1="9" x2="17" y2="15"/>
+                  <line x1="17" y1="9" x2="23" y2="15"/>
+                </svg>
+              ) : (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                </svg>
+              )}
+            </div>
+          </button>
+
+          {/* Like */}
+          <button onClick={(e) => { e.stopPropagation(); onLike(); }} className="flex flex-col items-center">
+            <div className="w-12 h-12 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center active:scale-90 transition-transform">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill={short.isLiked ? "#ff2d55" : "none"} stroke={short.isLiked ? "#ff2d55" : "white"} strokeWidth="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+              </svg>
+            </div>
+            <span className="text-white text-xs mt-1">{short.likesCount}</span>
+          </button>
+
+          {/* Comments */}
+          <button onClick={(e) => { e.stopPropagation(); onComment(); }} className="flex flex-col items-center">
+            <div className="w-12 h-12 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center active:scale-90 transition-transform">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+              </svg>
+            </div>
+            <span className="text-white text-xs mt-1">{short.commentsCount || 0}</span>
+          </button>
+
+          {/* Share */}
+          <button onClick={(e) => { e.stopPropagation(); onShare(); }} className="flex flex-col items-center">
+            <div className="w-12 h-12 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center active:scale-90 transition-transform">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                <circle cx="18" cy="5" r="3"/>
+                <circle cx="6" cy="12" r="3"/>
+                <circle cx="18" cy="19" r="3"/>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+              </svg>
+            </div>
+          </button>
+        </div>
+
+        {/* Bottom Info */}
+        <div className="absolute bottom-4 left-4 right-20 z-10">
+          {/* Trainer */}
+          {short.trainer && (
+            <Link 
+              href={`/trainers/${short.trainer.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center space-x-2 mb-2"
+            >
+              <div className="w-8 h-8 rounded-full bg-gray-600 overflow-hidden">
+                {short.trainer.avatar ? (
+                  <img src={short.trainer.avatar} alt="" className="w-full h-full object-cover"/>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-white text-sm font-bold bg-gradient-to-br from-blue-500 to-purple-600">
+                    {short.trainer.name.charAt(0)}
+                  </div>
+                )}
+              </div>
+              <span className="text-white font-medium text-sm drop-shadow-lg">
+                {short.trainer.name} {short.trainer.lastName}
+              </span>
+            </Link>
+          )}
+
+          {/* Title */}
+          <p className="text-white text-sm font-medium mb-1 drop-shadow-lg">{short.title}</p>
+
+          {/* Description */}
+          {short.description && (
+            <div>
+              <p className={`text-white/80 text-xs drop-shadow-lg ${showDescription ? '' : 'line-clamp-2'}`}>
+                {short.description}
+              </p>
+              {short.description.length > 80 && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setShowDescription(!showDescription); }}
+                  className="text-white/60 text-xs mt-1"
+                >
+                  {showDescription ? 'Свернуть' : 'Ещё'}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

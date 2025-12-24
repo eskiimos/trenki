@@ -219,7 +219,20 @@ export default function CalendarPage() {
         <button onClick={() => router.back()} className="mr-4 text-white/60 hover:text-white">
           <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
         </button>
-        <h1 className="text-white font-bold text-lg uppercase tracking-wider">КАЛЕНДАРЬ</h1>
+        <h1 
+          className="text-white uppercase"
+          style={{
+            fontFamily: 'Overpass',
+            fontWeight: 700,
+            fontSize: '12px',
+            lineHeight: '120%',
+            letterSpacing: '0.5px',
+            verticalAlign: 'middle',
+            textTransform: 'uppercase'
+          }}
+        >
+          КАЛЕНДАРЬ
+        </h1>
       </header>
 
       <div className="px-4">

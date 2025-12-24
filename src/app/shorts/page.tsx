@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, Suspense, useCallback } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getTelegramId } from '@/lib/auth';
@@ -30,22 +30,15 @@ interface ShortData {
 const ShortsContent = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const startIndexParam = parseInt(searchParams.get('index') || '0');
+  const startIndex = parseInt(searchParams.get('index') || '0');
   
   const [shorts, setShorts] = useState<ShortData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const pressTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const wasPlayingRef = useRef(false);
-  const touchStartYRef = useRef(0);
-  const touchStartXRef = useRef(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
   
   const userId = getTelegramId();
 
-  // Загрузка shorts из API
+  // Загрузка shorts
   useEffect(() => {
     const loadShorts = async () => {
       try {
@@ -53,16 +46,17 @@ const ShortsContent = () => {
         const url = userId 
           ? `/api/shorts?userId=${userId}`
           : '/api/shorts';
+        
         const response = await fetch(url);
         if (response.ok) {
           const data = await response.json();
           const loadedShorts = data.shorts || [];
           setShorts(loadedShorts);
           
-          // Нормализуем индекс
+          // Устанавливаем начальный индекс
           if (loadedShorts.length > 0) {
-            const normalizedIndex = Math.min(startIndexParam, loadedShorts.length - 1);
-            setCurrentVideoIndex(normalizedIndex);
+            const idx = Math.min(startIndex, loadedShorts.length - 1);
+            setCurrentIndex(Math.max(0, idx));
           }
         }
       } catch (error) {
@@ -72,35 +66,32 @@ const ShortsContent = () => {
       }
     };
     loadShorts();
-  }, [startIndexParam, userId]);
+  }, [startIndex, userId]);
 
-  const currentShort = shorts[currentVideoIndex];
+  // Текущий short
+  const currentShort = shorts[currentIndex];
 
-  // Увеличиваем счетчик просмотров
+  // Счетчик просмотров
   useEffect(() => {
-    const incrementViews = async () => {
-      if (!currentShort) return;
-      
+    if (!currentShort) return;
+    
+    const timer = setTimeout(async () => {
       try {
         await fetch(`/api/shorts/${currentShort.id}`, {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'incrementViews' }),
         });
       } catch (error) {
         console.error('Error incrementing views:', error);
       }
-    };
+    }, 3000);
     
-    // Увеличиваем просмотры через 3 секунды просмотра
-    const timer = setTimeout(incrementViews, 3000);
     return () => clearTimeout(timer);
-  }, [currentShort]);
+  }, [currentShort?.id]);
 
-  // Лайк/дизлайк
-  const toggleLike = async () => {
+  // Лайк
+  const handleLike = async () => {
     if (!userId || !currentShort) {
       alert('Пожалуйста, войдите в приложение');
       return;
@@ -108,15 +99,11 @@ const ShortsContent = () => {
 
     const wasLiked = currentShort.isLiked;
     
-    // Оптимистичное обновление UI
-    setShorts(prev => prev.map((short, idx) => 
-      idx === currentVideoIndex 
-        ? {
-            ...short,
-            isLiked: !wasLiked,
-            likesCount: wasLiked ? short.likesCount - 1 : short.likesCount + 1
-          }
-        : short
+    // Оптимистичное обновление
+    setShorts(prev => prev.map((s, i) => 
+      i === currentIndex 
+        ? { ...s, isLiked: !wasLiked, likesCount: wasLiked ? s.likesCount - 1 : s.likesCount + 1 }
+        : s
     ));
 
     try {
@@ -130,55 +117,23 @@ const ShortsContent = () => {
 
       if (response.ok) {
         const data = await response.json();
-        // Обновляем с данными сервера
-        setShorts(prev => prev.map((short, idx) =>
-          idx === currentVideoIndex
-            ? { ...short, isLiked: data.isLiked, likesCount: data.likesCount }
-            : short
-        ));
-      } else {
-        // Откатываем изменения при ошибке
-        setShorts(prev => prev.map((short, idx) =>
-          idx === currentVideoIndex
-            ? { ...short, isLiked: wasLiked, likesCount: currentShort.likesCount }
-            : short
+        setShorts(prev => prev.map((s, i) =>
+          i === currentIndex ? { ...s, isLiked: data.isLiked, likesCount: data.likesCount } : s
         ));
       }
     } catch (error) {
       console.error('Error toggling like:', error);
-      // Откатываем изменения
-      setShorts(prev => prev.map((short, idx) =>
-        idx === currentVideoIndex
-          ? { ...short, isLiked: wasLiked, likesCount: currentShort.likesCount }
-          : short
+      // Откат
+      setShorts(prev => prev.map((s, i) => 
+        i === currentIndex 
+          ? { ...s, isLiked: wasLiked, likesCount: currentShort.likesCount }
+          : s
       ));
     }
   };
 
-
-
-  const handleSwipeUp = useCallback(() => {
-    if (currentVideoIndex < shorts.length - 1 && !isTransitioning) {
-      setIsTransitioning(true);
-      setTimeout(() => {
-        setCurrentVideoIndex(prev => prev + 1);
-        setIsTransitioning(false);
-      }, 150);
-    }
-  }, [currentVideoIndex, shorts.length, isTransitioning]);
-
-  const handleSwipeDown = useCallback(() => {
-    if (currentVideoIndex > 0 && !isTransitioning) {
-      setIsTransitioning(true);
-      setTimeout(() => {
-        setCurrentVideoIndex(prev => prev - 1);
-        setIsTransitioning(false);
-      }, 150);
-    }
-  }, [currentVideoIndex, isTransitioning]);
-
-  // Открыть комментарии
-  const openComments = () => {
+  // Комментарии
+  const handleComment = () => {
     if (currentShort) {
       router.push(`/shorts/${currentShort.id}`);
     }
@@ -189,63 +144,53 @@ const ShortsContent = () => {
     if (!currentShort) return;
     
     const shareUrl = `${window.location.origin}/shorts/${currentShort.id}`;
-    const shareText = `${currentShort.title}${currentShort.description ? ` - ${currentShort.description}` : ''}`;
+    const shareText = currentShort.title;
     
     try {
-      // 1. Telegram Web App (приоритет для Telegram)
-      if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
-        window.Telegram.WebApp.openTelegramLink(
-          `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`
-        );
-        return;
-      }
-      
-      // 2. Web Share API (нативная функция поделиться)
       if (navigator.share) {
         await navigator.share({
-          title: currentShort.title,
-          text: shareText,
+          title: shareText,
           url: shareUrl,
         });
-        return;
-      }
-      
-      // 3. Fallback - копируем в буфер обмена
-      if (navigator.clipboard && navigator.clipboard.writeText) {
+      } else if (navigator.clipboard) {
         await navigator.clipboard.writeText(shareUrl);
-        alert('✓ Ссылка скопирована в буфер обмена');
-      } else {
-        // Старый метод для браузеров без Clipboard API
-        const textArea = document.createElement('textarea');
-        textArea.value = shareUrl;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        alert('✓ Ссылка скопирована');
+        alert('Ссылка скопирована!');
       }
     } catch (error) {
-      console.error('Error sharing:', error);
-      alert('Не удалось поделиться видео');
+      console.log('Share error:', error);
     }
   };
 
+  // Свайп вверх - следующее видео
+  const handleSwipeUp = () => {
+    if (currentIndex < shorts.length - 1) {
+      setCurrentIndex(prev => prev + 1);
+    }
+  };
+
+  // Свайп вниз - предыдущее видео
+  const handleSwipeDown = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(prev => prev - 1);
+    }
+  };
+
+  // Загрузка
   if (isLoading) {
     return (
-      <div className="fixed inset-0 bg-[#101530] z-50 flex items-center justify-center">
+      <div className="fixed inset-0 bg-black flex items-center justify-center">
         <div className="text-white text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
           <p>Загрузка...</p>
         </div>
       </div>
     );
   }
 
+  // Нет shorts
   if (shorts.length === 0) {
     return (
-      <div className="fixed inset-0 bg-[#101530] z-50 flex items-center justify-center">
+      <div className="fixed inset-0 bg-black flex items-center justify-center">
         <div className="text-white text-center">
           <p className="text-xl mb-4">Shorts пока нет</p>
           <Link href="/" className="text-blue-400 hover:text-blue-300">
@@ -259,97 +204,28 @@ const ShortsContent = () => {
   if (!currentShort) return null;
 
   return (
-    <div className="relative">
-      {/* Shorts Player */}
-      <div className={`transition-all duration-200 ease-out ${
-        isTransitioning ? 'scale-95 opacity-0' : 'scale-100 opacity-100'
-      }`}>
-        <ShortsPlayer
-          short={currentShort}
-          onLike={toggleLike}
-          onComment={openComments}
-          onShare={handleShare}
-          backUrl="/"
-          videoRef={videoRef}
-        />
-      </div>
-
-      {/* Touch/Swipe Area for Navigation */}
-      <div 
-        className="fixed inset-0 z-[60]"
-        style={{ touchAction: 'pan-y', pointerEvents: 'auto' }}
-        onTouchStart={(e) => {
-          // Игнорируем события на кнопках и интерактивных элементах
-          const target = e.target as HTMLElement;
-          if (target.closest('button') || target.closest('a') || target.closest('[role="button"]')) {
-            return;
-          }
-          touchStartYRef.current = e.touches[0].clientY;
-          touchStartXRef.current = e.touches[0].clientX;
-          
-          // Запускаем таймер для определения зажатия
-          pressTimerRef.current = setTimeout(() => {
-            if (videoRef.current) {
-              wasPlayingRef.current = !videoRef.current.paused;
-              if (wasPlayingRef.current) {
-                videoRef.current.pause();
-              }
-            }
-          }, 200);
-        }}
-        onTouchEnd={(e) => {
-          // Игнорируем события на кнопках и интерактивных элементах
-          const target = e.target as HTMLElement;
-          if (target.closest('button') || target.closest('a') || target.closest('[role="button"]')) {
-            return;
-          }
-          
-          // Отменяем таймер зажатия
-          if (pressTimerRef.current) {
-            clearTimeout(pressTimerRef.current);
-            pressTimerRef.current = null;
-          }
-          
-          // Возобновляем воспроизведение если было зажатие
-          if (wasPlayingRef.current && videoRef.current) {
-            videoRef.current.play();
-            wasPlayingRef.current = false;
-          }
-          
-          const endY = e.changedTouches[0].clientY;
-          const endX = e.changedTouches[0].clientX;
-          const deltaY = endY - touchStartYRef.current;
-          const deltaX = Math.abs(endX - touchStartXRef.current);
-          
-          // Проверяем что свайп вертикальный (не горизонтальный)
-          if (deltaX < 50) {
-            if (deltaY > 80) {
-              // Swipe down - previous video
-              handleSwipeDown();
-            } else if (deltaY < -80) {
-              // Swipe up - next video
-              handleSwipeUp();
-            }
-          }
-        }}
-      />
-    </div>
+    <ShortsPlayer
+      key={currentShort.id}
+      short={currentShort}
+      onLike={handleLike}
+      onComment={handleComment}
+      onShare={handleShare}
+      onSwipeUp={handleSwipeUp}
+      onSwipeDown={handleSwipeDown}
+      canSwipeUp={currentIndex < shorts.length - 1}
+      canSwipeDown={currentIndex > 0}
+    />
   );
 };
 
-const ShortsPage = () => {
+export default function ShortsPage() {
   return (
     <Suspense fallback={
-      <div className="fixed inset-0 bg-[#101530] z-50 flex items-center justify-center">
-        <div className="text-white text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p>Загрузка...</p>
-        </div>
+      <div className="fixed inset-0 bg-black flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
       </div>
     }>
       <ShortsContent />
     </Suspense>
   );
-};
-
-export default ShortsPage;
+}
