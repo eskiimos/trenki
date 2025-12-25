@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 
 export default function InvitePage() {
   const router = useRouter();
@@ -109,29 +108,29 @@ export default function InvitePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-purple-700 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#060919] flex items-center justify-center p-4">
       <div className="max-w-md w-full">
-        {/* Логотип */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-full mb-4 shadow-lg">
+        {/* Логотип и заголовок */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-6 shadow-xl">
             <span className="text-4xl">🏒</span>
           </div>
-          <h1 className="text-4xl font-bold text-white mb-2">
+          <h1 className="text-4xl font-bold text-white mb-3">
             TRENKI
           </h1>
-          <p className="text-blue-100 text-lg">
+          <p className="text-gray-400 text-lg">
             Закрытое бета-тестирование
           </p>
         </div>
 
-        {/* Карточка с формой */}
-        <div className="bg-white rounded-3xl shadow-2xl p-8">
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        {/* Форма ввода кода */}
+        <div className="bg-[#0D1425] rounded-2xl p-8 shadow-2xl border border-gray-800">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-white mb-2">
               Введите инвайт-код
             </h2>
-            <p className="text-gray-600">
-              У вас есть код? Введите его для доступа к приложению
+            <p className="text-gray-400">
+              Для доступа к приложению требуется код
             </p>
           </div>
 
@@ -144,12 +143,12 @@ export default function InvitePage() {
               onChange={(e) => handleCodeInput(0, e.target.value)}
               onPaste={handlePaste}
               onKeyPress={handleKeyPress}
-              className="w-20 h-20 text-center text-3xl font-bold border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none uppercase"
+              className="w-20 h-20 text-center text-3xl font-bold bg-[#1A2235] border-2 border-gray-700 text-white rounded-xl focus:border-blue-500 focus:outline-none uppercase transition-colors"
               maxLength={3}
               placeholder="XXX"
               autoFocus
             />
-            <span className="text-3xl font-bold text-gray-400">-</span>
+            <span className="text-3xl font-bold text-gray-600">-</span>
             <input
               id="code-1"
               type="text"
@@ -157,7 +156,7 @@ export default function InvitePage() {
               onChange={(e) => handleCodeInput(2, e.target.value)}
               onPaste={handlePaste}
               onKeyPress={handleKeyPress}
-              className="w-20 h-20 text-center text-3xl font-bold border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none uppercase"
+              className="w-20 h-20 text-center text-3xl font-bold bg-[#1A2235] border-2 border-gray-700 text-white rounded-xl focus:border-blue-500 focus:outline-none uppercase transition-colors"
               maxLength={3}
               placeholder="XXX"
             />
@@ -165,7 +164,7 @@ export default function InvitePage() {
 
           {/* Сообщение об ошибке */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm text-center">
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm text-center">
               {error}
             </div>
           )}
@@ -192,15 +191,22 @@ export default function InvitePage() {
           {/* Информация */}
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-500">
-              Нет кода? Свяжитесь с администратором для получения доступа
+              Нет кода? Свяжитесь с администратором
             </p>
           </div>
         </div>
 
         {/* Дополнительная информация */}
-        <div className="mt-6 text-center text-white text-sm opacity-80">
-          <p>🎯 Вы участвуете в закрытом бета-тестировании</p>
-          <p className="mt-1">Ваше мнение поможет сделать приложение лучше!</p>
+        <div className="mt-8 text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 rounded-full border border-blue-500/20">
+            <span className="text-lg">🎯</span>
+            <p className="text-sm text-blue-400">
+              Закрытое бета-тестирование
+            </p>
+          </div>
+          <p className="mt-4 text-gray-500 text-sm">
+            Ваше мнение поможет сделать приложение лучше
+          </p>
         </div>
       </div>
     </div>
