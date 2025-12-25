@@ -311,7 +311,7 @@ export default function VideoPage({ params }: VideoPageProps) {
         // Показываем модалку с приростом характеристик
         setCharacteristicsGains(data.gains);
         setNewCharacteristics(data.newCharacteristics);
-        setShowGainsModal(true);
+        // setShowGainsModal(true); // Временно скрыто
         
         // Обновляем локальный профиль
         setUserProfile((prev: any) => ({
@@ -1618,13 +1618,14 @@ export default function VideoPage({ params }: VideoPageProps) {
       {!isLandscape && <BottomNavigation activeTab="video" />}
       
       {/* Модалка прироста характеристик */}
-      {showGainsModal && characteristicsGains && newCharacteristics && (
+      {/* Временно скрыто */}
+      {/* {showGainsModal && characteristicsGains && newCharacteristics && (
         <CharacteristicsGainModal
           gains={characteristicsGains}
           newCharacteristics={newCharacteristics}
           onClose={handleGainsModalClose}
         />
-      )}
+      )} */}
       
       {/* Модалка планирования тренировки */}
       <ScheduleModal

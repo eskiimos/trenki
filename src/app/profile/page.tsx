@@ -257,11 +257,11 @@ const ProfilePage = () => {
                     />
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-[#445CFF] text-sm font-black font-overpass">
-                        {userProfile?.profile?.ratingEndurance?.toFixed(0) || '99'}
+                        {userProfile?.profile?.ratingEndurance?.toFixed(1) || '99'}
                       </span>
                       {recentGains?.gainEndurance > 0 && (
                         <span className="text-green-400 text-[9px] font-semibold">
-                          +{recentGains.gainEndurance.toFixed(2)}
+                          +{recentGains.gainEndurance.toFixed(1)}
                         </span>
                       )}
                     </div>
@@ -290,11 +290,11 @@ const ProfilePage = () => {
                     />
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-[#445CFF] text-sm font-black font-overpass">
-                        {userProfile?.profile?.ratingFlexibility?.toFixed(0) || '99'}
+                        {userProfile?.profile?.ratingFlexibility?.toFixed(1) || '99'}
                       </span>
                       {recentGains?.gainFlexibility > 0 && (
                         <span className="text-green-400 text-[9px] font-semibold">
-                          +{recentGains.gainFlexibility.toFixed(2)}
+                          +{recentGains.gainFlexibility.toFixed(1)}
                         </span>
                       )}
                     </div>
@@ -323,11 +323,11 @@ const ProfilePage = () => {
                     />
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-[#445CFF] text-sm font-black font-overpass">
-                        {userProfile?.profile?.ratingPower?.toFixed(0) || '99'}
+                        {userProfile?.profile?.ratingPower?.toFixed(1) || '99'}
                       </span>
                       {recentGains?.gainPower > 0 && (
                         <span className="text-green-400 text-[9px] font-semibold">
-                          +{recentGains.gainPower.toFixed(2)}
+                          +{recentGains.gainPower.toFixed(1)}
                         </span>
                       )}
                     </div>
@@ -356,11 +356,11 @@ const ProfilePage = () => {
                     />
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-[#445CFF] text-sm font-black font-overpass">
-                        {userProfile?.profile?.ratingTechnique?.toFixed(0) || '99'}
+                        {userProfile?.profile?.ratingTechnique?.toFixed(1) || '99'}
                       </span>
                       {recentGains?.gainTechnique > 0 && (
                         <span className="text-green-400 text-[9px] font-semibold">
-                          +{recentGains.gainTechnique.toFixed(2)}
+                          +{recentGains.gainTechnique.toFixed(1)}
                         </span>
                       )}
                     </div>
@@ -389,11 +389,11 @@ const ProfilePage = () => {
                     />
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-[#445CFF] text-sm font-black font-overpass">
-                        {userProfile?.profile?.ratingSpeed?.toFixed(0) || '99'}
+                        {userProfile?.profile?.ratingSpeed?.toFixed(1) || '99'}
                       </span>
                       {recentGains?.gainSpeed > 0 && (
                         <span className="text-green-400 text-[9px] font-semibold">
-                          +{recentGains.gainSpeed.toFixed(2)}
+                          +{recentGains.gainSpeed.toFixed(1)}
                         </span>
                       )}
                     </div>
@@ -431,7 +431,7 @@ const ProfilePage = () => {
                   {/* Внутренний контент */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <div className="text-[#A1FF4A] text-[42px] font-black font-overpass leading-none">
-                      {userProfile?.profile?.potential?.toFixed(0) || '99'}
+                      {userProfile?.profile?.potential?.toFixed(1) || '99'}
                     </div>
                     <div className="text-[#AEABBB] text-xs font-extrabold font-overpass uppercase mt-1 text-center leading-[100%] tracking-[0.5px] italic">
                       общий<br/>потенциал
