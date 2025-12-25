@@ -81,6 +81,14 @@ const AdminPage = () => {
               <p className="text-sm md:text-base text-gray-200">Управление модулями для алгоритма</p>
             </div>
           </Link>
+
+          {/* Инвайт-коды */}
+          <Link href="/admin/invite-codes">
+            <div className="bg-gradient-to-br from-pink-600 to-rose-600 rounded-lg p-5 md:p-6 hover:opacity-90 transition-opacity cursor-pointer h-full border border-white/10">
+              <h2 className="text-xl md:text-2xl font-bold mb-2">🎫 Инвайт-коды</h2>
+              <p className="text-sm md:text-base text-gray-200">Управление кодами доступа</p>
+            </div>
+          </Link>
         </div>
 
         <div className="mt-6 md:mt-8">
