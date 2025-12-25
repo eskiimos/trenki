@@ -4,9 +4,11 @@ import type { NextRequest } from 'next/server';
 // Публичные маршруты, которые доступны без авторизации
 const publicRoutes = [
   '/login',
+  '/invite',
   '/api/auth/create-login-token',
   '/api/auth/check-login-token',
   '/api/telegram',
+  '/api/invite/validate',
 ];
 
 // Проверяем, является ли маршрут публичным
@@ -40,11 +42,19 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Проверяем наличие telegramId в cookies
+  // Проверяем наличие инвайт-кода для неавторизованных пользователей
+  const inviteCode = request.cookies.get('inviteCode')?.value;
   const telegramId = request.cookies.get('telegramId')?.value;
 
+  // Если нет ни инвайт-кода, ни авторизации - редиректим на /invite
+  if (!inviteCode && !telegramId && pathname !== '/invite') {
+    console.log(`🎫 Middleware: Отсутствует инвайт-код, редирект на /invite`);
+    const inviteUrl = new URL('/invite', request.url);
+    return NextResponse.redirect(inviteUrl);
+  }
+
   // Если пользователь не авторизован, редиректим на /login
-  if (!telegramId && pathname !== '/login') {
+  if (!telegramId && pathname !== '/login' && pathname !== '/invite') {
     console.log(`🔒 Middleware: Неавторизованный доступ к ${pathname}, редирект на /login`);
     const loginUrl = new URL('/login', request.url);
     return NextResponse.redirect(loginUrl);

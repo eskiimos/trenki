@@ -19,6 +19,7 @@ model User {
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   lastActivity  DateTime          @default(now())
+  inviteCode    String?           // Код, с которым зарегистрировался пользователь
   favorites            FavoriteVideo[]
   profile              Profile?
   shortComments        ShortComment[]
@@ -574,4 +575,18 @@ model ScheduledWorkout {
 
   @@index([userId, date])
   @@map("scheduled_workouts")
+}
+
+// Инвайт-коды для закрытого бета-тестирования
+model InviteCode {
+  id          String    @id @default(cuid())
+  code        String    @unique // Формат: XXX-XXX
+  maxUses     Int       @default(1) // Сколько раз можно использовать
+  usedCount   Int       @default(0) // Сколько раз использовали
+  isActive    Boolean   @default(true) // Активен ли код
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime? // Дата истечения (опционально)
+  description String?   // Описание (например, "Бета-тестирование 25 человек")
+
+  @@map("invite_codes")
 }

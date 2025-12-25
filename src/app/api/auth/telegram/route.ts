@@ -86,6 +86,9 @@ export async function POST(request: NextRequest) {
 
     const telegramId = data.id.toString();
 
+    // Получаем инвайт-код из cookies
+    const inviteCode = request.cookies.get('inviteCode')?.value;
+
     // Проверяем, существует ли пользователь
     let user = await prisma.user.findUnique({
       where: { telegramId },
@@ -95,12 +98,49 @@ export async function POST(request: NextRequest) {
     // Если пользователя нет, создаём
     if (!user) {
       console.log('Creating new user:', telegramId);
+      
+      // Проверяем валидность инвайт-кода для новых пользователей
+      if (!inviteCode) {
+        return NextResponse.json(
+          { error: 'Требуется инвайт-код для регистрации' },
+          { status: 403 }
+        );
+      }
+
+      // Проверяем и используем инвайт-код
+      const invite = await prisma.inviteCode.findUnique({
+        where: { code: inviteCode.toUpperCase() },
+      });
+
+      if (!invite || !invite.isActive) {
+        return NextResponse.json(
+          { error: 'Неверный или неактивный инвайт-код' },
+          { status: 403 }
+        );
+      }
+
+      if (invite.expiresAt && new Date() > invite.expiresAt) {
+        return NextResponse.json(
+          { error: 'Срок действия инвайт-кода истёк' },
+          { status: 403 }
+        );
+      }
+
+      if (invite.usedCount >= invite.maxUses) {
+        return NextResponse.json(
+          { error: 'Инвайт-код уже использован максимальное количество раз' },
+          { status: 403 }
+        );
+      }
+
+      // Создаём пользователя с инвайт-кодом
       user = await prisma.user.create({
         data: {
           telegramId,
           firstName: data.first_name,
           lastName: data.last_name,
           username: data.username,
+          inviteCode: invite.code,
           profile: {
             create: {
               // Базовые значения
@@ -116,7 +156,17 @@ export async function POST(request: NextRequest) {
         },
         include: { profile: true },
       });
+      
       console.log('New user created:', user.id);
+
+      // Увеличиваем счётчик использований инвайт-кода
+      await prisma.inviteCode.update({
+        where: { code: invite.code },
+        data: { usedCount: { increment: 1 } },
+      });
+
+      console.log('Invite code used successfully:', invite.code);
+      
     } else {
       // Обновляем данные существующего пользователя
       console.log('Updating existing user:', user.id);
