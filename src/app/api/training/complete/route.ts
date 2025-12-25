@@ -163,6 +163,33 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Создаем запись в истории характеристик
+    await prisma.characteristicHistory.create({
+      data: {
+        userId: user.id,
+        sessionId: sessionId,
+        
+        // Новые значения после прироста
+        ratingPower: parseFloat(newCharacteristics.ratingPower.toFixed(1)),
+        ratingSpeed: parseFloat(newCharacteristics.ratingSpeed.toFixed(1)),
+        ratingEndurance: parseFloat(newCharacteristics.ratingEndurance.toFixed(1)),
+        ratingTechnique: parseFloat(newCharacteristics.ratingTechnique.toFixed(1)),
+        ratingFlexibility: parseFloat(newCharacteristics.ratingFlexibility.toFixed(1)),
+        potential: newPotential,
+        
+        // Прирост за всю тренировку
+        gainPower: gains.ratingPower,
+        gainSpeed: gains.ratingSpeed,
+        gainEndurance: gains.ratingEndurance,
+        gainTechnique: gains.ratingTechnique,
+        gainFlexibility: gains.ratingFlexibility,
+        
+        eventType: 'WORKOUT',
+      },
+    });
+
+    console.log('✅ History entry created for workout completion');
+
     // Обновляем статус тренировки на COMPLETED
     const updatedSession = await prisma.workoutSession.update({
       where: { id: sessionId },

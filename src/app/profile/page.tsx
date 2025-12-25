@@ -15,6 +15,7 @@ const ProfilePage = () => {
   const { user } = useTelegram();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [recentGains, setRecentGains] = useState<any>(null);
   
   // Push-уведомления
   const { 
@@ -59,12 +60,29 @@ const ProfilePage = () => {
         if (!cancelled) {
           setUserProfile(data.user);
           setIsLoading(false);
+          
+          // Загружаем последние приросты
+          if (data.user?.id) {
+            fetchRecentGains(data.user.id);
+          }
         }
       } catch (error) {
         if (!cancelled) {
           console.error('Ошибка загрузки профиля:', error);
           setIsLoading(false);
         }
+      }
+    };
+
+    const fetchRecentGains = async (userId: string) => {
+      try {
+        const response = await fetch(`/api/profile/recent-gains?userId=${userId}&limit=10`);
+        if (response.ok) {
+          const data = await response.json();
+          setRecentGains(data.totalGains);
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки приростов:', error);
       }
     };
 
@@ -237,10 +255,15 @@ const ProfilePage = () => {
                       height={56}
                       className="absolute inset-0"
                     />
-                    <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-[#445CFF] text-sm font-black font-overpass">
                         {userProfile?.profile?.ratingEndurance?.toFixed(0) || '99'}
                       </span>
+                      {recentGains?.gainEndurance > 0 && (
+                        <span className="text-green-400 text-[9px] font-semibold">
+                          +{recentGains.gainEndurance.toFixed(2)}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -265,10 +288,15 @@ const ProfilePage = () => {
                       height={56}
                       className="absolute inset-0"
                     />
-                    <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-[#445CFF] text-sm font-black font-overpass">
                         {userProfile?.profile?.ratingFlexibility?.toFixed(0) || '99'}
                       </span>
+                      {recentGains?.gainFlexibility > 0 && (
+                        <span className="text-green-400 text-[9px] font-semibold">
+                          +{recentGains.gainFlexibility.toFixed(2)}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -293,10 +321,15 @@ const ProfilePage = () => {
                       height={56}
                       className="absolute inset-0"
                     />
-                    <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-[#445CFF] text-sm font-black font-overpass">
                         {userProfile?.profile?.ratingPower?.toFixed(0) || '99'}
                       </span>
+                      {recentGains?.gainPower > 0 && (
+                        <span className="text-green-400 text-[9px] font-semibold">
+                          +{recentGains.gainPower.toFixed(2)}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -321,10 +354,15 @@ const ProfilePage = () => {
                       height={56}
                       className="absolute inset-0"
                     />
-                    <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-[#445CFF] text-sm font-black font-overpass">
                         {userProfile?.profile?.ratingTechnique?.toFixed(0) || '99'}
                       </span>
+                      {recentGains?.gainTechnique > 0 && (
+                        <span className="text-green-400 text-[9px] font-semibold">
+                          +{recentGains.gainTechnique.toFixed(2)}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -349,10 +387,15 @@ const ProfilePage = () => {
                       height={56}
                       className="absolute inset-0"
                     />
-                    <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-[#445CFF] text-sm font-black font-overpass">
                         {userProfile?.profile?.ratingSpeed?.toFixed(0) || '99'}
                       </span>
+                      {recentGains?.gainSpeed > 0 && (
+                        <span className="text-green-400 text-[9px] font-semibold">
+                          +{recentGains.gainSpeed.toFixed(2)}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

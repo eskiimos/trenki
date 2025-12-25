@@ -151,6 +151,33 @@ export async function POST(request: NextRequest) {
       modulesToday: modulesToday + 1,
     });
 
+    // Создаем запись в истории характеристик (для отображения прогресса)
+    await prisma.characteristicHistory.create({
+      data: {
+        userId: user.id,
+        sessionId: sessionId || null,
+        
+        // Новые значения после прироста
+        ratingPower: parseFloat(newCharacteristics.ratingPower.toFixed(1)),
+        ratingSpeed: parseFloat(newCharacteristics.ratingSpeed.toFixed(1)),
+        ratingEndurance: parseFloat(newCharacteristics.ratingEndurance.toFixed(1)),
+        ratingTechnique: parseFloat(newCharacteristics.ratingTechnique.toFixed(1)),
+        ratingFlexibility: parseFloat(newCharacteristics.ratingFlexibility.toFixed(1)),
+        potential: newPotential,
+        
+        // Прирост за этот модуль
+        gainPower: gains.ratingPower,
+        gainSpeed: gains.ratingSpeed,
+        gainEndurance: gains.ratingEndurance,
+        gainTechnique: gains.ratingTechnique,
+        gainFlexibility: gains.ratingFlexibility,
+        
+        eventType: 'MODULE',
+      },
+    });
+
+    console.log('✅ History entry created for module completion');
+
     // Если есть sessionId, отмечаем видео как завершенное
     if (sessionId) {
       await prisma.workoutSessionVideo.updateMany({

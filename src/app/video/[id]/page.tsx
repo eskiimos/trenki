@@ -165,6 +165,9 @@ export default function VideoPage({ params }: VideoPageProps) {
   // Отслеживание завершения видео (90% или конец)
   const videoCompletedRef = useRef(false);
   const lastProgressUpdateRef = useRef(0);
+  
+  // Отслеживание достижения 80% для начисления баллов (обычный просмотр)
+  const gainsCreditedRef = useRef(false);
 
   // Отмечаем начало видео в тренировке
   useEffect(() => {
@@ -195,36 +198,47 @@ export default function VideoPage({ params }: VideoPageProps) {
 
   // Отслеживание прогресса просмотра видео
   const handleVideoProgress = useCallback(async (currentTime: number, duration: number) => {
-    if (!fromWorkout || !sessionId || !videoId || !duration) return;
+    if (!duration) return;
     
     const progressPercent = (currentTime / duration) * 100;
     
-    // Отправляем обновление прогресса каждые 5 секунд
-    const now = Date.now();
-    if (now - lastProgressUpdateRef.current > 5000) {
-      lastProgressUpdateRef.current = now;
-      
-      try {
-        await fetch('/api/training/update', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId,
-            videoId,
-            action: 'progress',
-            watchedDuration: Math.floor(currentTime),
-          }),
-        });
-      } catch (error) {
-        console.error('Ошибка обновления прогресса:', error);
+    // Для тренировки - отправляем прогресс и проверяем 90%
+    if (fromWorkout && sessionId && videoId) {
+      // Отправляем обновление прогресса каждые 5 секунд
+      const now = Date.now();
+      if (now - lastProgressUpdateRef.current > 5000) {
+        lastProgressUpdateRef.current = now;
+        
+        try {
+          await fetch('/api/training/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId,
+              videoId,
+              action: 'progress',
+              watchedDuration: Math.floor(currentTime),
+            }),
+          });
+        } catch (error) {
+          console.error('Ошибка обновления прогресса:', error);
+        }
       }
-    }
 
-    // Проверяем достижение 90% или завершение видео
-    if (!videoCompletedRef.current && progressPercent >= 90) {
-      console.log('🎯 Video reached 90%, completing...', { currentTime, duration, progressPercent });
-      videoCompletedRef.current = true;
-      await completeVideoInWorkout();
+      // Проверяем достижение 90% для тренировки
+      if (!videoCompletedRef.current && progressPercent >= 90) {
+        console.log('🎯 Video reached 90%, completing...', { currentTime, duration, progressPercent });
+        videoCompletedRef.current = true;
+        await completeVideoInWorkout();
+      }
+    } 
+    // Для обычного просмотра - проверяем 80% для начисления баллов
+    else if (!fromWorkout && videoId) {
+      if (!gainsCreditedRef.current && progressPercent >= 80) {
+        console.log('💰 Video reached 80%, crediting gains...', { currentTime, duration, progressPercent });
+        gainsCreditedRef.current = true;
+        await creditGainsForWatching();
+      }
     }
   }, [fromWorkout, sessionId, videoId]);
 
@@ -264,6 +278,70 @@ export default function VideoPage({ params }: VideoPageProps) {
     }
   };
 
+  // Начисление баллов при просмотре 80% видео (обычный просмотр, не тренировка)
+  const creditGainsForWatching = async () => {
+    const telegramId = getTelegramId();
+    if (!telegramId || !videoId || fromWorkout) {
+      console.log('⚠️ Cannot credit gains - missing params or from workout:', { 
+        telegramId, 
+        videoId, 
+        fromWorkout 
+      });
+      return;
+    }
+
+    try {
+      console.log('💰 Crediting gains for watching 80%:', { telegramId, videoId });
+      setIsCompletingModule(true);
+      
+      const response = await fetch('/api/training/complete-module', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: telegramId,
+          videoId: videoId,
+          sessionId: null, // Обычный просмотр, не тренировка
+        }),
+      });
+
+      const data = await response.json();
+      console.log('📊 Gains credited response:', data);
+
+      if (response.ok && data.success) {
+        // Показываем модалку с приростом характеристик
+        setCharacteristicsGains(data.gains);
+        setNewCharacteristics(data.newCharacteristics);
+        setShowGainsModal(true);
+        
+        // Обновляем локальный профиль
+        setUserProfile((prev: any) => ({
+          ...prev,
+          ...data.newCharacteristics,
+        }));
+
+        setToast({
+          message: '🎉 Вы заработали очки! Прогресс обновлен',
+          type: 'success',
+        });
+      } else if (data.limitReached) {
+        setToast({
+          message: data.error || 'Достигнут дневной лимит',
+          type: 'warning',
+        });
+      } else {
+        console.error('❌ Failed to credit gains:', data);
+      }
+    } catch (error) {
+      console.error('Ошибка начисления очков:', error);
+      setToast({
+        message: 'Ошибка начисления очков',
+        type: 'error',
+      });
+    } finally {
+      setIsCompletingModule(false);
+    }
+  };
+
   // Загружаем прямую ссылку для Kinescope видео
   useEffect(() => {
     let ignore = false;
@@ -273,6 +351,8 @@ export default function VideoPage({ params }: VideoPageProps) {
     setDuration(0);
     setBuffered(0);
     setShowNextVideoPreview(false);
+    videoCompletedRef.current = false;
+    gainsCreditedRef.current = false;
     if (countdownTimerRef.current) {
       clearInterval(countdownTimerRef.current);
     }
