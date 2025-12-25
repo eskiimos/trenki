@@ -232,10 +232,10 @@ export default function VideoPage({ params }: VideoPageProps) {
         await completeVideoInWorkout();
       }
     } 
-    // Для обычного просмотра - проверяем 80% для начисления баллов
+    // Для обычного просмотра - проверяем 90% для начисления баллов
     else if (!fromWorkout && videoId) {
-      if (!gainsCreditedRef.current && progressPercent >= 80) {
-        console.log('💰 Video reached 80%, crediting gains...', { currentTime, duration, progressPercent });
+      if (!gainsCreditedRef.current && progressPercent >= 90) {
+        console.log('💰 Video reached 90%, crediting gains...', { currentTime, duration, progressPercent });
         gainsCreditedRef.current = true;
         await creditGainsForWatching();
       }
@@ -319,10 +319,10 @@ export default function VideoPage({ params }: VideoPageProps) {
           ...data.newCharacteristics,
         }));
 
-        setToast({
-          message: '🎉 Вы заработали очки! Прогресс обновлен',
-          type: 'success',
-        });
+        // setToast({
+        //   message: '🎉 Вы заработали очки! Прогресс обновлен',
+        //   type: 'success',
+        // });
       } else if (data.limitReached) {
         setToast({
           message: data.error || 'Достигнут дневной лимит',
