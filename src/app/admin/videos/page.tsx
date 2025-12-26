@@ -312,6 +312,38 @@ const AdminVideosPage = () => {
 
     const handleEditVideo = async (video: Video) => {
     setEditingVideoId(video.id);
+    
+    // Обратный маппинг enum → русские названия для формы
+    const moduleTypeToRussian: Record<string, string> = {
+      'WARMUP': 'Разминка',
+      'FITNESS': 'ОФП',
+      'TECHNIQUE': 'Техника',
+      'COOLDOWN': 'Заминка',
+    };
+    
+    const complexityToRussian: Record<string, string> = {
+      'BEGINNER': 'Новичок',
+      'AMATEUR': 'Любитель',
+      'ADVANCED': 'Продвинутый',
+      'PRO': 'Профи',
+    };
+    
+    const muscleGroupToRussian: Record<string, string> = {
+      'FULL_BODY': 'Все тело',
+      'LOWER_BODY': 'Низ тела',
+      'UPPER_PULL': 'Верх тяга',
+      'UPPER_PUSH': 'Верх жим',
+      'CORE_STABILITY': 'Кор стабилизация',
+      'CORE_DYNAMICS': 'Кор динамика',
+      'PREHAB_SHOULDER': 'ЛФК плечо',
+      'PREHAB_KNEE': 'ЛФК колено',
+      'PREHAB_BACK': 'ЛФК спина',
+    };
+    
+    const moduleTypeValue = (video as any).moduleType || '';
+    const complexityValue = (video as any).complexity || '';
+    const muscleGroupValue = (video as any).muscleGroup || '';
+    
     setFormData({
       title: video.title,
       description: video.description || '',
@@ -322,11 +354,11 @@ const AdminVideosPage = () => {
       trainerId: video.trainer.id,
       tags: video.tags.join(', '), // Старые текстовые теги
       equipment: video.equipment.join(', '),
-      // Поля для алгоритма (LoadType-based) - маппинг латиницы обратно в кириллицу для формы
-      типМодуля: (video as any).moduleType || video.типМодуля || '',
-      типНагрузки: (video as any).loadType || video.типНагрузки || '', // Основное поле - LoadType тег
-      группаМышц: (video as any).muscleGroup || video.группаМышц || '',
-      сложность: (video as any).complexity || video.сложность || '',
+      // Поля для алгоритма - маппинг enum обратно в русские названия для формы
+      типМодуля: moduleTypeToRussian[moduleTypeValue] || moduleTypeValue || '',
+      типНагрузки: (video as any).loadType || video.типНагрузки || '', // LoadType приходит уже в нужном формате
+      группаМышц: muscleGroupToRussian[muscleGroupValue] || muscleGroupValue || '',
+      сложность: complexityToRussian[complexityValue] || complexityValue || '',
     });
     
     // Загружаем теги из базы данных для этого видео
