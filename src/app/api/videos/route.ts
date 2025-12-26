@@ -199,6 +199,7 @@ export async function POST(request: NextRequest) {
         moduleType: moduleTypeEnum as any,
         complexity: complexityEnum as any,
         muscleGroup: muscleGroupEnum as any,
+        loadType: body.loadType as any,
       },
       include: {
         trainer: true
