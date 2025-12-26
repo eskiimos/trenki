@@ -152,7 +152,30 @@ export async function POST(request: NextRequest) {
       'Заминка': 'COOLDOWN',
     };
     
-    const moduleTypeEnum = moduleTypeRaw ? moduleTypeMap[moduleTypeRaw] || null : null;
+    const moduleTypeEnum = moduleTypeRaw ? moduleTypeMap[moduleTypeRaw] || moduleTypeRaw : null;
+
+    // Маппинг русских названий сложности в enum Complexity
+    const complexityMap: Record<string, string> = {
+      'Новичок': 'BEGINNER',
+      'Любитель': 'AMATEUR',
+      'Продвинутый': 'ADVANCED',
+      'Профи': 'PRO',
+    };
+    const complexityEnum = complexity ? complexityMap[complexity] || complexity : null;
+
+    // Маппинг русских названий групп мышц в enum MuscleGroup
+    const muscleGroupMap: Record<string, string> = {
+      'Все тело': 'FULL_BODY',
+      'Низ тела': 'LOWER_BODY',
+      'Верх тяга': 'UPPER_PULL',
+      'Верх жим': 'UPPER_PUSH',
+      'Кор стабилизация': 'CORE_STABILITY',
+      'Кор динамика': 'CORE_DYNAMICS',
+      'ЛФК плечо': 'PREHAB_SHOULDER',
+      'ЛФК колено': 'PREHAB_KNEE',
+      'ЛФК спина': 'PREHAB_BACK',
+    };
+    const muscleGroupEnum = muscleGroup ? muscleGroupMap[muscleGroup] || muscleGroup : null;
 
     console.log('isPublished value:', isPublished, 'type:', typeof isPublished);
     console.log('moduleTypeRaw:', moduleTypeRaw, '→ moduleTypeEnum:', moduleTypeEnum);
@@ -174,8 +197,8 @@ export async function POST(request: NextRequest) {
         rpeMin: rpeMinNum,
         rpeMax: rpeMaxNum,
         moduleType: moduleTypeEnum as any,
-        complexity: complexity || null,
-        muscleGroup: muscleGroup || null,
+        complexity: complexityEnum as any,
+        muscleGroup: muscleGroupEnum as any,
       },
       include: {
         trainer: true
