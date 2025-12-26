@@ -562,18 +562,26 @@ enum AgeGroup {
 }
 
 model ScheduledWorkout {
-  id        String   @id @default(cuid())
-  userId    String
-  videoId   String
-  date      DateTime
-  completed Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                      String   @id @default(cuid())
+  userId                  String
+  videoId                 String
+  date                    DateTime
+  completed               Boolean  @default(false)
+  
+  // Уведомления
+  notificationSent        Boolean  @default(false)   // Отправлено уведомление о создании
+  notification30MinSent   Boolean  @default(false)   // Отправлено уведомление за 30 мин
+  notification10MinSent   Boolean  @default(false)   // Отправлено уведомление за 10 мин
+  
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
 
   @@index([userId, date])
+  @@index([date, notification30MinSent])
+  @@index([date, notification10MinSent])
   @@map("scheduled_workouts")
 }
 

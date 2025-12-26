@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getTelegramId } from '@/lib/auth-server';
+import { sendTelegramMessage, formatWorkoutTime } from '@/lib/telegram';
 
 export async function GET(req: NextRequest) {
   try {
@@ -129,6 +130,22 @@ export async function POST(req: NextRequest) {
 
     const createdSchedules = [];
 
+    // Получаем информацию о видео для уведомления
+    const video = await prisma.video.findUnique({
+      where: { id: videoId },
+      select: {
+        id: true,
+        title: true,
+        duration: true,
+        trainer: {
+          select: {
+            name: true,
+            lastName: true,
+          }
+        }
+      }
+    });
+
     for (const dateString of dates) {
       const date = new Date(dateString);
       
@@ -147,9 +164,66 @@ export async function POST(req: NextRequest) {
             userId: user.id,
             videoId,
             date,
+            notificationSent: true, // Помечаем, что уведомление о создании будет отправлено
           },
         });
         createdSchedules.push(schedule);
+      }
+    }
+
+    // Отправляем уведомление пользователю о запланированных тренировках
+    if (createdSchedules.length > 0 && video) {
+      const trainerName = `${video.trainer.name} ${video.trainer.lastName}`;
+      
+      if (createdSchedules.length === 1) {
+        const workoutTime = formatWorkoutTime(createdSchedules[0].date);
+        const message = `✅ Тренировка запланирована!
+
+🎬 ${video.title}
+👤 Тренер: ${trainerName}
+⏱ Длительность: ${video.duration} мин
+📅 ${workoutTime}
+
+Мы напомним тебе за 30 и 10 минут до начала! ⏰`;
+
+        await sendTelegramMessage(user.telegramId, message, {
+          parseMode: 'HTML',
+          replyMarkup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '📱 Открыть приложение',
+                  web_app: { url: process.env.WEB_APP_URL || 'https://trenki.vercel.app' }
+                }
+              ]
+            ]
+          }
+        });
+      } else {
+        // Несколько тренировок запланировано
+        const message = `✅ Запланировано тренировок: ${createdSchedules.length}
+
+🎬 ${video.title}
+👤 Тренер: ${trainerName}
+⏱ Длительность: ${video.duration} мин
+
+${createdSchedules.map((s, i) => `${i + 1}. ${formatWorkoutTime(s.date)}`).join('\n')}
+
+Мы напомним тебе за 30 и 10 минут до каждой! ⏰`;
+
+        await sendTelegramMessage(user.telegramId, message, {
+          parseMode: 'HTML',
+          replyMarkup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '📱 Открыть приложение',
+                  web_app: { url: process.env.WEB_APP_URL || 'https://trenki.vercel.app' }
+                }
+              ]
+            ]
+          }
+        });
       }
     }
 
