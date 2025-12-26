@@ -124,6 +124,7 @@ const AdminVideosPage = () => {
       };
 
       console.log('Sending payload:', payload);
+      console.log('Form data типНагрузки:', formData.типНагрузки);
 
       const url = editingVideoId ? `/api/videos/${editingVideoId}` : '/api/videos';
       const method = editingVideoId ? 'PUT' : 'POST';

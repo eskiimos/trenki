@@ -121,6 +121,11 @@ export async function PUT(
     };
     const muscleGroupEnum = muscleGroup ? muscleGroupMap[muscleGroup] || muscleGroup : null;
 
+    // Обрабатываем loadType - если пустая строка, то null
+    const loadTypeValue = body.loadType && body.loadType !== '' ? body.loadType : null;
+    
+    console.log('Updating video - loadType:', body.loadType, '→', loadTypeValue);
+
     // Обновляем видео
     const video = await prisma.video.update({
       where: { id },
@@ -142,7 +147,7 @@ export async function PUT(
         moduleType: moduleTypeEnum as any,
         complexity: complexityEnum as any,
         muscleGroup: muscleGroupEnum as any,
-        loadType: body.loadType as any,
+        loadType: loadTypeValue as any,
       },
       include: {
         trainer: {
