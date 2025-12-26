@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
         },
         video: {
           select: {
+            id: true,
             title: true,
             duration: true,
             trainer: {
@@ -134,6 +135,7 @@ export async function GET(request: NextRequest) {
         },
         video: {
           select: {
+            id: true,
             title: true,
             duration: true,
             trainer: {
