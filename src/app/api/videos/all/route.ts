@@ -61,9 +61,8 @@ export async function GET(request: NextRequest) {
       createdAt: video.createdAt,
       rpeMin: video.rpeMin,
       rpeMax: video.rpeMax,
-      // Добавляем LoadType для обратной совместимости с админкой
-      loadType: getLoadType(video.videoTags),
-      // Новые поля для алгоритма
+      // Новые поля для алгоритма - берем напрямую из video, не из тегов
+      loadType: video.loadType || getLoadType(video.videoTags), // сначала поле, потом fallback на теги
       moduleType: video.moduleType,
       complexity: video.complexity,
       muscleGroup: video.muscleGroup,
