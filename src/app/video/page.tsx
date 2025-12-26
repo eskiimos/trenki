@@ -353,7 +353,11 @@ const VideoPage = () => {
                   {video.trainer.name} {video.trainer.lastName}
                 </span>
                 <span className="text-white/40"> | </span>
-                <span>{video.viewsCount} тыс. лайков</span>
+                <span>
+                  {video.likesCount >= 1000 
+                    ? `${(video.likesCount / 1000).toFixed(1)} тыс.` 
+                    : video.likesCount} лайков
+                </span>
                 <span className="text-white/40"> | </span>
                 <span>оборудование ({video.equipment.join(' / ')})</span>
               </div>
