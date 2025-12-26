@@ -30,6 +30,7 @@ interface Video {
   equipment: string[];
   level?: string;
   viewsCount: number;
+  likesCount: number;
   trainer: {
     id: string;
     name: string;
