@@ -84,8 +84,19 @@ export async function PUT(
     }
 
         // Преобразуем RPE в числа
-    const rpeМинNum = rpeМин ? parseInt(rpeМин.toString()) : null;
+    const rpeМинNum = rpeМін ? parseInt(rpeМін.toString()) : null;
     const rpeМаксNum = rpeМакс ? parseInt(rpeМакс.toString()) : null;
+
+    // Маппинг русских названий модулей в enum ModuleType
+    const moduleTypeMap: Record<string, string> = {
+      'Разминка': 'WARMUP',
+      'ОФП': 'FITNESS',
+      'Техника': 'TECHNIQUE',
+      'Заминка': 'COOLDOWN',
+    };
+    
+    const moduleTypeEnum = типМодуля ? moduleTypeMap[типМодуля] || null : null;
+    console.log('типМодуля:', типМодуля, '→ moduleTypeEnum:', moduleTypeEnum);
 
     // Обновляем видео
     const video = await prisma.video.update({
@@ -105,7 +116,7 @@ export async function PUT(
         isPublished: isPublished !== undefined ? isPublished : true,
         rpeМин: rpeМинNum,
         rpeМакс: rpeМаксNum,
-        moduleType: типМодуля || null,
+        moduleType: moduleTypeEnum as any,
         complexity: сложность || null,
         muscleGroup: группаМышц || null,
       },

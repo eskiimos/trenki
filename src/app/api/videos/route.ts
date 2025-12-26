@@ -144,7 +144,18 @@ export async function POST(request: NextRequest) {
     const rpeМинNum = rpeМин ? parseInt(rpeМин.toString()) : null;
     const rpeМаксNum = rpeМакс ? parseInt(rpeМакс.toString()) : null;
 
+    // Маппинг русских названий модулей в enum ModuleType
+    const moduleTypeMap: Record<string, string> = {
+      'Разминка': 'WARMUP',
+      'ОФП': 'FITNESS',
+      'Техника': 'TECHNIQUE',
+      'Заминка': 'COOLDOWN',
+    };
+    
+    const moduleTypeEnum = типМодуля ? moduleTypeMap[типМодуля] || null : null;
+
     console.log('isPublished value:', isPublished, 'type:', typeof isPublished);
+    console.log('типМодуля:', типМодуля, '→ moduleTypeEnum:', moduleTypeEnum);
 
     const video = await prisma.video.create({
       data: {
@@ -162,7 +173,7 @@ export async function POST(request: NextRequest) {
         isPublished: isPublished ?? false,
         rpeМин: rpeМинNum,
         rpeМакс: rpeМаксNum,
-        moduleType: типМодуля || null,
+        moduleType: moduleTypeEnum as any,
         complexity: сложность || null,
         muscleGroup: группаМышц || null,
       },
