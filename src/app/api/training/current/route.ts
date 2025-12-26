@@ -68,10 +68,10 @@ export async function GET(request: NextRequest) {
           sessionVideoId: wsVideo.id,
           title: wsVideo.video.title,
           description: wsVideo.video.description,
-          типМодуля: wsVideo.video.category || null,
-          типНагрузки: wsVideo.video.difficulty || null,
+          moduleType: wsVideo.video.category || null,
+          loadType: wsVideo.video.difficulty || null,
           duration: wsVideo.video.duration,
-          rpeRange: `${wsVideo.video.rpeМин}-${wsVideo.video.rpeМакс}`,
+          rpeRange: `${wsVideo.video.rpeMin}-${wsVideo.video.rpeMax}`,
           videoUrl: wsVideo.video.videoUrl,
           thumbnail: wsVideo.video.thumbnail,
           trainer: {

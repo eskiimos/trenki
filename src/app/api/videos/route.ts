@@ -184,13 +184,13 @@ export async function POST(request: NextRequest) {
 
     console.log('Created video with isPublished:', video.isPublished);
 
-    // Автоматически создаём LoadType тег, если указан типНагрузки
-    if (body.типНагрузки) {
-      console.log('Creating LoadType tag for:', body.типНагрузки);
+    // Автоматически создаём LoadType тег, если указан loadType
+    if (body.loadType) {
+      console.log('Creating LoadType tag for:', body.loadType);
       
       // Маппинг типов нагрузки на LoadType enum (из prisma/schema.prisma)
-      // Теперь типНагрузки приходит уже в формате enum (MAX_STRENGTH, POWER, etc)
-      const loadTypeEnum = body.типНагрузки;
+      // Теперь loadType приходит уже в формате enum (MAX_STRENGTH, POWER, etc)
+      const loadTypeEnum = body.loadType;
       
       if (loadTypeEnum) {
         // Находим LoadType тег по имени
@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
 
         console.log(`✅ LoadType tag created: ${tagName} for video ${video.id}`);
       } else {
-        console.warn(`⚠️ No LoadType mapping for: ${body.типНагрузки}`);
+        console.warn(`⚠️ No LoadType mapping for: ${body.loadType}`);
       }
     }
 

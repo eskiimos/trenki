@@ -195,7 +195,7 @@ export async function PUT(
 
         console.log(`✅ LoadType tag updated: ${tagName} for video ${id}`);
       } else {
-        console.warn(`⚠️ No LoadType mapping for: ${body.типНагрузки}`);
+        console.warn(`⚠️ No LoadType mapping for: ${body.loadType}`);
       }
     }
 

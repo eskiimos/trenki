@@ -141,10 +141,10 @@ export async function POST(request: NextRequest) {
           id: wsVideo.video.id,
           title: wsVideo.video.title,
           description: wsVideo.video.description,
-          типМодуля: wsVideo.video.category || null,
-          типНагрузки: wsVideo.video.difficulty || null,
+          moduleType: wsVideo.video.category || null,
+          loadType: wsVideo.video.difficulty || null,
           duration: wsVideo.video.duration,
-          rpeRange: `${wsVideo.video.rpeМин}-${wsVideo.video.rpeМакс}`,
+          rpeRange: `${wsVideo.video.rpeMin}-${wsVideo.video.rpeMax}`,
           videoUrl: wsVideo.video.videoUrl,
           thumbnail: wsVideo.video.thumbnail,
           trainer: {
@@ -190,7 +190,7 @@ async function selectModulesForWorkout(
     where: {
       isPublished: true,
       id: { notIn: excludeModuleIds },
-      rpeМакс: { lte: 5 }, // разминка всегда легкая
+      rpeMax: { lte: 5 }, // разминка всегда легкая
       category: { in: ['GENERAL', 'TECHNIQUE', 'SKATING'] }, // подходящие для разминки
     },
     include: {
@@ -222,8 +222,8 @@ async function selectModulesForWorkout(
           ...(warmup ? [warmup.id] : []),
         ] 
       },
-      rpeМин: { lte: targetRPE + 2 },
-      rpeМакс: { gte: targetRPE - 2 },
+      rpeMin: { lte: targetRPE + 2 },
+      rpeMax: { gte: targetRPE - 2 },
     },
     include: {
       trainer: true,
@@ -254,8 +254,8 @@ async function selectModulesForWorkout(
           ...videos.map((v) => v.id),
         ] 
       },
-      rpeМин: { lte: targetRPE + 2 },
-      rpeМакс: { gte: targetRPE - 2 },
+      rpeMin: { lte: targetRPE + 2 },
+      rpeMax: { gte: targetRPE - 2 },
     },
     include: {
       trainer: true,
@@ -286,7 +286,7 @@ async function selectModulesForWorkout(
           ...videos.map((v) => v.id),
         ],
       },
-      rpeМакс: { lte: 5 }, // заминка легкая (до 5 RPE)
+      rpeMax: { lte: 5 }, // заминка легкая (до 5 RPE)
     },
     include: {
       trainer: true,

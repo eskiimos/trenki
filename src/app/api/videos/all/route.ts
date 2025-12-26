@@ -59,14 +59,14 @@ export async function GET(request: NextRequest) {
         speciality: video.trainer.speciality,
       },
       createdAt: video.createdAt,
-      rpeМин: video.rpeМин,
-      rpeМакс: video.rpeМакс,
+      rpeMin: video.rpeMin,
+      rpeMax: video.rpeMax,
       // Добавляем LoadType для обратной совместимости с админкой
-      типНагрузки: getLoadType(video.videoTags),
+      loadType: getLoadType(video.videoTags),
       // Новые поля для алгоритма
-      типМодуля: video.moduleType,
-      сложность: video.complexity,
-      группаМышц: video.muscleGroup,
+      moduleType: video.moduleType,
+      complexity: video.complexity,
+      muscleGroup: video.muscleGroup,
     }));    return NextResponse.json({ videos: formattedVideos });
   } catch (error) {
     console.error('Error fetching all videos:', error);
