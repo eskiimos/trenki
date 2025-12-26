@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/cron/check-workouts",
-      "schedule": "* * * * *"
+      "schedule": "*/10 * * * *"
     }
   ]
 }
