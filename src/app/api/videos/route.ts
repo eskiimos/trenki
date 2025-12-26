@@ -40,6 +40,11 @@ export async function GET(request: NextRequest) {
           include: {
             tag: true
           }
+        },
+        _count: {
+          select: {
+            likes: true, // Подсчитываем реальные лайки из VideoLike
+          }
         }
       },
       orderBy: { createdAt: 'desc' }
@@ -67,7 +72,7 @@ export async function GET(request: NextRequest) {
         equipment: video.equipment,
         level: video.level,
         viewsCount: video.viewsCount,
-        likesCount: video.likesCount,
+        likesCount: video._count.likes, // Реальное количество лайков из VideoLike
         trainer: {
           id: video.trainer.id,
           name: video.trainer.name,
