@@ -82,8 +82,8 @@ export async function GET(request: NextRequest) {
         },
         createdAt: video.createdAt,
         isPublished: video.isPublished,
-        rpeМин: video.rpeМин,
-        rpeМакс: video.rpeМакс,
+        rpeMin: video.rpeMin,
+        rpeMax: video.rpeMax,
       };
     });
 
@@ -124,11 +124,11 @@ export async function POST(request: NextRequest) {
       equipment,
       level,
       isPublished,
-      rpeМин,
-      rpeМакс,
-      типМодуля,
-      сложность,
-      группаМышц,
+      rpeMin,
+      rpeMax,
+      moduleType: moduleTypeRaw,
+      complexity,
+      muscleGroup,
     } = body;
 
     if (!title || !videoUrl || !category || !difficulty || !trainerId) {
@@ -141,8 +141,8 @@ export async function POST(request: NextRequest) {
     const durationNum = parseInt(duration) || 0;
     
     // Преобразуем RPE в числа
-    const rpeМинNum = rpeМин ? parseInt(rpeМин.toString()) : null;
-    const rpeМаксNum = rpeМакс ? parseInt(rpeМакс.toString()) : null;
+    const rpeMinNum = rpeMin ? parseInt(rpeMin.toString()) : null;
+    const rpeMaxNum = rpeMax ? parseInt(rpeMax.toString()) : null;
 
     // Маппинг русских названий модулей в enum ModuleType
     const moduleTypeMap: Record<string, string> = {
@@ -152,10 +152,10 @@ export async function POST(request: NextRequest) {
       'Заминка': 'COOLDOWN',
     };
     
-    const moduleTypeEnum = типМодуля ? moduleTypeMap[типМодуля] || null : null;
+    const moduleTypeEnum = moduleTypeRaw ? moduleTypeMap[moduleTypeRaw] || null : null;
 
     console.log('isPublished value:', isPublished, 'type:', typeof isPublished);
-    console.log('типМодуля:', типМодуля, '→ moduleTypeEnum:', moduleTypeEnum);
+    console.log('moduleTypeRaw:', moduleTypeRaw, '→ moduleTypeEnum:', moduleTypeEnum);
 
     const video = await prisma.video.create({
       data: {
@@ -171,11 +171,11 @@ export async function POST(request: NextRequest) {
         equipment: equipment || [],
         level: level || null,
         isPublished: isPublished ?? false,
-        rpeМин: rpeМинNum,
-        rpeМакс: rpeМаксNum,
+        rpeMin: rpeMinNum,
+        rpeMax: rpeMaxNum,
         moduleType: moduleTypeEnum as any,
-        complexity: сложность || null,
-        muscleGroup: группаМышц || null,
+        complexity: complexity || null,
+        muscleGroup: muscleGroup || null,
       },
       include: {
         trainer: true

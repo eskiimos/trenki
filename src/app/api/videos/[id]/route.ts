@@ -70,11 +70,11 @@ export async function PUT(
       equipment,
       level,
       isPublished,
-      rpeМин,
-      rpeМакс,
-      типМодуля,
-      сложность,
-      группаМышц,
+      rpeMin,
+      rpeMax,
+      moduleType: moduleTypeRaw,
+      complexity,
+      muscleGroup,
     } = body;
 
     if (!title || !videoUrl || !category || !difficulty || !trainerId) {
@@ -84,8 +84,8 @@ export async function PUT(
     }
 
         // Преобразуем RPE в числа
-    const rpeМинNum = rpeМін ? parseInt(rpeМін.toString()) : null;
-    const rpeМаксNum = rpeМакс ? parseInt(rpeМакс.toString()) : null;
+    const rpeMinNum = rpeMin ? parseInt(rpeMin.toString()) : null;
+    const rpeMaxNum = rpeMax ? parseInt(rpeMax.toString()) : null;
 
     // Маппинг русских названий модулей в enum ModuleType
     const moduleTypeMap: Record<string, string> = {
@@ -95,8 +95,8 @@ export async function PUT(
       'Заминка': 'COOLDOWN',
     };
     
-    const moduleTypeEnum = типМодуля ? moduleTypeMap[типМодуля] || null : null;
-    console.log('типМодуля:', типМодуля, '→ moduleTypeEnum:', moduleTypeEnum);
+    const moduleTypeEnum = moduleTypeRaw ? moduleTypeMap[moduleTypeRaw] || null : null;
+    console.log('moduleTypeRaw:', moduleTypeRaw, '→ moduleTypeEnum:', moduleTypeEnum);
 
     // Обновляем видео
     const video = await prisma.video.update({
@@ -114,11 +114,11 @@ export async function PUT(
         equipment: equipment || [],
         level: level || '',
         isPublished: isPublished !== undefined ? isPublished : true,
-        rpeМин: rpeМинNum,
-        rpeМакс: rpeМаксNum,
+        rpeMin: rpeMinNum,
+        rpeMax: rpeMaxNum,
         moduleType: moduleTypeEnum as any,
-        complexity: сложность || null,
-        muscleGroup: группаМышц || null,
+        complexity: complexity || null,
+        muscleGroup: muscleGroup || null,
       },
       include: {
         trainer: {
@@ -132,12 +132,12 @@ export async function PUT(
       },
     });
 
-    // Обновляем LoadType тег, если указан типНагрузки
-    if (body.типНагрузки) {
-      console.log('Updating LoadType tag for:', body.типНагрузки);
+    // Обновляем LoadType тег, если указан loadType
+    if (body.loadType) {
+      console.log('Updating LoadType tag for:', body.loadType);
       
-      // Теперь типНагрузки приходит уже в формате enum (MAX_STRENGTH, POWER, etc)
-      const loadTypeEnum = body.типНагрузки;
+      // Теперь loadType приходит уже в формате enum (MAX_STRENGTH, POWER, etc)
+      const loadTypeEnum = body.loadType;
       
       if (loadTypeEnum) {
         // Удаляем старые LoadType теги
