@@ -104,11 +104,23 @@ const AdminVideosPage = () => {
       const tagsArray = formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
       const equipmentArray = formData.equipment.split(',').map(eq => eq.trim()).filter(eq => eq);
 
+      // Маппинг кириллических полей на латиницу для API
       const payload = {
-        ...formData,
+        title: formData.title,
+        description: formData.description,
+        videoUrl: formData.videoUrl,
+        thumbnail: formData.thumbnail,
+        category: formData.category,
+        difficulty: formData.difficulty,
+        trainerId: formData.trainerId,
         tags: tagsArray,
         equipment: equipmentArray,
         isPublished: true,
+        // Маппинг полей для алгоритма (кириллица → латиница)
+        moduleType: formData.типМодуля,
+        loadType: formData.типНагрузки,
+        muscleGroup: formData.группаМышц,
+        complexity: formData.сложность,
       };
 
       console.log('Sending payload:', payload);
@@ -310,11 +322,11 @@ const AdminVideosPage = () => {
       trainerId: video.trainer.id,
       tags: video.tags.join(', '), // Старые текстовые теги
       equipment: video.equipment.join(', '),
-      // Поля для алгоритма (LoadType-based)
-      типМодуля: video.типМодуля || '',
-      типНагрузки: video.типНагрузки || '', // Основное поле - LoadType тег
-      группаМышц: video.группаМышц || '',
-      сложность: video.сложность || '',
+      // Поля для алгоритма (LoadType-based) - маппинг латиницы обратно в кириллицу для формы
+      типМодуля: (video as any).moduleType || video.типМодуля || '',
+      типНагрузки: (video as any).loadType || video.типНагрузки || '', // Основное поле - LoadType тег
+      группаМышц: (video as any).muscleGroup || video.группаМышц || '',
+      сложность: (video as any).complexity || video.сложность || '',
     });
     
     // Загружаем теги из базы данных для этого видео
