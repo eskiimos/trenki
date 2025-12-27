@@ -9,11 +9,17 @@ import MultiLevelTagFilter from '@/components/MultiLevelTagFilter';
 import { getTelegramId } from '@/lib/auth';
 import { calculateWorkoutGains, CharacteristicType } from '@/lib/characteristics';
 
-// Функция для форматирования длительности видео
+// Функция для форматирования длительности видео в YouTube формате (MM:SS или H:MM:SS)
 const formatDuration = (seconds: number): string => {
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  if (!seconds || seconds <= 0) return '0:00';
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  return `${minutes}:${secs.toString().padStart(2, '0')}`;
 };
 
 interface Video {

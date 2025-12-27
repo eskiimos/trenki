@@ -37,10 +37,17 @@ interface Video {
   сложность?: string;
 }
 
-// Функция форматирования длительности
+// Функция форматирования длительности в YouTube формате (MM:SS или H:MM:SS)
 const formatDuration = (seconds: number): string => {
-  const minutes = Math.floor(seconds / 60);
-  return `${minutes} мин`;
+  if (!seconds || seconds <= 0) return '0:00';
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  return `${minutes}:${secs.toString().padStart(2, '0')}`;
 };
 
 const AdminVideosPage = () => {
@@ -62,6 +69,7 @@ const AdminVideosPage = () => {
     trainerId: '',
     tags: '', // Оставляем для обратной совместимости (старые текстовые теги)
     equipment: '',
+    duration: 0, // Длительность в секундах (из Kinescope)
     // Поля для алгоритма тренировок (LoadType-based)
     типМодуля: '',
     типНагрузки: '', // Основное поле - создаёт LoadType тег автоматически
@@ -123,6 +131,7 @@ const AdminVideosPage = () => {
         tags: tagsArray,
         equipment: equipmentArray,
         isPublished: true,
+        duration: formData.duration, // Длительность в секундах
         // Маппинг полей для алгоритма (кириллица → латиница)
         moduleType: formData.типМодуля,
         loadType: formData.типНагрузки,
@@ -362,6 +371,7 @@ const AdminVideosPage = () => {
       trainerId: video.trainer.id,
       tags: video.tags.join(', '), // Старые текстовые теги
       equipment: video.equipment.join(', '),
+      duration: video.duration || 0, // Длительность в секундах
       // Поля для алгоритма - маппинг enum обратно в русские названия для формы
       типМодуля: moduleTypeToRussian[moduleTypeValue] || moduleTypeValue || '',
       типНагрузки: (video as any).loadType || video.типНагрузки || '', // LoadType приходит уже в нужном формате
