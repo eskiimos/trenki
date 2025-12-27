@@ -16,7 +16,8 @@ interface Video {
   id: string;
   title: string;
   description?: string;
-  duration: string;
+  duration: number;
+  durationFormatted?: string;
   videoUrl: string;
   thumbnail?: string;
   trainer: {
@@ -35,6 +36,12 @@ interface Video {
   группаМышц?: string;
   сложность?: string;
 }
+
+// Функция форматирования длительности
+const formatDuration = (seconds: number): string => {
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes} мин`;
+};
 
 const AdminVideosPage = () => {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
@@ -1066,7 +1073,7 @@ const AdminVideosPage = () => {
                   
                   {/* Категория и длительность */}
                   <p className="text-xs md:text-sm text-gray-400 mb-3">
-                    {video.category} • {video.duration}
+                    {video.category} • {video.durationFormatted || formatDuration(video.duration)}
                   </p>
                   
                   {/* Кнопки */}
