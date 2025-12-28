@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 
 interface Tag {
   id: string;
@@ -35,6 +36,7 @@ interface TagsSectionProps {
   description?: string;
   title?: string;
   trainer?: {
+    id: string;
     name: string;
     lastName: string;
     avatar: string | null;
@@ -155,7 +157,10 @@ const TagsSection: React.FC<TagsSectionProps> = ({
 
       {/* Trainer Info */}
       {trainer && (
-        <div className="flex items-center space-x-3 mb-4">
+        <Link 
+          href={`/trainers/${trainer.id}`}
+          className="flex items-center space-x-3 mb-4 hover:opacity-80 transition-opacity cursor-pointer"
+        >
           <div className="w-8 h-8 rounded-full overflow-hidden bg-[#2d3448] flex items-center justify-center">
             {trainer.avatar ? (
               <Image 
@@ -176,7 +181,7 @@ const TagsSection: React.FC<TagsSectionProps> = ({
               {trainer.name} {trainer.lastName}
             </p>
           </div>
-        </div>
+        </Link>
       )}
       
       {/* Video Title */}

@@ -1590,6 +1590,7 @@ export default function VideoPage({ params }: VideoPageProps) {
         description={videoData?.description}
         title={videoData?.title}
         trainer={videoData?.trainer ? {
+          id: videoData.trainer.id,
           name: videoData.trainer.name,
           lastName: videoData.trainer.lastName,
           avatar: videoData.trainer.avatar

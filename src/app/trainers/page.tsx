@@ -14,6 +14,8 @@ interface Trainer {
   avatar: string | null;
   description: string | null;
   videos: any[];
+  shortVideosCount: number; // Тренеки (< 10 мин)
+  longVideosCount: number;  // Тренировки (>= 10 мин)
 }
 
 const TrainersPage = () => {
@@ -184,12 +186,12 @@ const TrainerCard = ({ trainer }: { trainer: Trainer }) => {
             </div>
             <div className="w-px h-8 bg-[#101530]"></div>
             <div className="text-center">
-              <div className="text-[#A1FF4A] text-sm font-bold">{trainer.videos.length}</div>
+              <div className="text-[#A1FF4A] text-sm font-bold">{trainer.shortVideosCount || 0}</div>
               <div className="text-white text-xs font-bold uppercase tracking-wide">ТРЕНЕК</div>
             </div>
             <div className="w-px h-8 bg-[#101530]"></div>
             <div className="text-center">
-              <div className="text-[#A1FF4A] text-sm font-bold">{trainer.videos.length}</div>
+              <div className="text-[#A1FF4A] text-sm font-bold">{trainer.longVideosCount || 0}</div>
               <div className="text-white text-xs font-bold uppercase tracking-wide">ТРЕНИРОВОК</div>
             </div>
           </div>

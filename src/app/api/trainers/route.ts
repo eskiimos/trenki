@@ -6,14 +6,32 @@ export async function GET() {
     const trainers = await prisma.trainer.findMany({
       include: {
         videos: {
-          take: 3, // Показываем первые 3 видео тренера
-          orderBy: { createdAt: 'desc' }
+          select: {
+            id: true,
+            duration: true
+          },
+          where: {
+            isPublished: true // Считаем только опубликованные видео
+          }
         }
       },
       orderBy: { rating: 'desc' }
     });
 
-    return NextResponse.json({ trainers });
+    // Вычисляем статистику для каждого тренера
+    const trainersWithStats = trainers.map(trainer => {
+      const shortVideos = trainer.videos.filter(v => v.duration < 600).length; // < 10 минут = Тренеки
+      const longVideos = trainer.videos.filter(v => v.duration >= 600).length; // >= 10 минут = Тренировки
+      
+      return {
+        ...trainer,
+        videos: trainer.videos, // Возвращаем массив для совместимости
+        shortVideosCount: shortVideos,
+        longVideosCount: longVideos
+      };
+    });
+
+    return NextResponse.json({ trainers: trainersWithStats });
   } catch (error) {
     console.error('Error fetching trainers:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
