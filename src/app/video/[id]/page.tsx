@@ -719,6 +719,50 @@ export default function VideoPage({ params }: VideoPageProps) {
     showControlsTemporarily();
   };
 
+  // Перемотка на 10 секунд назад
+  const skipBackward = () => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
+    }
+    showControlsTemporarily();
+  };
+
+  // Перемотка на 10 секунд вперед
+  const skipForward = () => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = Math.min(videoRef.current.duration, videoRef.current.currentTime + 10);
+    }
+    showControlsTemporarily();
+  };
+
+  // Обработка горячих клавиш для перемотки
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Игнорируем, если пользователь печатает в input/textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      switch(e.key) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          skipBackward();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          skipForward();
+          break;
+        case ' ':
+          e.preventDefault();
+          togglePlay();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, []);
+
   // Проверка поддержки Fullscreen API
   const checkFullscreenSupport = () => {
     if (typeof document === 'undefined') return false;
@@ -1291,6 +1335,32 @@ export default function VideoPage({ params }: VideoPageProps) {
                   />
                 </button>
                 
+                {/* Skip Backward 10s */}
+                <button 
+                  onClick={skipBackward}
+                  className="transition-opacity hover:opacity-80"
+                  title="Назад на 10 секунд"
+                >
+                  <svg width={isLandscape ? 28 : 24} height={isLandscape ? 28 : 24} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M11 18V6L5.25 12L11 18Z" fill="white"/>
+                    <path d="M11.5 6L5.75 12L11.5 18" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <text x="14" y="16" fill="white" fontSize="10" fontWeight="bold">10</text>
+                  </svg>
+                </button>
+                
+                {/* Skip Forward 10s */}
+                <button 
+                  onClick={skipForward}
+                  className="transition-opacity hover:opacity-80"
+                  title="Вперед на 10 секунд"
+                >
+                  <svg width={isLandscape ? 28 : 24} height={isLandscape ? 28 : 24} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M13 6V18L18.75 12L13 6Z" fill="white"/>
+                    <path d="M12.5 18L18.25 12L12.5 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <text x="4" y="16" fill="white" fontSize="10" fontWeight="bold">10</text>
+                  </svg>
+                </button>
+                
                 {/* Volume Control */}
                 <button 
                   onClick={toggleMute} 
@@ -1331,39 +1401,6 @@ export default function VideoPage({ params }: VideoPageProps) {
                     height={isLandscape ? 28 : 24}
                   />
                 </button>
-                
-                {/* Quality Toggle - Кнопка качества */}
-                <div className="relative">
-                  <button
-                    onClick={() => setShowQualityMenu(!showQualityMenu)}
-                    className="transition-opacity hover:opacity-80"
-                    title={Object.keys(availableQualities).length > 0 ? "Выбрать качество видео" : "Качество видео не доступно"}
-                  >
-                    <svg width={isLandscape ? 28 : 24} height={isLandscape ? 28 : 24} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="12" cy="12" r="2.5" stroke="white" strokeWidth="2"/>
-                      <path d="M12 6.5V5M12 19V17.5M6.5 12H5M19 12H17.5M7.93 7.93L7.05 7.05M16.95 16.95L16.07 16.07M16.07 7.93L16.95 7.05M7.05 16.95L7.93 16.07" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </button>
-                  
-                  {/* Quality Menu Dropdown */}
-                  {showQualityMenu && Object.keys(availableQualities).length > 0 && (
-                    <div className="absolute bottom-full right-0 mb-2 bg-[#101530] border border-[#A1FF4A] rounded-lg overflow-hidden z-50 min-w-max shadow-xl">
-                      {Object.entries(availableQualities).map(([quality, url]) => (
-                        <button
-                          key={quality}
-                          onClick={() => handleQualityChange(quality)}
-                          className={`w-full px-4 py-2 text-left text-xs font-medium transition-colors ${
-                            selectedQuality === quality
-                              ? 'bg-[#A1FF4A] text-[#060919]'
-                              : 'text-white hover:bg-[#A1FF4A]/20'
-                          }`}
-                        >
-                          {quality}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
                 
                 {/* Fullscreen Button */}
                 <button 
