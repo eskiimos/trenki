@@ -1283,11 +1283,12 @@ export default function VideoPage({ params }: VideoPageProps) {
                       className="w-12 h-12 md:w-14 md:h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
                       title="Назад на 10 секунд"
                     >
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M11 18V6L5.25 12L11 18Z" fill="white"/>
-                        <path d="M11.5 6L5.75 12L11.5 18" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        <text x="14" y="16" fill="white" fontSize="10" fontWeight="bold">10</text>
-                      </svg>
+                      <Image
+                        src="/icons/video/player/carbon_rewind-10-l.svg"
+                        alt="Назад на 10 секунд"
+                        width={28}
+                        height={28}
+                      />
                     </button>
                     
                     {/* Play/Pause Button */}
@@ -1312,11 +1313,12 @@ export default function VideoPage({ params }: VideoPageProps) {
                       className="w-12 h-12 md:w-14 md:h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
                       title="Вперед на 10 секунд"
                     >
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M13 6V18L18.75 12L13 6Z" fill="white"/>
-                        <path d="M12.5 18L18.25 12L12.5 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        <text x="4" y="16" fill="white" fontSize="10" fontWeight="bold">10</text>
-                      </svg>
+                      <Image
+                        src="/icons/video/player/carbon_rewind-10-r.svg"
+                        alt="Вперед на 10 секунд"
+                        width={28}
+                        height={28}
+                      />
                     </button>
                   </div>
                 </div>
