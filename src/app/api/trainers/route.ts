@@ -13,6 +13,14 @@ export async function GET() {
           where: {
             isPublished: true // Считаем только опубликованные видео
           }
+        },
+        shorts: {
+          select: {
+            id: true
+          },
+          where: {
+            isPublished: true // Считаем только опубликованные шорты
+          }
         }
       },
       orderBy: { rating: 'desc' }
@@ -20,8 +28,8 @@ export async function GET() {
 
     // Вычисляем статистику для каждого тренера
     const trainersWithStats = trainers.map(trainer => {
-      const shortVideos = trainer.videos.filter(v => v.duration < 600).length; // < 10 минут = Тренеки
-      const longVideos = trainer.videos.filter(v => v.duration >= 600).length; // >= 10 минут = Тренировки
+      const shortVideos = trainer.shorts.length; // Тренеки = Shorts (отдельная модель)
+      const longVideos = trainer.videos.length; // Тренировки = Videos
       
       return {
         ...trainer,
