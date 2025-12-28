@@ -99,6 +99,7 @@ model Trainer {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
   videos      Video[]
+  shorts      Short[]
   reviews     TrainerReview[]
 
   @@map("trainers")
@@ -211,6 +212,7 @@ model Short {
   videoUrl    String
   thumbnail   String?
   trainerId   String?
+  trainer     Trainer?       @relation(fields: [trainerId], references: [id])
   tags        String[]
   isPublished Boolean        @default(false)
   viewsCount  Int            @default(0)
