@@ -1271,25 +1271,54 @@ export default function VideoPage({ params }: VideoPageProps) {
               )}
               
               
-              {/* Play/Pause Overlay */}
+              {/* Play/Pause Overlay with Skip Buttons */}
               {!showFullscreenHint && (
                 <div className={`absolute inset-0 bg-gradient-to-b from-transparent to-black/50 flex items-center justify-center transition-opacity duration-300 ${
                   showControls ? 'opacity-100' : 'opacity-0'
                 }`}>
-                  <button
-                    onClick={togglePlay}
-                    className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
-                  >
-                    <Image
-                      src={isPlaying 
-                        ? '/icons/video/player/pause.svg'
-                        : '/icons/video/player/Play.svg'
-                      }
-                      alt={isPlaying ? 'Пауза' : 'Воспроизвести'}
-                      width={32}
-                      height={32}
-                    />
-                  </button>
+                  <div className="flex items-center gap-8 md:gap-12">
+                    {/* Skip Backward 10s */}
+                    <button
+                      onClick={skipBackward}
+                      className="w-12 h-12 md:w-14 md:h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
+                      title="Назад на 10 секунд"
+                    >
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M11 18V6L5.25 12L11 18Z" fill="white"/>
+                        <path d="M11.5 6L5.75 12L11.5 18" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <text x="14" y="16" fill="white" fontSize="10" fontWeight="bold">10</text>
+                      </svg>
+                    </button>
+                    
+                    {/* Play/Pause Button */}
+                    <button
+                      onClick={togglePlay}
+                      className="w-16 h-16 md:w-20 md:h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
+                    >
+                      <Image
+                        src={isPlaying 
+                          ? '/icons/video/player/pause.svg'
+                          : '/icons/video/player/Play.svg'
+                        }
+                        alt={isPlaying ? 'Пауза' : 'Воспроизвести'}
+                        width={36}
+                        height={36}
+                      />
+                    </button>
+                    
+                    {/* Skip Forward 10s */}
+                    <button
+                      onClick={skipForward}
+                      className="w-12 h-12 md:w-14 md:h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
+                      title="Вперед на 10 секунд"
+                    >
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M13 6V18L18.75 12L13 6Z" fill="white"/>
+                        <path d="M12.5 18L18.25 12L12.5 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <text x="4" y="16" fill="white" fontSize="10" fontWeight="bold">10</text>
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               )}
               
@@ -1333,32 +1362,6 @@ export default function VideoPage({ params }: VideoPageProps) {
                     width={isLandscape ? 28 : 24}
                     height={isLandscape ? 28 : 24}
                   />
-                </button>
-                
-                {/* Skip Backward 10s */}
-                <button 
-                  onClick={skipBackward}
-                  className="transition-opacity hover:opacity-80"
-                  title="Назад на 10 секунд"
-                >
-                  <svg width={isLandscape ? 28 : 24} height={isLandscape ? 28 : 24} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M11 18V6L5.25 12L11 18Z" fill="white"/>
-                    <path d="M11.5 6L5.75 12L11.5 18" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    <text x="14" y="16" fill="white" fontSize="10" fontWeight="bold">10</text>
-                  </svg>
-                </button>
-                
-                {/* Skip Forward 10s */}
-                <button 
-                  onClick={skipForward}
-                  className="transition-opacity hover:opacity-80"
-                  title="Вперед на 10 секунд"
-                >
-                  <svg width={isLandscape ? 28 : 24} height={isLandscape ? 28 : 24} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M13 6V18L18.75 12L13 6Z" fill="white"/>
-                    <path d="M12.5 18L18.25 12L12.5 6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    <text x="4" y="16" fill="white" fontSize="10" fontWeight="bold">10</text>
-                  </svg>
                 </button>
                 
                 {/* Volume Control */}
