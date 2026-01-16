@@ -393,11 +393,11 @@ export default function TrainerPage() {
         </div>
       </div>
 
-      {/* ТРЕНЕРОВКИ (Длинные видео) */}
+      {/* ТРЕНИРОВКИ (Длинные видео) */}
       <div className="mb-8 bg-[#060919] py-4">
         <div className="px-4 mb-4 flex items-center justify-between">
           <h3 className="text-white text-sm font-bold uppercase">
-            тренеровки
+            тренировки
           </h3>
           <div className="flex items-center gap-2">
             <span className="text-[#f9f9f9] text-sm">({videos.length})</span>

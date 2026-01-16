@@ -38,6 +38,7 @@ export default function ScheduleModal({ isOpen, onClose, videoId }: ScheduleModa
   const minutesRef = useRef<HTMLDivElement>(null);
   const [videoData, setVideoData] = useState<VideoData | null>(null);
   const [timeError, setTimeError] = useState<string | null>(null);
+  const [isAddingToDevice, setIsAddingToDevice] = useState(false);
 
   // Fetch video data when modal opens
   useEffect(() => {
@@ -250,15 +251,81 @@ export default function ScheduleModal({ isOpen, onClose, videoId }: ScheduleModa
 
       if (response.ok) {
         setIsSuccess(true);
-        setTimeout(() => {
-          handleClose();
-        }, 1000);
+        // Не закрываем автоматически - даём пользователю возможность добавить в календарь устройства
       }
     } catch (error) {
       console.error('Error saving schedule:', error);
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleAddToDeviceCalendar = async () => {
+    if (!videoData || selectedDates.length === 0) return;
+
+    setIsAddingToDevice(true);
+
+    try {
+      // Добавляем каждую выбранную дату в календарь устройства
+      for (const selectedDate of selectedDates) {
+        const dateWithTime = new Date(selectedDate);
+        dateWithTime.setHours(startTime.hours);
+        dateWithTime.setMinutes(startTime.minutes);
+        dateWithTime.setSeconds(0);
+
+        const response = await fetch('/api/calendar/ics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            videoId: videoData.id,
+            date: dateWithTime.toISOString(),
+          }),
+        });
+
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const filename = `trenki-workout-${videoData.id}-${Date.now()}.ics`;
+
+          // Проверяем поддержку Web Share API для мобильных устройств
+          if (navigator.share && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+            try {
+              const file = new File([blob], filename, { type: 'text/calendar' });
+              await navigator.share({
+                files: [file],
+                title: '🏋️ Тренировка',
+                text: `Добавить в календарь: ${videoData.title}`,
+              });
+            } catch (shareError) {
+              // Если share не сработал, переходим к скачиванию
+              downloadICSFile(url, filename);
+            }
+          } else {
+            // Для desktop или если Share API не поддерживается - скачиваем файл
+            downloadICSFile(url, filename);
+          }
+
+          // Небольшая задержка между файлами, если их несколько
+          if (selectedDates.length > 1) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error adding to device calendar:', error);
+    } finally {
+      setIsAddingToDevice(false);
+    }
+  };
+
+  const downloadICSFile = (url: string, filename: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
   };
 
   const renderCalendar = () => {
@@ -530,12 +597,32 @@ export default function ScheduleModal({ isOpen, onClose, videoId }: ScheduleModa
                 </div>
               </div>
 
-              {/* Success Button */}
+              {/* Success Message */}
+              <div className="w-full py-4 rounded-full font-bold text-[14px] uppercase tracking-wider bg-[#445CFF] text-white text-center">
+                ✅ УСПЕШНО ДОБАВЛЕНО В ПРИЛОЖЕНИЕ
+              </div>
+
+              {/* Add to Device Calendar Button */}
+              <button
+                onClick={handleAddToDeviceCalendar}
+                disabled={isAddingToDevice}
+                className="w-full py-4 rounded-full font-bold text-[14px] uppercase tracking-wider bg-[#A1FF4A] text-[#060919] hover:bg-[#8FE639] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Image 
+                  src="/icons/video/Type=calendar, Active=No.svg" 
+                  alt="Календарь" 
+                  width={20} 
+                  height={20} 
+                />
+                {isAddingToDevice ? 'ДОБАВЛЕНИЕ...' : 'ДОБАВИТЬ В КАЛЕНДАРЬ УСТРОЙСТВА'}
+              </button>
+
+              {/* Close Button */}
               <button
                 onClick={handleClose}
-                className="w-full py-4 rounded-full font-bold text-[14px] uppercase tracking-wider bg-[#445CFF] text-white hover:bg-[#3A4EE6] transition-all"
+                className="w-full py-3 rounded-full font-medium text-[12px] uppercase tracking-wider bg-transparent text-white/60 hover:text-white transition-all"
               >
-                УСПЕШНО ДОБАВЛЕНО
+                ЗАКРЫТЬ
               </button>
             </div>
           ) : (
