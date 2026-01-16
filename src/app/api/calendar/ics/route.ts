@@ -47,14 +47,14 @@ export async function POST(req: NextRequest) {
     const endDate = new Date(startDate.getTime() + duration * 1000); // duration в секундах, умножаем на 1000 для миллисекунд
 
     // Форматируем даты в формате iCalendar с локальным временем (YYYYMMDDTHHMMSS)
-    // Используем локальное время, чтобы избежать проблем с временными зонами
+    // Используем UTC методы, так как дата в БД сохранена с компенсацией временной зоны
     const formatICSDate = (d: Date): string => {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const hours = String(d.getHours()).padStart(2, '0');
-      const minutes = String(d.getMinutes()).padStart(2, '0');
-      const seconds = String(d.getSeconds()).padStart(2, '0');
+      const year = d.getUTCFullYear();
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      const hours = String(d.getUTCHours()).padStart(2, '0');
+      const minutes = String(d.getUTCMinutes()).padStart(2, '0');
+      const seconds = String(d.getUTCSeconds()).padStart(2, '0');
       return `${year}${month}${day}T${hours}${minutes}${seconds}`;
     };
 
