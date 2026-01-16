@@ -41,10 +41,10 @@ export async function POST(req: NextRequest) {
 
     const videoTitle = video.title;
     const trainerName = `${video.trainer.name} ${video.trainer.lastName}`;
-    const duration = video.duration;
+    const duration = video.duration; // duration в секундах
 
     const startDate = new Date(date);
-    const endDate = new Date(startDate.getTime() + duration * 60 * 1000);
+    const endDate = new Date(startDate.getTime() + duration * 1000); // duration в секундах, умножаем на 1000 для миллисекунд
 
     // Форматируем даты в формате iCalendar с локальным временем (YYYYMMDDTHHMMSS)
     // Используем локальное время, чтобы избежать проблем с временными зонами
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       `DTSTART;VALUE=DATE-TIME:${formatICSDate(startDate)}`,
       `DTEND;VALUE=DATE-TIME:${formatICSDate(endDate)}`,
       `SUMMARY:🏋️ ${escapeICS(videoTitle)}`,
-      `DESCRIPTION:Тренировка с ${escapeICS(trainerName || 'тренером')}\\nДлительность: ${duration} мин\\n\\nОткрыть в приложении: ${appUrl}/video/${videoId}`,
+      `DESCRIPTION:Тренировка с ${escapeICS(trainerName || 'тренером')}\\nДлительность: ${Math.round(duration / 60)} мин\\n\\nОткрыть в приложении: ${appUrl}/video/${videoId}`,
       'LOCATION:Онлайн',
       'STATUS:CONFIRMED',
       'TRANSP:OPAQUE',
