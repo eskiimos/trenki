@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
 
 🎬 ${video.title}
 👤 Тренер: ${trainerName}
-⏱ Длительность: ${video.duration} мин
+⏱ Длительность: ${Math.round(video.duration / 60)} мин
 📅 ${workoutTime}
 
 Мы напомним тебе за 30 и 10 минут до начала! ⏰`;
@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
 
 🎬 ${video.title}
 👤 Тренер: ${trainerName}
-⏱ Длительность: ${video.duration} мин
+⏱ Длительность: ${Math.round(video.duration / 60)} мин
 
 ${createdSchedules.map((s, i) => `${i + 1}. ${formatWorkoutTime(s.date)}`).join('\n')}
 

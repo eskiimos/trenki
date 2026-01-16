@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
 
 🎬 ${workout.video.title}
 👤 Тренер: ${trainerName}
-⏱ Длительность: ${workout.video.duration} мин
+⏱ Длительность: ${Math.round(workout.video.duration / 60)} мин
 📅 ${workoutTime}
 
 Начни готовиться! 💪`;
@@ -159,7 +159,7 @@ export async function GET(request: NextRequest) {
 
 🎬 ${workout.video.title}
 👤 Тренер: ${trainerName}
-⏱ Длительность: ${workout.video.duration} мин
+⏱ Длительность: ${Math.round(workout.video.duration / 60)} мин
 📅 ${workoutTime}
 
 Время размяться! 🏃‍♂️`;
