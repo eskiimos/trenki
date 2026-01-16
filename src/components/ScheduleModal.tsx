@@ -287,25 +287,23 @@ export default function ScheduleModal({ isOpen, onClose, videoId }: ScheduleModa
           const url = window.URL.createObjectURL(blob);
           const filename = `trenki-workout-${videoData.id}-${Date.now()}.ics`;
 
-          // Сразу скачиваем файл - система автоматически откроет календарь
-          // На iOS/Android - откроется календарь напрямую
-          // На Desktop - файл скачается и откроется при клике
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = filename;
-          
-          // Для мобильных устройств пробуем открыть файл напрямую (без скачивания)
-          if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-            // Открываем в новом окне - мобильный браузер перенаправит в календарь
-            window.open(url, '_blank');
+          // Проверяем поддержку Web Share API для мобильных устройств
+          if (navigator.share && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+            try {
+              const file = new File([blob], filename, { type: 'text/calendar' });
+              await navigator.share({
+                files: [file],
+                title: '🏋️ Тренировка',
+                text: `Добавить в календарь: ${videoData.title}`,
+              });
+            } catch (shareError) {
+              // Если share не сработал, переходим к скачиванию
+              downloadICSFile(url, filename);
+            }
           } else {
-            // Для desktop - скачиваем
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            // Для desktop или если Share API не поддерживается - скачиваем файл
+            downloadICSFile(url, filename);
           }
-          
-          window.URL.revokeObjectURL(url);
 
           // Небольшая задержка между файлами, если их несколько
           if (selectedDates.length > 1) {
@@ -318,6 +316,16 @@ export default function ScheduleModal({ isOpen, onClose, videoId }: ScheduleModa
     } finally {
       setIsAddingToDevice(false);
     }
+  };
+
+  const downloadICSFile = (url: string, filename: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
   };
 
   const renderCalendar = () => {
