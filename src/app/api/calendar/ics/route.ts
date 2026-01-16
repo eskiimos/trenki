@@ -43,20 +43,34 @@ export async function POST(req: NextRequest) {
     const trainerName = `${video.trainer.name} ${video.trainer.lastName}`;
     const duration = video.duration; // duration в секундах
 
-    const startDate = new Date(date);
-    const endDate = new Date(startDate.getTime() + duration * 1000); // duration в секундах, умножаем на 1000 для миллисекунд
+    // Парсим дату напрямую из строки, без создания Date объекта
+    // Строка формата: "2026-01-19T09:00:00.000"
+    const dateStr = date as string;
+    const dateParts = dateStr.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+    
+    if (!dateParts) {
+      return NextResponse.json(
+        { error: 'Invalid date format' },
+        { status: 400 }
+      );
+    }
 
-    // Форматируем даты в формате iCalendar (YYYYMMDDTHHMMSS)
-    // Используем обычные методы (не UTC), чтобы читать время как есть из БД
-    const formatICSDate = (d: Date): string => {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const hours = String(d.getHours()).padStart(2, '0');
-      const minutes = String(d.getMinutes()).padStart(2, '0');
-      const seconds = String(d.getSeconds()).padStart(2, '0');
-      return `${year}${month}${day}T${hours}${minutes}${seconds}`;
+    const [_, year, month, day, hours, minutes, seconds] = dateParts;
+    
+    // Вычисляем время окончания
+    const startMinutes = parseInt(hours) * 60 + parseInt(minutes);
+    const durationMinutes = Math.round(duration / 60);
+    const endMinutes = startMinutes + durationMinutes;
+    const endHours = Math.floor(endMinutes / 60) % 24;
+    const endMins = endMinutes % 60;
+
+    // Форматируем для iCalendar без использования Date
+    const formatICSDateTime = (y: string, m: string, d: string, h: number, min: number) => {
+      return `${y}${m}${d}T${String(h).padStart(2, '0')}${String(min).padStart(2, '0')}00`;
     };
+
+    const startDateTime = formatICSDateTime(year, month, day, parseInt(hours), parseInt(minutes));
+    const endDateTime = formatICSDateTime(year, month, day, endHours, endMins);
 
     // Экранируем специальные символы для iCalendar
     const escapeICS = (str: string): string => {
@@ -68,7 +82,8 @@ export async function POST(req: NextRequest) {
     };
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.WEB_APP_URL || 'https://trenki.app';
-    const uid = `workout-${videoId}-${startDate.getTime()}@trenki.app`;
+    const uid = `workout-${videoId}-${Date.now()}@trenki.app`;
+    const timestamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 
     // Генерируем содержимое .ICS файла
     const icsContent = [
@@ -79,9 +94,9 @@ export async function POST(req: NextRequest) {
       'METHOD:PUBLISH',
       'BEGIN:VEVENT',
       `UID:${uid}`,
-      `DTSTAMP:${formatICSDate(new Date())}`,
-      `DTSTART;VALUE=DATE-TIME:${formatICSDate(startDate)}`,
-      `DTEND;VALUE=DATE-TIME:${formatICSDate(endDate)}`,
+      `DTSTAMP:${timestamp}`,
+      `DTSTART;VALUE=DATE-TIME:${startDateTime}`,
+      `DTEND;VALUE=DATE-TIME:${endDateTime}`,
       `SUMMARY:🏋️ ${escapeICS(videoTitle)}`,
       `DESCRIPTION:Тренировка с ${escapeICS(trainerName || 'тренером')}\\nДлительность: ${Math.round(duration / 60)} мин\\n\\nОткрыть в приложении: ${appUrl}/video/${videoId}`,
       'LOCATION:Онлайн',
