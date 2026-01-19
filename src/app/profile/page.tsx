@@ -443,6 +443,18 @@ const ProfilePage = () => {
           </div>
         </div>
 
+        {/* Кнопка для прохождения опроса потенциала */}
+        {userProfile?.profile && (userProfile.profile.potential === undefined || userProfile.profile.potential < 5) && (
+          <div className="mb-6">
+            <button
+              onClick={() => router.push('/onboarding/characteristics')}
+              className="w-full bg-gradient-to-r from-[#445CFF] to-[#A1FF4A] text-white font-bold font-overpass text-base py-4 px-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
+            >
+              ✨ Узнать свой потенциал
+            </button>
+          </div>
+        )}
+
         {/* Дневной прогресс - временно скрыто */}
         {false && userProfile?.profile?.potential !== undefined && userProfile?.profile?.potential > 0 && (
           <div className="bg-[#2d3448] rounded-lg p-4 mb-6">
