@@ -8,7 +8,7 @@ import { useTelegram } from '../../hooks/useTelegram';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { ProfileSkeleton } from '../../components/Skeleton';
 import BottomNavigation from '@/components/BottomNavigation';
-import { clearAuth } from '@/lib/auth';
+import { clearAuth, getTelegramId } from '@/lib/auth';
 
 const ProfilePage = () => {
   const router = useRouter();
