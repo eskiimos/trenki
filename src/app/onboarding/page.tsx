@@ -70,9 +70,8 @@ export default function OnboardingProfilePage() {
       });
 
       if (response.ok) {
-        console.log('Profile completed successfully');
-        router.push('/');
-        router.refresh();
+        console.log('✅ Базовая информация сохранена, переход к характеристикам');
+        router.push('/onboarding/characteristics');
       } else {
         const error = await response.json();
         console.error('Profile completion failed:', error);

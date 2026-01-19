@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
 
     // Токен аутентифицирован, возвращаем данные пользователя
     console.log('✅ Token authenticated, returning user data');
+    console.log('📋 Returning needsOnboarding:', tokenData.needsOnboarding);
     return NextResponse.json({
       authenticated: true,
       user: tokenData.userData,

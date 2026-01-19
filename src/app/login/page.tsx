@@ -50,6 +50,8 @@ export default function LoginPage() {
       
       if (data.authenticated && data.user) {
         console.log('✅ Authentication successful!');
+        console.log('📋 User data:', data.user);
+        console.log('📋 needsOnboarding:', data.needsOnboarding);
         
         // Очищаем сохраненный токен
         localStorage.removeItem('pendingLoginToken');
