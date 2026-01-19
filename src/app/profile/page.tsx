@@ -455,38 +455,6 @@ const ProfilePage = () => {
           </div>
         )}
 
-        {/* DEV: Кнопка сброса потенциала */}
-        {userProfile?.profile && userProfile.profile.potential !== undefined && userProfile.profile.potential >= 5 && (
-          <div className="mb-6">
-            <button
-              onClick={async () => {
-                if (confirm('Сбросить все характеристики? Это действие нельзя отменить.')) {
-                  try {
-                    const response = await fetch('/api/profile/reset-characteristics', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ userId: getTelegramId() }),
-                    });
-                    
-                    if (response.ok) {
-                      alert('Характеристики сброшены! Обновите страницу.');
-                      router.refresh();
-                    } else {
-                      alert('Ошибка при сбросе характеристик');
-                    }
-                  } catch (error) {
-                    console.error('Error resetting characteristics:', error);
-                    alert('Ошибка при сбросе характеристик');
-                  }
-                }
-              }}
-              className="w-full bg-red-500 text-white font-bold font-overpass text-sm py-3 px-4 rounded-lg hover:bg-red-600 transition-all duration-200 active:scale-95"
-            >
-              🔄 DEV: Сбросить потенциал
-            </button>
-          </div>
-        )}
-
         {/* Дневной прогресс - временно скрыто */}
         {false && userProfile?.profile?.potential !== undefined && userProfile?.profile?.potential > 0 && (
           <div className="bg-[#2d3448] rounded-lg p-4 mb-6">
