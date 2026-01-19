@@ -20,10 +20,14 @@ interface FormData {
   gameDifficulty: string;
 }
 
+type TrainingGoal = 'power' | 'speed' | 'endurance' | 'technique' | 'flexibility' | 'all';
+
 export default function CharacteristicsOnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedGoals, setSelectedGoals] = useState<TrainingGoal[]>([]);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   
   const [formData, setFormData] = useState<FormData>({
     rawPower: 5,
@@ -45,6 +49,24 @@ export default function CharacteristicsOnboardingPage() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const toggleGoal = (goal: TrainingGoal) => {
+    if (goal === 'all') {
+      // Если выбрано "все и сразу", очищаем остальные и добавляем только 'all'
+      setSelectedGoals(['all']);
+    } else {
+      setSelectedGoals(prev => {
+        // Убираем 'all' если он был выбран
+        const withoutAll = prev.filter(g => g !== 'all');
+        // Переключаем выбранную цель
+        if (withoutAll.includes(goal)) {
+          return withoutAll.filter(g => g !== goal);
+        } else {
+          return [...withoutAll, goal];
+        }
+      });
+    }
+  };
+
   const handleSubmit = async () => {
     setIsSubmitting(true);
     
@@ -62,14 +84,15 @@ export default function CharacteristicsOnboardingPage() {
         body: JSON.stringify({
           userId,
           ...formData,
+          trainingGoals: selectedGoals,
         }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // Переходим в профиль или на главную
-        router.push('/profile');
+        // Показываем модальное окно успеха
+        setShowSuccessModal(true);
       } else {
         alert(data.error || 'Ошибка при сохранении данных');
       }
@@ -90,289 +113,418 @@ export default function CharacteristicsOnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#060919] text-white pb-20">
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 text-white flex flex-col">
       {/* Шапка */}
-      <div className="px-4 pt-8 pb-4">
-        <div className="flex items-center justify-between mb-6">
-          {step > 1 && (
-            <button onClick={prevStep} className="w-10 h-10 flex items-center justify-center">
-              <Image 
-                src="/icons/icon-action-back.svg" 
-                alt="Назад" 
-                width={32} 
-                height={32}
-              />
-            </button>
-          )}
-          <div className="flex-1 text-center">
-            <span className="text-[#A1FF4A] text-sm font-bold">ШАГ {step} ИЗ 3</span>
-          </div>
-          <div className="w-10" /> {/* Для симметрии */}
-        </div>
-
-        <h1 className="text-2xl font-bold text-center mb-2">
-          {step === 1 && 'Раскрой свой потенциал!'}
-          {step === 2 && 'Твой опыт в хоккее'}
-          {step === 3 && 'Последний шаг!'}
-        </h1>
-        <p className="text-center text-gray-400 text-sm">
-          {step === 1 && 'Оцени свои текущие способности по шкале от 1 до 10'}
-          {step === 2 && 'Расскажи о своей хоккейной практике'}
-          {step === 3 && 'Еще пара вопросов и готово!'}
-        </p>
+      <div className="px-4 pt-8 pb-3 flex-shrink-0">
+        {step === 1 && (
+          <>
+            <h1 className="text-base font-bold font-['Overpass'] uppercase leading-4 tracking-wide text-slate-50 text-center mb-2">
+              О СКИЛАХ
+            </h1>
+            <p className="text-center text-gray-400 text-xs font-medium font-['Overpass'] leading-3 tracking-wide">
+              Честно оцени свою текущую форму от 0 до 10
+            </p>
+          </>
+        )}
+        {step === 2 && (
+          <>
+            <h1 className="text-center text-slate-50 text-base font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+              МАСТЕРСТВО
+            </h1>
+            <p className="text-center text-gray-400 text-xs font-medium font-['Overpass'] leading-3 tracking-wide">
+              Расскажи о своем опыте и уверенности
+            </p>
+          </>
+        )}
       </div>
 
-      <div className="px-4">
+      <div className="px-0">
         {/* ШАГ 1: Самооценка */}
         {step === 1 && (
-          <div className="space-y-6">
+          <div className="flex flex-col gap-3">
             {/* Сила */}
-            <div>
-              <div className="flex justify-between mb-2">
-                <span className="text-sm font-bold uppercase">💪 Сила</span>
-                <span className="text-[#A1FF4A] text-lg font-bold">{formData.rawPower}</span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="10"
-                value={formData.rawPower}
-                onChange={(e) => handleSliderChange('rawPower', parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-[#A1FF4A]"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>Слабая</span>
-                <span>Средняя</span>
-                <span>Отличная</span>
+            <div className="p-4 bg-zinc-950/20 rounded-3xl">
+              <div className="flex flex-col items-center gap-4">
+                <div className="self-stretch text-slate-50 text-xs font-bold font-['Overpass'] uppercase leading-4 tracking-wide text-center">
+                  💪🏻<br />СИЛА (броски, силовая игра, единоборства)
+                </div>
+                <div className="h-11 px-4 py-3 bg-gray-400/20 rounded-[32px] flex justify-center items-center">
+                  <div className="text-slate-50 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                    {formData.rawPower}
+                  </div>
+                </div>
+                <div className="w-full relative h-6">
+                  <input
+                    type="range"
+                    min="0"
+                    max="10"
+                    value={formData.rawPower}
+                    onChange={(e) => handleSliderChange('rawPower', parseInt(e.target.value))}
+                    className="w-full h-4 bg-gray-400/20 rounded-xl appearance-none cursor-pointer slider-custom"
+                    style={{
+                      background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${formData.rawPower * 10}%, rgba(156, 163, 175, 0.2) ${formData.rawPower * 10}%, rgba(156, 163, 175, 0.2) 100%)`
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
             {/* Скорость */}
-            <div>
-              <div className="flex justify-between mb-2">
-                <span className="text-sm font-bold uppercase">⚡ Скорость</span>
-                <span className="text-[#A1FF4A] text-lg font-bold">{formData.rawSpeed}</span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="10"
-                value={formData.rawSpeed}
-                onChange={(e) => handleSliderChange('rawSpeed', parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-[#A1FF4A]"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>Медленная</span>
-                <span>Средняя</span>
-                <span>Быстрая</span>
+            <div className="p-4 bg-zinc-950/20 rounded-3xl">
+              <div className="flex flex-col items-center gap-4">
+                <div className="self-stretch text-slate-50 text-xs font-bold font-['Overpass'] uppercase leading-4 tracking-wide text-center">
+                  ⚡<br />СКОРОСТЬ (скорость, маневренность и резкость)
+                </div>
+                <div className="h-11 px-4 py-3 bg-gray-400/20 rounded-[32px] flex justify-center items-center">
+                  <div className="text-slate-50 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                    {formData.rawSpeed}
+                  </div>
+                </div>
+                <div className="w-full relative h-6">
+                  <input
+                    type="range"
+                    min="0"
+                    max="10"
+                    value={formData.rawSpeed}
+                    onChange={(e) => handleSliderChange('rawSpeed', parseInt(e.target.value))}
+                    className="w-full h-4 bg-gray-400/20 rounded-xl appearance-none cursor-pointer slider-custom"
+                    style={{
+                      background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${formData.rawSpeed * 10}%, rgba(156, 163, 175, 0.2) ${formData.rawSpeed * 10}%, rgba(156, 163, 175, 0.2) 100%)`
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
             {/* Выносливость */}
-            <div>
-              <div className="flex justify-between mb-2">
-                <span className="text-sm font-bold uppercase">🫀 Выносливость</span>
-                <span className="text-[#A1FF4A] text-lg font-bold">{formData.rawEndurance}</span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="10"
-                value={formData.rawEndurance}
-                onChange={(e) => handleSliderChange('rawEndurance', parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-[#A1FF4A]"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>Низкая</span>
-                <span>Средняя</span>
-                <span>Высокая</span>
+            <div className="p-4 bg-zinc-950/20 rounded-3xl">
+              <div className="flex flex-col items-center gap-4">
+                <div className="self-stretch text-slate-50 text-xs font-bold font-['Overpass'] uppercase leading-4 tracking-wide text-center">
+                  🫁<br />ВЫНОСЛИВОСТЬ (играть всю смену, период, матч на максимуме)
+                </div>
+                <div className="h-11 px-4 py-3 bg-gray-400/20 rounded-[32px] flex justify-center items-center">
+                  <div className="text-slate-50 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                    {formData.rawEndurance}
+                  </div>
+                </div>
+                <div className="w-full relative h-6">
+                  <input
+                    type="range"
+                    min="0"
+                    max="10"
+                    value={formData.rawEndurance}
+                    onChange={(e) => handleSliderChange('rawEndurance', parseInt(e.target.value))}
+                    className="w-full h-4 bg-gray-400/20 rounded-xl appearance-none cursor-pointer slider-custom"
+                    style={{
+                      background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${formData.rawEndurance * 10}%, rgba(156, 163, 175, 0.2) ${formData.rawEndurance * 10}%, rgba(156, 163, 175, 0.2) 100%)`
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
             {/* Техника */}
-            <div>
-              <div className="flex justify-between mb-2">
-                <span className="text-sm font-bold uppercase">🎯 Техника</span>
-                <span className="text-[#A1FF4A] text-lg font-bold">{formData.rawTechnique}</span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="10"
-                value={formData.rawTechnique}
-                onChange={(e) => handleSliderChange('rawTechnique', parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-[#A1FF4A]"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>Базовая</span>
-                <span>Средняя</span>
-                <span>Мастерская</span>
+            <div className="p-4 bg-zinc-950/20 rounded-3xl">
+              <div className="flex flex-col items-center gap-4">
+                <div className="self-stretch text-slate-50 text-xs font-bold font-['Overpass'] uppercase leading-4 tracking-wide text-center">
+                  🎯<br />ТЕХНИКА (точность паса, контроль шайбы)
+                </div>
+                <div className="h-11 px-4 py-3 bg-gray-400/20 rounded-[32px] flex justify-center items-center">
+                  <div className="text-slate-50 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                    {formData.rawTechnique}
+                  </div>
+                </div>
+                <div className="w-full relative h-6">
+                  <input
+                    type="range"
+                    min="0"
+                    max="10"
+                    value={formData.rawTechnique}
+                    onChange={(e) => handleSliderChange('rawTechnique', parseInt(e.target.value))}
+                    className="w-full h-4 bg-gray-400/20 rounded-xl appearance-none cursor-pointer slider-custom"
+                    style={{
+                      background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${formData.rawTechnique * 10}%, rgba(156, 163, 175, 0.2) ${formData.rawTechnique * 10}%, rgba(156, 163, 175, 0.2) 100%)`
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
             {/* Гибкость */}
-            <div>
-              <div className="flex justify-between mb-2">
-                <span className="text-sm font-bold uppercase">🤸 Гибкость</span>
-                <span className="text-[#A1FF4A] text-lg font-bold">{formData.rawFlexibility}</span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="10"
-                value={formData.rawFlexibility}
-                onChange={(e) => handleSliderChange('rawFlexibility', parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-[#A1FF4A]"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>Жесткая</span>
-                <span>Средняя</span>
-                <span>Отличная</span>
+            <div className="p-4 bg-zinc-950/20 rounded-3xl">
+              <div className="flex flex-col items-center gap-4">
+                <div className="self-stretch text-slate-50 text-xs font-bold font-['Overpass'] uppercase leading-4 tracking-wide text-center">
+                  🐈<br />ГИБКОСТЬ (пластичность, устойчивость, маневренность)
+                </div>
+                <div className="h-11 px-4 py-3 bg-gray-400/20 rounded-[32px] flex justify-center items-center">
+                  <div className="text-slate-50 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                    {formData.rawFlexibility}
+                  </div>
+                </div>
+                <div className="w-full relative h-6">
+                  <input
+                    type="range"
+                    min="0"
+                    max="10"
+                    value={formData.rawFlexibility}
+                    onChange={(e) => handleSliderChange('rawFlexibility', parseInt(e.target.value))}
+                    className="w-full h-4 bg-gray-400/20 rounded-xl appearance-none cursor-pointer slider-custom"
+                    style={{
+                      background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${formData.rawFlexibility * 10}%, rgba(156, 163, 175, 0.2) ${formData.rawFlexibility * 10}%, rgba(156, 163, 175, 0.2) 100%)`
+                    }}
+                  />
+                </div>
               </div>
             </div>
-
-            <button
-              onClick={nextStep}
-              className="w-full bg-[#A1FF4A] text-black py-4 rounded-lg font-bold text-lg mt-8 hover:bg-[#8fea35] transition"
-            >
-              Далее
-            </button>
           </div>
         )}
 
-        {/* ШАГ 2: Опыт */}
+        {/* ШАГ 2: Мастерство (все 4 вопроса) */}
         {step === 2 && (
-          <div className="space-y-6">
+          <div className="px-4 py-6 flex flex-col gap-8">
             {/* Сколько лет в хоккее */}
-            <div>
-              <label className="block text-sm font-bold uppercase mb-3">
-                Сколько лет вы занимаетесь хоккеем?
-              </label>
-              <div className="space-y-2">
+            <div className="flex flex-col gap-4">
+              <div className="text-slate-50 text-xs font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                Сколько лет занимаешься хоккеем?
+              </div>
+              <div className="flex flex-wrap gap-2">
                 {[
-                  { value: 'LESS_THAN_1', label: 'Меньше 1 года', coef: 1.53 },
-                  { value: '1_TO_3', label: '1-3 года', coef: 1.65 },
-                  { value: '3_TO_5', label: '3-5 лет', coef: 1.7 },
-                  { value: 'MORE_THAN_5', label: 'Больше 5 лет', coef: 1.75 },
+                  { value: 'LESS_THAN_1', label: '<1 года' },
+                  { value: '1_TO_3', label: '1-3 года' },
+                  { value: '3_TO_5', label: '3-5 лет' },
+                  { value: 'MORE_THAN_5', label: '>5 лет' },
                 ].map((option) => (
                   <button
                     key={option.value}
                     onClick={() => handleSelectChange('yearsInHockey', option.value)}
-                    className={`w-full p-4 rounded-lg border-2 transition ${
+                    className={`h-11 px-4 py-3 rounded-[32px] flex justify-center items-center transition ${
                       formData.yearsInHockey === option.value
-                        ? 'border-[#A1FF4A] bg-[#A1FF4A]/10'
-                        : 'border-gray-700 bg-[#111631]'
+                        ? 'bg-[#A1FF4A] text-slate-950'
+                        : 'bg-gray-400/20 text-slate-50'
                     }`}
                   >
-                    <div className="text-left font-semibold">{option.label}</div>
+                    <div className="text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                      {option.label}
+                    </div>
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Частота тренировок */}
-            <div>
-              <label className="block text-sm font-bold uppercase mb-3">
-                Как часто вы тренируетесь?
-              </label>
-              <div className="space-y-2">
+            <div className="flex flex-col gap-4">
+              <div className="text-slate-50 text-xs font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                Как часто тренируешься? (На льду и на земле, с командой и дополнительно)
+              </div>
+              <div className="flex flex-wrap gap-2">
                 {[
-                  { value: 'ONCE_A_WEEK', label: 'Раз в неделю или реже', coef: 1.53 },
-                  { value: '2_TO_4_TIMES', label: '2-4 раза в неделю', coef: 1.65 },
-                  { value: 'ALMOST_DAILY', label: 'Почти каждый день', coef: 1.7 },
-                  { value: 'SEVERAL_TIMES_DAILY', label: 'Несколько раз в день', coef: 1.75 },
+                  { value: 'ONCE_A_WEEK', label: 'раз в неделю / реже' },
+                  { value: '2_TO_4_TIMES', label: '2-4 раза в неделю' },
+                  { value: 'ALMOST_DAILY', label: 'почти каждый день' },
+                  { value: 'SEVERAL_TIMES_DAILY', label: 'несколько раз в день' },
                 ].map((option) => (
                   <button
                     key={option.value}
                     onClick={() => handleSelectChange('trainingFrequency', option.value)}
-                    className={`w-full p-4 rounded-lg border-2 transition ${
+                    className={`h-11 px-4 py-3 rounded-[32px] flex justify-center items-center transition ${
                       formData.trainingFrequency === option.value
-                        ? 'border-[#A1FF4A] bg-[#A1FF4A]/10'
-                        : 'border-gray-700 bg-[#111631]'
+                        ? 'bg-[#A1FF4A] text-slate-950'
+                        : 'bg-gray-400/20 text-slate-50'
                     }`}
                   >
-                    <div className="text-left font-semibold">{option.label}</div>
+                    <div className="text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                      {option.label}
+                    </div>
                   </button>
                 ))}
               </div>
             </div>
 
-            <button
-              onClick={nextStep}
-              disabled={!formData.yearsInHockey || !formData.trainingFrequency}
-              className="w-full bg-[#A1FF4A] text-black py-4 rounded-lg font-bold text-lg mt-8 hover:bg-[#8fea35] transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Далее
-            </button>
-          </div>
-        )}
-
-        {/* ШАГ 3: Игровая практика */}
-        {step === 3 && (
-          <div className="space-y-6">
             {/* Частота матчей */}
-            <div>
-              <label className="block text-sm font-bold uppercase mb-3">
-                Как часто вы играете матчи?
-              </label>
-              <div className="space-y-2">
+            <div className="flex flex-col gap-4">
+              <div className="text-slate-50 text-xs font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                Как часто играешь матчи?
+              </div>
+              <div className="flex flex-wrap gap-2">
                 {[
-                  { value: 'NO_MATCHES', label: 'Не играю, только тренируюсь', coef: 1.53 },
-                  { value: 'FEW_PER_MONTH', label: 'Несколько раз в месяц', coef: 1.65 },
-                  { value: 'ONCE_A_WEEK', label: 'Раз в неделю', coef: 1.7 },
-                  { value: 'SEVERAL_PER_WEEK', label: 'Несколько раз в неделю', coef: 1.75 },
+                  { value: 'NO_MATCHES', label: 'не играю, только тренируюсь' },
+                  { value: 'FEW_PER_MONTH', label: 'пару раз в месяц' },
+                  { value: 'ONCE_A_WEEK', label: 'раз в неделю' },
+                  { value: 'SEVERAL_PER_WEEK', label: 'несколько раз в неделю' },
                 ].map((option) => (
                   <button
                     key={option.value}
                     onClick={() => handleSelectChange('matchFrequency', option.value)}
-                    className={`w-full p-4 rounded-lg border-2 transition ${
+                    className={`h-11 px-4 py-3 rounded-[32px] flex justify-center items-center transition ${
                       formData.matchFrequency === option.value
-                        ? 'border-[#A1FF4A] bg-[#A1FF4A]/10'
-                        : 'border-gray-700 bg-[#111631]'
+                        ? 'bg-[#A1FF4A] text-slate-950'
+                        : 'bg-gray-400/20 text-slate-50'
                     }`}
                   >
-                    <div className="text-left font-semibold">{option.label}</div>
+                    <div className="text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                      {option.label}
+                    </div>
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Сложность игровых ситуаций */}
-            <div>
-              <label className="block text-sm font-bold uppercase mb-3">
-                Насколько сложно вам в игровых ситуациях против равных соперников?
-              </label>
-              <div className="space-y-2">
+            {/* Уверенность в игровых ситуациях */}
+            <div className="flex flex-col gap-4">
+              <div className="text-slate-50 text-xs font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                Оцени свою уверенность в игровых ситуациях (единоборства, обводка, игра в пас и тд)
+              </div>
+              <div className="flex flex-wrap gap-2">
                 {[
-                  { value: 'VERY_HARD', label: 'Очень сложно, часто проигрываю', coef: 1.53 },
-                  { value: 'HARD', label: 'Есть сложности, но могу конкурировать', coef: 1.64 },
-                  { value: 'ADVANTAGE', label: 'В большинстве случаев чувствую преимущество', coef: 1.75 },
+                  { value: 'VERY_HARD', label: 'чаще проигрываю, есть над чем работать' },
+                  { value: 'HARD', label: 'нормально, я конкурирую' },
+                  { value: 'ADVANTAGE', label: 'чувствую свое преимущество в большинстве случаев' },
                 ].map((option) => (
                   <button
                     key={option.value}
                     onClick={() => handleSelectChange('gameDifficulty', option.value)}
-                    className={`w-full p-4 rounded-lg border-2 transition ${
+                    className={`h-11 px-4 py-3 rounded-[32px] flex justify-center items-center transition ${
                       formData.gameDifficulty === option.value
-                        ? 'border-[#A1FF4A] bg-[#A1FF4A]/10'
-                        : 'border-gray-700 bg-[#111631]'
+                        ? 'bg-[#A1FF4A] text-slate-950'
+                        : 'bg-gray-400/20 text-slate-50'
                     }`}
                   >
-                    <div className="text-left font-semibold">{option.label}</div>
+                    <div className="text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                      {option.label}
+                    </div>
                   </button>
                 ))}
               </div>
             </div>
-
-            <button
-              onClick={handleSubmit}
-              disabled={!formData.matchFrequency || !formData.gameDifficulty || isSubmitting}
-              className="w-full bg-[#A1FF4A] text-black py-4 rounded-lg font-bold text-lg mt-8 hover:bg-[#8fea35] transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? 'Сохранение...' : 'Завершить'}
-            </button>
           </div>
         )}
+
+        {/* Шаг 3: Выбор целей */}
+        {step === 3 && (
+          <>
+            <div className="pb-3 flex flex-col gap-2 mb-6">
+              <h1 className="text-center text-slate-50 text-base font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                куда направим наш "щелчок"?
+              </h1>
+              <p className="text-center text-gray-400 text-xs font-medium font-['Overpass'] leading-3 tracking-wide">
+                Выбери, что хочешь прокачать в первую очередь. Не можешь выбрать — жми «Всё и сразу»!
+              </p>
+            </div>
+
+            <div className="px-4 py-6 flex flex-col gap-8">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: 'power' as TrainingGoal, label: 'стать сильнее и мощнее' },
+                  { value: 'speed' as TrainingGoal, label: 'добавить скорости и резкости' },
+                  { value: 'endurance' as TrainingGoal, label: 'повысить выносливость' },
+                  { value: 'technique' as TrainingGoal, label: 'улучшить технику владения' },
+                  { value: 'flexibility' as TrainingGoal, label: 'стать гибче и избежать травм' },
+                  { value: 'all' as TrainingGoal, label: 'все и сразу!' },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => toggleGoal(option.value)}
+                    className={`h-11 px-4 py-3 rounded-[32px] flex justify-center items-center transition ${
+                      selectedGoals.includes(option.value)
+                        ? option.value === 'all'
+                          ? 'bg-indigo-500 text-slate-50'
+                          : 'bg-[#A1FF4A] text-slate-950'
+                        : 'bg-gray-400/20 text-slate-50'
+                    }`}
+                  >
+                    <div className="text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                      {option.label}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
       </div>
+
+      {/* Нижняя панель */}
+      <div className={`w-full px-4 py-6 bg-slate-900 flex flex-col gap-6 ${step === 3 ? 'mt-auto' : ''}`}>
+        {step === 1 && (
+          <>
+            <button
+              onClick={nextStep}
+              className="w-full h-12 px-6 py-3 bg-[#A1FF4A] rounded-[32px] flex justify-center items-center hover:bg-[#90E841] transition"
+            >
+              <div className="text-slate-950 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                ДАЛЕЕ
+              </div>
+            </button>
+            <div className="text-center text-gray-400 text-xs font-medium font-['Overpass'] leading-3 tracking-wide">
+              1/3
+            </div>
+          </>
+        )}
+        {step === 2 && (
+          <>
+            <button
+              onClick={nextStep}
+              disabled={!formData.yearsInHockey || !formData.trainingFrequency || !formData.matchFrequency || !formData.gameDifficulty}
+              className="w-full h-12 px-6 py-3 bg-[#A1FF4A] rounded-[32px] flex justify-center items-center hover:bg-[#90E841] transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <div className="text-slate-950 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                ДАЛЕЕ
+              </div>
+            </button>
+            <div className="text-center text-gray-400 text-xs font-medium font-['Overpass'] leading-3 tracking-wide">
+              2/3
+            </div>
+          </>
+        )}
+        {step === 3 && (
+          <>
+            <button
+              onClick={handleSubmit}
+              disabled={selectedGoals.length === 0 || isSubmitting}
+              className={`w-full h-12 px-6 py-3 rounded-[32px] flex justify-center items-center transition ${
+                selectedGoals.length > 0 && !isSubmitting
+                  ? 'bg-[#A1FF4A] text-slate-950 hover:bg-[#90E841]'
+                  : 'bg-[#A1FF4A]/20 text-slate-950'
+              } disabled:cursor-not-allowed`}
+            >
+              <div className="text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                {isSubmitting ? 'СОХРАНЕНИЕ...' : 'поехали тренироваться!'}
+              </div>
+            </button>
+            <div className="text-center text-gray-400 text-xs font-medium font-['Overpass'] leading-3 tracking-wide">
+              3/3
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Модальное окно успешного завершения */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="w-80 px-4 py-6 bg-indigo-500 rounded-2xl inline-flex flex-col justify-start items-center gap-4">
+            {/* Эмодзи медали */}
+            <div className="text-center justify-start text-black text-2xl font-bold font-['Overpass'] leading-6">
+              🥇
+            </div>
+
+            {/* Текст */}
+            <div className="self-stretch text-center justify-start text-slate-50 text-2xl font-bold font-['Overpass'] leading-6">
+              Да ты жаждешь побед! Так держать!
+            </div>
+
+            {/* Кнопка */}
+            <div 
+              onClick={() => router.push('/')}
+              className="self-stretch h-12 px-6 py-3 bg-[#A1FF4A] rounded-[32px] inline-flex justify-center items-center gap-2.5 cursor-pointer hover:bg-[#90E841] transition"
+            >
+              <div className="justify-center text-slate-950 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                поехали тренироваться!
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
