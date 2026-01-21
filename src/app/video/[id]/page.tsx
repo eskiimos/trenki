@@ -225,17 +225,17 @@ export default function VideoPage({ params }: VideoPageProps) {
         }
       }
 
-      // Проверяем достижение 95% для тренировки
-      if (!videoCompletedRef.current && progressPercent >= 95) {
-        console.log('🎯 Video reached 95%, completing...', { currentTime, duration, progressPercent });
+      // Проверяем достижение 99% для тренировки
+      if (!videoCompletedRef.current && progressPercent >= 99) {
+        console.log('🎯 Video reached 99%, completing...', { currentTime, duration, progressPercent });
         videoCompletedRef.current = true;
         await completeVideoInWorkout();
       }
     } 
-    // Для обычного просмотра - проверяем 95% для начисления баллов
+    // Для обычного просмотра - проверяем 99% для начисления баллов
     else if (!fromWorkout && videoId) {
-      if (!gainsCreditedRef.current && progressPercent >= 95) {
-        console.log('💰 Video reached 95%, crediting gains...', { currentTime, duration, progressPercent });
+      if (!gainsCreditedRef.current && progressPercent >= 99) {
+        console.log('💰 Video reached 99%, crediting gains...', { currentTime, duration, progressPercent });
         gainsCreditedRef.current = true;
         await creditGainsForWatching();
       }
