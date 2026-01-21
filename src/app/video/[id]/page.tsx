@@ -225,17 +225,17 @@ export default function VideoPage({ params }: VideoPageProps) {
         }
       }
 
-      // Проверяем достижение 90% для тренировки
-      if (!videoCompletedRef.current && progressPercent >= 90) {
-        console.log('🎯 Video reached 90%, completing...', { currentTime, duration, progressPercent });
+      // Проверяем достижение 95% для тренировки
+      if (!videoCompletedRef.current && progressPercent >= 95) {
+        console.log('🎯 Video reached 95%, completing...', { currentTime, duration, progressPercent });
         videoCompletedRef.current = true;
         await completeVideoInWorkout();
       }
     } 
-    // Для обычного просмотра - проверяем 90% для начисления баллов
+    // Для обычного просмотра - проверяем 95% для начисления баллов
     else if (!fromWorkout && videoId) {
-      if (!gainsCreditedRef.current && progressPercent >= 90) {
-        console.log('💰 Video reached 90%, crediting gains...', { currentTime, duration, progressPercent });
+      if (!gainsCreditedRef.current && progressPercent >= 95) {
+        console.log('💰 Video reached 95%, crediting gains...', { currentTime, duration, progressPercent });
         gainsCreditedRef.current = true;
         await creditGainsForWatching();
       }
@@ -311,7 +311,7 @@ export default function VideoPage({ params }: VideoPageProps) {
         // Показываем модалку с приростом характеристик
         setCharacteristicsGains(data.gains);
         setNewCharacteristics(data.newCharacteristics);
-        // setShowGainsModal(true); // Временно скрыто
+        setShowGainsModal(true);
         
         // Обновляем локальный профиль
         setUserProfile((prev: any) => ({
@@ -1661,14 +1661,13 @@ export default function VideoPage({ params }: VideoPageProps) {
       {!isLandscape && <BottomNavigation activeTab="video" />}
       
       {/* Модалка прироста характеристик */}
-      {/* Временно скрыто */}
-      {/* {showGainsModal && characteristicsGains && newCharacteristics && (
+      {showGainsModal && characteristicsGains && newCharacteristics && (
         <CharacteristicsGainModal
           gains={characteristicsGains}
           newCharacteristics={newCharacteristics}
           onClose={handleGainsModalClose}
         />
-      )} */}
+      )}
       
       {/* Модалка планирования тренировки */}
       <ScheduleModal
