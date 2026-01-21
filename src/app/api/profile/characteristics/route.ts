@@ -104,13 +104,13 @@ export async function POST(request: NextRequest) {
     const profile = await prisma.profile.upsert({
       where: { userId: user.id },
       update: {
-        // Новые характеристики (округляем до целых при регистрации)
-        ratingPower: Math.round(ratingPower),
-        ratingSpeed: Math.round(ratingSpeed),
-        ratingEndurance: Math.round(ratingEndurance),
-        ratingTechnique: Math.round(ratingTechnique),
-        ratingFlexibility: Math.round(ratingFlexibility),
-        potential: Math.round(potential),
+        // Новые характеристики (округляем до десятых)
+        ratingPower: parseFloat(ratingPower.toFixed(1)),
+        ratingSpeed: parseFloat(ratingSpeed.toFixed(1)),
+        ratingEndurance: parseFloat(ratingEndurance.toFixed(1)),
+        ratingTechnique: parseFloat(ratingTechnique.toFixed(1)),
+        ratingFlexibility: parseFloat(ratingFlexibility.toFixed(1)),
+        potential: parseFloat(potential.toFixed(1)),
         
         // Исходные данные
         rawPower,
@@ -122,13 +122,13 @@ export async function POST(request: NextRequest) {
       },
       create: {
         userId: user.id,
-        // Новые характеристики (округляем до целых при регистрации)
-        ratingPower: Math.round(ratingPower),
-        ratingSpeed: Math.round(ratingSpeed),
-        ratingEndurance: Math.round(ratingEndurance),
-        ratingTechnique: Math.round(ratingTechnique),
-        ratingFlexibility: Math.round(ratingFlexibility),
-        potential: Math.round(potential),
+        // Новые характеристики (округляем до десятых)
+        ratingPower: parseFloat(ratingPower.toFixed(1)),
+        ratingSpeed: parseFloat(ratingSpeed.toFixed(1)),
+        ratingEndurance: parseFloat(ratingEndurance.toFixed(1)),
+        ratingTechnique: parseFloat(ratingTechnique.toFixed(1)),
+        ratingFlexibility: parseFloat(ratingFlexibility.toFixed(1)),
+        potential: parseFloat(potential.toFixed(1)),
         
         // Исходные данные
         rawPower,

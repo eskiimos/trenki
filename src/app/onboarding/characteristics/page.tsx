@@ -156,13 +156,13 @@ export default function CharacteristicsOnboardingPage() {
                 <div className="w-full relative h-6">
                   <input
                     type="range"
-                    min="0"
+                    min="1"
                     max="10"
                     value={formData.rawPower}
                     onChange={(e) => handleSliderChange('rawPower', parseInt(e.target.value))}
                     className="w-full h-4 bg-gray-400/20 rounded-xl appearance-none cursor-pointer slider-custom"
                     style={{
-                      background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${formData.rawPower * 10}%, rgba(156, 163, 175, 0.2) ${formData.rawPower * 10}%, rgba(156, 163, 175, 0.2) 100%)`
+                      background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((formData.rawPower - 1) / 9) * 100}%, rgba(156, 163, 175, 0.2) ${((formData.rawPower - 1) / 9) * 100}%, rgba(156, 163, 175, 0.2) 100%)`
                     }}
                   />
                 </div>
@@ -183,13 +183,13 @@ export default function CharacteristicsOnboardingPage() {
                 <div className="w-full relative h-6">
                   <input
                     type="range"
-                    min="0"
+                    min="1"
                     max="10"
                     value={formData.rawSpeed}
                     onChange={(e) => handleSliderChange('rawSpeed', parseInt(e.target.value))}
                     className="w-full h-4 bg-gray-400/20 rounded-xl appearance-none cursor-pointer slider-custom"
                     style={{
-                      background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${formData.rawSpeed * 10}%, rgba(156, 163, 175, 0.2) ${formData.rawSpeed * 10}%, rgba(156, 163, 175, 0.2) 100%)`
+                      background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((formData.rawSpeed - 1) / 9) * 100}%, rgba(156, 163, 175, 0.2) ${((formData.rawSpeed - 1) / 9) * 100}%, rgba(156, 163, 175, 0.2) 100%)`
                     }}
                   />
                 </div>
@@ -210,13 +210,13 @@ export default function CharacteristicsOnboardingPage() {
                 <div className="w-full relative h-6">
                   <input
                     type="range"
-                    min="0"
+                    min="1"
                     max="10"
                     value={formData.rawEndurance}
                     onChange={(e) => handleSliderChange('rawEndurance', parseInt(e.target.value))}
                     className="w-full h-4 bg-gray-400/20 rounded-xl appearance-none cursor-pointer slider-custom"
                     style={{
-                      background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${formData.rawEndurance * 10}%, rgba(156, 163, 175, 0.2) ${formData.rawEndurance * 10}%, rgba(156, 163, 175, 0.2) 100%)`
+                      background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((formData.rawEndurance - 1) / 9) * 100}%, rgba(156, 163, 175, 0.2) ${((formData.rawEndurance - 1) / 9) * 100}%, rgba(156, 163, 175, 0.2) 100%)`
                     }}
                   />
                 </div>
@@ -237,13 +237,13 @@ export default function CharacteristicsOnboardingPage() {
                 <div className="w-full relative h-6">
                   <input
                     type="range"
-                    min="0"
+                    min="1"
                     max="10"
                     value={formData.rawTechnique}
                     onChange={(e) => handleSliderChange('rawTechnique', parseInt(e.target.value))}
                     className="w-full h-4 bg-gray-400/20 rounded-xl appearance-none cursor-pointer slider-custom"
                     style={{
-                      background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${formData.rawTechnique * 10}%, rgba(156, 163, 175, 0.2) ${formData.rawTechnique * 10}%, rgba(156, 163, 175, 0.2) 100%)`
+                      background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((formData.rawTechnique - 1) / 9) * 100}%, rgba(156, 163, 175, 0.2) ${((formData.rawTechnique - 1) / 9) * 100}%, rgba(156, 163, 175, 0.2) 100%)`
                     }}
                   />
                 </div>
@@ -264,13 +264,13 @@ export default function CharacteristicsOnboardingPage() {
                 <div className="w-full relative h-6">
                   <input
                     type="range"
-                    min="0"
+                    min="1"
                     max="10"
                     value={formData.rawFlexibility}
                     onChange={(e) => handleSliderChange('rawFlexibility', parseInt(e.target.value))}
                     className="w-full h-4 bg-gray-400/20 rounded-xl appearance-none cursor-pointer slider-custom"
                     style={{
-                      background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${formData.rawFlexibility * 10}%, rgba(156, 163, 175, 0.2) ${formData.rawFlexibility * 10}%, rgba(156, 163, 175, 0.2) 100%)`
+                      background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((formData.rawFlexibility - 1) / 9) * 100}%, rgba(156, 163, 175, 0.2) ${((formData.rawFlexibility - 1) / 9) * 100}%, rgba(156, 163, 175, 0.2) 100%)`
                     }}
                   />
                 </div>
