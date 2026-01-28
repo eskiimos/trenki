@@ -30,7 +30,19 @@ async function checkUsers() {
       
       if (user.profile) {
         console.log(`\n📝 Профиль:`);
-        console.log(`  Возраст: ${user.profile.age || 'не указан'}`);
+        let ageDisplay = 'не указан';
+        if (user.profile.birthDate) {
+          const today = new Date();
+          const birthDate = new Date(user.profile.birthDate);
+          let age = today.getFullYear() - birthDate.getFullYear();
+          const monthDiff = today.getMonth() - birthDate.getMonth();
+          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+          }
+          ageDisplay = `${age} лет (ДР: ${birthDate.toISOString().split('T')[0]})`;
+        }
+        console.log(`  Возраст: ${ageDisplay}`);
+        console.log(`  Возрастная группа: ${user.profile.ageGroup || 'не указана'}`);
         console.log(`  Пол: ${user.profile.gender || 'не указан'}`);
       } else {
         console.log(`\n❌ Профиль не создан`);

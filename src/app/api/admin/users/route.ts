@@ -61,7 +61,18 @@ export async function GET(request: NextRequest) {
             position: user.profile.position,
             gender: user.profile.gender,
             number: user.profile.number,
-            age: user.profile.age,
+            birthDate: user.profile.birthDate,
+            age: user.profile.birthDate ? (() => {
+              const today = new Date();
+              const birthDate = new Date(user.profile.birthDate);
+              let age = today.getFullYear() - birthDate.getFullYear();
+              const monthDiff = today.getMonth() - birthDate.getMonth();
+              if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+              }
+              return age;
+            })() : null,
+            ageGroup: user.profile.ageGroup,
             height: user.profile.height,
             weight: user.profile.weight,
             overall: user.profile.overall,

@@ -37,7 +37,8 @@ export async function ensureDevUser(userId: string) {
         username: 'dev_user',
         profile: {
           create: {
-            age: 25,
+            birthDate: new Date('1999-01-01'), // Возраст 25-27 лет
+            ageGroup: 'YOUNG_ADULT',
             gender: Gender.MALE,
             position: HockeyPosition.CENTER,
             height: 180,

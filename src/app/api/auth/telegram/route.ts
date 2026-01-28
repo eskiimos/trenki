@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Проверяем, заполнен ли профиль
-    const needsOnboarding = !user.profile?.age || !user.profile?.gender;
+    const needsOnboarding = !user.profile?.birthDate || !user.profile?.gender;
 
     return NextResponse.json({
       success: true,

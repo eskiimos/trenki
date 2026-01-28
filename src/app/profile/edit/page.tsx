@@ -23,7 +23,7 @@ const ProfileEditPage = () => {
     lastName: '',
     position: '',
     number: '',
-    age: '',
+    birthDate: '',
     height: '',
     weight: '',
     avatarUrl: '',
@@ -60,7 +60,7 @@ const ProfileEditPage = () => {
             lastName: data.user?.lastName || user.last_name || '',
             position: data.user?.profile?.position || '',
             number: data.user?.profile?.number?.toString() || '',
-            age: data.user?.profile?.age?.toString() || '',
+            birthDate: data.user?.profile?.birthDate ? new Date(data.user.profile.birthDate).toISOString().split('T')[0] : '',
             height: data.user?.profile?.height?.toString() || '',
             weight: data.user?.profile?.weight?.toString() || '',
             avatarUrl: data.user?.profile?.avatarUrl || '',
@@ -223,7 +223,7 @@ const ProfileEditPage = () => {
         profile: {
           position: formData.position || null,
           number: formData.number ? parseInt(formData.number) : null,
-          age: formData.age ? parseInt(formData.age) : null,
+          birthDate: formData.birthDate ? new Date(formData.birthDate).toISOString() : null,
           height: formData.height ? parseInt(formData.height) : null,
           weight: formData.weight ? parseInt(formData.weight) : null,
           avatarUrl: formData.avatarUrl || null,
@@ -407,14 +407,12 @@ const ProfileEditPage = () => {
 
         {/* Дата рождения */}
         <div>
-          <label className="text-white text-sm mb-2 block uppercase">ВОЗРАСТ</label>
+          <label className="text-white text-sm mb-2 block uppercase">ДАТА РОЖДЕНИЯ</label>
           <input
-            type="number"
-            min="1"
-            max="120"
-            value={formData.age}
-            onChange={(e) => handleInputChange('age', e.target.value)}
-            placeholder="ЛЕТ"
+            type="date"
+            max={new Date().toISOString().split('T')[0]}
+            value={formData.birthDate}
+            onChange={(e) => handleInputChange('birthDate', e.target.value)}
             className="w-full text-white placeholder-gray-400 px-4 border focus:outline-none transition-colors"
             style={{
               background: '#AEABBB33',

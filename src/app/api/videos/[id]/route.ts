@@ -75,6 +75,8 @@ export async function PUT(
       moduleType: moduleTypeRaw,
       complexity,
       muscleGroup,
+      ageGroups,
+      trainingGoals,
     } = body;
 
     if (!title || !videoUrl || !category || !difficulty || !trainerId) {
@@ -124,7 +126,13 @@ export async function PUT(
     // Обрабатываем loadType - если пустая строка, то null
     const loadTypeValue = body.loadType && body.loadType !== '' ? body.loadType : null;
     
+    // Обрабатываем массивы для Алгоритма 2.0
+    const ageGroupsArray = Array.isArray(ageGroups) ? ageGroups : [];
+    const trainingGoalsArray = Array.isArray(trainingGoals) ? trainingGoals : [];
+    
     console.log('Updating video - loadType:', body.loadType, '→', loadTypeValue);
+    console.log('Updating video - ageGroups:', ageGroupsArray);
+    console.log('Updating video - trainingGoals:', trainingGoalsArray);
 
     // Обновляем видео
     const video = await prisma.video.update({
@@ -148,6 +156,8 @@ export async function PUT(
         complexity: complexityEnum as any,
         muscleGroup: muscleGroupEnum as any,
         loadType: loadTypeValue as any,
+        ageGroups: ageGroupsArray,
+        trainingGoals: trainingGoalsArray,
       },
       include: {
         trainer: {

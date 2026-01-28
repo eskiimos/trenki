@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
             include: { profile: true }
           });
 
-          const needsOnboarding = !user || !user.profile || !user.profile.age || !user.profile.gender;
+          const needsOnboarding = !user || !user.profile || !user.profile.birthDate || !user.profile.gender;
 
           // Если пользователя нет, создаем
           if (!user) {

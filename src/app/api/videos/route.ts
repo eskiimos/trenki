@@ -135,6 +135,8 @@ export async function POST(request: NextRequest) {
       moduleType: moduleTypeRaw,
       complexity,
       muscleGroup,
+      ageGroups, // НОВОЕ для Алгоритма 2.0
+      trainingGoals, // НОВОЕ для Алгоритма 2.0
     } = body;
 
     if (!title || !videoUrl || !category || !difficulty || !trainerId) {
@@ -185,10 +187,16 @@ export async function POST(request: NextRequest) {
 
     // Обрабатываем loadType - если пустая строка, то null
     const loadTypeValue = body.loadType && body.loadType !== '' ? body.loadType : null;
+    
+    // Обрабатываем массивы для Алгоритма 2.0
+    const ageGroupsArray = Array.isArray(ageGroups) ? ageGroups : [];
+    const trainingGoalsArray = Array.isArray(trainingGoals) ? trainingGoals : [];
 
     console.log('isPublished value:', isPublished, 'type:', typeof isPublished);
     console.log('moduleTypeRaw:', moduleTypeRaw, '→ moduleTypeEnum:', moduleTypeEnum);
     console.log('Creating video - loadType:', body.loadType, '→', loadTypeValue);
+    console.log('Creating video - ageGroups:', ageGroupsArray);
+    console.log('Creating video - trainingGoals:', trainingGoalsArray);
 
     const video = await prisma.video.create({
       data: {
@@ -210,6 +218,8 @@ export async function POST(request: NextRequest) {
         complexity: complexityEnum as any,
         muscleGroup: muscleGroupEnum as any,
         loadType: loadTypeValue as any,
+        ageGroups: ageGroupsArray, // НОВОЕ
+        trainingGoals: trainingGoalsArray, // НОВОЕ
       },
       include: {
         trainer: true

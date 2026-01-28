@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
         firstName: true,
         profile: {
           select: {
-            age: true,
+            birthDate: true,
             gender: true
           }
         }

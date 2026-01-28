@@ -103,6 +103,10 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [availableQualities, setAvailableQualities] = useState<Record<string, string>>({});
   const [selectedQuality, setSelectedQuality] = useState<string>('');
   const [showQualityMenu, setShowQualityMenu] = useState(false);
+  
+  // Состояние для скрытия/показа плеера
+  const [isPlayerMinimized, setIsPlayerMinimized] = useState(false);
+  const playerContainerRef = useRef<HTMLDivElement>(null);
 
   // Получаем params асинхронно и загружаем данные видео
   useEffect(() => {
@@ -845,6 +849,14 @@ export default function VideoPage({ params }: VideoPageProps) {
   const handleVideoInteraction = () => {
     showControlsTemporarily();
   };
+  
+  // Обработчик клика по свободной области для скрытия/показа плеера
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Проверяем что клик был именно по backdrop, а не по дочерним элементам
+    if (e.target === e.currentTarget) {
+      setIsPlayerMinimized(prev => !prev);
+    }
+  };
 
   // Все обработчики событий видео (timeupdate, progress, canplay и т.д.) теперь inline на video элементе
 
@@ -1130,13 +1142,21 @@ export default function VideoPage({ params }: VideoPageProps) {
         </div>
       </header>
 
-      {/* Video Player */}
-      <div className={isLandscape ? 'fixed inset-0 z-50 bg-black flex items-center justify-center' : 'relative bg-black'}>
+      {/* Video Player - обёртка с возможностью скрытия */}
+      <div 
+        className={`${isLandscape ? 'fixed inset-0 z-50' : 'relative'} transition-all duration-300 ${isPlayerMinimized && !isLandscape ? 'h-0 overflow-hidden' : ''}`}
+        onClick={handleBackdropClick}
+      >
         <div 
-          className={`${isLandscape ? 'w-full h-full' : 'aspect-video'} relative overflow-hidden`}
-          onMouseMove={handleVideoInteraction}
-          onTouchStart={handleVideoInteraction}
+          className={`${isLandscape ? 'w-full h-full bg-black flex items-center justify-center' : 'bg-black'}`}
         >
+          <div 
+            ref={playerContainerRef}
+            className={`${isLandscape ? 'w-full h-full' : 'aspect-video'} relative overflow-hidden`}
+            onMouseMove={handleVideoInteraction}
+            onTouchStart={handleVideoInteraction}
+            onClick={(e) => e.stopPropagation()}
+          >
           {isLoading ? (
             <div className="w-full h-full flex items-center justify-center bg-black">
               <div className="text-white">Загрузка...</div>
@@ -1549,7 +1569,68 @@ export default function VideoPage({ params }: VideoPageProps) {
             </div>
           )}
         </div>
+        </div>
       </div>
+
+      {/* Кнопка для восстановления плеера когда он скрыт */}
+      {isPlayerMinimized && !isLandscape && (
+        <div 
+          className="sticky top-0 z-40 bg-[#0A0E1A] border-b border-[#A1FF4A]/20 px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-[#0A0E1A]/80 transition-all group"
+          onClick={() => setIsPlayerMinimized(false)}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-16 h-12 rounded overflow-hidden bg-gray-800 flex-shrink-0">
+              {videoData?.thumbnail && (
+                <Image
+                  src={videoData.thumbnail}
+                  alt={videoData.title || 'Video'}
+                  width={64}
+                  height={48}
+                  className="w-full h-full object-cover"
+                />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-white text-sm font-medium truncate">
+                {videoData?.title || 'Видео'}
+              </h3>
+              <p className="text-[#A1FF4A]/70 text-xs font-medium">
+                Нажмите чтобы развернуть ↓
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                togglePlay();
+              }}
+              className="w-10 h-10 rounded-full bg-[#A1FF4A]/10 hover:bg-[#A1FF4A]/20 flex items-center justify-center transition-colors"
+            >
+              <Image
+                src={isPlaying 
+                  ? '/icons/video/player/material-symbols_pause.svg'
+                  : '/icons/video/player/material-symbols_play-arrow.svg'
+                }
+                alt={isPlaying ? 'Пауза' : 'Играть'}
+                width={20}
+                height={20}
+              />
+            </button>
+            <div className="flex flex-col items-center">
+              <svg 
+                className="w-6 h-6 text-[#A1FF4A] group-hover:translate-y-0.5 transition-transform"
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+              </svg>
+              <span className="text-[10px] text-[#A1FF4A]/60 uppercase font-bold tracking-wider">Развернуть</span>
+            </div>
+          </div>
+        </div>
+      )}
 
   {/* Action Icons (скрываем в ландшафтном режиме на мобилках) */}
   <div className={`bg-[#101530] ${isLandscape ? 'hidden' : ''}`}>

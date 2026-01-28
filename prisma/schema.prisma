@@ -39,7 +39,7 @@ model Profile {
   position      HockeyPosition?
   gender        Gender?
   number        Int?
-  age           Int?
+  birthDate     DateTime?       // Дата рождения (возраст вычисляется автоматически)
   height        Int?
   weight        Int?
   avatarUrl     String?
@@ -60,6 +60,10 @@ model Profile {
   rawTechnique      Int?            // самооценка техники (1-10)
   rawFlexibility    Int?            // самооценка гибкости (1-10)
   kMastery          Float?          // коэффициент мастерства (5.5-9.4)
+  
+  // Алгоритм 2.0 - новые поля
+  ageGroup          AgeGroup?       // Возрастная группа
+  lastGoals         String[]        @default([]) // Последние 3 выбранные цели для отслеживания разнообразия
   
   // Ограничения и прогресс
   trainingsToday    Int             @default(0)  // тренировок сегодня
@@ -152,8 +156,8 @@ model Video {
   muscleGroup     MuscleGroup?          // направление нагрузки  
   complexity      Complexity?           // сложность
   moduleType      ModuleType?           // тип модуля (разминка/ОФП/техника/заминка)
-  trainingGoals   TrainingGoal[]        // для каких состояний подходит (массив)
-  ageGroup        AgeGroup?             // целевая возрастная группа
+  trainingGoals   TrainingGoal[]        // для каких целей подходит модуль (массив)
+  ageGroups       AgeGroup[]            // целевые возрастные группы (массив)
   
   favorites       FavoriteVideo[]
   trainingModules TrainingModule[]
@@ -516,10 +520,29 @@ enum Complexity {
   PRO
 }
 
-enum TrainingGoal {
+// Старый enum (deprecated - используется в старом алгоритме)
+enum TrainingStatus {
   RECOVERY
   DEVELOPMENT
   PEAK
+}
+
+// Новые цели тренировок (Алгоритм 2.0)
+enum TrainingGoal {
+  POWERFUL_SHOT          // 🎯 Мощный бросок
+  OUTRUN_OPPONENT        // 🦵🏻 Убегаем от соперника
+  STRENGTH_STABILITY     // 💪🏻 Силовая борьба и устойчивость
+  SOFT_HANDS             // 🏒 Мягкие ручки
+  FULL_GAME_ENDURANCE    // 🫁 Выносливость на всю игру
+  AGILITY                // ⚡️ Маневренность
+  SPORT_LONGEVITY        // 🏥 Спортивное долголетие
+}
+
+// Состояние энергии перед тренировкой
+enum EnergyState {
+  FULLY_CHARGED          // 🔋 заряжен на все 100%
+  IN_TONE                // ⚡️ в тонусе, но не супер
+  TIRED                  // 😴 устал/восстанавливаюсь
 }
 
 enum TagType {
@@ -558,9 +581,18 @@ enum WorkoutStatus {
 }
 
 enum AgeGroup {
-  CHILD      // ребенок
-  TEEN       // подросток
-  ADULT      // взрослый
+  CHILD           // Дети (7-10 лет)
+  TEEN            // Подростки (11-17 лет)
+  YOUNG_ADULT     // Молодые взрослые (18-34)
+  ADULT           // Взрослые (35+)
+}
+
+// Уровень сложности на основе потенциала
+enum ComplexityLevel {
+  BEGINNER        // Начинающий (потенциал 0-29)
+  AMATEUR         // Любитель (потенциал 30-50)
+  ADVANCED        // Продвинутый (потенциал 51-76)
+  PRO             // Профи (потенциал 77-100)
 }
 
 model ScheduledWorkout {

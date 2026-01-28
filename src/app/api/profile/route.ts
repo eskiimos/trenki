@@ -120,11 +120,24 @@ export async function POST(request: NextRequest) {
     // Нормализуем данные профиля (преобразуем пустые строки в null)
     let normalizedProfile = null;
     if (profile) {
+      const { calculateAgeData, isValidBirthDate } = await import('@/lib/age-utils');
+      
+      // Вычисляем ageGroup если указана дата рождения
+      let ageGroup = profile.ageGroup || null;
+      if (profile.birthDate) {
+        if (!isValidBirthDate(profile.birthDate)) {
+          return NextResponse.json({ error: 'Invalid birth date' }, { status: 400 });
+        }
+        const { ageGroup: calculatedAgeGroup } = calculateAgeData(profile.birthDate);
+        ageGroup = calculatedAgeGroup;
+      }
+      
       normalizedProfile = {
         ...profile,
         position: profile.position ? profile.position : null,
         number: profile.number ? parseInt(profile.number) : null,
-        age: profile.age ? parseInt(profile.age) : null,
+        birthDate: profile.birthDate ? new Date(profile.birthDate) : null,
+        ageGroup,
         height: profile.height ? parseInt(profile.height) : null,
         weight: profile.weight ? parseInt(profile.weight) : null,
       };

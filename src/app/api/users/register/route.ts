@@ -4,16 +4,26 @@ import prisma from '@/lib/prisma';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { telegramId, firstName, lastName, age, gender } = body;
+    const { telegramId, firstName, lastName, birthDate, gender } = body;
 
-    console.log('Register user:', { telegramId, firstName, lastName, age, gender });
+    console.log('Register user:', { telegramId, firstName, lastName, birthDate, gender });
 
-    if (!telegramId || !firstName || !lastName || !age || !gender) {
+    if (!telegramId || !firstName || !lastName || !birthDate || !gender) {
       return NextResponse.json(
         { error: 'All fields are required' },
         { status: 400 }
       );
     }
+    
+    // Вычисляем ageGroup из даты рождения
+    const { calculateAgeData, isValidBirthDate } = await import('@/lib/age-utils');
+    if (!isValidBirthDate(birthDate)) {
+      return NextResponse.json(
+        { error: 'Invalid birth date' },
+        { status: 400 }
+      );
+    }
+    const { ageGroup } = calculateAgeData(birthDate);
 
     // Конвертируем gender в enum формат
     let genderEnum: 'MALE' | 'FEMALE' | 'NOT_SPECIFIED';
@@ -29,7 +39,8 @@ export async function POST(request: NextRequest) {
       telegramId,
       firstName,
       lastName,
-      age: parseInt(age),
+      birthDate,
+      ageGroup,
       gender: genderEnum
     });
 
@@ -42,11 +53,13 @@ export async function POST(request: NextRequest) {
         profile: {
           upsert: {
             create: {
-              age: parseInt(age),
+              birthDate: new Date(birthDate),
+              ageGroup,
               gender: genderEnum,
             },
             update: {
-              age: parseInt(age),
+              birthDate: new Date(birthDate),
+              ageGroup,
               gender: genderEnum,
             },
           },
@@ -58,7 +71,8 @@ export async function POST(request: NextRequest) {
         lastName,
         profile: {
           create: {
-            age: parseInt(age),
+            birthDate: new Date(birthDate),
+            ageGroup,
             gender: genderEnum,
           },
         },

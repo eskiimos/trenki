@@ -135,7 +135,8 @@ async function main() {
         create: {
           position: 'GOALTENDER',
           number: 88,
-          age: 24,
+          birthDate: new Date('2000-01-01'),
+          ageGroup: 'YOUNG_ADULT',
           gender: 'MALE',
           height: 185,
           weight: 82,
@@ -180,7 +181,8 @@ async function main() {
         create: {
           position: 'LEFT_WING',
           number: 8,
-          age: 28,
+          birthDate: new Date('1996-06-15'),
+          ageGroup: 'YOUNG_ADULT',
           gender: 'MALE',
           height: 191,
           weight: 107,
@@ -216,7 +218,8 @@ async function main() {
         create: {
           position: 'RIGHT_WING',
           number: 86,
-          age: 25,
+          birthDate: new Date('1999-03-20'),
+          ageGroup: 'YOUNG_ADULT',
           gender: 'MALE',
           height: 180,
           weight: 82,

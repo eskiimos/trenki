@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import MultiLevelTagFilter from '@/components/MultiLevelTagFilter';
+import { AgeGroup, TrainingGoal } from '@/generated/prisma';
+import { GOAL_LABELS } from '@/lib/training-algorithm-v3';
 
 interface Trainer {
   id: string;
@@ -35,6 +37,9 @@ interface Video {
   типНагрузки?: string;
   группаМышц?: string;
   сложность?: string;
+  // Новые поля для Алгоритма 2.0
+  ageGroups?: string[];
+  trainingGoals?: string[];
 }
 
 // Функция форматирования длительности в YouTube формате (MM:SS или H:MM:SS)
@@ -57,6 +62,8 @@ const AdminVideosPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]); // ID тегов из базы
+  const [activeTab, setActiveTab] = useState<'basic' | 'algorithm'>('basic');
+  const [algorithmSubTab, setAlgorithmSubTab] = useState<'classification' | 'targeting'>('classification');
   
     // Начальное состояние формы
   const initialFormState = {
@@ -75,6 +82,11 @@ const AdminVideosPage = () => {
     типНагрузки: '', // Основное поле - создаёт LoadType тег автоматически
     группаМышц: '',
     сложность: '',
+    rpeMin: '',
+    rpeMax: '',
+    // Новые поля для Алгоритма 2.0
+    ageGroups: [] as string[],
+    trainingGoals: [] as string[],
   };
   
   // Данные формы
@@ -137,6 +149,11 @@ const AdminVideosPage = () => {
         loadType: formData.типНагрузки,
         muscleGroup: formData.группаМышц,
         complexity: formData.сложность,
+        rpeMin: formData.rpeMin ? parseInt(formData.rpeMin) : null,
+        rpeMax: formData.rpeMax ? parseInt(formData.rpeMax) : null,
+        // Новые поля для Алгоритма 2.0
+        ageGroups: formData.ageGroups,
+        trainingGoals: formData.trainingGoals,
       };
 
       console.log('Sending payload:', payload);
@@ -284,6 +301,16 @@ const AdminVideosPage = () => {
         if (data.title && !formData.title) {
           updates.title = data.title;
           updatedFields.push('название');
+          
+          // 🤖 Умный парсинг названия для автозаполнения полей алгоритма
+          const parsedData = parseVideoTitle(data.title);
+          if (Object.keys(parsedData).length > 0) {
+            Object.assign(updates, parsedData);
+            if (parsedData.типНагрузки) updatedFields.push('тип нагрузки');
+            if (parsedData.группаМышц) updatedFields.push('группа мышц');
+            if (parsedData.сложность) updatedFields.push('сложность');
+            if (parsedData.rpeMin) updatedFields.push('RPE');
+          }
         }
         
         if (data.description && !formData.description) {
@@ -377,6 +404,11 @@ const AdminVideosPage = () => {
       типНагрузки: (video as any).loadType || video.типНагрузки || '', // LoadType приходит уже в нужном формате
       группаМышц: muscleGroupToRussian[muscleGroupValue] || muscleGroupValue || '',
       сложность: complexityToRussian[complexityValue] || complexityValue || '',
+      rpeMin: (video as any).rpeMin?.toString() || '',
+      rpeMax: (video as any).rpeMax?.toString() || '',
+      // Новые поля для Алгоритма 2.0
+      ageGroups: (video as any).ageGroups || [],
+      trainingGoals: (video as any).trainingGoals || [],
     });
     
     // Загружаем теги из базы данных для этого видео
@@ -392,6 +424,8 @@ const AdminVideosPage = () => {
       setSelectedTagIds([]);
     }
     
+    setActiveTab('basic'); // Всегда начинаем с первой вкладки
+    setAlgorithmSubTab('classification'); // И с первой подвкладки
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -400,10 +434,112 @@ const AdminVideosPage = () => {
     setEditingVideoId(null);
     setShowForm(false);
     setSelectedTagIds([]); // Очищаем выбранные теги
+    setActiveTab('basic'); // Сбрасываем на первую вкладку
+    setAlgorithmSubTab('classification'); // И подвкладку тоже
     setFormData({
       ...initialFormState,
       trainerId: trainers[0]?.id || '',
     });
+  };
+
+  // Умный парсинг названия видео для автозаполнения полей
+  const parseVideoTitle = (title: string) => {
+    console.log('Parsing video title:', title);
+    const parsed: any = {};
+    
+    // Маппинг русских названий на enum значения
+    const loadTypeMap: Record<string, string> = {
+      'сила': 'MAX_STRENGTH',
+      'максимальная сила': 'MAX_STRENGTH',
+      'мощность': 'POWER',
+      'скорость': 'SPEED',
+      'силовая выносливость': 'STRENGTH_ENDURANCE',
+      'выносливость': 'AEROBIC_ENDURANCE',
+      'анаэробная выносливость': 'ANAEROBIC_ENDURANCE',
+      'аэробная выносливость': 'AEROBIC_ENDURANCE',
+      'ловкость': 'AGILITY',
+      'мобильность': 'MOBILITY',
+      'техника': 'TECHNICAL_SKILL',
+      'технические навыки': 'TECHNICAL_SKILL',
+      'статическая растяжка': 'STATIC_STRETCH',
+      'растяжка': 'STATIC_STRETCH',
+      'динамическая растяжка': 'DYNAMIC_STRETCH',
+      'лфк': 'PREHAB',
+      'кроссфит': 'CROSSFIT_COMPLEX',
+    };
+
+    const muscleGroupMap: Record<string, string> = {
+      'все тело': 'Все тело',
+      'всё тело': 'Все тело',
+      'низ тела': 'Низ тела',
+      'низ': 'Низ тела',
+      'ноги': 'Низ тела',
+      'верх тела': 'Верх тяга',
+      'верх': 'Верх тяга',
+      'верх тяга': 'Верх тяга',
+      'верх жим': 'Верх жим',
+      'кор': 'Кор стабилизация',
+      'кор стабилизация': 'Кор стабилизация',
+      'кор динамика': 'Кор динамика',
+    };
+
+    const complexityMap: Record<string, string> = {
+      'новичок': 'Новичок',
+      'начинающий': 'Новичок',
+      'любитель': 'Любитель',
+      'продвинутый': 'Продвинутый',
+      'профи': 'Профи',
+      'про': 'Профи',
+    };
+
+    // Разбиваем по "+"
+    const parts = title.split('+').map(p => p.trim().toLowerCase());
+    
+    // Первая часть - обычно тип нагрузки
+    if (parts[0]) {
+      for (const [key, value] of Object.entries(loadTypeMap)) {
+        if (parts[0].includes(key)) {
+          parsed.типНагрузки = value;
+          console.log('Found loadType:', value);
+          break;
+        }
+      }
+    }
+
+    // Вторая часть - направление нагрузки
+    if (parts[1]) {
+      for (const [key, value] of Object.entries(muscleGroupMap)) {
+        if (parts[1].includes(key)) {
+          parsed.группаМышц = value;
+          console.log('Found muscleGroup:', value);
+          break;
+        }
+      }
+    }
+
+    // Третья часть - сложность (может быть через дефис, например "продвинутый-про")
+    if (parts[2]) {
+      const complexityPart = parts[2].split('.')[0]; // Убираем RPE часть
+      for (const [key, value] of Object.entries(complexityMap)) {
+        if (complexityPart.includes(key)) {
+          parsed.сложность = value;
+          console.log('Found complexity:', value);
+          break;
+        }
+      }
+    }
+
+    // Ищем RPE в любой части (формат: RPE8 или RPE 8)
+    const rpeMatch = title.match(/rpe\s*(\d+)/i);
+    if (rpeMatch) {
+      const rpe = parseInt(rpeMatch[1]);
+      parsed.rpeMin = Math.max(1, rpe - 1).toString();
+      parsed.rpeMax = Math.min(10, rpe + 1).toString();
+      console.log('Found RPE:', rpe, '→ range:', parsed.rpeMin, '-', parsed.rpeMax);
+    }
+
+    console.log('Parsed data:', parsed);
+    return parsed;
   };
 
   const handleDeleteVideo = async (videoId: string) => {
@@ -443,8 +579,19 @@ const AdminVideosPage = () => {
             onClick={() => {
               if (showForm && editingVideoId) {
                 handleCancelEdit();
+              } else if (!showForm) {
+                // Открываем форму для нового видео
+                setFormData({
+                  ...initialFormState,
+                  trainerId: trainers[0]?.id || '',
+                });
+                setActiveTab('basic');
+                setAlgorithmSubTab('classification');
+                setShowForm(true);
               } else {
-                setShowForm(!showForm);
+                // Закрываем форму
+                setShowForm(false);
+                handleCancelEdit();
               }
             }}
             className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg font-semibold transition-colors"
@@ -494,23 +641,77 @@ const AdminVideosPage = () => {
             </div>
             <form onSubmit={handleSubmit} className="space-y-6">
               
-              {/* 📹 Основная информация о видео */}
+              {/* Табы */}
+              <div className="flex gap-2 border-b border-white/10 pb-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('basic')}
+                  className={`px-4 py-2 rounded-t-lg font-medium transition-colors ${
+                    activeTab === 'basic' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-[#1a1f3a] text-gray-400 hover:text-white hover:bg-[#2d3448]'
+                  }`}
+                >
+                  📹 Основное
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('algorithm')}
+                  className={`px-4 py-2 rounded-t-lg font-medium transition-colors ${
+                    activeTab === 'algorithm' 
+                      ? 'bg-purple-600 text-white' 
+                      : 'bg-[#1a1f3a] text-gray-400 hover:text-white hover:bg-[#2d3448]'
+                  }`}
+                >
+                  ⚙️ Алгоритм 2.0
+                </button>
+              </div>
+
+              {/* Вкладка: Основное */}
+              {activeTab === 'basic' && (
               <fieldset className="border border-blue-500/30 rounded-lg p-4 md:p-6 bg-blue-900/5">
-                <legend className="px-3 text-base font-bold text-blue-300">📹 Видео и медиа</legend>
+                <legend className="px-3 text-base font-bold text-blue-300">📹 Основная информация</legend>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                   
                   {/* Название */}
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium mb-2">Название *</label>
-                    <input
-                      type="text"
-                      name="title"
-                      value={formData.title}
-                      onChange={handleChange}
-                      required
-                      placeholder="Например: Разминка для хоккеистов"
-                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        name="title"
+                        value={formData.title}
+                        onChange={handleChange}
+                        required
+                        placeholder="Например: Ловкость+низ тела+продвинутый.RPE8"
+                        className="flex-1 bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      />
+                      {formData.title && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const parsed = parseVideoTitle(formData.title);
+                            if (Object.keys(parsed).length > 0) {
+                              setFormData(prev => ({ ...prev, ...parsed }));
+                              const fields = [];
+                              if (parsed.типНагрузки) fields.push('тип нагрузки');
+                              if (parsed.группаМышц) fields.push('группа мышц');
+                              if (parsed.сложность) fields.push('сложность');
+                              if (parsed.rpeMin) fields.push('RPE');
+                              alert(`Название распознано!\n\nЗаполнено: ${fields.join(', ')}`);
+                            } else {
+                              alert('Не удалось распознать данные из названия.\n\nФормат: "Тип нагрузки+Группа мышц+Сложность.RPE8"');
+                            }
+                          }}
+                          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+                        >
+                          🤖 Распарсить
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      💡 Формат: "Ловкость+низ тела+продвинутый.RPE8" - нажмите "Распарсить" для автозаполнения
+                    </p>
                   </div>
 
                   {/* URL видео */}
@@ -602,15 +803,7 @@ const AdminVideosPage = () => {
                     />
                   </div>
 
-                </div>
-              </fieldset>
-
-              {/* 🎯 Категоризация */}
-              <fieldset className="border border-green-500/30 rounded-lg p-4 md:p-6 bg-green-900/5">
-                <legend className="px-3 text-base font-bold text-green-300">🎯 Категория и классификация</legend>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-
-                  {/* Категория */}
+                  {/* Категория и Сложность в одной строке */}
                   <div>
                     <label className="block text-sm font-medium mb-2">Категория *</label>
                     <select
@@ -618,23 +811,22 @@ const AdminVideosPage = () => {
                       value={formData.category}
                       onChange={handleChange}
                       required
-                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
+                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                     >
-                      <option value="STRENGTH">Сила</option>
-                      <option value="ENDURANCE">Выносливость</option>
-                      <option value="SPEED">Скорость</option>
-                      <option value="TECHNIQUE">Техника</option>
-                      <option value="SKATING">Катание</option>
-                      <option value="SHOOTING">Броски</option>
-                      <option value="PASSING">Пас</option>
-                      <option value="CHECKING">Силовая борьба</option>
-                      <option value="GOALKEEPER">Вратарь</option>
-                      <option value="TACTICAL">Тактика</option>
-                      <option value="GENERAL">Общая</option>
+                      <option value="STRENGTH">💪 Сила</option>
+                      <option value="ENDURANCE">🫀 Выносливость</option>
+                      <option value="SPEED">⚡ Скорость</option>
+                      <option value="TECHNIQUE">🎯 Техника</option>
+                      <option value="SKATING">⛸️ Катание</option>
+                      <option value="SHOOTING">🏒 Броски</option>
+                      <option value="PASSING">🎯 Пас</option>
+                      <option value="CHECKING">💥 Силовая борьба</option>
+                      <option value="GOALKEEPER">🥅 Вратарь</option>
+                      <option value="TACTICAL">🧠 Тактика</option>
+                      <option value="GENERAL">🔄 Общая</option>
                     </select>
                   </div>
 
-                  {/* Сложность */}
                   <div>
                     <label className="block text-sm font-medium mb-2">Сложность *</label>
                     <select
@@ -642,12 +834,12 @@ const AdminVideosPage = () => {
                       value={formData.difficulty}
                       onChange={handleChange}
                       required
-                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
+                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                     >
-                      <option value="BEGINNER">Начальный</option>
-                      <option value="INTERMEDIATE">Средний</option>
-                      <option value="ADVANCED">Продвинутый</option>
-                      <option value="EXPERT">Эксперт</option>
+                      <option value="BEGINNER">🟢 Начальный</option>
+                      <option value="INTERMEDIATE">🔵 Средний</option>
+                      <option value="ADVANCED">🟠 Продвинутый</option>
+                      <option value="EXPERT">🔴 Эксперт</option>
                     </select>
                   </div>
 
@@ -659,7 +851,7 @@ const AdminVideosPage = () => {
                       value={formData.trainerId}
                       onChange={handleChange}
                       required
-                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
+                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                     >
                       {trainers.map(trainer => (
                         <option key={trainer.id} value={trainer.id}>
@@ -667,6 +859,19 @@ const AdminVideosPage = () => {
                         </option>
                       ))}
                     </select>
+                  </div>
+
+                  {/* Оборудование */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-2">Оборудование</label>
+                    <input
+                      type="text"
+                      name="equipment"
+                      value={formData.equipment}
+                      onChange={handleChange}
+                      placeholder="Коньки, Шлем, Клюшка, Шайба (через запятую)"
+                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    />
                   </div>
 
                   {/* Теги */}
@@ -678,30 +883,47 @@ const AdminVideosPage = () => {
                     />
                   </div>
 
-                  {/* Оборудование */}
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-2">Необходимое оборудование</label>
-                    <input
-                      type="text"
-                      name="equipment"
-                      value={formData.equipment}
-                      onChange={handleChange}
-                      placeholder="Коньки, Шлем, Клюшка, Шайба (через запятую)"
-                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
-                    />
-                  </div>
-
                 </div>
               </fieldset>
+              )}
 
-              {/* ⚙️ Параметры для алгоритма тренировок */}
+              {/* Вкладка: Алгоритм 2.0 */}
+              {activeTab === 'algorithm' && (
+              <div className="space-y-4">
+              
+              {/* Внутренние вкладки (sub-tabs) */}
+              <div className="flex gap-2 bg-[#1a1f3a] p-1 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setAlgorithmSubTab('classification')}
+                  className={`flex-1 px-4 py-2 rounded-md font-medium transition-all duration-200 ${
+                    algorithmSubTab === 'classification' 
+                      ? 'bg-purple-600 text-white shadow-lg' 
+                      : 'text-gray-400 hover:text-white hover:bg-[#2d3448]'
+                  }`}
+                >
+                  ⚙️ Классификация
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAlgorithmSubTab('targeting')}
+                  className={`flex-1 px-4 py-2 rounded-md font-medium transition-all duration-200 ${
+                    algorithmSubTab === 'targeting' 
+                      ? 'bg-green-600 text-white shadow-lg' 
+                      : 'text-gray-400 hover:text-white hover:bg-[#2d3448]'
+                  }`}
+                >
+                  🎯 Цели и возраст
+                </button>
+              </div>
+              
+              {/* Секция 1: Классификация модуля */}
+              {algorithmSubTab === 'classification' && (
               <fieldset className="border border-purple-500/30 rounded-lg p-4 md:p-6 bg-purple-900/10">
-                <legend className="px-3 text-base font-bold text-purple-300">⚙️ Параметры для умного алгоритма</legend>
-                
-                {/* Подсказка */}
+                <legend className="px-3 text-base font-bold text-purple-300">⚙️ Классификация модуля</legend>
                 <div className="bg-purple-900/20 border border-purple-500/20 rounded-lg p-3 mb-4">
                   <p className="text-xs text-gray-300">
-                    💡 Эти параметры используются алгоритмом для автоматического подбора видео в персональные тренировки
+                    💡 Основные параметры для автоматического подбора видео в тренировки
                   </p>
                 </div>
 
@@ -1015,9 +1237,152 @@ const AdminVideosPage = () => {
 
                   </div>
 
+                  {/* Строка 4: RPE (метрика нагрузки) */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        📊 RPE минимум (1-10)
+                      </label>
+                      <input
+                        type="number"
+                        name="rpeMin"
+                        value={formData.rpeMin}
+                        onChange={handleChange}
+                        min="1"
+                        max="10"
+                        placeholder="Например: 3"
+                        className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">Минимальные усилия/энергозатраты</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        📊 RPE максимум (1-10)
+                      </label>
+                      <input
+                        type="number"
+                        name="rpeMax"
+                        value={formData.rpeMax}
+                        onChange={handleChange}
+                        min="1"
+                        max="10"
+                        placeholder="Например: 7"
+                        className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">Максимальные усилия/энергозатраты</p>
+                    </div>
+
+                  </div>
+
                 </div>
               </fieldset>
+              )}
 
+              {/* Секция 2: Цели и возрастные группы */}
+              {algorithmSubTab === 'targeting' && (
+              <fieldset className="border border-green-500/30 rounded-lg p-4 md:p-6 bg-green-900/10">
+                <legend className="px-3 text-base font-bold text-green-300">🎯 Цели и возрастные группы</legend>
+                
+                <div className="bg-green-900/20 border border-green-500/20 rounded-lg p-3 mb-4">
+                  <p className="text-xs text-gray-300">
+                    💡 Укажите, для каких целей тренировок и возрастных групп подходит это видео
+                  </p>
+                </div>
+
+                <div className="space-y-6">
+                  
+                  {/* Возрастные группы (множественный выбор) */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-green-300">
+                      👥 Возрастные группы
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {Object.values(AgeGroup).map((group) => {
+                        const labels: Record<string, string> = {
+                          CHILD: '👶 Дети (до 12 лет)',
+                          TEEN: '🧒 Подростки (13-17 лет)',
+                          YOUNG_ADULT: '👨 Молодые (18-35 лет)',
+                          ADULT: '👴 Взрослые (36+ лет)',
+                        };
+                        
+                        return (
+                          <label key={group} className="flex items-center gap-2 p-2 rounded hover:bg-green-900/20 cursor-pointer transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={formData.ageGroups.includes(group)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    ageGroups: [...prev.ageGroups, group]
+                                  }));
+                                } else {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    ageGroups: prev.ageGroups.filter(g => g !== group)
+                                  }));
+                                }
+                              }}
+                              className="w-5 h-5 rounded border-2 border-green-500 bg-[#2d3448] checked:bg-green-600 checked:border-green-600 focus:ring-2 focus:ring-green-500 cursor-pointer"
+                            />
+                            <span className="text-sm text-gray-200">{labels[group]}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2">
+                      ✓ Выбрано: {formData.ageGroups.length > 0 ? `${formData.ageGroups.length} из 4` : 'Не указано'}
+                    </p>
+                  </div>
+
+                  {/* Цели тренировок (множественный выбор) */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-green-300">
+                      🎯 Цели тренировок
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                      {Object.values(TrainingGoal).map((goal) => {
+                        const goalInfo = GOAL_LABELS[goal];
+                        return (
+                          <label key={goal} className="flex items-center gap-2 p-2 rounded hover:bg-green-900/20 cursor-pointer transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={formData.trainingGoals.includes(goal)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    trainingGoals: [...prev.trainingGoals, goal]
+                                  }));
+                                } else {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    trainingGoals: prev.trainingGoals.filter(g => g !== goal)
+                                  }));
+                                }
+                              }}
+                              className="w-5 h-5 rounded border-2 border-green-500 bg-[#2d3448] checked:bg-green-600 checked:border-green-600 focus:ring-2 focus:ring-green-500 cursor-pointer"
+                            />
+                            <span className="text-sm text-gray-200">{goalInfo.emoji} {goalInfo.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2">
+                      ✓ Выбрано: {formData.trainingGoals.length > 0 ? `${formData.trainingGoals.length} из 7` : 'Не указано'}
+                    </p>
+                  </div>
+
+                </div>
+              </fieldset>
+              )}
+
+              </div>
+              )}
+
+              {/* Кнопки управления (всегда видны) */}
               <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
                 <button
                   type="button"
