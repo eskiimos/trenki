@@ -17,13 +17,21 @@ export async function POST(request: NextRequest) {
     
     // Вычисляем ageGroup из даты рождения
     const { calculateAgeData, isValidBirthDate } = await import('@/lib/age-utils');
+    
+    console.log('📅 Birth date received:', birthDate, 'Type:', typeof birthDate);
+    console.log('📅 Validating birth date...');
+    
     if (!isValidBirthDate(birthDate)) {
+      console.error('❌ Invalid birth date:', birthDate);
       return NextResponse.json(
         { error: 'Invalid birth date' },
         { status: 400 }
       );
     }
-    const { ageGroup } = calculateAgeData(birthDate);
+    
+    console.log('✅ Birth date valid');
+    const { age, ageGroup } = calculateAgeData(birthDate);
+    console.log('📊 Calculated:', { age, ageGroup });
 
     // Конвертируем gender в enum формат
     let genderEnum: 'MALE' | 'FEMALE' | 'NOT_SPECIFIED';
@@ -95,9 +103,17 @@ export async function POST(request: NextRequest) {
       user,
     });
   } catch (error) {
-    console.error('Error registering user:', error);
+    console.error('❌ Error registering user:', error);
+    console.error('Error type:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('Error message:', error instanceof Error ? error.message : JSON.stringify(error));
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+    
     return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
+      { 
+        error: 'Internal server error', 
+        details: error instanceof Error ? error.message : 'Unknown error',
+        type: error instanceof Error ? error.constructor.name : typeof error
+      },
       { status: 500 }
     );
   }
