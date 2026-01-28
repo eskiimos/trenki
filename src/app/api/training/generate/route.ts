@@ -527,11 +527,11 @@ function getTrainingStatusEnum(assessment: any): TrainingGoal {
   const readinessLevel = freshnessCoeff + assessment.energyLevel;
 
   if (readinessLevel >= 2 && readinessLevel <= 6) {
-    return TrainingGoal.RECOVERY;
+    return TrainingGoal.SPORT_LONGEVITY;
   } else if (readinessLevel >= 7 && readinessLevel <= 10) {
-    return TrainingGoal.DEVELOPMENT;
+    return TrainingGoal.FULL_GAME_ENDURANCE;
   } else {
-    return TrainingGoal.PEAK;
+    return TrainingGoal.POWERFUL_SHOT;
   }
 }
 
@@ -540,24 +540,29 @@ function getTrainingStatusEnum(assessment: any): TrainingGoal {
  */
 function getFitnessLoadTypesByStatus(status: TrainingGoal): LoadType[] {
   const map: Record<TrainingGoal, LoadType[]> = {
-    [TrainingGoal.RECOVERY]: [
+    [TrainingGoal.SPORT_LONGEVITY]: [
       LoadType.PREHAB,
       LoadType.MOBILITY,
     ],
-    [TrainingGoal.DEVELOPMENT]: [
+    [TrainingGoal.FULL_GAME_ENDURANCE]: [
       LoadType.ANAEROBIC_ENDURANCE,
       LoadType.AEROBIC_ENDURANCE,
       LoadType.AGILITY,
       LoadType.SPEED,
     ],
-    [TrainingGoal.PEAK]: [
+    [TrainingGoal.POWERFUL_SHOT]: [
       LoadType.MAX_STRENGTH,
       LoadType.POWER,
       LoadType.SPEED,
       LoadType.ANAEROBIC_ENDURANCE,
     ],
+    // Остальные цели - сбалансированный подход
+    [TrainingGoal.OUTRUN_OPPONENT]: [LoadType.SPEED, LoadType.AGILITY],
+    [TrainingGoal.STRENGTH_STABILITY]: [LoadType.MAX_STRENGTH, LoadType.POWER],
+    [TrainingGoal.SOFT_HANDS]: [LoadType.AGILITY],
+    [TrainingGoal.AGILITY]: [LoadType.AGILITY, LoadType.SPEED],
   };
-  return map[status];
+  return map[status] || [LoadType.AEROBIC_ENDURANCE];
 }
 
 /**
@@ -585,7 +590,7 @@ function getCompatibleTechniqueTypes(fitnessType: LoadType): LoadType[] {
  * п.9-10: Типы РАЗМИНКИ по статусу и типу ФИЗ ПОДГОТОВКИ
  */
 function getWarmupTypesByStatus(status: TrainingGoal, fitnessType: LoadType): LoadType[] {
-  if (status === TrainingGoal.RECOVERY) {
+  if (status === TrainingGoal.SPORT_LONGEVITY) {
     return [LoadType.DYNAMIC_STRETCH];
   }
 

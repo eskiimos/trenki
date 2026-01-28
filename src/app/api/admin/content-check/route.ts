@@ -194,7 +194,7 @@ export async function GET(request: NextRequest) {
           moduleType: ModuleType.COOLDOWN,
           loadType: loadType,
           muscleGroup: MuscleGroup.FULL_BODY,
-          status: TrainingGoal.RECOVERY, // Заминка связана с восстановлением
+          status: TrainingGoal.SPORT_LONGEVITY, // Заминка связана с восстановлением
           priority: 9,
           reason: `ВАЖНО: Нет заминки ${loadType} для всего тела`,
           currentCount: 0,
@@ -214,7 +214,7 @@ export async function GET(request: NextRequest) {
         gaps.push({
           moduleType: ModuleType.COOLDOWN,
           loadType: loadType,
-          status: TrainingGoal.RECOVERY,
+          status: TrainingGoal.SPORT_LONGEVITY,
           priority: 6,
           reason: `Мало вариантов заминки ${loadType} для отдельных групп`,
           currentCount: otherCooldowns.length,
@@ -235,7 +235,7 @@ export async function GET(request: NextRequest) {
           gaps.push({
             moduleType: ModuleType.TECHNIQUE,
             loadType: techniqueType as LoadType,
-            status: TrainingGoal.DEVELOPMENT,
+            status: TrainingGoal.SOFT_HANDS,
             priority: 5,
             reason: `Совместимо с FITNESS ${fitnessLoadType}. Добавит разнообразие.`,
             currentCount: techniqueVideos.length,
@@ -259,14 +259,6 @@ export async function GET(request: NextRequest) {
         WARMUP: allVideos.filter((v) => v.moduleType === ModuleType.WARMUP).length,
         COOLDOWN: allVideos.filter((v) => v.moduleType === ModuleType.COOLDOWN).length,
         TECHNIQUE: allVideos.filter((v) => v.moduleType === ModuleType.TECHNIQUE).length,
-      },
-      byStatus: {
-        RECOVERY: allVideos.filter((v) => v.trainingGoals?.includes(TrainingGoal.RECOVERY))
-          .length,
-        DEVELOPMENT: allVideos.filter((v) =>
-          v.trainingGoals?.includes(TrainingGoal.DEVELOPMENT)
-        ).length,
-        PEAK: allVideos.filter((v) => v.trainingGoals?.includes(TrainingGoal.PEAK)).length,
       },
       criticalGaps: gaps.filter((g) => g.priority >= 9).length,
       importantGaps: gaps.filter((g) => g.priority >= 7 && g.priority < 9).length,
