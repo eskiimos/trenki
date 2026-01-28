@@ -10,7 +10,7 @@ export default function OnboardingProfilePage() {
   const [selectedGender, setSelectedGender] = useState<'male' | 'female' | 'none' | null>(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [age, setAge] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
@@ -35,7 +35,7 @@ export default function OnboardingProfilePage() {
   const isFormValid = 
     firstName.trim() !== '' && 
     lastName.trim() !== '' && 
-    age.trim() !== '' && 
+    birthDate.trim() !== '' && 
     selectedGender !== null;
 
   const handleSubmit = async () => {
@@ -55,7 +55,7 @@ export default function OnboardingProfilePage() {
         telegramId,
         firstName,
         lastName,
-        age,
+        birthDate,
         gender: selectedGender,
       };
       
@@ -167,19 +167,22 @@ export default function OnboardingProfilePage() {
               />
             </div>
 
-            {/* Возраст */}
+            {/* Дата рождения */}
             <div>
+              <label className="text-white text-sm mb-2 block">ДАТА РОЖДЕНИЯ</label>
               <input
-                type="number"
-                placeholder="Возраст"
-                value={age}
-                onChange={(e) => setAge(e.target.value)}
+                type="date"
+                placeholder="Дата рождения"
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
                 className="w-full text-white placeholder-gray-400 px-4 border focus:outline-none transition-colors"
                 style={{
                   background: '#AEABBB33',
                   borderRadius: '32px',
                   border: '1px solid transparent',
                   height: '44px',
+                  colorScheme: 'dark',
                 }}
                 onFocus={(e) => (e.target.style.border = '1px solid #A1FF4A')}
                 onBlur={(e) => (e.target.style.border = '1px solid transparent')}
