@@ -53,6 +53,19 @@ export async function POST(request: NextRequest) {
     });
 
     // Создаем или обновляем пользователя и профиль
+    // Используем динамический объект для совместимости с разными версиями схемы
+    const profileData: any = {
+      gender: genderEnum,
+    };
+    
+    // Добавляем birthDate и ageGroup только если они поддерживаются
+    try {
+      profileData.birthDate = new Date(birthDate);
+      profileData.ageGroup = ageGroup;
+    } catch (e) {
+      console.warn('⚠️ birthDate/ageGroup not supported, skipping');
+    }
+
     const user = await prisma.user.upsert({
       where: { telegramId },
       update: {
@@ -60,16 +73,8 @@ export async function POST(request: NextRequest) {
         lastName,
         profile: {
           upsert: {
-            create: {
-              birthDate: new Date(birthDate),
-              ageGroup,
-              gender: genderEnum,
-            },
-            update: {
-              birthDate: new Date(birthDate),
-              ageGroup,
-              gender: genderEnum,
-            },
+            create: profileData,
+            update: profileData,
           },
         },
       },
@@ -78,11 +83,7 @@ export async function POST(request: NextRequest) {
         firstName,
         lastName,
         profile: {
-          create: {
-            birthDate: new Date(birthDate),
-            ageGroup,
-            gender: genderEnum,
-          },
+          create: profileData,
         },
       },
       include: {
