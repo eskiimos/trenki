@@ -125,7 +125,7 @@ export default function WorkoutReminder() {
           <button
             type="button"
             onClick={handleCancelWorkout}
-            className="text-[#A1FF4A] text-sm font-bold leading-4"
+            className="w-8 h-8 -m-1 inline-flex items-center justify-center text-[#A1FF4A] text-lg font-bold leading-none"
             aria-label="Закрыть напоминание"
           >
             ✕
