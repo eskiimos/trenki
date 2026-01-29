@@ -228,7 +228,7 @@ const ProfilePage = () => {
             {/* Возраст, рост, вес */}
             <div className="h-10 px-4 flex items-center">
               <div className="text-[#AEABBB] text-sm font-medium font-overpass uppercase">
-                {displayAge ?? '-'} ГОД | {userProfile?.profile?.height || '-'} СМ | {userProfile?.profile?.weight || '-'} КГ
+                {displayAge ?? '-'} ЛЕТ | {userProfile?.profile?.height || '-'} СМ | {userProfile?.profile?.weight || '-'} КГ
               </div>
             </div>
           </div>

@@ -127,17 +127,7 @@ export function getTelegramId(): string | null {
     return auth.telegramId;
   }
   
-  // Если нет ни WebApp, ни сохранённых данных - создаём временный ID
-  // Это позволит пользователям регистрироваться без Telegram авторизации
-  const tempId = localStorage.getItem('temp_user_id');
-  if (tempId) {
-    return tempId;
-  }
-  
-  // Создаём новый временный ID
-  const newTempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  localStorage.setItem('temp_user_id', newTempId);
-  return newTempId;
+  return null;
 }
 
 /**
@@ -168,18 +158,6 @@ export function getUserData() {
       username: auth.username,
     };
   }
-  
-  // Dev-режим или fallback для пользователей без Telegram
-  const tempId = getTelegramId();
-  if (tempId) {
-    return {
-      id: parseInt(tempId.replace(/\D/g, '').slice(0, 10)) || Date.now(),
-      telegramId: tempId,
-      firstName: 'User',
-      lastName: '',
-      username: tempId,
-    };
-  }
-  
+
   return null;
 }

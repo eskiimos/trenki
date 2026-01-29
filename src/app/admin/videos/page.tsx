@@ -446,26 +446,36 @@ const AdminVideosPage = () => {
   const parseVideoTitle = (title: string) => {
     console.log('Parsing video title:', title);
     const parsed: any = {};
-    
-    // Маппинг русских названий на enum значения
+    const normalize = (value: string) => value.toLowerCase().replace(/ё/g, 'е');
+    const normalizedTitle = normalize(title);
+    const tokens = normalizedTitle
+      .split(/[+|/•,]|\s+-\s+|\s*—\s*|\s*–\s*|\s*\|\s*/g)
+      .map((token) => token.trim())
+      .filter(Boolean);
+
     const loadTypeMap: Record<string, string> = {
-      'сила': 'MAX_STRENGTH',
       'максимальная сила': 'MAX_STRENGTH',
+      'сила': 'MAX_STRENGTH',
       'мощность': 'POWER',
       'скорость': 'SPEED',
       'силовая выносливость': 'STRENGTH_ENDURANCE',
-      'выносливость': 'AEROBIC_ENDURANCE',
       'анаэробная выносливость': 'ANAEROBIC_ENDURANCE',
       'аэробная выносливость': 'AEROBIC_ENDURANCE',
+      'выносливость': 'AEROBIC_ENDURANCE',
       'ловкость': 'AGILITY',
+      'маневренность': 'AGILITY',
       'мобильность': 'MOBILITY',
+      'гибкость': 'MOBILITY',
       'техника': 'TECHNICAL_SKILL',
       'технические навыки': 'TECHNICAL_SKILL',
       'статическая растяжка': 'STATIC_STRETCH',
       'растяжка': 'STATIC_STRETCH',
       'динамическая растяжка': 'DYNAMIC_STRETCH',
       'лфк': 'PREHAB',
-      'кроссфит': 'CROSSFIT_COMPLEX',
+      'реабилитация': 'PREHAB',
+      'кроссфит': 'POWER',
+      'hiit': 'POWER',
+      'интервальная': 'POWER',
     };
 
     const muscleGroupMap: Record<string, string> = {
@@ -474,73 +484,352 @@ const AdminVideosPage = () => {
       'низ тела': 'Низ тела',
       'низ': 'Низ тела',
       'ноги': 'Низ тела',
+      'бедра': 'Низ тела',
       'верх тела': 'Верх тяга',
       'верх': 'Верх тяга',
       'верх тяга': 'Верх тяга',
       'верх жим': 'Верх жим',
+      'грудь': 'Верх жим',
+      'спина': 'Верх тяга',
       'кор': 'Кор стабилизация',
       'кор стабилизация': 'Кор стабилизация',
       'кор динамика': 'Кор динамика',
+      'плечо': 'ЛФК плечо',
+      'колено': 'ЛФК колено',
+      'спина лфк': 'ЛФК спина',
+      'голеностоп': 'ЛФК колено',
+      'тазобедренный': 'ЛФК колено',
     };
 
     const complexityMap: Record<string, string> = {
       'новичок': 'Новичок',
       'начинающий': 'Новичок',
+      'beginner': 'Новичок',
       'любитель': 'Любитель',
+      'amateur': 'Любитель',
       'продвинутый': 'Продвинутый',
+      'advanced': 'Продвинутый',
       'профи': 'Профи',
       'про': 'Профи',
+      'pro': 'Профи',
+      'elite': 'Профи',
     };
 
-    // Разбиваем по "+"
-    const parts = title.split('+').map(p => p.trim().toLowerCase());
-    
-    // Первая часть - обычно тип нагрузки
-    if (parts[0]) {
-      for (const [key, value] of Object.entries(loadTypeMap)) {
-        if (parts[0].includes(key)) {
-          parsed.типНагрузки = value;
-          console.log('Found loadType:', value);
-          break;
+    const categoryMap: Array<[RegExp, string]> = [
+      [/катание|скольж|skating/i, 'SKATING'],
+      [/бросок|броски|shoot|shot|щелчок|слэп/i, 'SHOOTING'],
+      [/пас|передач|passing/i, 'PASSING'],
+      [/единоборств|борьб|checking|контакт/i, 'CHECKING'],
+      [/вратар|goalie|goalkeeper/i, 'GOALKEEPER'],
+      [/большинство|power play|powerplay/i, 'POWER_PLAY'],
+      [/меньшинство|penalty kill|pk/i, 'PENALTY_KILL'],
+      [/тактик|tactic|strategy/i, 'TACTICAL'],
+      [/техника|handling|skill/i, 'TECHNIQUE'],
+      [/сила|strength|max strength/i, 'STRENGTH'],
+      [/выносливость|endurance/i, 'ENDURANCE'],
+      [/скорость|speed/i, 'SPEED'],
+    ];
+
+    const difficultyMap: Record<string, string> = {
+      'новичок': 'BEGINNER',
+      'начинающий': 'BEGINNER',
+      'beginner': 'BEGINNER',
+      'любитель': 'INTERMEDIATE',
+      'amateur': 'INTERMEDIATE',
+      'продвинутый': 'ADVANCED',
+      'advanced': 'ADVANCED',
+      'профи': 'EXPERT',
+      'про': 'EXPERT',
+      'pro': 'EXPERT',
+      'elite': 'EXPERT',
+    };
+
+    const moduleTypeMap: Record<string, string> = {
+      'разминка': 'Разминка',
+      'warmup': 'Разминка',
+      'офп': 'ОФП',
+      'физ подготовка': 'ОФП',
+      'физическая подготовка': 'ОФП',
+      'fitness': 'ОФП',
+      'техника': 'Техника',
+      'technique': 'Техника',
+      'заминка': 'Заминка',
+      'cooldown': 'Заминка',
+      'stretch': 'Заминка',
+    };
+
+    const goalMap: Array<[RegExp, TrainingGoal]> = [
+      [/мощн(ый|ая)|бросок|слэп|щелчок|shot/i, TrainingGoal.POWERFUL_SHOT],
+      [/убегаем|скорост(ь|ная смена)|спринт|рывок|оппонент/i, TrainingGoal.OUTRUN_OPPONENT],
+      [/силов(ая|ой) борьба|устойчивост(ь|и)|контакт|столкнов/i, TrainingGoal.STRENGTH_STABILITY],
+      [/мягк(ие|ие) ручк|плеймейкер|контроль клюшки|handling/i, TrainingGoal.SOFT_HANDS],
+      [/выносливост(ь|и) на всю игру|эндьюранс|endurance|длительн/i, TrainingGoal.FULL_GAME_ENDURANCE],
+      [/маневренност(ь|и)|агилит|agility|смена направления/i, TrainingGoal.AGILITY],
+      [/долголетие|восстановлени|профилактик|prehab|rehab|mobility/i, TrainingGoal.SPORT_LONGEVITY],
+    ];
+
+    const ageGroupMap: Array<[RegExp, string]> = [
+      [/дети|детск|u10|u11|u12|7-10/i, 'CHILD'],
+      [/подрост|юниор|u13|u14|u15|u16|u17|11-17/i, 'TEEN'],
+      [/молод(ые|ежь)|18-34|18-35|adult 18/i, 'YOUNG_ADULT'],
+      [/взросл|ветеран|мастерс|35\+|36\+|40\+/i, 'ADULT'],
+    ];
+
+    const findByMap = (map: Record<string, string>) => {
+      for (const token of tokens) {
+        for (const [key, value] of Object.entries(map)) {
+          if (token.includes(key)) {
+            return value;
+          }
         }
+      }
+      return null;
+    };
+
+    const moduleType = findByMap(moduleTypeMap);
+    if (moduleType) {
+      parsed.типМодуля = moduleType;
+      console.log('Found moduleType:', moduleType);
+    }
+
+    const loadType = findByMap(loadTypeMap);
+    if (loadType) {
+      parsed.типНагрузки = loadType;
+      console.log('Found loadType:', loadType);
+    }
+
+    const muscleGroup = findByMap(muscleGroupMap);
+    if (muscleGroup) {
+      parsed.группаМышц = muscleGroup;
+      console.log('Found muscleGroup:', muscleGroup);
+    }
+
+    for (const [key, value] of Object.entries(complexityMap)) {
+      if (normalizedTitle.includes(key)) {
+        parsed.сложность = value;
+        console.log('Found complexity:', value);
+        break;
       }
     }
 
-    // Вторая часть - направление нагрузки
-    if (parts[1]) {
-      for (const [key, value] of Object.entries(muscleGroupMap)) {
-        if (parts[1].includes(key)) {
-          parsed.группаМышц = value;
-          console.log('Found muscleGroup:', value);
-          break;
-        }
+    for (const [regex, category] of categoryMap) {
+      if (regex.test(normalizedTitle)) {
+        parsed.category = category;
+        console.log('Found category:', category);
+        break;
       }
     }
 
-    // Третья часть - сложность (может быть через дефис, например "продвинутый-про")
-    if (parts[2]) {
-      const complexityPart = parts[2].split('.')[0]; // Убираем RPE часть
-      for (const [key, value] of Object.entries(complexityMap)) {
-        if (complexityPart.includes(key)) {
-          parsed.сложность = value;
-          console.log('Found complexity:', value);
-          break;
-        }
+    for (const [key, value] of Object.entries(difficultyMap)) {
+      if (normalizedTitle.includes(key)) {
+        parsed.difficulty = value;
+        console.log('Found difficulty:', value);
+        break;
       }
     }
 
-    // Ищем RPE в любой части (формат: RPE8 или RPE 8)
-    const rpeMatch = title.match(/rpe\s*(\d+)/i);
-    if (rpeMatch) {
-      const rpe = parseInt(rpeMatch[1]);
-      parsed.rpeMin = Math.max(1, rpe - 1).toString();
-      parsed.rpeMax = Math.min(10, rpe + 1).toString();
-      console.log('Found RPE:', rpe, '→ range:', parsed.rpeMin, '-', parsed.rpeMax);
+    const rpeRangeMatch = normalizedTitle.match(/rpe\s*(\d{1,2})\s*[-–—]\s*(\d{1,2})/i);
+    if (rpeRangeMatch) {
+      const min = Math.max(1, parseInt(rpeRangeMatch[1]));
+      const max = Math.min(10, parseInt(rpeRangeMatch[2]));
+      parsed.rpeMin = Math.min(min, max).toString();
+      parsed.rpeMax = Math.max(min, max).toString();
+      console.log('Found RPE range:', parsed.rpeMin, '-', parsed.rpeMax);
+    } else {
+      const rpeSingleMatch = normalizedTitle.match(/rpe\s*(\d{1,2})/i);
+      if (rpeSingleMatch) {
+        const rpe = parseInt(rpeSingleMatch[1]);
+        parsed.rpeMin = Math.max(1, rpe - 1).toString();
+        parsed.rpeMax = Math.min(10, rpe + 1).toString();
+        console.log('Found RPE:', rpe, '→ range:', parsed.rpeMin, '-', parsed.rpeMax);
+      }
+    }
+
+    const goalMatches = new Set<string>();
+    for (const [regex, goal] of goalMap) {
+      if (regex.test(normalizedTitle)) {
+        goalMatches.add(goal);
+      }
+    }
+    if (goalMatches.size > 0) {
+      parsed.trainingGoals = Array.from(goalMatches);
+      console.log('Found goals:', parsed.trainingGoals);
+    }
+
+    const ageMatches = new Set<string>();
+    for (const [regex, group] of ageGroupMap) {
+      if (regex.test(normalizedTitle)) {
+        ageMatches.add(group);
+      }
+    }
+    if (ageMatches.size > 0) {
+      parsed.ageGroups = Array.from(ageMatches);
+      console.log('Found age groups:', parsed.ageGroups);
+    }
+
+    if (!parsed.типНагрузки && parsed.типМодуля === 'Разминка') {
+      parsed.типНагрузки = 'DYNAMIC_STRETCH';
+    }
+    if (!parsed.типНагрузки && parsed.типМодуля === 'Заминка') {
+      parsed.типНагрузки = 'STATIC_STRETCH';
+    }
+    if (!parsed.типНагрузки && parsed.типМодуля === 'Техника') {
+      parsed.типНагрузки = 'TECHNICAL_SKILL';
+    }
+    if (!parsed.типМодуля && parsed.типНагрузки) {
+      const loadTypeToModule: Record<string, string> = {
+        STATIC_STRETCH: 'Заминка',
+        PREHAB: 'Заминка',
+        MOBILITY: 'Заминка',
+        DYNAMIC_STRETCH: 'Разминка',
+        TECHNICAL_SKILL: 'Техника',
+      };
+      parsed.типМодуля = loadTypeToModule[parsed.типНагрузки] || 'ОФП';
+    }
+
+    if (!parsed.category && parsed.типНагрузки) {
+      const loadTypeToCategory: Record<string, string> = {
+        POWER: 'STRENGTH',
+        MAX_STRENGTH: 'STRENGTH',
+        STRENGTH_ENDURANCE: 'ENDURANCE',
+        ANAEROBIC_ENDURANCE: 'ENDURANCE',
+        AEROBIC_ENDURANCE: 'ENDURANCE',
+        SPEED: 'SPEED',
+        AGILITY: 'TECHNIQUE',
+        TECHNICAL_SKILL: 'TECHNIQUE',
+        MOBILITY: 'GENERAL',
+        PREHAB: 'GENERAL',
+        STATIC_STRETCH: 'GENERAL',
+        DYNAMIC_STRETCH: 'GENERAL',
+      };
+      parsed.category = loadTypeToCategory[parsed.типНагрузки] || 'GENERAL';
+    }
+
+    if (!parsed.difficulty && parsed.сложность) {
+      const complexityToDifficulty: Record<string, string> = {
+        'Новичок': 'BEGINNER',
+        'Любитель': 'INTERMEDIATE',
+        'Продвинутый': 'ADVANCED',
+        'Профи': 'EXPERT',
+      };
+      parsed.difficulty = complexityToDifficulty[parsed.сложность] || parsed.difficulty;
+    }
+
+    if (!parsed.trainingGoals && parsed.типНагрузки) {
+      const inferredGoals = new Set<string>();
+      const loadTypeGoalMap: Record<string, TrainingGoal> = {
+        POWER: TrainingGoal.POWERFUL_SHOT,
+        MAX_STRENGTH: TrainingGoal.STRENGTH_STABILITY,
+        SPEED: TrainingGoal.OUTRUN_OPPONENT,
+        AGILITY: TrainingGoal.AGILITY,
+        ANAEROBIC_ENDURANCE: TrainingGoal.FULL_GAME_ENDURANCE,
+        AEROBIC_ENDURANCE: TrainingGoal.FULL_GAME_ENDURANCE,
+        STRENGTH_ENDURANCE: TrainingGoal.FULL_GAME_ENDURANCE,
+        MOBILITY: TrainingGoal.SPORT_LONGEVITY,
+        PREHAB: TrainingGoal.SPORT_LONGEVITY,
+        STATIC_STRETCH: TrainingGoal.SPORT_LONGEVITY,
+        DYNAMIC_STRETCH: TrainingGoal.SPORT_LONGEVITY,
+        TECHNICAL_SKILL: TrainingGoal.SOFT_HANDS,
+      };
+
+      const inferredGoal = loadTypeGoalMap[parsed.типНагрузки];
+      if (inferredGoal) inferredGoals.add(inferredGoal);
+
+      if (parsed.типНагрузки === 'AGILITY' && parsed.типМодуля === 'Техника') {
+        inferredGoals.add(TrainingGoal.SOFT_HANDS);
+      }
+      if (parsed.типНагрузки === 'POWER' && parsed.типМодуля === 'ОФП') {
+        inferredGoals.add(TrainingGoal.POWERFUL_SHOT);
+      }
+      if (parsed.типНагрузки === 'MAX_STRENGTH') {
+        inferredGoals.add(TrainingGoal.STRENGTH_STABILITY);
+      }
+
+      if (inferredGoals.size > 0) {
+        parsed.trainingGoals = Array.from(inferredGoals);
+        console.log('Inferred goals:', parsed.trainingGoals);
+      }
+    }
+
+    if (!parsed.ageGroups) {
+      const ageDefaults: string[] = ['CHILD', 'TEEN', 'YOUNG_ADULT', 'ADULT'];
+
+      if (parsed.типНагрузки === 'POWER' || parsed.типНагрузки === 'MAX_STRENGTH') {
+        parsed.ageGroups = ['TEEN', 'YOUNG_ADULT', 'ADULT'];
+      } else if (parsed.типНагрузки === 'PREHAB' || parsed.типНагрузки === 'MOBILITY' || parsed.типНагрузки === 'STATIC_STRETCH') {
+        parsed.ageGroups = ['TEEN', 'YOUNG_ADULT', 'ADULT'];
+      } else if (parsed.типМодуля === 'Разминка' || parsed.типМодуля === 'Техника') {
+        parsed.ageGroups = ageDefaults;
+      } else {
+        parsed.ageGroups = ageDefaults;
+      }
+
+      console.log('Inferred age groups:', parsed.ageGroups);
+    }
+
+    if (!parsed.rpeMin && !parsed.rpeMax) {
+      const complexityBoost = (() => {
+        switch (parsed.сложность) {
+          case 'Новичок':
+            return -1;
+          case 'Любитель':
+            return 0;
+          case 'Продвинутый':
+            return 1;
+          case 'Профи':
+            return 2;
+          default:
+            return 0;
+        }
+      })();
+
+      const baseRange = (() => {
+        if (parsed.типМодуля === 'Заминка') return { min: 1, max: 3 };
+        if (parsed.типМодуля === 'Разминка') return { min: 2, max: 5 };
+        if (parsed.типМодуля === 'Техника') return { min: 3, max: 6 };
+
+        switch (parsed.типНагрузки) {
+          case 'MAX_STRENGTH':
+          case 'POWER':
+            return { min: 6, max: 9 };
+          case 'SPEED':
+            return { min: 5, max: 8 };
+          case 'ANAEROBIC_ENDURANCE':
+          case 'AEROBIC_ENDURANCE':
+          case 'STRENGTH_ENDURANCE':
+            return { min: 4, max: 8 };
+          case 'AGILITY':
+            return { min: 4, max: 7 };
+          case 'MOBILITY':
+          case 'PREHAB':
+            return { min: 2, max: 5 };
+          case 'STATIC_STRETCH':
+          case 'DYNAMIC_STRETCH':
+            return { min: 1, max: 4 };
+          case 'TECHNICAL_SKILL':
+            return { min: 3, max: 6 };
+          default:
+            return { min: 4, max: 7 };
+        }
+      })();
+
+      const inferredMin = Math.max(1, baseRange.min + complexityBoost);
+      const inferredMax = Math.min(10, baseRange.max + complexityBoost);
+      parsed.rpeMin = Math.min(inferredMin, inferredMax).toString();
+      parsed.rpeMax = Math.max(inferredMin, inferredMax).toString();
+      console.log('Inferred RPE:', parsed.rpeMin, '-', parsed.rpeMax);
     }
 
     console.log('Parsed data:', parsed);
     return parsed;
   };
+
+  const normalizeTitleForCompare = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/ё/g, 'е')
+      .replace(/\s+/g, ' ')
+      .trim();
 
   const handleDeleteVideo = async (videoId: string) => {
     if (!confirm('Вы уверены, что хотите удалить это видео? Это действие нельзя отменить.')) {
@@ -690,6 +979,18 @@ const AdminVideosPage = () => {
                         <button
                           type="button"
                           onClick={() => {
+                            const normalizedInput = normalizeTitleForCompare(formData.title);
+                            const duplicate = videos.find((video) =>
+                              normalizeTitleForCompare(video.title) === normalizedInput
+                            );
+                            if (duplicate && duplicate.id !== editingVideoId) {
+                              const proceed = confirm(
+                                `⚠️ Видео с таким названием уже существует:\n${duplicate.title}\n\nПродолжить автозаполнение?`
+                              );
+                              if (!proceed) {
+                                return;
+                              }
+                            }
                             const parsed = parseVideoTitle(formData.title);
                             if (Object.keys(parsed).length > 0) {
                               setFormData(prev => ({ ...prev, ...parsed }));

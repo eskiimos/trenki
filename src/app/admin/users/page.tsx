@@ -64,6 +64,7 @@ export default function AdminUsersPage() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [updatedUserIds, setUpdatedUserIds] = useState<Set<string>>(new Set());
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [isDeletingUserId, setIsDeletingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -122,6 +123,34 @@ export default function AdminUsersPage() {
       console.error('Error fetching users:', error);
     } finally {
       if (!silent) setIsLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (userToDelete: User) => {
+    const userLabel = userToDelete.firstName || userToDelete.username || userToDelete.telegramId;
+    const confirmed = confirm(`Удалить пользователя "${userLabel}"? Это действие необратимо.`);
+    if (!confirmed) return;
+
+    try {
+      setIsDeletingUserId(userToDelete.id);
+      const response = await fetch(`/api/admin/users?userId=${userToDelete.id}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || 'Ошибка удаления пользователя');
+      }
+
+      setUsers(prev => prev.filter(user => user.id !== userToDelete.id));
+      if (selectedUser?.id === userToDelete.id) {
+        setSelectedUser(null);
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert('Ошибка удаления пользователя. Попробуйте снова.');
+    } finally {
+      setIsDeletingUserId(null);
     }
   };
 
@@ -458,13 +487,22 @@ export default function AdminUsersPage() {
                     </p>
                   )}
                 </div>
-                
-                <button
-                  onClick={() => setSelectedUser(null)}
-                  className="w-10 h-10 rounded-full bg-[#2d3448] hover:bg-[#3a4255] flex items-center justify-center transition-colors"
-                >
-                  <span className="text-2xl">×</span>
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleDeleteUser(selectedUser)}
+                    disabled={isDeletingUserId === selectedUser.id}
+                    className="px-4 py-2 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isDeletingUserId === selectedUser.id ? 'Удаление...' : 'Удалить'}
+                  </button>
+                  <button
+                    onClick={() => setSelectedUser(null)}
+                    className="w-10 h-10 rounded-full bg-[#2d3448] hover:bg-[#3a4255] flex items-center justify-center transition-colors"
+                  >
+                    <span className="text-2xl">×</span>
+                  </button>
+                </div>
               </div>
 
               {/* Контент модального окна */}

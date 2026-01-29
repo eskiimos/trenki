@@ -23,6 +23,14 @@ export async function GET(
         level: true,
         equipment: true,
         tags: true,
+        moduleType: true,
+        loadType: true,
+        muscleGroup: true,
+        complexity: true,
+        rpeMin: true,
+        rpeMax: true,
+        ageGroups: true,
+        trainingGoals: true,
         trainer: {
           select: {
             id: true,

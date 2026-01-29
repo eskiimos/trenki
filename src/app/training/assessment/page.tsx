@@ -4,8 +4,16 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTelegram } from '@/hooks/useTelegram';
 import CircularSlider from '@/components/CircularSlider2';
+import { TrainingGoal, EnergyState } from '@/generated/prisma';
+import { GOAL_LABELS, ENERGY_STATE_LABELS } from '@/lib/training-algorithm-v3';
 
-type LastTrainingTime = 'TODAY' | 'YESTERDAY' | 'TWO_DAYS_AGO' | 'THREE_PLUS_DAYS' | 'WEEK_PLUS';
+const trainingGoals = Object.values(TrainingGoal) as TrainingGoal[];
+
+const mapEnergyToState = (value: number): EnergyState => {
+  if (value >= 8) return EnergyState.FULLY_CHARGED;
+  if (value >= 4) return EnergyState.IN_TONE;
+  return EnergyState.TIRED;
+};
 
 export default function TrainingAssessmentPage() {
   const router = useRouter();
@@ -15,8 +23,8 @@ export default function TrainingAssessmentPage() {
   
   // Состояние формы
   const [formData, setFormData] = useState({
-    lastTrainingTime: '' as LastTrainingTime | '',
-    energyLevel: 0,
+    goal: null as TrainingGoal | null,
+    energyLevel: 5,
   });
 
   // Логирование состояния пользователя
@@ -45,81 +53,51 @@ export default function TrainingAssessmentPage() {
       return;
     }
 
-    if (!formData.lastTrainingTime) {
-      alert('Пожалуйста, ответьте на все вопросы');
+    if (!formData.goal) {
+      alert('Пожалуйста, выберите цель тренировки');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const assessmentPayload = {
+      const energyState = mapEnergyToState(formData.energyLevel);
+      const generatePayload = {
         userId: user.id.toString(),
-        ...formData,
-        // Добавляем значения по умолчанию для удаленных полей
-        muscleReadiness: 5,
-        motivation: 5,
-        availableTime: 30,
+        goal: formData.goal,
+        energyState,
       };
       
-      console.log('📤 Sending assessment:', assessmentPayload);
+      console.log('📤 Generating workout (v3):', generatePayload);
       
-      const response = await fetch('/api/training/assessment', {
+      const generateResponse = await fetch('/api/training/generate-v3', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(assessmentPayload),
+        body: JSON.stringify(generatePayload),
       });
 
-      const data = await response.json();
-      console.log('📥 Assessment response:', data);
+      const generateData = await generateResponse.json();
+      console.log('📥 Generate response:', generateData);
 
-      if (data.success) {
-        // Сразу генерируем тренировку
-        const generatePayload = {
-          userId: user.id.toString(),
-          assessmentId: data.assessment.id,
-          loadDirection: data.recommendation.loadDirection,
-          availableTime: data.assessment.availableTime || 45,
-        };
-        
-        console.log('📤 Generating workout:', generatePayload);
-        
-        const generateResponse = await fetch('/api/training/generate-v2', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(generatePayload),
-        });
-
-        const generateData = await generateResponse.json();
-        console.log('📥 Generate response:', generateData);
-
-        if (generateData.success) {
-          console.log('✅ Workout generated, redirecting...');
-          // Переходим на страницу тренировки
-          router.push('/training/workout');
-        } else {
-          console.error('❌ Generate error:', generateData.error);
-          
-          // Если профиль не найден, редиректим на стартовый опрос
-          if (generateData.redirectTo) {
-            alert('Пожалуйста, пройди стартовый опрос для определения твоих характеристик');
-            router.push(generateData.redirectTo);
-            return;
-          }
-          
-          // Если есть информация о недостающих модулях, переходим на workout page
-          // где будет показана подробная информация о том, что нужно добавить
-          if (generateData.missingModules && generateData.missingModules.length > 0) {
-            console.log('⚠️ Missing modules detected, redirecting to workout page for details');
-            router.push('/training/workout');
-            return;
-          }
-          
-          alert('Ошибка генерации тренировки: ' + generateData.error);
-        }
+      if (generateData.success) {
+        console.log('✅ Workout generated, redirecting...');
+        router.push(`/training/workout?id=${generateData.workoutId}`);
       } else {
-        console.error('❌ Assessment error:', data.error);
-        alert('Ошибка: ' + data.error);
+        console.error('❌ Generate error:', generateData.error);
+        
+        if (generateData.redirectTo) {
+          alert('Пожалуйста, пройди стартовый опрос для определения твоих характеристик');
+          router.push(generateData.redirectTo);
+          return;
+        }
+
+        if (generateData.missingModules && generateData.missingModules.length > 0) {
+          alert(`Не хватает модулей для тренировки: ${generateData.missingModules.join(', ')}`);
+          router.push('/training/workout');
+          return;
+        }
+        
+        alert('Ошибка генерации тренировки: ' + generateData.error);
       }
     } catch (error) {
       console.error('❌ Exception during assessment:', error);
@@ -129,13 +107,7 @@ export default function TrainingAssessmentPage() {
     }
   };
 
-  const lastTrainingOptions = [
-    { value: 'TODAY', label: 'Сегодня' },
-    { value: 'YESTERDAY', label: 'Вчера' },
-    { value: 'TWO_DAYS_AGO', label: '2 дня назад' },
-    { value: 'THREE_PLUS_DAYS', label: '3+ дня назад' },
-    { value: 'WEEK_PLUS', label: 'Неделя+ назад' },
-  ];
+  const energyStateLabel = ENERGY_STATE_LABELS[mapEnergyToState(formData.energyLevel)];
 
   const [showInfoBlock, setShowInfoBlock] = useState(true);
   const [isClosing, setIsClosing] = useState(false);
@@ -236,7 +208,7 @@ export default function TrainingAssessmentPage() {
       {/* Вопросы */}
       <div className="space-y-12">
         <div className="animate-fadeIn space-y-12">
-          {/* Вопрос 1: Когда тренировался */}
+          {/* Вопрос 1: Цель тренировки */}
           <div>
             <h2 className="mb-6" style={{
               fontFamily: 'Overpass',
@@ -247,18 +219,18 @@ export default function TrainingAssessmentPage() {
               textTransform: 'uppercase',
               color: '#F9F8FE'
             }}>
-              когда ты в последний раз тренировался
+              цель тренировки
             </h2>
-            <div className="flex flex-wrap" style={{ gap: '16px' }}>
-              {lastTrainingOptions.map((option) => {
-                const isSelected = formData.lastTrainingTime === option.value;
+            <div className="flex flex-wrap" style={{ gap: '12px' }}>
+              {trainingGoals.map((goal) => {
+                const info = GOAL_LABELS[goal];
+                if (!info) return null;
+                const isSelected = formData.goal === goal;
                 return (
                   <button
-                    key={option.value}
-                    onClick={() => {
-                      setFormData({ ...formData, lastTrainingTime: option.value as LastTrainingTime });
-                    }}
-                    className="uppercase transition-all duration-200 hover:scale-105"
+                    key={goal}
+                    onClick={() => setFormData({ ...formData, goal })}
+                    className="transition-all duration-200 hover:scale-105"
                     style={{
                       height: '44px',
                       paddingTop: '12px',
@@ -280,7 +252,7 @@ export default function TrainingAssessmentPage() {
                       cursor: 'pointer'
                     }}
                   >
-                    {option.label}
+                    {info.emoji} {info.label}
                   </button>
                 );
               })}
@@ -300,6 +272,9 @@ export default function TrainingAssessmentPage() {
             }}>
               уровень энергии
             </h2>
+            <div className="mb-4 text-sm text-gray-300">
+              {energyStateLabel ? `${energyStateLabel.emoji} ${energyStateLabel.label}` : ''}
+            </div>
             <CircularSlider
               value={formData.energyLevel}
               min={0}
@@ -322,17 +297,17 @@ export default function TrainingAssessmentPage() {
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={!formData.lastTrainingTime || isSubmitting || userLoading}
+          disabled={!formData.goal || isSubmitting || userLoading}
           className="w-full rounded-full font-medium transition-all uppercase flex items-center justify-center"
           style={{
             backgroundColor: '#A1FF4A',
             color: '#060919',
-            opacity: (!formData.lastTrainingTime || isSubmitting || userLoading) ? 0.2 : 1,
+            opacity: (!formData.goal || isSubmitting || userLoading) ? 0.2 : 1,
             fontFamily: 'Overpass, sans-serif',
             fontWeight: 700,
             fontSize: '16px',
             letterSpacing: '0.5px',
-            cursor: (!formData.lastTrainingTime || isSubmitting || userLoading) ? 'not-allowed' : 'pointer',
+            cursor: (!formData.goal || isSubmitting || userLoading) ? 'not-allowed' : 'pointer',
             height: '56px',
             padding: '0 16px',
           }}

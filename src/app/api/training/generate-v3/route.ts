@@ -162,11 +162,16 @@ export async function POST(request: NextRequest) {
     });
 
     // Обновляем lastGoals в профиле (п.11 - отслеживание разнообразия)
-    const lastGoals = [goal, ...(profile.lastGoals || [])].slice(0, 3);
+    const previousGoals = profile.lastGoals || [];
+    const lastGoals = [goal, ...previousGoals].slice(0, 3);
     await prisma.profile.update({
       where: { id: profile.id },
       data: { lastGoals },
     });
+
+    const isRepeatedGoal =
+      previousGoals.length >= 2 &&
+      previousGoals.slice(0, 2).every((g) => g === goal);
 
     console.log('✅ Тренировка создана:', workoutSession.id);
 
@@ -183,6 +188,9 @@ export async function POST(request: NextRequest) {
         complexity: complexityLevel,
         rpeRange,
         structure,
+        diversityWarning: isRepeatedGoal
+          ? 'Вы выбирали одну и ту же цель последние 3 тренировки. Попробуйте смежную цель для баланса.'
+          : null,
       },
     });
   } catch (error: any) {
@@ -228,44 +236,26 @@ async function buildWorkout(params: {
   const missingModules: string[] = [];
   const excludeVideoIds: string[] = [];
 
+  const selectTechniqueInsteadOfFitness =
+    energyState === EnergyState.TIRED && structure.includeFitness && !structure.includeTechnique
+      ? Math.random() < 0.5
+      : false;
+
+  let selectedWarmup: any | null = null;
+  let selectedFitness: any | null = null;
+  let selectedTechnique: any | null = null;
+  let selectedCooldown: any | null = null;
+
   // ========================================================================
   // 1. РАЗМИНКА (если нужна)
   // ========================================================================
-  if (structure.includeWarmup) {
-    console.log('\n🔥 Подбираем РАЗМИНКУ...');
-
-    const warmupLoadTypes = getWarmupLoadTypes(energyState);
-    const warmupCriteria = createSearchCriteria(
-      ModuleType.WARMUP,
-      warmupLoadTypes,
-      muscleGroups.warmup,
-      complexityLevels,
-      { min: 1, max: 5 }, // разминка всегда легкая
-      ageGroup
-    );
-
-    const warmupResult = await selectModuleWithFallback(
-      warmupCriteria,
-      excludeVideoIds
-    );
-
-    if (warmupResult.video) {
-      modules.push(formatModule(warmupResult.video, 'WARMUP'));
-      excludeVideoIds.push(warmupResult.video.id);
-      totalDuration += warmupResult.video.duration;
-      console.log(
-        `✅ РАЗМИНКА: ${warmupResult.video.title} (уровень: ${warmupResult.fallbackLevel})`
-      );
-    } else {
-      missingModules.push('РАЗМИНКА');
-      console.log('❌ РАЗМИНКА не найдена');
-    }
-  }
-
   // ========================================================================
-  // 2. ФИЗИЧЕСКАЯ ПОДГОТОВКА (если нужна)
+  // 1. ФИЗИЧЕСКАЯ ПОДГОТОВКА / ТЕХНИКА (если нужна)
   // ========================================================================
-  if (structure.includeFitness) {
+  const shouldSelectFitness = structure.includeFitness && !selectTechniqueInsteadOfFitness;
+  const shouldSelectTechnique = structure.includeTechnique || selectTechniqueInsteadOfFitness;
+
+  if (shouldSelectFitness) {
     console.log('\n💪 Подбираем ФИЗИЧЕСКУЮ ПОДГОТОВКУ...');
 
     const fitnessCriteria = createSearchCriteria(
@@ -283,7 +273,7 @@ async function buildWorkout(params: {
     );
 
     if (fitnessResult.video) {
-      modules.push(formatModule(fitnessResult.video, 'FITNESS'));
+      selectedFitness = formatModule(fitnessResult.video, 'FITNESS');
       excludeVideoIds.push(fitnessResult.video.id);
       totalDuration += fitnessResult.video.duration;
       console.log(
@@ -295,10 +285,7 @@ async function buildWorkout(params: {
     }
   }
 
-  // ========================================================================
-  // 3. ТЕХНИКА (если нужна)
-  // ========================================================================
-  if (structure.includeTechnique) {
+  if (shouldSelectTechnique) {
     console.log('\n🏒 Подбираем ТЕХНИКУ...');
 
     const techniqueCriteria = createSearchCriteria(
@@ -316,7 +303,7 @@ async function buildWorkout(params: {
     );
 
     if (techniqueResult.video) {
-      modules.push(formatModule(techniqueResult.video, 'TECHNIQUE'));
+      selectedTechnique = formatModule(techniqueResult.video, 'TECHNIQUE');
       excludeVideoIds.push(techniqueResult.video.id);
       totalDuration += techniqueResult.video.duration;
       console.log(
@@ -325,6 +312,45 @@ async function buildWorkout(params: {
     } else {
       missingModules.push('ТЕХНИКА');
       console.log('❌ ТЕХНИКА не найдена');
+    }
+  }
+
+  // ========================================================================
+  // 2. РАЗМИНКА (если нужна) - с привязкой к ФП
+  // ========================================================================
+  if (structure.includeWarmup) {
+    console.log('\n🔥 Подбираем РАЗМИНКУ...');
+
+    const warmupLoadTypes = getWarmupLoadTypes(energyState);
+    const fitnessMuscleGroup = selectedFitness?.muscleGroup;
+    const warmupMuscleGroups = fitnessMuscleGroup
+      ? matchWarmupToFitness(fitnessMuscleGroup)
+      : muscleGroups.warmup;
+
+    const warmupCriteria = createSearchCriteria(
+      ModuleType.WARMUP,
+      warmupLoadTypes,
+      warmupMuscleGroups,
+      complexityLevels,
+      { min: 1, max: 5 }, // разминка всегда легкая
+      ageGroup
+    );
+
+    const warmupResult = await selectModuleWithFallback(
+      warmupCriteria,
+      excludeVideoIds
+    );
+
+    if (warmupResult.video) {
+      selectedWarmup = formatModule(warmupResult.video, 'WARMUP');
+      excludeVideoIds.push(warmupResult.video.id);
+      totalDuration += warmupResult.video.duration;
+      console.log(
+        `✅ РАЗМИНКА: ${warmupResult.video.title} (уровень: ${warmupResult.fallbackLevel})`
+      );
+    } else {
+      missingModules.push('РАЗМИНКА');
+      console.log('❌ РАЗМИНКА не найдена');
     }
   }
 
@@ -349,7 +375,7 @@ async function buildWorkout(params: {
     );
 
     if (cooldownResult.video) {
-      modules.push(formatModule(cooldownResult.video, 'COOLDOWN'));
+      selectedCooldown = formatModule(cooldownResult.video, 'COOLDOWN');
       excludeVideoIds.push(cooldownResult.video.id);
       totalDuration += cooldownResult.video.duration;
       console.log(
@@ -360,6 +386,11 @@ async function buildWorkout(params: {
       console.log('❌ ЗАМИНКА не найдена');
     }
   }
+
+  if (selectedWarmup) modules.push(selectedWarmup);
+  if (selectedFitness) modules.push(selectedFitness);
+  if (selectedTechnique) modules.push(selectedTechnique);
+  if (selectedCooldown) modules.push(selectedCooldown);
 
   console.log(`\n📊 Итого модулей: ${modules.length}`);
   console.log(`⏱️ Общая длительность: ${Math.floor(totalDuration / 60)} мин`);
@@ -382,6 +413,7 @@ function formatModule(video: any, moduleType: string) {
     duration: video.duration,
     videoUrl: video.videoUrl,
     thumbnail: video.thumbnail,
+    muscleGroup: video.muscleGroup || null,
     trainer: {
       id: video.trainer.id,
       name: video.trainer.name,

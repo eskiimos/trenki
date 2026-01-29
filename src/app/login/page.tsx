@@ -275,27 +275,6 @@ export default function LoginPage() {
                 </svg>
                 Вход через Telegram
               </button>
-              
-              {/* Dev-кнопка для localhost */}
-              {typeof window !== 'undefined' && 
-                (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && (
-                <button
-                  onClick={() => {
-                    console.log('🔓 Dev mode: bypassing authentication');
-                    // Создаём фейковые данные для разработки
-                    saveAuth({
-                      telegramId: 'dev_user_' + Date.now(),
-                      firstName: 'Dev',
-                      lastName: 'User',
-                      username: 'dev_user',
-                    });
-                    window.location.href = '/';
-                  }}
-                  className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-all"
-                >
-                  🔓 Dev: Войти без Telegram
-                </button>
-              )}
             </>
           ) : (
             <button

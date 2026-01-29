@@ -124,3 +124,29 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'userId required' },
+        { status: 400 }
+      );
+    }
+
+    await prisma.user.delete({
+      where: { id: userId }
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    return NextResponse.json(
+      { error: 'Ошибка при удалении пользователя' },
+      { status: 500 }
+    );
+  }
+}

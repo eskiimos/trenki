@@ -73,7 +73,11 @@ export async function GET(request: NextRequest) {
       moduleType: video.moduleType,
       complexity: video.complexity,
       muscleGroup: video.muscleGroup,
-    }));    return NextResponse.json({ videos: formattedVideos });
+      ageGroups: video.ageGroups,
+      trainingGoals: video.trainingGoals,
+    }));
+
+    return NextResponse.json({ videos: formattedVideos });
   } catch (error) {
     console.error('Error fetching all videos:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

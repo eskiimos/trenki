@@ -5,10 +5,13 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 interface GapAnalysis {
+  goal: string;
   moduleType: string;
   loadType: string;
   muscleGroup?: string;
-  status: string;
+  ageGroup?: string;
+  complexity?: string;
+  energyState?: string;
   priority: number;
   reason: string;
   currentCount: number;
@@ -23,11 +26,19 @@ interface Stats {
     COOLDOWN: number;
     TECHNIQUE: number;
   };
-  byStatus: {
-    RECOVERY: number;
-    DEVELOPMENT: number;
-    PEAK: number;
+  byGoal: Record<string, number>;
+  byAgeGroup: Record<string, number>;
+  byComplexity: Record<string, number>;
+  metaQuality: {
+    missingModuleType: number;
+    missingLoadType: number;
+    missingMuscleGroup: number;
+    missingComplexity: number;
+    missingRpe: number;
+    missingAgeGroups: number;
+    missingTrainingGoals: number;
   };
+  fullyTagged: number;
   criticalGaps: number;
   importantGaps: number;
   desirableGaps: number;
@@ -75,16 +86,46 @@ const MUSCLE_GROUP_LABELS: Record<string, string> = {
   PREHAB_BACK: 'Профилактика: спина',
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  RECOVERY: '🟢 Восстановление',
-  DEVELOPMENT: '🟡 Развитие',
-  PEAK: '🔴 Пик',
+const GOAL_LABELS: Record<string, string> = {
+  POWERFUL_SHOT: '🎯 Мощный бросок',
+  OUTRUN_OPPONENT: '🦵🏻 Убегаем от соперника',
+  STRENGTH_STABILITY: '💪🏻 Силовая борьба',
+  SOFT_HANDS: '🏒 Мягкие ручки',
+  FULL_GAME_ENDURANCE: '🫁 Выносливость',
+  AGILITY: '⚡️ Маневренность',
+  SPORT_LONGEVITY: '🏥 Долголетие',
+};
+
+const AGE_GROUP_LABELS: Record<string, string> = {
+  CHILD: '7–10 лет',
+  TEEN: '11–17 лет',
+  YOUNG_ADULT: '18–34',
+  ADULT: '35+',
+};
+
+const COMPLEXITY_LABELS: Record<string, string> = {
+  BEGINNER: 'Начинающий',
+  AMATEUR: 'Любитель',
+  ADVANCED: 'Продвинутый',
+  PRO: 'Профи',
+};
+
+const ENERGY_LABELS: Record<string, string> = {
+  TIRED: '😴 Устал',
+  IN_TONE: '⚡️ В тонусе',
+  FULLY_CHARGED: '🔋 Заряжен',
 };
 
 export default function AdminContentCheckPage() {
   const [result, setResult] = useState<ContentCheckResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showAllGaps, setShowAllGaps] = useState(false);
+  const [goalFilter, setGoalFilter] = useState('');
+  const [moduleFilter, setModuleFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+  const [activeTab, setActiveTab] = useState<'priorities' | 'metadata' | 'stats'>('priorities');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [expandedGaps, setExpandedGaps] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     checkContent();
@@ -129,6 +170,40 @@ export default function AdminContentCheckPage() {
     );
   };
 
+  const getGapKey = (gap: GapAnalysis) =>
+    [
+      gap.goal,
+      gap.moduleType,
+      gap.loadType,
+      gap.muscleGroup || '-',
+      gap.ageGroup || '-',
+      gap.complexity || '-',
+      gap.energyState || '-',
+    ].join('|');
+
+  const toggleGapDetails = (gapKey: string) => {
+    setExpandedGaps((prev) => {
+      const next = new Set(prev);
+      if (next.has(gapKey)) {
+        next.delete(gapKey);
+      } else {
+        next.add(gapKey);
+      }
+      return next;
+    });
+  };
+
+  const filteredGaps = (showAllGaps ? result?.allGaps : result?.topPriorities || []).filter(
+    (gap) => {
+      if (goalFilter && gap.goal !== goalFilter) return false;
+      if (moduleFilter && gap.moduleType !== moduleFilter) return false;
+      if (priorityFilter === 'critical' && gap.priority < 9) return false;
+      if (priorityFilter === 'important' && (gap.priority < 6 || gap.priority >= 9)) return false;
+      if (priorityFilter === 'desirable' && gap.priority >= 6) return false;
+      return true;
+    }
+  );
+
   return (
     <div className="min-h-screen bg-[#101530] text-white p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
@@ -170,82 +245,364 @@ export default function AdminContentCheckPage() {
         {/* Results */}
         {!isLoading && result && (
           <>
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              {/* Total Videos */}
-              <div className="bg-gradient-to-br from-purple-600 to-purple-800 rounded-lg p-6">
-                <div className="text-3xl font-bold mb-1">{result.stats.total}</div>
-                <div className="text-white/90 text-sm">Всего видео</div>
-              </div>
-
-              {/* Critical Gaps */}
-              <div className="bg-gradient-to-br from-red-600 to-red-800 rounded-lg p-6">
-                <div className="text-3xl font-bold mb-1">{result.stats.criticalGaps}</div>
-                <div className="text-white/90 text-sm">🔥 Критичных пробелов</div>
-              </div>
-
-              {/* Important Gaps */}
-              <div className="bg-gradient-to-br from-orange-600 to-orange-800 rounded-lg p-6">
-                <div className="text-3xl font-bold mb-1">{result.stats.importantGaps}</div>
-                <div className="text-white/90 text-sm">⚠️ Важных пробелов</div>
-              </div>
+            {/* Tabs */}
+            <div className="flex flex-wrap gap-2 mb-6">
+              <button
+                onClick={() => setActiveTab('priorities')}
+                className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+                  activeTab === 'priorities'
+                    ? 'bg-[#A1FF4A] text-[#0A0E1A]'
+                    : 'bg-[#1a1f3a] text-gray-300 hover:bg-[#2d3448]'
+                }`}
+              >
+                Приоритеты
+              </button>
+              <button
+                onClick={() => setActiveTab('metadata')}
+                className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+                  activeTab === 'metadata'
+                    ? 'bg-[#A1FF4A] text-[#0A0E1A]'
+                    : 'bg-[#1a1f3a] text-gray-300 hover:bg-[#2d3448]'
+                }`}
+              >
+                Метаданные
+              </button>
+              <button
+                onClick={() => setActiveTab('stats')}
+                className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+                  activeTab === 'stats'
+                    ? 'bg-[#A1FF4A] text-[#0A0E1A]'
+                    : 'bg-[#1a1f3a] text-gray-300 hover:bg-[#2d3448]'
+                }`}
+              >
+                Статистика
+              </button>
             </div>
 
-            {/* Module Distribution */}
-            <div className="bg-[#1a1f3a] rounded-lg p-6 mb-6">
-              <h3 className="text-lg font-semibold mb-4">📦 Распределение по модулям</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-400">
-                    {result.stats.byModule.FITNESS}
+            {activeTab === 'priorities' && (
+              <>
+                {/* Stats Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-gradient-to-br from-purple-600 to-purple-800 rounded-lg p-6">
+                    <div className="text-3xl font-bold mb-1">{result.stats.total}</div>
+                    <div className="text-white/90 text-sm">Всего видео</div>
                   </div>
-                  <div className="text-xs text-gray-400">💪 ОФП (стержневой)</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-400">
-                    {result.stats.byModule.WARMUP}
+                  <div className="bg-gradient-to-br from-red-600 to-red-800 rounded-lg p-6">
+                    <div className="text-3xl font-bold mb-1">{result.stats.criticalGaps}</div>
+                    <div className="text-white/90 text-sm">🔥 Критичных пробелов</div>
                   </div>
-                  <div className="text-xs text-gray-400">🤸 Разминка</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-400">
-                    {result.stats.byModule.COOLDOWN}
+                  <div className="bg-gradient-to-br from-orange-600 to-orange-800 rounded-lg p-6">
+                    <div className="text-3xl font-bold mb-1">{result.stats.importantGaps}</div>
+                    <div className="text-white/90 text-sm">⚠️ Важных пробелов</div>
                   </div>
-                  <div className="text-xs text-gray-400">🧘 Заминка</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-yellow-400">
-                    {result.stats.byModule.TECHNIQUE}
-                  </div>
-                  <div className="text-xs text-gray-400">⚡ Техника</div>
-                </div>
-              </div>
-            </div>
 
-            {/* Status Distribution */}
-            <div className="bg-[#1a1f3a] rounded-lg p-6 mb-6">
-              <h3 className="text-lg font-semibold mb-4">🎯 Распределение по статусам</h3>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-400">
-                    {result.stats.byStatus.RECOVERY}
+                {/* Top Priorities */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold">
+                      🎯 Топ-{result.topPriorities.length} приоритетов
+                    </h3>
+                    <button
+                      onClick={() => setShowAllGaps(!showAllGaps)}
+                      className="text-sm text-blue-400 hover:text-blue-300"
+                    >
+                      {showAllGaps ? 'Скрыть все' : `Показать все (${result.allGaps.length})`}
+                    </button>
                   </div>
-                  <div className="text-xs text-gray-400">🟢 Восстановление</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-yellow-400">
-                    {result.stats.byStatus.DEVELOPMENT}
+
+                  <button
+                    onClick={() => setFiltersOpen(!filtersOpen)}
+                    className="w-full md:w-auto mb-4 px-4 py-2 rounded-lg bg-[#1a1f3a] hover:bg-[#2d3448] text-sm font-medium text-gray-200 transition-colors"
+                  >
+                    {filtersOpen ? 'Скрыть фильтры' : 'Показать фильтры'}
+                  </button>
+
+                  {filtersOpen && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                      <select
+                        value={goalFilter}
+                        onChange={(e) => setGoalFilter(e.target.value)}
+                        className="bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      >
+                        <option value="">Все цели</option>
+                        {Object.keys(result.stats.byGoal).map((goal) => (
+                          <option key={goal} value={goal}>
+                            {GOAL_LABELS[goal] || goal}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={moduleFilter}
+                        onChange={(e) => setModuleFilter(e.target.value)}
+                        className="bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      >
+                        <option value="">Все модули</option>
+                        {Object.keys(MODULE_LABELS).map((moduleType) => (
+                          <option key={moduleType} value={moduleType}>
+                            {MODULE_LABELS[moduleType]}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={priorityFilter}
+                        onChange={(e) => setPriorityFilter(e.target.value)}
+                        className="bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      >
+                        <option value="">Все приоритеты</option>
+                        <option value="critical">🔥 Критично</option>
+                        <option value="important">⚠️ Важно</option>
+                        <option value="desirable">💡 Желательно</option>
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    {filteredGaps.map((gap, index) => {
+                      const gapKey = getGapKey(gap);
+                      const isExpanded = expandedGaps.has(gapKey);
+
+                      return (
+                        <div
+                          key={index}
+                          className={`bg-gradient-to-r ${getPriorityColor(gap.priority)} rounded-lg p-4`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                <h4 className="text-base font-bold">
+                                  {MODULE_LABELS[gap.moduleType] || gap.moduleType}
+                                </h4>
+                                {getPriorityBadge(gap.priority)}
+                                <span className="px-2 py-1 bg-black/30 rounded-full text-[11px] font-medium">
+                                  {gap.currentCount}/{gap.recommendedCount}
+                                </span>
+                              </div>
+                              <div className="text-xs text-white/80">
+                                {GOAL_LABELS[gap.goal] || gap.goal} •{' '}
+                                {LOAD_TYPE_LABELS[gap.loadType] || gap.loadType}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => toggleGapDetails(gapKey)}
+                              className="text-xs text-white/80 hover:text-white"
+                            >
+                              {isExpanded ? 'Свернуть' : 'Подробнее'}
+                            </button>
+                          </div>
+
+                          {isExpanded && (
+                            <div className="mt-3 space-y-2 text-sm">
+                              {gap.muscleGroup && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-white/60">Мышечная группа:</span>
+                                  <span className="font-medium">
+                                    {MUSCLE_GROUP_LABELS[gap.muscleGroup] || gap.muscleGroup}
+                                  </span>
+                                </div>
+                              )}
+                              {gap.ageGroup && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-white/60">Возраст:</span>
+                                  <span className="font-medium">
+                                    {AGE_GROUP_LABELS[gap.ageGroup] || gap.ageGroup}
+                                  </span>
+                                </div>
+                              )}
+                              {gap.complexity && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-white/60">Сложность:</span>
+                                  <span className="font-medium">
+                                    {COMPLEXITY_LABELS[gap.complexity] || gap.complexity}
+                                  </span>
+                                </div>
+                              )}
+                              {gap.energyState && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-white/60">Состояние:</span>
+                                  <span className="font-medium">
+                                    {ENERGY_LABELS[gap.energyState] || gap.energyState}
+                                  </span>
+                                </div>
+                              )}
+                              <p className="text-sm text-white/90 bg-black/20 rounded p-3">
+                                💡 {gap.reason}
+                              </p>
+
+                              <div className="w-full bg-black/30 rounded-full h-2">
+                                <div
+                                  className="bg-white h-2 rounded-full transition-all"
+                                  style={{
+                                    width: `${Math.min(
+                                      (gap.currentCount / gap.recommendedCount) * 100,
+                                      100
+                                    )}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="text-xs text-gray-400">🟡 Развитие</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-red-400">
-                    {result.stats.byStatus.PEAK}
+              </>
+            )}
+
+            {activeTab === 'metadata' && (
+              <>
+                <div className="bg-[#1a1f3a] rounded-lg p-6 mb-6">
+                  <h3 className="text-lg font-semibold mb-4">🧩 Качество метаданных</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div className="flex justify-between bg-[#12162a] rounded-lg px-4 py-3">
+                      <span className="text-gray-400">Полностью размечено</span>
+                      <span className="font-semibold">
+                        {result.stats.fullyTagged} / {result.stats.total}
+                      </span>
+                    </div>
+                    <div className="flex justify-between bg-[#12162a] rounded-lg px-4 py-3">
+                      <span className="text-gray-400">Без типа модуля</span>
+                      <span className="font-semibold text-red-400">
+                        {result.stats.metaQuality.missingModuleType}
+                      </span>
+                    </div>
+                    <div className="flex justify-between bg-[#12162a] rounded-lg px-4 py-3">
+                      <span className="text-gray-400">Без типа нагрузки</span>
+                      <span className="font-semibold text-red-400">
+                        {result.stats.metaQuality.missingLoadType}
+                      </span>
+                    </div>
+                    <div className="flex justify-between bg-[#12162a] rounded-lg px-4 py-3">
+                      <span className="text-gray-400">Без направления нагрузки</span>
+                      <span className="font-semibold text-red-400">
+                        {result.stats.metaQuality.missingMuscleGroup}
+                      </span>
+                    </div>
+                    <div className="flex justify-between bg-[#12162a] rounded-lg px-4 py-3">
+                      <span className="text-gray-400">Без сложности</span>
+                      <span className="font-semibold text-orange-400">
+                        {result.stats.metaQuality.missingComplexity}
+                      </span>
+                    </div>
+                    <div className="flex justify-between bg-[#12162a] rounded-lg px-4 py-3">
+                      <span className="text-gray-400">Без RPE</span>
+                      <span className="font-semibold text-orange-400">
+                        {result.stats.metaQuality.missingRpe}
+                      </span>
+                    </div>
+                    <div className="flex justify-between bg-[#12162a] rounded-lg px-4 py-3">
+                      <span className="text-gray-400">Без возрастных групп</span>
+                      <span className="font-semibold text-orange-400">
+                        {result.stats.metaQuality.missingAgeGroups}
+                      </span>
+                    </div>
+                    <div className="flex justify-between bg-[#12162a] rounded-lg px-4 py-3">
+                      <span className="text-gray-400">Без цели тренировки</span>
+                      <span className="font-semibold text-orange-400">
+                        {result.stats.metaQuality.missingTrainingGoals}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-400">🔴 Пик</div>
                 </div>
-              </div>
-            </div>
+
+                <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4">
+                  <h4 className="font-semibold mb-2 text-blue-300">ℹ️ Как это работает?</h4>
+                  <ul className="text-sm text-gray-300 space-y-1">
+                    <li>
+                      • <strong>Критично (🔥)</strong>: отсутствуют базовые модули под цель и тип
+                      нагрузки — алгоритм не сможет собрать тренировку
+                    </li>
+                    <li>
+                      • <strong>Важно (⚠️)</strong>: недобор по возрасту/модулям/сложности
+                    </li>
+                    <li>
+                      • <strong>Желательно (💡)</strong>: нет RPE-диапазонов или редкие комбинации
+                    </li>
+                    <li>
+                      • Алгоритм учитывает цель, тип модуля, возраст, сложность и RPE
+                    </li>
+                  </ul>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'stats' && (
+              <>
+                <div className="bg-[#1a1f3a] rounded-lg p-6 mb-6">
+                  <h3 className="text-lg font-semibold mb-4">📦 Распределение по модулям</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-400">
+                        {result.stats.byModule.FITNESS}
+                      </div>
+                      <div className="text-xs text-gray-400">💪 ОФП</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-400">
+                        {result.stats.byModule.WARMUP}
+                      </div>
+                      <div className="text-xs text-gray-400">🤸 Разминка</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-purple-400">
+                        {result.stats.byModule.COOLDOWN}
+                      </div>
+                      <div className="text-xs text-gray-400">🧘 Заминка</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-yellow-400">
+                        {result.stats.byModule.TECHNIQUE}
+                      </div>
+                      <div className="text-xs text-gray-400">⚡ Техника</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-[#1a1f3a] rounded-lg p-6 mb-6">
+                  <h3 className="text-lg font-semibold mb-4">🎯 Распределение по целям</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {Object.entries(result.stats.byGoal).map(([goal, count]) => (
+                      <div key={goal} className="flex items-center justify-between bg-[#12162a] rounded-lg px-4 py-3">
+                        <span className="text-sm text-gray-300">
+                          {GOAL_LABELS[goal] || goal}
+                        </span>
+                        <span className="text-sm font-semibold text-blue-300">{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-[#1a1f3a] rounded-lg p-6">
+                    <h3 className="text-lg font-semibold mb-4">👶 Возрастные группы</h3>
+                    <div className="space-y-3">
+                      {Object.entries(result.stats.byAgeGroup).map(([group, count]) => (
+                        <div key={group} className="flex items-center justify-between bg-[#12162a] rounded-lg px-4 py-3">
+                          <span className="text-sm text-gray-300">
+                            {AGE_GROUP_LABELS[group] || group}
+                          </span>
+                          <span className="text-sm font-semibold text-blue-300">{count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="bg-[#1a1f3a] rounded-lg p-6">
+                    <h3 className="text-lg font-semibold mb-4">🏋️ Сложность</h3>
+                    <div className="space-y-3">
+                      {Object.entries(result.stats.byComplexity).map(([complexity, count]) => (
+                        <div key={complexity} className="flex items-center justify-between bg-[#12162a] rounded-lg px-4 py-3">
+                          <span className="text-sm text-gray-300">
+                            {COMPLEXITY_LABELS[complexity] || complexity}
+                          </span>
+                          <span className="text-sm font-semibold text-blue-300">{count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Top Priorities */}
             <div className="mb-6">
@@ -261,8 +618,45 @@ export default function AdminContentCheckPage() {
                 </button>
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                <select
+                  value={goalFilter}
+                  onChange={(e) => setGoalFilter(e.target.value)}
+                  className="bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                >
+                  <option value="">Все цели</option>
+                  {Object.keys(result.stats.byGoal).map((goal) => (
+                    <option key={goal} value={goal}>
+                      {GOAL_LABELS[goal] || goal}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={moduleFilter}
+                  onChange={(e) => setModuleFilter(e.target.value)}
+                  className="bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                >
+                  <option value="">Все модули</option>
+                  {Object.keys(MODULE_LABELS).map((moduleType) => (
+                    <option key={moduleType} value={moduleType}>
+                      {MODULE_LABELS[moduleType]}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value)}
+                  className="bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                >
+                  <option value="">Все приоритеты</option>
+                  <option value="critical">🔥 Критично</option>
+                  <option value="important">⚠️ Важно</option>
+                  <option value="desirable">💡 Желательно</option>
+                </select>
+              </div>
+
               <div className="space-y-4">
-                {(showAllGaps ? result.allGaps : result.topPriorities).map((gap, index) => (
+                {filteredGaps.map((gap, index) => (
                   <div
                     key={index}
                     className={`bg-gradient-to-r ${getPriorityColor(gap.priority)} rounded-lg p-6`}
@@ -276,6 +670,9 @@ export default function AdminContentCheckPage() {
                           {getPriorityBadge(gap.priority)}
                           <span className="px-3 py-1 bg-black/30 rounded-full text-xs font-medium">
                             {gap.currentCount}/{gap.recommendedCount} видео
+                          </span>
+                          <span className="px-3 py-1 bg-black/30 rounded-full text-xs font-medium">
+                            {GOAL_LABELS[gap.goal] || gap.goal}
                           </span>
                         </div>
 
@@ -296,12 +693,32 @@ export default function AdminContentCheckPage() {
                             </div>
                           )}
 
-                          <div className="flex items-center gap-2 text-sm">
-                            <span className="text-white/60">Статус тренировки:</span>
-                            <span className="font-medium">
-                              {STATUS_LABELS[gap.status] || gap.status}
-                            </span>
-                          </div>
+                          {gap.ageGroup && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="text-white/60">Возраст:</span>
+                              <span className="font-medium">
+                                {AGE_GROUP_LABELS[gap.ageGroup] || gap.ageGroup}
+                              </span>
+                            </div>
+                          )}
+
+                          {gap.complexity && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="text-white/60">Сложность:</span>
+                              <span className="font-medium">
+                                {COMPLEXITY_LABELS[gap.complexity] || gap.complexity}
+                              </span>
+                            </div>
+                          )}
+
+                          {gap.energyState && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="text-white/60">Состояние:</span>
+                              <span className="font-medium">
+                                {ENERGY_LABELS[gap.energyState] || gap.energyState}
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         <p className="text-sm text-white/90 bg-black/20 rounded p-3">
@@ -333,7 +750,7 @@ export default function AdminContentCheckPage() {
             </div>
 
             {/* Quick Actions */}
-            <div className="bg-[#1a1f3a] rounded-lg p-6">
+            <div className="bg-[#1a1f3a] rounded-lg p-6 mt-6">
               <h4 className="font-semibold mb-4">🚀 Быстрые действия</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <Link href="/admin/videos">
@@ -352,29 +769,6 @@ export default function AdminContentCheckPage() {
                   </button>
                 </Link>
               </div>
-            </div>
-
-            {/* Info */}
-            <div className="mt-6 bg-blue-900/20 border border-blue-700/50 rounded-lg p-4">
-              <h4 className="font-semibold mb-2 text-blue-300">ℹ️ Как это работает?</h4>
-              <ul className="text-sm text-gray-300 space-y-1">
-                <li>
-                  • <strong>Критично (🔥)</strong>: Стержневой модуль FITNESS - без него
-                  тренировка невозможна
-                </li>
-                <li>
-                  • <strong>Важно (⚠️)</strong>: Разминка и заминка - обязательные части
-                  тренировки
-                </li>
-                <li>
-                  • <strong>Желательно (💡)</strong>: Техника - добавляет разнообразие и
-                  специализацию
-                </li>
-                <li>
-                  • Алгоритм анализирует совместимость типов нагрузки и покрытие всех статусов
-                  (Восстановление/Развитие/Пик)
-                </li>
-              </ul>
             </div>
           </>
         )}
