@@ -200,8 +200,8 @@ const ScheduledWorkoutSection = () => {
   const timerLabel = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
   return (
-    <section className="px-4 mt-2">
-      <div className="self-stretch p-4 bg-gradient-to-b from-slate-900 to-slate-950 rounded-lg shadow-[inset_0px_1px_2px_0px_rgba(147,255,45,0.40)] inline-flex flex-col justify-start items-start gap-4 overflow-hidden">
+    <section className="px-4 mb-4">
+      <div className="self-stretch p-4 bg-gradient-to-b from-slate-900 to-slate-950 rounded-lg inline-flex flex-col justify-start items-start gap-4 overflow-hidden">
         <div className="self-stretch inline-flex justify-between items-start">
           <div className="flex-1 h-9 justify-center text-slate-50 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
             запланированная тренировка через
