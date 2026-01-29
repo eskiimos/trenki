@@ -193,16 +193,18 @@ export default function AdminContentCheckPage() {
     });
   };
 
-  const filteredGaps = (showAllGaps ? result?.allGaps : result?.topPriorities || []).filter(
-    (gap) => {
-      if (goalFilter && gap.goal !== goalFilter) return false;
-      if (moduleFilter && gap.moduleType !== moduleFilter) return false;
-      if (priorityFilter === 'critical' && gap.priority < 9) return false;
-      if (priorityFilter === 'important' && (gap.priority < 6 || gap.priority >= 9)) return false;
-      if (priorityFilter === 'desirable' && gap.priority >= 6) return false;
-      return true;
-    }
-  );
+  const gapsSource = showAllGaps
+    ? result?.allGaps ?? []
+    : result?.topPriorities ?? [];
+
+  const filteredGaps = gapsSource.filter((gap) => {
+    if (goalFilter && gap.goal !== goalFilter) return false;
+    if (moduleFilter && gap.moduleType !== moduleFilter) return false;
+    if (priorityFilter === 'critical' && gap.priority < 9) return false;
+    if (priorityFilter === 'important' && (gap.priority < 6 || gap.priority >= 9)) return false;
+    if (priorityFilter === 'desirable' && gap.priority >= 6) return false;
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-[#101530] text-white p-4 md:p-8">
