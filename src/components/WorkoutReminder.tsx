@@ -112,8 +112,16 @@ export default function WorkoutReminder() {
 
   return (
     <div className="fixed left-0 right-0 bottom-20 z-40 px-4">
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => router.push(`/training/workout?id=${workout.id}`)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            router.push(`/training/workout?id=${workout.id}`);
+          }
+        }}
         className="w-full p-2 bg-[#445CFF] rounded-lg inline-flex flex-col justify-center items-start gap-2 overflow-hidden text-left"
       >
         <div className="self-stretch inline-flex justify-between items-start gap-2">
@@ -124,7 +132,10 @@ export default function WorkoutReminder() {
           />
           <button
             type="button"
-            onClick={handleCancelWorkout}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleCancelWorkout();
+            }}
             className="w-8 h-8 -m-1 inline-flex items-center justify-center text-[#A1FF4A] text-lg font-bold leading-none"
             aria-label="Закрыть напоминание"
           >
@@ -139,7 +150,7 @@ export default function WorkoutReminder() {
             {' '}тренировку с персональным тренером
           </span>
         </div>
-      </button>
+      </div>
     </div>
   );
 }
