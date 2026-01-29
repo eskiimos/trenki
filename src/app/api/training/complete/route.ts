@@ -50,7 +50,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (session.userId !== userId) {
+    // Находим пользователя по telegramId или внутреннему id
+    let requestUser = await prisma.user.findUnique({
+      where: { telegramId: userId },
+      select: { id: true },
+    });
+
+    if (!requestUser) {
+      requestUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true },
+      });
+    }
+
+    if (!requestUser || session.userId !== requestUser.id) {
       return NextResponse.json(
         { error: 'Доступ запрещен' },
         { status: 403 }
