@@ -10,53 +10,76 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const userId = searchParams.get('userId');
+    const workoutId = searchParams.get('workoutId');
 
-    if (!userId) {
+    if (!userId && !workoutId) {
       return NextResponse.json(
-        { error: 'userId обязателен' },
+        { error: 'userId или workoutId обязателен' },
         { status: 400 }
       );
     }
 
-    // Находим пользователя по telegramId или внутреннему id
-    let user = await prisma.user.findUnique({
-      where: { telegramId: userId },
-      select: { id: true },
-    });
-
-    if (!user) {
-      user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true },
-      });
-    }
-
-    if (!user) {
-      return NextResponse.json({ workout: null });
-    }
-
     // Ищем активную тренировку (PENDING или IN_PROGRESS)
-    const workout = await prisma.workoutSession.findFirst({
-      where: {
-        userId: user.id,
-        status: {
-          in: [WorkoutStatus.PENDING, WorkoutStatus.IN_PROGRESS],
-        },
-      },
-      include: {
-        videos: {
+    // Если передан workoutId — возвращаем тренировку по id (включая COMPLETED)
+    let workout = workoutId
+      ? await prisma.workoutSession.findUnique({
+          where: { id: workoutId },
           include: {
-            video: {
+            videos: {
               include: {
-                trainer: true,
+                video: {
+                  include: {
+                    trainer: true,
+                  },
+                },
               },
+              orderBy: { order: 'asc' },
             },
           },
-          orderBy: { order: 'asc' },
+        })
+      : null;
+
+    if (!workout && userId) {
+      // Находим пользователя по telegramId или внутреннему id
+      let user = await prisma.user.findUnique({
+        where: { telegramId: userId },
+        select: { id: true },
+      });
+
+      if (!user) {
+        user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { id: true },
+        });
+      }
+
+      if (!user) {
+        return NextResponse.json({ workout: null });
+      }
+
+      // Ищем активную тренировку (PENDING или IN_PROGRESS)
+      workout = await prisma.workoutSession.findFirst({
+        where: {
+          userId: user.id,
+          status: {
+            in: [WorkoutStatus.PENDING, WorkoutStatus.IN_PROGRESS],
+          },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        include: {
+          videos: {
+            include: {
+              video: {
+                include: {
+                  trainer: true,
+                },
+              },
+            },
+            orderBy: { order: 'asc' },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
 
     if (!workout) {
       return NextResponse.json({ workout: null });

@@ -111,12 +111,8 @@ export default function WorkoutPage() {
 
       let response;
       if (workoutId) {
-        // Загружаем конкретную тренировку по ID
-        // TODO: создать отдельный endpoint /api/training/session/{id}
-        // Пока используем current, так как он возвращает последнюю незавершенную
-        response = await fetch(`/api/training/current?userId=${user?.id}`);
+        response = await fetch(`/api/training/current?workoutId=${workoutId}&userId=${user?.id}`);
       } else {
-        // Загружаем текущую незавершенную тренировку
         response = await fetch(`/api/training/current?userId=${user?.id}`);
       }
 
