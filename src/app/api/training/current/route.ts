@@ -18,10 +18,27 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Находим пользователя по telegramId или внутреннему id
+    let user = await prisma.user.findUnique({
+      where: { telegramId: userId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true },
+      });
+    }
+
+    if (!user) {
+      return NextResponse.json({ workout: null });
+    }
+
     // Ищем активную тренировку (PENDING или IN_PROGRESS)
     const workout = await prisma.workoutSession.findFirst({
       where: {
-        userId,
+        userId: user.id,
         status: {
           in: [WorkoutStatus.PENDING, WorkoutStatus.IN_PROGRESS],
         },

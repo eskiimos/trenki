@@ -37,6 +37,13 @@ interface Video {
   типНагрузки?: string;
   группаМышц?: string;
   сложность?: string;
+  // Поля для алгоритма 2.0 (enum значения)
+  moduleType?: string;
+  loadType?: string;
+  muscleGroup?: string;
+  complexity?: string;
+  rpeMin?: number | null;
+  rpeMax?: number | null;
   // Новые поля для Алгоритма 2.0
   ageGroups?: string[];
   trainingGoals?: string[];
@@ -64,6 +71,25 @@ const AdminVideosPage = () => {
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]); // ID тегов из базы
   const [activeTab, setActiveTab] = useState<'basic' | 'algorithm'>('basic');
   const [algorithmSubTab, setAlgorithmSubTab] = useState<'classification' | 'targeting'>('classification');
+
+  const getMissingAlgorithmFields = (video: Video) => {
+    const missing: string[] = [];
+    const moduleTypeValue = (video as any).moduleType || video.типМодуля;
+    const loadTypeValue = (video as any).loadType || video.типНагрузки;
+    const muscleGroupValue = (video as any).muscleGroup || video.группаМышц;
+    const complexityValue = (video as any).complexity || video.сложность;
+
+    if (!moduleTypeValue) missing.push('тип модуля');
+    if (!loadTypeValue) missing.push('тип нагрузки');
+    if (!muscleGroupValue) missing.push('группа мышц');
+    if (!complexityValue) missing.push('сложность');
+    if (video.rpeMin == null) missing.push('RPE min');
+    if (video.rpeMax == null) missing.push('RPE max');
+    if (!video.ageGroups || video.ageGroups.length === 0) missing.push('возраст');
+    if (!video.trainingGoals || video.trainingGoals.length === 0) missing.push('цели');
+
+    return missing;
+  };
   
     // Начальное состояние формы
   const initialFormState = {
@@ -1722,6 +1748,16 @@ const AdminVideosPage = () => {
                   
                   {/* Название видео */}
                   <h3 className="font-semibold text-base md:text-lg mb-2 pr-28">{video.title}</h3>
+
+                  {(() => {
+                    const missingFields = getMissingAlgorithmFields(video);
+                    if (missingFields.length === 0) return null;
+                    return (
+                      <div className="mb-2 text-xs text-red-300">
+                        ⚠️ Не заполнено: {missingFields.join(', ')}
+                      </div>
+                    );
+                  })()}
                   
                   {/* Тип модуля (если указан) */}
                   {video.типМодуля && (
