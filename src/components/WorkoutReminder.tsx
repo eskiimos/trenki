@@ -58,52 +58,25 @@ export default function WorkoutReminder() {
   const isStarted = workout.status === 'IN_PROGRESS';
 
   return (
-    <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-4 rounded-lg shadow-lg mb-6 animate-pulse-slow">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-2xl">🔥</span>
-            <h3 className="text-white font-bold text-lg">
-              {isStarted ? 'Продолжи тренировку!' : 'У тебя есть тренировка!'}
-            </h3>
-          </div>
-          
-          <div className="space-y-1">
-            <p className="text-white/90 text-sm">
-              Прогресс: {completedVideos}/{totalVideos} видео
-            </p>
-            
-            {/* Прогресс-бар */}
-            <div className="w-full bg-white/30 rounded-full h-2 overflow-hidden">
-              <div 
-                className="bg-white h-full rounded-full transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            
-            <p className="text-white/80 text-xs">
-              {progress}% завершено
-            </p>
+    <div className="fixed left-1/2 bottom-20 -translate-x-1/2 z-40">
+      <button
+        onClick={() => router.push(`/training/workout?id=${workout.id}`)}
+        className="w-80 pl-4 pr-2 py-2 bg-indigo-500 rounded-lg shadow-[inset_0px_1px_2px_0px_rgba(249,248,254,0.40)] outline outline-[0.50px] outline-offset-[-0.50px] inline-flex flex-col justify-center items-start gap-2 overflow-hidden"
+      >
+        <div className="self-stretch inline-flex justify-start items-start gap-2">
+          <div className="w-4 h-4 relative bg-lime-400/20 rounded overflow-hidden">
+            <div className="w-3 h-2.5 left-[2px] top-[2px] absolute bg-lime-400" />
           </div>
         </div>
-        
-        <button
-          onClick={() => router.push(`/training/workout?id=${workout.id}`)}
-          className="ml-4 bg-white text-orange-600 px-6 py-3 rounded-lg font-semibold hover:bg-orange-50 transition-colors shadow-md flex items-center gap-2"
-        >
-          {isStarted ? (
-            <>
-              <span>Продолжить</span>
-              <span>▶️</span>
-            </>
-          ) : (
-            <>
-              <span>Начать</span>
-              <span>🚀</span>
-            </>
-          )}
-        </button>
-      </div>
+        <div className="self-stretch justify-start">
+          <span className="text-slate-50 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+            {isStarted ? 'продолжить' : 'начать'}
+          </span>
+          <span className="text-lime-400 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+            {' '}тренировку с персональным тренером
+          </span>
+        </div>
+      </button>
     </div>
   );
 }
