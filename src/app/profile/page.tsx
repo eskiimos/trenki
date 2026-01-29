@@ -9,6 +9,7 @@ import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { ProfileSkeleton } from '../../components/Skeleton';
 import BottomNavigation from '@/components/BottomNavigation';
 import { clearAuth, getTelegramId } from '@/lib/auth';
+import { calculateAge } from '@/lib/age-utils';
 
 const ProfilePage = () => {
   const router = useRouter();
@@ -115,6 +116,10 @@ const ProfilePage = () => {
   const displayPosition = userProfile?.profile?.position ? 
     positionMap[userProfile.profile.position] || userProfile.profile.position :
     'Позиция не указана';
+
+  const displayAge = userProfile?.profile?.birthDate
+    ? calculateAge(new Date(userProfile.profile.birthDate))
+    : null;
 
   // Функция выхода
   const handleLogout = () => {
@@ -223,7 +228,7 @@ const ProfilePage = () => {
             {/* Возраст, рост, вес */}
             <div className="h-10 px-4 flex items-center">
               <div className="text-[#AEABBB] text-sm font-medium font-overpass uppercase">
-                {userProfile?.profile?.age || '-'} ГОД | {userProfile?.profile?.height || '-'} СМ | {userProfile?.profile?.weight || '-'} КГ
+                {displayAge ?? '-'} ГОД | {userProfile?.profile?.height || '-'} СМ | {userProfile?.profile?.weight || '-'} КГ
               </div>
             </div>
           </div>

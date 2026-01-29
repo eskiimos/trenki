@@ -24,6 +24,7 @@ const ProfileEditPage = () => {
     position: '',
     number: '',
     birthDate: '',
+    gender: '',
     height: '',
     weight: '',
     avatarUrl: '',
@@ -61,6 +62,7 @@ const ProfileEditPage = () => {
             position: data.user?.profile?.position || '',
             number: data.user?.profile?.number?.toString() || '',
             birthDate: data.user?.profile?.birthDate ? new Date(data.user.profile.birthDate).toISOString().split('T')[0] : '',
+            gender: data.user?.profile?.gender || '',
             height: data.user?.profile?.height?.toString() || '',
             weight: data.user?.profile?.weight?.toString() || '',
             avatarUrl: data.user?.profile?.avatarUrl || '',
@@ -224,6 +226,7 @@ const ProfileEditPage = () => {
           position: formData.position || null,
           number: formData.number ? parseInt(formData.number) : null,
           birthDate: formData.birthDate ? new Date(formData.birthDate).toISOString() : null,
+          gender: formData.gender || null,
           height: formData.height ? parseInt(formData.height) : null,
           weight: formData.weight ? parseInt(formData.weight) : null,
           avatarUrl: formData.avatarUrl || null,
@@ -431,19 +434,34 @@ const ProfileEditPage = () => {
           <div className="flex gap-3 flex-wrap">
             <button
               type="button"
-              className="px-6 py-3 rounded-full font-medium transition-all bg-[#AEABBB33] text-white hover:bg-[#A1FF4A] hover:text-[#0A0E1A]"
+              onClick={() => handleInputChange('gender', 'MALE')}
+              className={`px-6 py-3 rounded-full font-medium transition-all ${
+                formData.gender === 'MALE'
+                  ? 'bg-[#A1FF4A] text-[#0A0E1A]'
+                  : 'bg-[#AEABBB33] text-white hover:bg-[#A1FF4A] hover:text-[#0A0E1A]'
+              }`}
             >
               М
             </button>
             <button
               type="button"
-              className="px-6 py-3 rounded-full font-medium transition-all bg-[#AEABBB33] text-white hover:bg-[#A1FF4A] hover:text-[#0A0E1A]"
+              onClick={() => handleInputChange('gender', 'FEMALE')}
+              className={`px-6 py-3 rounded-full font-medium transition-all ${
+                formData.gender === 'FEMALE'
+                  ? 'bg-[#A1FF4A] text-[#0A0E1A]'
+                  : 'bg-[#AEABBB33] text-white hover:bg-[#A1FF4A] hover:text-[#0A0E1A]'
+              }`}
             >
               Ж
             </button>
             <button
               type="button"
-              className="px-6 py-3 rounded-full font-medium text-sm transition-all bg-[#AEABBB33] text-white hover:bg-[#A1FF4A] hover:text-[#0A0E1A]"
+              onClick={() => handleInputChange('gender', 'NOT_SPECIFIED')}
+              className={`px-6 py-3 rounded-full font-medium text-sm transition-all ${
+                formData.gender === 'NOT_SPECIFIED'
+                  ? 'bg-[#A1FF4A] text-[#0A0E1A]'
+                  : 'bg-[#AEABBB33] text-white hover:bg-[#A1FF4A] hover:text-[#0A0E1A]'
+              }`}
             >
               Не хочу указывать
             </button>
