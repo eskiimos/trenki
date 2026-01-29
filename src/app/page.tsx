@@ -91,6 +91,9 @@ const HomePage = () => {
       
       {/* Секция с короткими видео (треньки) */}
       <TrenkiSection />
+
+      {/* Запланированная тренировка (за 1 час до старта) */}
+      <ScheduledWorkoutSection />
       
       {/* Основное обучающее видео */}
       <HeroVideoSection />
@@ -107,6 +110,117 @@ const HomePage = () => {
       {/* Нижнее меню */}
       <BottomNavigation activeTab="home" />
     </div>
+  );
+};
+
+const ScheduledWorkoutSection = () => {
+  const router = useRouter();
+  const [nextWorkout, setNextWorkout] = useState<any | null>(null);
+  const [timeLeftMs, setTimeLeftMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchNextWorkout = async () => {
+      try {
+        const now = new Date();
+        const month = now.getMonth();
+        const year = now.getFullYear();
+        const telegramId = getTelegramId();
+
+        if (!telegramId) return;
+
+        const response = await fetch(`/api/schedule?month=${month}&year=${year}`, {
+          headers: {
+            'x-telegram-id': telegramId,
+          },
+        });
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const upcoming = (data || [])
+          .filter((item: any) => !item.completed)
+          .map((item: any) => ({
+            ...item,
+            dateObj: new Date(item.date),
+          }))
+          .filter((item: any) => item.dateObj.getTime() > Date.now())
+          .sort((a: any, b: any) => a.dateObj.getTime() - b.dateObj.getTime());
+
+        if (isMounted) {
+          setNextWorkout(upcoming[0] || null);
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки расписания:', error);
+      }
+    };
+
+    fetchNextWorkout();
+    const refreshInterval = setInterval(fetchNextWorkout, 60_000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(refreshInterval);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!nextWorkout) {
+      setTimeLeftMs(null);
+      return;
+    }
+
+    const updateTimer = () => {
+      const diff = new Date(nextWorkout.date).getTime() - Date.now();
+      setTimeLeftMs(diff);
+
+      if (diff <= 0) {
+        setNextWorkout(null);
+      }
+    };
+
+    updateTimer();
+    const timerId = setInterval(updateTimer, 1000);
+
+    return () => clearInterval(timerId);
+  }, [nextWorkout]);
+
+  if (!nextWorkout || timeLeftMs === null) return null;
+
+  if (timeLeftMs <= 0 || timeLeftMs > 60 * 60 * 1000) {
+    return null;
+  }
+
+  const totalSeconds = Math.floor(timeLeftMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  const timerLabel = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+  return (
+    <section className="px-4 mt-2">
+      <div className="self-stretch p-4 bg-gradient-to-b from-slate-900 to-slate-950 rounded-lg shadow-[inset_0px_1px_2px_0px_rgba(147,255,45,0.40)] inline-flex flex-col justify-start items-start gap-4 overflow-hidden">
+        <div className="self-stretch inline-flex justify-between items-start">
+          <div className="flex-1 h-9 justify-center text-slate-50 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+            запланированная тренировка через
+          </div>
+          <div className="w-16 h-8 px-2 py-1 bg-lime-400/20 rounded-lg shadow-[inset_0px_1px_2px_0px_rgba(249,248,254,0.40)] flex justify-center items-center gap-4">
+            <div className="justify-center text-lime-400 text-base font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+              {timerLabel}
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => router.push(`/video/${nextWorkout.video?.id}?fromWorkout=true`)}
+          className="self-stretch h-12 px-6 py-3 bg-lime-400 rounded-[32px] inline-flex justify-center items-center gap-2.5"
+        >
+          <div className="justify-center text-slate-950 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+            начать
+          </div>
+        </button>
+      </div>
+    </section>
   );
 };
 
