@@ -4,15 +4,17 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTelegram } from '@/hooks/useTelegram';
 import CircularSlider from '@/components/CircularSlider2';
-import { TrainingGoal, EnergyState } from '@/generated/prisma';
+import { TrainingGoal } from '@/generated/prisma';
 import { GOAL_LABELS, ENERGY_STATE_LABELS } from '@/lib/training-algorithm-v3';
 
 const trainingGoals = Object.values(TrainingGoal) as TrainingGoal[];
 
-const mapEnergyToState = (value: number): EnergyState => {
-  if (value >= 8) return EnergyState.FULLY_CHARGED;
-  if (value >= 4) return EnergyState.IN_TONE;
-  return EnergyState.TIRED;
+type EnergyStateValue = 'FULLY_CHARGED' | 'IN_TONE' | 'TIRED';
+
+const mapEnergyToState = (value: number): EnergyStateValue => {
+  if (value >= 8) return 'FULLY_CHARGED';
+  if (value >= 4) return 'IN_TONE';
+  return 'TIRED';
 };
 
 export default function TrainingAssessmentPage() {
@@ -107,7 +109,7 @@ export default function TrainingAssessmentPage() {
     }
   };
 
-  const energyStateLabel = ENERGY_STATE_LABELS[mapEnergyToState(formData.energyLevel)];
+  const energyStateLabel = ENERGY_STATE_LABELS?.[mapEnergyToState(formData.energyLevel)];
 
   const [showInfoBlock, setShowInfoBlock] = useState(true);
   const [isClosing, setIsClosing] = useState(false);
