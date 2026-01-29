@@ -25,6 +25,7 @@ export default function WorkoutReminder() {
   const [workout, setWorkout] = useState<WorkoutData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   useEffect(() => {
     const fetchCurrentWorkout = async () => {
@@ -58,25 +59,8 @@ export default function WorkoutReminder() {
   const progress = Math.round((completedVideos / totalVideos) * 100);
   const isStarted = workout.status === 'IN_PROGRESS';
 
-  const requestCancelConfirmation = () => {
-    return new Promise<boolean>((resolve) => {
-      const tg = window.Telegram?.WebApp;
-      const message = 'Вы уверены, что хотите отменить тренировку?';
-
-      if (tg?.showConfirm) {
-        tg.showConfirm(message, (confirmed) => resolve(!!confirmed));
-        return;
-      }
-
-      resolve(window.confirm(message));
-    });
-  };
-
   const handleCancelWorkout = async () => {
     if (isCancelling || !workout) return;
-
-    const confirmed = await requestCancelConfirmation();
-    if (!confirmed) return;
 
     const telegramId = getTelegramId();
     if (!telegramId) return;
@@ -95,6 +79,7 @@ export default function WorkoutReminder() {
       }
 
       setWorkout(null);
+      setShowCancelConfirm(false);
     } catch (error) {
       console.error('Ошибка отмены тренировки:', error);
       const tg = window.Telegram?.WebApp;
@@ -134,7 +119,7 @@ export default function WorkoutReminder() {
             type="button"
             onClick={(event) => {
               event.stopPropagation();
-              handleCancelWorkout();
+              setShowCancelConfirm(true);
             }}
             className="w-8 h-8 -m-1 inline-flex items-center justify-center text-[#A1FF4A] text-lg font-bold leading-none"
             aria-label="Закрыть напоминание"
@@ -151,6 +136,39 @@ export default function WorkoutReminder() {
           </span>
         </div>
       </div>
+      {showCancelConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowCancelConfirm(false)}
+            role="button"
+            tabIndex={-1}
+            aria-label="Закрыть подтверждение"
+          />
+          <div className="relative w-full max-w-sm rounded-xl bg-[#0B0F2A] p-4 text-left shadow-lg">
+            <div className="text-white text-base font-semibold">Вы уверены?</div>
+            <div className="mt-2 text-white/80 text-sm">
+              Тренировка будет отменена.
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCancelConfirm(false)}
+                className="flex-1 rounded-lg border border-white/20 px-3 py-2 text-sm font-semibold text-white"
+              >
+                Нет
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelWorkout}
+                className="flex-1 rounded-lg bg-[#A1FF4A] px-3 py-2 text-sm font-semibold text-[#0B0F2A]"
+              >
+                Да, отменить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
