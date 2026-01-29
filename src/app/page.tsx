@@ -123,14 +123,11 @@ const ScheduledWorkoutSection = () => {
 
     const fetchNextWorkout = async () => {
       try {
-        const now = new Date();
-        const month = now.getMonth();
-        const year = now.getFullYear();
         const telegramId = getTelegramId();
 
         if (!telegramId) return;
 
-        const response = await fetch(`/api/schedule?month=${month}&year=${year}`, {
+        const response = await fetch('/api/schedule', {
           headers: {
             'x-telegram-id': telegramId,
           },
@@ -139,13 +136,18 @@ const ScheduledWorkoutSection = () => {
         if (!response.ok) return;
 
         const data = await response.json();
+        const now = Date.now();
+        const oneHourFromNow = now + 60 * 60 * 1000;
         const upcoming = (data || [])
           .filter((item: any) => !item.completed)
           .map((item: any) => ({
             ...item,
             dateObj: new Date(item.date),
           }))
-          .filter((item: any) => item.dateObj.getTime() > Date.now())
+          .filter((item: any) => {
+            const ts = item.dateObj.getTime();
+            return ts > now && ts <= oneHourFromNow;
+          })
           .sort((a: any, b: any) => a.dateObj.getTime() - b.dateObj.getTime());
 
         if (isMounted) {
@@ -188,7 +190,7 @@ const ScheduledWorkoutSection = () => {
 
   if (!nextWorkout || timeLeftMs === null) return null;
 
-  if (timeLeftMs <= 0 || timeLeftMs > 60 * 60 * 1000) {
+  if (timeLeftMs <= 0) {
     return null;
   }
 
