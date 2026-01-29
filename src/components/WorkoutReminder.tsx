@@ -58,15 +58,17 @@ export default function WorkoutReminder() {
   const isStarted = workout.status === 'IN_PROGRESS';
 
   return (
-    <div className="fixed left-1/2 bottom-20 -translate-x-1/2 z-40">
+    <div className="fixed left-0 right-0 bottom-20 z-40 px-4">
       <button
         onClick={() => router.push(`/training/workout?id=${workout.id}`)}
-        className="w-80 pl-4 pr-2 py-2 bg-indigo-500 rounded-lg shadow-[inset_0px_1px_2px_0px_rgba(249,248,254,0.40)] outline outline-[0.50px] outline-offset-[-0.50px] inline-flex flex-col justify-center items-start gap-2 overflow-hidden"
+        className="w-full p-2 bg-[#445CFF] rounded-lg inline-flex flex-col justify-center items-start gap-2 overflow-hidden text-left"
       >
         <div className="self-stretch inline-flex justify-start items-start gap-2">
-          <div className="w-4 h-4 relative bg-lime-400/20 rounded overflow-hidden">
-            <div className="w-3 h-2.5 left-[2px] top-[2px] absolute bg-lime-400" />
-          </div>
+          <img
+            src="/icons/icon-cards.svg"
+            alt=""
+            className="w-4 h-4"
+          />
         </div>
         <div className="self-stretch justify-start">
           <span className="text-slate-50 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
