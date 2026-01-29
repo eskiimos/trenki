@@ -13,6 +13,8 @@ interface WorkoutModule {
   description: string | null;
   типМодуля: string | null;
   типНагрузки: string | null;
+  moduleType?: string | null;
+  loadType?: string | null;
   duration: number;
   rpeRange: string;
   videoUrl: string;
@@ -365,6 +367,10 @@ export default function WorkoutPage() {
     'ОФП': 'FITNESS',
     'Техника': 'TECHNIQUE',
     'Заминка': 'COOLDOWN',
+    WARMUP: 'WARMUP',
+    FITNESS: 'FITNESS',
+    TECHNIQUE: 'TECHNIQUE',
+    COOLDOWN: 'COOLDOWN',
   };
 
   const moduleTypeInfo = {
@@ -376,7 +382,8 @@ export default function WorkoutPage() {
 
   // Функция для получения типа модуля
   const getModuleType = (module: WorkoutModule): string => {
-    return moduleTypeMap[module.типМодуля || ''] || 'WARMUP';
+    const raw = module.moduleType || module.типМодуля || '';
+    return moduleTypeMap[raw] || 'WARMUP';
   };
 
   return (
@@ -645,7 +652,7 @@ export default function WorkoutPage() {
                 textAlign: 'center',
                 padding: '0 16px',
               }}>
-                {info?.label || module.типМодуля || 'МОДУЛЬ'}
+                {info?.label || module.типМодуля || module.moduleType || 'МОДУЛЬ'}
               </div>
             </div>
           );
