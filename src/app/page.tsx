@@ -215,7 +215,7 @@ const ScheduledWorkoutSection = () => {
         <button
           type="button"
           onClick={() => router.push(`/video/${nextWorkout.video?.id}?fromWorkout=true`)}
-          className="self-stretch h-12 px-6 py-3 bg-lime-400 rounded-[32px] inline-flex justify-center items-center gap-2.5"
+          className="self-stretch h-12 px-6 py-3 bg-[#A1FF4A] rounded-[32px] inline-flex justify-center items-center gap-2.5"
         >
           <div className="justify-center text-slate-950 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
             начать
