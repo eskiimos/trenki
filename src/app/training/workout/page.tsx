@@ -101,16 +101,7 @@ export default function WorkoutPage() {
     };
   }, [user]);
 
-  // Проверяем завершение всех модулей
-  useEffect(() => {
-    if (workout && workout.modules.length > 0) {
-      const allCompleted = workout.modules.every(m => m.completed);
-      if (allCompleted && !showCompletionModal) {
-        console.log('🎉 All modules completed! Showing completion modal');
-        setShowCompletionModal(true);
-      }
-    }
-  }, [workout]);
+  const allCompleted = !!workout && workout.modules.length > 0 && workout.modules.every(m => m.completed);
 
   const loadWorkout = async () => {
     try {
@@ -172,11 +163,19 @@ export default function WorkoutPage() {
     }, 300);
   };
 
-  const startWorkout = () => {
-    // Переход к первому видео с параметрами fromWorkout и sessionId
-    if (workout && workout.modules.length > 0) {
-      router.push(`/video/${workout.modules[0].id}?fromWorkout=true&sessionId=${workout.id}`);
+  const startOrContinueWorkout = () => {
+    if (!workout || workout.modules.length === 0) return;
+
+    if (allCompleted) {
+      completeWorkout();
+      return;
     }
+
+    const firstIncompleteIndex = workout.modules.findIndex(m => !m.completed);
+    const targetIndex = firstIncompleteIndex === -1 ? 0 : firstIncompleteIndex;
+    const targetModule = workout.modules[targetIndex];
+
+    router.push(`/video/${targetModule.id}?fromWorkout=true&sessionId=${workout.id}`);
   };
 
   const completeWorkout = async () => {
@@ -710,7 +709,7 @@ export default function WorkoutPage() {
         </div>
       </div>
 
-      {/* Фиксированная кнопка "Начать тренировку" */}
+      {/* Фиксированная кнопка управления тренировкой */}
       <div 
         className="fixed bottom-0 left-0 right-0 p-4"
         style={{
@@ -721,7 +720,7 @@ export default function WorkoutPage() {
       >
         <button
           type="button"
-          onClick={startWorkout}
+          onClick={startOrContinueWorkout}
           className="w-full rounded-full font-medium transition-all uppercase"
           style={{
             backgroundColor: '#A1FF4A',
@@ -735,7 +734,11 @@ export default function WorkoutPage() {
             padding: '0 16px',
           }}
         >
-          Начать тренировку
+          {allCompleted
+            ? 'Завершить тренировку'
+            : workout && workout.modules.some(m => m.completed)
+              ? 'Продолжить тренировку'
+              : 'Начать тренировку'}
         </button>
       </div>
 
