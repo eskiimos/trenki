@@ -227,17 +227,11 @@ export default function ScheduleModal({ isOpen, onClose, videoId }: ScheduleModa
     try {
       const telegramId = getTelegramId();
       
-      // Combine dates with selected time
-      // Формируем строку вручную БЕЗ 'Z' чтобы время интерпретировалось как локальное
-      const datesWithTime = selectedDates.map(d => {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        const hours = String(startTime.hours).padStart(2, '0');
-        const minutes = String(startTime.minutes).padStart(2, '0');
-        
-        // НЕ добавляем 'Z' в конце - это важно для правильной интерпретации времени
-        return `${year}-${month}-${day}T${hours}:${minutes}:00.000`;
+      // Combine dates with selected time (сохраняем в UTC через toISOString)
+      const datesWithTime = selectedDates.map((d) => {
+        const dateWithTime = new Date(d);
+        dateWithTime.setHours(startTime.hours, startTime.minutes, 0, 0);
+        return dateWithTime.toISOString();
       });
       
       const response = await fetch('/api/schedule', {
