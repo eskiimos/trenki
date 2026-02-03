@@ -516,6 +516,7 @@ const ProfilePage = () => {
 
         {/* Меню разделы */}
         <div className="bg-[#060919] rounded-lg px-4 mb-6">
+          {/* ВРЕМЕННО СКРЫТО 
           <Link href="/training/history">
             <div className="flex justify-between items-center py-4 cursor-pointer hover:opacity-80 transition-opacity">
               <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИЗБРАННЫЕ ТРЕНЕРЫ</span>
@@ -545,6 +546,7 @@ const ProfilePage = () => {
           </Link>
           
           <div className="h-[1px] bg-[#26252F]"></div>
+          */}
           
           <Link href="/profile/watch-history">
             <div className="flex justify-between items-center py-4 cursor-pointer hover:opacity-80 transition-opacity">
