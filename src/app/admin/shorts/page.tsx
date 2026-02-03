@@ -47,6 +47,13 @@ export default function AdminShortsPage() {
     fetchTrainers();
   }, []);
 
+  const getTrainerName = (trainerId?: string | null) => {
+    if (!trainerId) return 'Без автора';
+    const trainer = trainers.find((t) => t.id === trainerId);
+    if (!trainer) return 'Без автора';
+    return `${trainer.name} ${trainer.lastName}`.trim();
+  };
+
   const fetchShorts = async () => {
     try {
       const response = await fetch('/api/shorts');
@@ -94,7 +101,7 @@ export default function AdminShortsPage() {
       });
 
       if (response.ok) {
-        alert(editingShortId ? 'Short обновлён!' : 'Short добавлен!');
+        alert(editingShortId ? 'Тренька обновлена!' : 'Тренька добавлена!');
         resetForm();
         fetchShorts();
       } else {
@@ -122,12 +129,12 @@ export default function AdminShortsPage() {
   };
 
   const handleDeleteShort = async (id: string) => {
-    if (!confirm('Вы уверены, что хотите удалить этот short?')) return;
+    if (!confirm('Вы уверены, что хотите удалить эту тренью?')) return;
 
     try {
       const response = await fetch(`/api/shorts/${id}`, { method: 'DELETE' });
       if (response.ok) {
-        alert('Short удалён!');
+        alert('Тренька удалена!');
         fetchShorts();
       }
     } catch (error) {
@@ -206,14 +213,14 @@ export default function AdminShortsPage() {
     <div className="min-h-screen bg-[#101530] text-white p-6">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-8">
-          <h1 className="text-3xl font-bold">Управление Shorts</h1>
+          <h1 className="text-3xl font-bold">Управление тренями</h1>
           <div className="flex flex-col w-full sm:w-auto gap-2">
             {!showForm && (
               <button
                 onClick={() => setShowForm(true)}
                 className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 w-full sm:w-auto"
               >
-                + Добавить Short
+                + Добавить тренью
               </button>
             )}
             <Link href="/admin" className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600 text-center">
@@ -226,7 +233,7 @@ export default function AdminShortsPage() {
         {showForm && (
           <div className="bg-[#1a1f3a] rounded-lg p-6 mb-8 border border-white/5">
           <h2 className="text-xl font-semibold mb-4">
-            {editingShortId ? 'Редактировать Short' : 'Добавить новый Short'}
+            {editingShortId ? 'Редактировать тренью' : 'Добавить новую тренью'}
           </h2>
           
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -374,20 +381,20 @@ export default function AdminShortsPage() {
 
         {/* Список shorts */}
         <div className="bg-[#1a1f3a] rounded-lg p-6 border border-white/5">
-          <h2 className="text-xl font-semibold mb-4">Список Shorts ({shorts.length})</h2>
+          <h2 className="text-xl font-semibold mb-4">Список тренек ({shorts.length})</h2>
           
           {isLoading ? (
             <div className="text-center py-8">Загрузка...</div>
           ) : shorts.length === 0 ? (
             <div className="text-center py-8 text-gray-400">Shorts пока нет</div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {shorts.map((short) => (
-                <div key={short.id} className="bg-[#2d3448] rounded-lg p-3 sm:p-4">
-                  {/* Мобильный layout: вертикальный */}
-                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start">
+                <div key={short.id} className="bg-[#2d3448] rounded-lg p-2 sm:p-3">
+                  {/* Структура: превью слева, контент справа */}
+                  <div className="flex gap-3 items-stretch">
                     {/* Миниатюра */}
-                    <div className="w-20 h-28 sm:w-24 sm:h-32 flex-shrink-0 rounded overflow-hidden bg-black relative">
+                    <div className="w-16 h-24 sm:w-20 sm:h-28 flex-shrink-0 rounded overflow-hidden bg-black relative">
                       {short.thumbnail ? (
                         <Image 
                           src={short.thumbnail} 
@@ -406,37 +413,41 @@ export default function AdminShortsPage() {
                     </div>
 
                     {/* Информация */}
-                    <div className="flex-1 min-w-0 w-full">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <h3 className="font-semibold text-base sm:text-lg flex-1 min-w-0 truncate">{short.title}</h3>
-                        <span className={`px-2 py-0.5 sm:py-1 rounded text-xs flex-shrink-0 ${short.isPublished ? 'bg-green-600' : 'bg-gray-600'}`}>
+                    <div className="flex-1 min-w-0 w-full flex flex-col justify-between">
+                      {/* Заголовок + статус */}
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-semibold text-sm sm:text-base flex-1 min-w-0 truncate">{short.title}</h3>
+                        <span className={`px-1.5 py-0.5 rounded text-xs flex-shrink-0 ${short.isPublished ? 'bg-green-600' : 'bg-gray-600'}`}>
                           {short.isPublished ? 'Опубл.' : 'Черн.'}
                         </span>
                       </div>
-                      
+
+                      {/* Описание */}
                       {short.description && (
-                        <p className="text-xs sm:text-sm text-gray-400 mb-2 line-clamp-2">{short.description}</p>
+                        <p className="text-xs text-gray-400 mt-1 line-clamp-1">{short.description}</p>
                       )}
-                      
-                      <div className="flex flex-wrap gap-2 sm:gap-4 text-xs text-gray-500 mb-3">
-                        <span>Порядок: {short.order}</span>
-                        <span>Просмотры: {short.viewsCount}</span>
-                        {short.tags.length > 0 && (
-                          <span className="hidden sm:inline">Теги: {short.tags.join(', ')}</span>
-                        )}
+
+                      {/* Мета */}
+                      <div className="text-xs text-gray-500 mt-1">
+                        Автор: {getTrainerName(short.trainerId)}
                       </div>
+                      {short.tags.length > 0 && (
+                        <div className="text-xs text-gray-500 mt-1 hidden sm:block">
+                          Теги: {short.tags.join(', ')}
+                        </div>
+                      )}
 
                       {/* Кнопки */}
-                      <div className="flex gap-2 w-full">
+                      <div className="flex gap-1.5 w-full mt-2">
                         <button
                           onClick={() => handleEditShort(short)}
-                          className="flex-1 sm:flex-none px-3 sm:px-4 py-1.5 bg-blue-600 rounded hover:bg-blue-700 text-xs sm:text-sm"
+                          className="flex-1 sm:flex-none px-2 sm:px-3 py-1 bg-blue-600 rounded hover:bg-blue-700 text-xs"
                         >
                           Редактировать
                         </button>
                         <button
                           onClick={() => handleDeleteShort(short.id)}
-                          className="flex-1 sm:flex-none px-3 sm:px-4 py-1.5 bg-red-600 rounded hover:bg-red-700 text-xs sm:text-sm"
+                          className="flex-1 sm:flex-none px-2 sm:px-3 py-1 bg-red-600 rounded hover:bg-red-700 text-xs"
                         >
                           Удалить
                         </button>

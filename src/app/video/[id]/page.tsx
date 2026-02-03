@@ -173,7 +173,7 @@ export default function VideoPage({ params }: VideoPageProps) {
   // Отслеживание достижения 80% для начисления баллов (обычный просмотр)
   const gainsCreditedRef = useRef(false);
 
-  // Отмечаем начало видео в тренировке
+  // Отмечаем начало видео в тренировке или записываем просмотр
   useEffect(() => {
     const notifyVideoStart = async () => {
       if (fromWorkout && sessionId && videoId) {
@@ -190,6 +190,32 @@ export default function VideoPage({ params }: VideoPageProps) {
           });
         } catch (error) {
           console.error('Ошибка отметки начала видео:', error);
+        }
+      } else if (!fromWorkout && videoId) {
+        // Записываем обычный просмотр в историю
+        try {
+          const telegramId = getTelegramId();
+          if (!telegramId) return;
+
+          const profileResponse = await fetch(`/api/profile?telegramId=${telegramId}`);
+          if (profileResponse.ok) {
+            const profileData = await profileResponse.json();
+            const userId = profileData.user?.id;
+
+            if (userId) {
+              console.log('📹 Recording video watch:', { userId, videoId });
+              await fetch('/api/profile/record-watch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId,
+                  videoId,
+                }),
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Ошибка записи просмотра:', error);
         }
       }
     };

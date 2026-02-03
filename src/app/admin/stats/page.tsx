@@ -107,6 +107,7 @@ export default function AdminStatsPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'content' | 'training' | 'distributions' | 'charts' | 'top' | 'recent'>('overview');
 
   useEffect(() => {
     fetchStats();
@@ -172,6 +173,17 @@ export default function AdminStatsPage() {
     PROFESSIONAL: 'Профессионал',
   };
 
+  const tabs = [
+    { id: 'overview' as const, label: 'Ключевые' },
+    { id: 'users' as const, label: 'Пользователи' },
+    { id: 'content' as const, label: 'Контент' },
+    { id: 'training' as const, label: 'Тренировки' },
+    { id: 'distributions' as const, label: 'Распределения' },
+    { id: 'charts' as const, label: 'Графики' },
+    { id: 'top' as const, label: 'ТОП' },
+    { id: 'recent' as const, label: 'Новые' },
+  ];
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#101530] text-white p-4 md:p-8">
@@ -232,479 +244,518 @@ export default function AdminStatsPage() {
           </button>
         </div>
 
-        {/* Основные метрики */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">📊 Ключевые показатели</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg p-6">
-              <p className="text-sm text-blue-200 mb-1">Всего пользователей</p>
-              <p className="text-3xl font-bold">{stats.users.total}</p>
-              <p className="text-xs text-blue-200 mt-2">
-                Сегодня: +{stats.users.today}
-              </p>
-            </div>
-
-            <div className="bg-gradient-to-br from-green-600 to-green-800 rounded-lg p-6">
-              <p className="text-sm text-green-200 mb-1">Онлайн сейчас</p>
-              <p className="text-3xl font-bold">{stats.activity.onlineNow}</p>
-              <p className="text-xs text-green-200 mt-2">
-                DAU: {stats.activity.dauRate}%
-              </p>
-            </div>
-
-            <div className="bg-gradient-to-br from-purple-600 to-purple-800 rounded-lg p-6">
-              <p className="text-sm text-purple-200 mb-1">Тренировок</p>
-              <p className="text-3xl font-bold">{stats.training.total}</p>
-              <p className="text-xs text-purple-200 mt-2">
-                Завершено: {stats.training.completionRate}%
-              </p>
-            </div>
-
-            <div className="bg-gradient-to-br from-orange-600 to-orange-800 rounded-lg p-6">
-              <p className="text-sm text-orange-200 mb-1">Видео контент</p>
-              <p className="text-3xl font-bold">{stats.content.videos.published}</p>
-              <p className="text-xs text-orange-200 mt-2">
-                Просмотров: {stats.content.videos.views.toLocaleString()}
-              </p>
-            </div>
+        {/* Вкладки */}
+        <div className="mb-6">
+          <div className="flex flex-wrap gap-2">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  activeTab === tab.id
+                    ? 'bg-[#A1FF4A] text-[#060919]'
+                    : 'bg-[#1a1f3a] text-gray-300 hover:bg-[#2d3448]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
         </div>
+
+        {/* Основные метрики */}
+        {activeTab === 'overview' && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold mb-4">📊 Ключевые показатели</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-[#1a1f3a] rounded-lg p-6 border border-white/5">
+                <p className="text-sm text-gray-400 mb-1">Всего пользователей</p>
+                <p className="text-3xl font-bold">{stats.users.total}</p>
+                <p className="text-xs text-gray-400 mt-2">
+                  Сегодня: +{stats.users.today}
+                </p>
+              </div>
+
+              <div className="bg-[#1a1f3a] rounded-lg p-6 border border-white/5">
+                <p className="text-sm text-gray-400 mb-1">Онлайн сейчас</p>
+                <p className="text-3xl font-bold">{stats.activity.onlineNow}</p>
+                <p className="text-xs text-gray-400 mt-2">
+                  DAU: {stats.activity.dauRate}%
+                </p>
+              </div>
+
+              <div className="bg-[#1a1f3a] rounded-lg p-6 border border-white/5">
+                <p className="text-sm text-gray-400 mb-1">Тренировок</p>
+                <p className="text-3xl font-bold">{stats.training.total}</p>
+                <p className="text-xs text-gray-400 mt-2">
+                  Завершено: {stats.training.completionRate}%
+                </p>
+              </div>
+
+              <div className="bg-[#1a1f3a] rounded-lg p-6 border border-white/5">
+                <p className="text-sm text-gray-400 mb-1">Видео контент</p>
+                <p className="text-3xl font-bold">{stats.content.videos.published}</p>
+                <p className="text-xs text-gray-400 mt-2">
+                  Просмотров: {stats.content.videos.views.toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Пользователи */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">👥 Пользователи</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-[#1a1f3a] rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">Регистрации</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Сегодня</span>
-                  <span className="font-bold text-green-400">{stats.users.today}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Вчера</span>
-                  <span className="font-bold">{stats.users.yesterday}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">За неделю</span>
-                  <span className="font-bold">{stats.users.thisWeek}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">За месяц</span>
-                  <span className="font-bold">{stats.users.thisMonth}</span>
-                </div>
-                <div className="pt-3 border-t border-gray-700">
+        {activeTab === 'users' && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold mb-4">👥 Пользователи</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-[#1a1f3a] rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Регистрации</h3>
+                <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Рост</span>
-                    <span className={`font-bold ${
-                      parseFloat(stats.users.growth) > 0 ? 'text-green-400' : 'text-red-400'
-                    }`}>
-                      {parseFloat(stats.users.growth) > 0 ? '+' : ''}{stats.users.growth}%
-                    </span>
+                    <span className="text-gray-400">Сегодня</span>
+                    <span className="font-bold text-green-400">{stats.users.today}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Вчера</span>
+                    <span className="font-bold">{stats.users.yesterday}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">За неделю</span>
+                    <span className="font-bold">{stats.users.thisWeek}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">За месяц</span>
+                    <span className="font-bold">{stats.users.thisMonth}</span>
+                  </div>
+                  <div className="pt-3 border-t border-gray-700">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Рост</span>
+                      <span className={`font-bold ${
+                        parseFloat(stats.users.growth) > 0 ? 'text-green-400' : 'text-red-400'
+                      }`}>
+                        {parseFloat(stats.users.growth) > 0 ? '+' : ''}{stats.users.growth}%
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="bg-[#1a1f3a] rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">Активность</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Активны сегодня</span>
-                  <span className="font-bold text-green-400">{stats.activity.activeToday}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Активны за неделю</span>
-                  <span className="font-bold">{stats.activity.activeThisWeek}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Активны за месяц</span>
-                  <span className="font-bold">{stats.activity.activeThisMonth}</span>
-                </div>
-                <div className="pt-3 border-t border-gray-700 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">DAU</span>
-                    <span className="text-blue-400">{stats.activity.dauRate}%</span>
+              <div className="bg-[#1a1f3a] rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Активность</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Активны сегодня</span>
+                    <span className="font-bold text-green-400">{stats.activity.activeToday}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">WAU</span>
-                    <span className="text-blue-400">{stats.activity.wauRate}%</span>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Активны за неделю</span>
+                    <span className="font-bold">{stats.activity.activeThisWeek}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">MAU</span>
-                    <span className="text-blue-400">{stats.activity.mauRate}%</span>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Активны за месяц</span>
+                    <span className="font-bold">{stats.activity.activeThisMonth}</span>
+                  </div>
+                  <div className="pt-3 border-t border-gray-700 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">DAU</span>
+                      <span className="text-blue-400">{stats.activity.dauRate}%</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">WAU</span>
+                      <span className="text-blue-400">{stats.activity.wauRate}%</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">MAU</span>
+                      <span className="text-blue-400">{stats.activity.mauRate}%</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="bg-[#1a1f3a] rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">Вовлеченность</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Email подтвержден</span>
-                  <span className="font-bold">{stats.engagement.verifiedEmails}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Конверсия</span>
-                  <span className="text-green-400">{stats.engagement.emailVerificationRate}%</span>
-                </div>
-                <div className="flex justify-between pt-2">
-                  <span className="text-gray-400">Push подписки</span>
-                  <span className="font-bold">{stats.engagement.pushSubscriptions}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Конверсия</span>
-                  <span className="text-green-400">{stats.engagement.pushSubscriptionRate}%</span>
-                </div>
-                <div className="flex justify-between pt-2">
-                  <span className="text-gray-400">Заполненные профили</span>
-                  <span className="font-bold">{stats.engagement.profilesWithPosition}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Конверсия</span>
-                  <span className="text-green-400">{stats.engagement.profileCompletionRate}%</span>
+              <div className="bg-[#1a1f3a] rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Вовлеченность</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Email подтвержден</span>
+                    <span className="font-bold">{stats.engagement.verifiedEmails}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Конверсия</span>
+                    <span className="text-green-400">{stats.engagement.emailVerificationRate}%</span>
+                  </div>
+                  <div className="flex justify-between pt-2">
+                    <span className="text-gray-400">Push подписки</span>
+                    <span className="font-bold">{stats.engagement.pushSubscriptions}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Конверсия</span>
+                    <span className="text-green-400">{stats.engagement.pushSubscriptionRate}%</span>
+                  </div>
+                  <div className="flex justify-between pt-2">
+                    <span className="text-gray-400">Заполненные профили</span>
+                    <span className="font-bold">{stats.engagement.profilesWithPosition}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Конверсия</span>
+                    <span className="text-green-400">{stats.engagement.profileCompletionRate}%</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Контент */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">🎬 Контент</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-[#1a1f3a] rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-3">Видео</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Всего</span>
-                  <span>{stats.content.videos.total}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Опубликовано</span>
-                  <span className="text-green-400">{stats.content.videos.published}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Просмотров</span>
-                  <span className="text-blue-400">{stats.content.videos.views.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Лайков</span>
-                  <span className="text-purple-400">{stats.content.videos.likes.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-[#1a1f3a] rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-3">Shorts</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Всего</span>
-                  <span>{stats.content.shorts.total}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Опубликовано</span>
-                  <span className="text-green-400">{stats.content.shorts.published}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Просмотров</span>
-                  <span className="text-blue-400">{stats.content.shorts.views.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Лайков</span>
-                  <span className="text-purple-400">{stats.content.shorts.likes.toLocaleString()}</span>
+        {activeTab === 'content' && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold mb-4">🎬 Контент</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-[#1a1f3a] rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-3">Видео</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Всего</span>
+                    <span>{stats.content.videos.total}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Опубликовано</span>
+                    <span className="text-green-400">{stats.content.videos.published}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Просмотров</span>
+                    <span className="text-blue-400">{stats.content.videos.views.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Лайков</span>
+                    <span className="text-purple-400">{stats.content.videos.likes.toLocaleString()}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="bg-[#1a1f3a] rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-3">Взаимодействие</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Комментарии</span>
-                  <span>{stats.content.comments.total}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Сегодня</span>
-                  <span className="text-green-400">+{stats.content.comments.today}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Избранное</span>
-                  <span>{stats.content.favorites}</span>
+              <div className="bg-[#1a1f3a] rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-3">Shorts</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Всего</span>
+                    <span>{stats.content.shorts.total}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Опубликовано</span>
+                    <span className="text-green-400">{stats.content.shorts.published}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Просмотров</span>
+                    <span className="text-blue-400">{stats.content.shorts.views.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Лайков</span>
+                    <span className="text-purple-400">{stats.content.shorts.likes.toLocaleString()}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="bg-[#1a1f3a] rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-3">Отзывы</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Всего</span>
-                  <span>{stats.reviews.total}</span>
+              <div className="bg-[#1a1f3a] rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-3">Взаимодействие</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Комментарии</span>
+                    <span>{stats.content.comments.total}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Сегодня</span>
+                    <span className="text-green-400">+{stats.content.comments.today}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Избранное</span>
+                    <span>{stats.content.favorites}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">На модерации</span>
-                  <span className="text-yellow-400">{stats.reviews.pending}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Средний рейтинг</span>
-                  <span className="text-orange-400">⭐ {stats.reviews.avgRating}</span>
+              </div>
+
+              <div className="bg-[#1a1f3a] rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-3">Отзывы</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Всего</span>
+                    <span>{stats.reviews.total}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">На модерации</span>
+                    <span className="text-yellow-400">{stats.reviews.pending}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Средний рейтинг</span>
+                    <span className="text-orange-400">⭐ {stats.reviews.avgRating}</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Тренировки */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">💪 Тренировки</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-[#1a1f3a] rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-3">Статистика сессий</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Всего сессий</span>
-                  <span className="font-bold">{stats.training.total}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Завершено</span>
-                  <span className="font-bold text-green-400">{stats.training.completed}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Процент завершения</span>
-                  <span className="font-bold text-blue-400">{stats.training.completionRate}%</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-[#1a1f3a] rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-3">Активность</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Сегодня</span>
-                  <span className="font-bold text-green-400">{stats.training.today}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">За неделю</span>
-                  <span className="font-bold">{stats.training.thisWeek}</span>
+        {activeTab === 'training' && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold mb-4">💪 Тренировки</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-[#1a1f3a] rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-3">Статистика сессий</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Всего сессий</span>
+                    <span className="font-bold">{stats.training.total}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Завершено</span>
+                    <span className="font-bold text-green-400">{stats.training.completed}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Процент завершения</span>
+                    <span className="font-bold text-blue-400">{stats.training.completionRate}%</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="bg-[#1a1f3a] rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-3">Другое</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Тренеров</span>
-                  <span className="font-bold">{stats.content.trainers}</span>
+              <div className="bg-[#1a1f3a] rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-3">Активность</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Сегодня</span>
+                    <span className="font-bold text-green-400">{stats.training.today}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">За неделю</span>
+                    <span className="font-bold">{stats.training.thisWeek}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-[#1a1f3a] rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-3">Другое</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Тренеров</span>
+                    <span className="font-bold">{stats.content.trainers}</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Распределения */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">📈 Распределения</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Позиции */}
-            <div className="bg-[#1a1f3a] rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-3">Позиции игроков</h3>
-              <div className="space-y-2">
-                {stats.distributions.positions.map((pos) => (
-                  <div key={pos.position} className="flex justify-between text-sm">
-                    <span className="text-gray-400">
-                      {positionNames[pos.position] || pos.position}
-                    </span>
-                    <span className="font-medium">{pos.count}</span>
-                  </div>
-                ))}
+        {activeTab === 'distributions' && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold mb-4">📈 Распределения</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Позиции */}
+              <div className="bg-[#1a1f3a] rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-3">Позиции игроков</h3>
+                <div className="space-y-2">
+                  {stats.distributions.positions.map((pos) => (
+                    <div key={pos.position} className="flex justify-between text-sm">
+                      <span className="text-gray-400">
+                        {positionNames[pos.position] || pos.position}
+                      </span>
+                      <span className="font-medium">{pos.count}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Пол */}
-            <div className="bg-[#1a1f3a] rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-3">Распределение по полу</h3>
-              <div className="space-y-2">
-                {stats.distributions.genders.map((gender) => (
-                  <div key={gender.gender} className="flex justify-between text-sm">
-                    <span className="text-gray-400">
-                      {gender.gender === 'MALE' ? 'Мужской' : 'Женский'}
-                    </span>
-                    <span className="font-medium">{gender.count}</span>
-                  </div>
-                ))}
+              {/* Пол */}
+              <div className="bg-[#1a1f3a] rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-3">Распределение по полу</h3>
+                <div className="space-y-2">
+                  {stats.distributions.genders.map((gender) => (
+                    <div key={gender.gender} className="flex justify-between text-sm">
+                      <span className="text-gray-400">
+                        {gender.gender === 'MALE' ? 'Мужской' : 'Женский'}
+                      </span>
+                      <span className="font-medium">{gender.count}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Категории видео */}
-            <div className="bg-[#1a1f3a] rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-3">Категории видео</h3>
-              <div className="space-y-2">
-                {stats.distributions.categories.map((cat) => (
-                  <div key={cat.category} className="flex justify-between text-sm">
-                    <span className="text-gray-400">
-                      {categoryNames[cat.category] || cat.category}
-                    </span>
-                    <span className="font-medium">{cat.count}</span>
-                  </div>
-                ))}
+              {/* Категории видео */}
+              <div className="bg-[#1a1f3a] rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-3">Категории видео</h3>
+                <div className="space-y-2">
+                  {stats.distributions.categories.map((cat) => (
+                    <div key={cat.category} className="flex justify-between text-sm">
+                      <span className="text-gray-400">
+                        {categoryNames[cat.category] || cat.category}
+                      </span>
+                      <span className="font-medium">{cat.count}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Сложность видео */}
-            <div className="bg-[#1a1f3a] rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-3">Сложность видео</h3>
-              <div className="space-y-2">
-                {stats.distributions.difficulties.map((diff) => (
-                  <div key={diff.difficulty} className="flex justify-between text-sm">
-                    <span className="text-gray-400">
-                      {difficultyNames[diff.difficulty] || diff.difficulty}
-                    </span>
-                    <span className="font-medium">{diff.count}</span>
-                  </div>
-                ))}
+              {/* Сложность видео */}
+              <div className="bg-[#1a1f3a] rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-3">Сложность видео</h3>
+                <div className="space-y-2">
+                  {stats.distributions.difficulties.map((diff) => (
+                    <div key={diff.difficulty} className="flex justify-between text-sm">
+                      <span className="text-gray-400">
+                        {difficultyNames[diff.difficulty] || diff.difficulty}
+                      </span>
+                      <span className="font-medium">{diff.count}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Графики регистраций */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">📅 Регистрации за 30 дней</h2>
-          <div className="bg-[#1a1f3a] rounded-lg p-6">
-            <div className="flex items-end justify-between h-64 gap-1">
-              {stats.charts.registrations.map((day, index) => {
-                const maxCount = Math.max(...stats.charts.registrations.map(d => d.count), 1);
-                const height = (day.count / maxCount) * 100;
-                
-                return (
-                  <div key={index} className="flex-1 flex flex-col items-center group">
-                    <div className="relative w-full">
-                      <div
-                        className="bg-blue-500 hover:bg-blue-400 transition-all rounded-t relative group"
-                        style={{ height: `${height * 2}px` }}
-                      >
-                        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                          {day.count} регистраций
+        {/* Графики */}
+        {activeTab === 'charts' && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold mb-4">📊 Графики</h2>
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Регистрации за 30 дней</h3>
+                <div className="bg-[#1a1f3a] rounded-lg p-6">
+                  <div className="flex items-end justify-between h-64 gap-1">
+                    {stats.charts.registrations.map((day, index) => {
+                      const maxCount = Math.max(...stats.charts.registrations.map(d => d.count), 1);
+                      const height = (day.count / maxCount) * 100;
+                      
+                      return (
+                        <div key={index} className="flex-1 flex flex-col items-center group">
+                          <div className="relative w-full">
+                            <div
+                              className="bg-blue-500 hover:bg-blue-400 transition-all rounded-t relative group"
+                              style={{ height: `${height * 2}px` }}
+                            >
+                              <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                {day.count} регистраций
+                              </div>
+                            </div>
+                          </div>
+                          <span className="text-xs text-gray-400 mt-2 rotate-45 origin-left">
+                            {formatDate(day.date)}
+                          </span>
                         </div>
-                      </div>
-                    </div>
-                    <span className="text-xs text-gray-400 mt-2 rotate-45 origin-left">
-                      {formatDate(day.date)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* График активности по часам */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">🕐 Активность по часам (сегодня)</h2>
-          <div className="bg-[#1a1f3a] rounded-lg p-6">
-            <div className="flex items-end justify-between h-48 gap-1">
-              {Array.from({ length: 24 }, (_, hour) => {
-                const data = stats.charts.activity.find(a => a.hour === hour);
-                const count = data?.count || 0;
-                const maxCount = Math.max(...stats.charts.activity.map(d => d.count), 1);
-                const height = (count / maxCount) * 100;
-                
-                return (
-                  <div key={hour} className="flex-1 flex flex-col items-center group">
-                    <div className="relative w-full">
-                      <div
-                        className="bg-green-500 hover:bg-green-400 transition-all rounded-t"
-                        style={{ height: `${height * 1.5}px` }}
-                      >
-                        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                          {count} активных
-                        </div>
-                      </div>
-                    </div>
-                    <span className="text-xs text-gray-400 mt-2">{hour}:00</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* ТОП контент */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">🏆 ТОП-5 контента</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* ТОП видео */}
-            <div className="bg-[#1a1f3a] rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">Популярные видео</h3>
-              <div className="space-y-3">
-                {stats.top.videos.map((video, index) => (
-                  <div key={video.id} className="flex items-center gap-3 p-3 bg-[#2d3448] rounded-lg">
-                    <span className="text-2xl font-bold text-gray-600">#{index + 1}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{video.title}</p>
-                      <div className="flex gap-3 text-sm text-gray-400 mt-1">
-                        <span>👁 {video.viewsCount.toLocaleString()}</span>
-                        <span>❤️ {video.likesCount.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* ТОП shorts */}
-            <div className="bg-[#1a1f3a] rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">Популярные Shorts</h3>
-              <div className="space-y-3">
-                {stats.top.shorts.map((short, index) => (
-                  <div key={short.id} className="flex items-center gap-3 p-3 bg-[#2d3448] rounded-lg">
-                    <span className="text-2xl font-bold text-gray-600">#{index + 1}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{short.title}</p>
-                      <div className="flex gap-3 text-sm text-gray-400 mt-1">
-                        <span>👁 {short.viewsCount.toLocaleString()}</span>
-                        <span>❤️ {short.likesCount.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Последние регистрации */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">🆕 Последние регистрации</h2>
-          <div className="bg-[#1a1f3a] rounded-lg p-6">
-            <div className="space-y-3">
-              {stats.recent.users.map((user) => (
-                <div key={user.id} className="flex items-center justify-between p-3 bg-[#2d3448] rounded-lg">
-                  <div>
-                    <p className="font-medium">
-                      {user.firstName || user.username || 'Пользователь'}
-                      {user.lastName && ` ${user.lastName}`}
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      @{user.username || 'без username'}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-400">
-                      {formatDate(user.createdAt)} {formatTime(user.createdAt)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Активность: {formatTime(user.lastActivity)}
-                    </p>
+                      );
+                    })}
                   </div>
                 </div>
-              ))}
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Активность по часам (сегодня)</h3>
+                <div className="bg-[#1a1f3a] rounded-lg p-6">
+                  <div className="flex items-end justify-between h-48 gap-1">
+                    {Array.from({ length: 24 }, (_, hour) => {
+                      const data = stats.charts.activity.find(a => a.hour === hour);
+                      const count = data?.count || 0;
+                      const maxCount = Math.max(...stats.charts.activity.map(d => d.count), 1);
+                      const height = (count / maxCount) * 100;
+                      
+                      return (
+                        <div key={hour} className="flex-1 flex flex-col items-center group">
+                          <div className="relative w-full">
+                            <div
+                              className="bg-green-500 hover:bg-green-400 transition-all rounded-t"
+                              style={{ height: `${height * 1.5}px` }}
+                            >
+                              <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                {count} активных
+                              </div>
+                            </div>
+                          </div>
+                          <span className="text-xs text-gray-400 mt-2">{hour}:00</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* ТОП контент */}
+        {activeTab === 'top' && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold mb-4">🏆 ТОП-5 контента</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* ТОП видео */}
+              <div className="bg-[#1a1f3a] rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Популярные видео</h3>
+                <div className="space-y-3">
+                  {stats.top.videos.map((video, index) => (
+                    <div key={video.id} className="flex items-center gap-3 p-3 bg-[#2d3448] rounded-lg">
+                      <span className="text-2xl font-bold text-gray-600">#{index + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{video.title}</p>
+                        <div className="flex gap-3 text-sm text-gray-400 mt-1">
+                          <span>👁 {video.viewsCount.toLocaleString()}</span>
+                          <span>❤️ {video.likesCount.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ТОП shorts */}
+              <div className="bg-[#1a1f3a] rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Популярные Shorts</h3>
+                <div className="space-y-3">
+                  {stats.top.shorts.map((short, index) => (
+                    <div key={short.id} className="flex items-center gap-3 p-3 bg-[#2d3448] rounded-lg">
+                      <span className="text-2xl font-bold text-gray-600">#{index + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{short.title}</p>
+                        <div className="flex gap-3 text-sm text-gray-400 mt-1">
+                          <span>👁 {short.viewsCount.toLocaleString()}</span>
+                          <span>❤️ {short.likesCount.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Последние регистрации */}
+        {activeTab === 'recent' && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold mb-4">🆕 Последние регистрации</h2>
+            <div className="bg-[#1a1f3a] rounded-lg p-6">
+              <div className="space-y-3">
+                {stats.recent.users.map((user) => (
+                  <div key={user.id} className="flex items-center justify-between p-3 bg-[#2d3448] rounded-lg">
+                    <div>
+                      <p className="font-medium">
+                        {user.firstName || user.username || 'Пользователь'}
+                        {user.lastName && ` ${user.lastName}`}
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        @{user.username || 'без username'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-400">
+                        {formatDate(user.createdAt)} {formatTime(user.createdAt)}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Активность: {formatTime(user.lastActivity)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

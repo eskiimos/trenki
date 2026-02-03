@@ -1,0 +1,11 @@
+<div className="self-stretch p-4 bg-gradient-to-b from-slate-900 to-slate-950 rounded-lg shadow-[inset_0px_1px_2px_0px_rgba(147,255,45,0.40)] inline-flex flex-col justify-start items-start gap-4 overflow-hidden">
+    <div className="self-stretch inline-flex justify-between items-start">
+        <div className="flex-1 h-9 justify-center text-slate-50 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">запланированная тренировка через</div>
+        <div data-size="Large" className="w-16 h-8 px-2 py-1 bg-lime-400/20 rounded-lg shadow-[inset_0px_1px_2px_0px_rgba(249,248,254,0.40)] flex justify-center items-center gap-4">
+            <div className="justify-center text-lime-400 text-base font-bold font-['Overpass'] uppercase leading-4 tracking-wide">59:44</div>
+        </div>
+    </div>
+    <div data-active="Yes" data-color="Green" className="self-stretch h-12 px-6 py-3 bg-lime-400 rounded-[32px] inline-flex justify-center items-center gap-2.5">
+        <div className="justify-center text-slate-950 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">Начать</div>
+    </div>
+</div>

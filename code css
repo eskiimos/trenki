@@ -1,0 +1,26 @@
+// запланированная тренировка через
+text-slate-50
+text-sm
+font-bold
+font-['Overpass']
+uppercase
+leading-4
+tracking-wide
+---
+// 59:44
+text-lime-400
+text-base
+font-bold
+font-['Overpass']
+uppercase
+leading-4
+tracking-wide
+---
+// Начать
+text-slate-950
+text-sm
+font-bold
+font-['Overpass']
+uppercase
+leading-4
+tracking-wide

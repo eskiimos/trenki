@@ -102,12 +102,25 @@ export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get('admin_token')?.value;
 
-    if (!token || !validateSessionToken(token)) {
+    if (!token) {
+      console.log('🔐 No admin token in cookies');
       return NextResponse.json(
         { authenticated: false },
         { status: 401 }
       );
     }
+
+    if (!validateSessionToken(token)) {
+      console.log('🔐 Admin token is invalid or expired');
+      return NextResponse.json(
+        { authenticated: false },
+        { status: 401 }
+      );
+    }
+
+    // Продляем время сессии (обновляем loginTime каждый раз при проверке)
+    const session = adminSessions.get(token)!;
+    session.loginTime = Date.now();
 
     return NextResponse.json({ 
       authenticated: true 

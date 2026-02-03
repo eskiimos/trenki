@@ -531,29 +531,33 @@ const ProfilePage = () => {
           
           <div className="h-[1px] bg-[#26252F]"></div>
           
-          <div className="flex justify-between items-center py-4">
-            <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИЗБРАННЫЕ ТРЕНИРОВКИ</span>
-            <Image 
-              src="/icons/arrow.svg" 
-              alt="Стрелка" 
-              width={20} 
-              height={20}
-              className="opacity-50"
-            />
-          </div>
+          <Link href="/favorites">
+            <div className="flex justify-between items-center py-4 cursor-pointer hover:opacity-80 transition-opacity">
+              <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИЗБРАННЫЕ ТРЕНИРОВКИ</span>
+              <Image 
+                src="/icons/arrow.svg" 
+                alt="Стрелка" 
+                width={20} 
+                height={20}
+                className="opacity-50"
+              />
+            </div>
+          </Link>
           
           <div className="h-[1px] bg-[#26252F]"></div>
           
-          <div className="flex justify-between items-center py-4">
-            <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИСТОРИЯ ПРОСМОТРОВ</span>
-            <Image 
-              src="/icons/arrow.svg" 
-              alt="Стрелка" 
-              width={20} 
-              height={20}
-              className="opacity-50"
-            />
-          </div>
+          <Link href="/profile/watch-history">
+            <div className="flex justify-between items-center py-4 cursor-pointer hover:opacity-80 transition-opacity">
+              <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИСТОРИЯ ПРОСМОТРОВ</span>
+              <Image 
+                src="/icons/arrow.svg" 
+                alt="Стрелка" 
+                width={20} 
+                height={20}
+                className="opacity-50"
+              />
+            </div>
+          </Link>
         </div>
         
         {/* FAQ секция */}

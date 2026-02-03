@@ -16,9 +16,14 @@ interface ShortVideoPlayerProps {
   shortId: string;
   poster: string;
   title: string;
+  trainer?: {
+    name: string;
+    lastName: string;
+    avatar?: string;
+  };
 }
 
-const ShortVideoPlayer = ({ shortId, poster, title }: ShortVideoPlayerProps) => {
+const ShortVideoPlayer = ({ shortId, poster, title, trainer }: ShortVideoPlayerProps) => {
   return (
     <Link href={`/shorts/${shortId}`}>
       <div className="flex-shrink-0 w-36 cursor-pointer">
@@ -604,16 +609,15 @@ const HeroVideoSection = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchRandomVideo = async () => {
+    const fetchLatestVideo = async () => {
       try {
         const response = await fetch('/api/videos');
         const data = await response.json();
         const videos = data.videos || [];
         
         if (videos.length > 0) {
-          // Выбираем случайное видео
-          const randomIndex = Math.floor(Math.random() * videos.length);
-          setRandomVideo(videos[randomIndex]);
+          // Берем первое видео (самое последнее загруженное)
+          setRandomVideo(videos[0]);
         }
       } catch (error) {
         console.error('Error loading random video:', error);
@@ -621,7 +625,7 @@ const HeroVideoSection = () => {
         setIsLoading(false);
       }
     };
-    fetchRandomVideo();
+    fetchLatestVideo();
   }, []);
 
   if (isLoading) {
@@ -648,17 +652,57 @@ const HeroVideoSection = () => {
   return (
     <section className="px-4" style={{ paddingBottom: '15px' }}>
       <Link href={`/video/${randomVideo.id}`}>
-        <div className="bg-gray-900 overflow-hidden relative aspect-video w-full cursor-pointer hover:opacity-90 transition-opacity" style={{ borderRadius: '4px' }}>
-          {randomVideo.thumbnail && (
-            <Image 
-              src={randomVideo.thumbnail} 
-              alt={randomVideo.title} 
-              fill
-              className="object-cover" 
-            />
-          )}
-          <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-            {formatDuration(randomVideo.duration)}
+        <div>
+          {/* Video Thumbnail */}
+          <div className="relative w-full aspect-video rounded overflow-hidden">
+            {randomVideo.thumbnail && (
+              <Image 
+                src={randomVideo.thumbnail} 
+                alt={randomVideo.title} 
+                fill
+                className="object-cover" 
+              />
+            )}
+            {/* Duration badge */}
+            <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm text-white text-sm font-medium px-2.5 py-1 rounded-lg">
+              {formatDuration(randomVideo.duration)}
+            </div>
+            {/* "Новое" badge */}
+            <div className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: '#A1FF4A', color: '#060919' }}>
+              Новое
+            </div>
+          </div>
+          
+          {/* Video Info */}
+          <div className="px-0 py-3">
+            {/* Trainer Avatar + Title на одной строке */}
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-700">
+                {randomVideo.trainer?.avatar ? (
+                  <Image
+                    src={randomVideo.trainer.avatar}
+                    alt={`${randomVideo.trainer.name} ${randomVideo.trainer.lastName}`}
+                    width={40}
+                    height={40}
+                    className="object-cover w-full h-full"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-white font-bold text-sm">
+                    {randomVideo.trainer?.name?.charAt(0)}
+                  </div>
+                )}
+              </div>
+              <h3 className="text-white text-base font-semibold line-clamp-2 leading-tight flex-1">
+                {randomVideo.title.toUpperCase()}
+              </h3>
+            </div>
+            
+            {/* Trainer info */}
+            <div style={{ fontSize: '12px' }} className="text-white/60">
+              <span>
+                {randomVideo.trainer?.name} {randomVideo.trainer?.lastName}
+              </span>
+            </div>
           </div>
         </div>
       </Link>
@@ -722,7 +766,12 @@ const TrenkiSection = () => {
             key={short.id} 
             shortId={short.id}
             poster={short.thumbnail || '/images/preview_shorts/shorts_1.png'}
-            title={short.title} 
+            title={short.title}
+            trainer={short.trainer ? {
+              name: short.trainer.name,
+              lastName: short.trainer.lastName,
+              avatar: short.trainer.avatar
+            } : undefined}
           />
         ))}
       </div>
@@ -1082,8 +1131,8 @@ const PromoBannerSection = () => {
 
   if (isLoading) {
     return (
-      <section className="px-4">
-        <div className="bg-gray-700/30 rounded-lg overflow-hidden relative aspect-video animate-pulse">
+      <section className="px-4" style={{ paddingBottom: '15px' }}>
+        <div className="bg-gray-700/30 overflow-hidden relative aspect-video w-full animate-pulse" style={{ borderRadius: '4px' }}>
           <div className="absolute inset-0 bg-gradient-to-r from-gray-700/20 via-gray-600/30 to-gray-700/20" />
         </div>
       </section>
@@ -1102,19 +1151,55 @@ const PromoBannerSection = () => {
   };
 
   return (
-    <section className="px-4">
+    <section className="px-4" style={{ paddingBottom: '15px' }}>
       <Link href={`/video/${randomVideo.id}`}>
-        <div className="bg-[#2d3448] rounded-lg overflow-hidden relative aspect-video border border-[#3d4759] cursor-pointer hover:opacity-90 transition-opacity">
-          {randomVideo.thumbnail && (
-            <Image 
-              src={randomVideo.thumbnail} 
-              alt={randomVideo.title} 
-              fill
-              className="object-cover" 
-            />
-          )}
-          <div className="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
-            {formatDuration(randomVideo.duration)}
+        <div>
+          {/* Video Thumbnail */}
+          <div className="relative w-full aspect-video rounded overflow-hidden">
+            {randomVideo.thumbnail && (
+              <Image 
+                src={randomVideo.thumbnail} 
+                alt={randomVideo.title} 
+                fill
+                className="object-cover" 
+              />
+            )}
+            {/* Duration badge */}
+            <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm text-white text-sm font-medium px-2.5 py-1 rounded-lg">
+              {formatDuration(randomVideo.duration)}
+            </div>
+          </div>
+          
+          {/* Video Info */}
+          <div className="px-0 py-3">
+            {/* Trainer Avatar + Title на одной строке */}
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-700">
+                {randomVideo.trainer?.avatar ? (
+                  <Image
+                    src={randomVideo.trainer.avatar}
+                    alt={`${randomVideo.trainer.name} ${randomVideo.trainer.lastName}`}
+                    width={40}
+                    height={40}
+                    className="object-cover w-full h-full"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-white font-bold text-sm">
+                    {randomVideo.trainer?.name?.charAt(0)}
+                  </div>
+                )}
+              </div>
+              <h3 className="text-white text-base font-semibold line-clamp-2 leading-tight flex-1">
+                {randomVideo.title.toUpperCase()}
+              </h3>
+            </div>
+            
+            {/* Trainer info */}
+            <div style={{ fontSize: '12px' }} className="text-white/60">
+              <span>
+                {randomVideo.trainer?.name} {randomVideo.trainer?.lastName}
+              </span>
+            </div>
           </div>
         </div>
       </Link>
