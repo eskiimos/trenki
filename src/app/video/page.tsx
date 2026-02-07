@@ -114,8 +114,7 @@ const VideoPage = () => {
     { id: 'TECHNIQUE', label: 'Техника' },
     { id: 'STRENGTH', label: 'Сила' },
     { id: 'ENDURANCE', label: 'Выносливость' },
-    { id: 'SPEED', label: 'Скорость' },
-    { id: 'TACTICAL', label: 'Тактика' }
+    { id: 'SPEED', label: 'Скорость' }
   ];
 
   // Фильтрация видео по категории и тегам

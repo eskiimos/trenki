@@ -449,7 +449,7 @@ const ProfilePage = () => {
         </div>
 
         {/* Кнопка для прохождения опроса потенциала */}
-        {userProfile?.profile && (userProfile.profile.potential === undefined || userProfile.profile.potential < 5) && (
+        {userProfile?.profile && (userProfile.profile.potential === undefined || userProfile.profile.potential < 10) && (
           <div className="mb-6">
             <button
               onClick={() => router.push('/onboarding/characteristics')}

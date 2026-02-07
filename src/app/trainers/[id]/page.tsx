@@ -488,7 +488,7 @@ export default function TrainerPage() {
                   style={{ opacity: isActive ? 1 : 0.3 }}
                 >
                   <Image 
-                    src={isActive ? "/icons/star-6.svg" : "/icons/star-6-null.svg"}
+                    src={isActive ? "/icons/star-6.svg" : "/icons/Raiting-star.svg"}
                     alt={`Звезда ${star}`}
                     width={32}
                     height={32}

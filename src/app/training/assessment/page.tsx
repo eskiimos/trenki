@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTelegram } from '@/hooks/useTelegram';
-import CircularSlider from '@/components/CircularSlider2';
 import { TrainingGoal } from '@/generated/prisma';
 import { GOAL_LABELS, ENERGY_STATE_LABELS } from '@/lib/training-algorithm-v3';
 
@@ -11,11 +10,7 @@ const trainingGoals = Object.values(TrainingGoal) as TrainingGoal[];
 
 type EnergyStateValue = 'FULLY_CHARGED' | 'IN_TONE' | 'TIRED';
 
-const mapEnergyToState = (value: number): EnergyStateValue => {
-  if (value >= 8) return 'FULLY_CHARGED';
-  if (value >= 4) return 'IN_TONE';
-  return 'TIRED';
-};
+const energyStates: EnergyStateValue[] = ['FULLY_CHARGED', 'IN_TONE', 'TIRED'];
 
 export default function TrainingAssessmentPage() {
   const router = useRouter();
@@ -26,7 +21,7 @@ export default function TrainingAssessmentPage() {
   // Состояние формы
   const [formData, setFormData] = useState({
     goal: null as TrainingGoal | null,
-    energyLevel: 5,
+    energyState: 'IN_TONE' as EnergyStateValue,
   });
 
   // Логирование состояния пользователя
@@ -63,11 +58,10 @@ export default function TrainingAssessmentPage() {
     setIsSubmitting(true);
 
     try {
-      const energyState = mapEnergyToState(formData.energyLevel);
       const generatePayload = {
         userId: user.id.toString(),
         goal: formData.goal,
-        energyState,
+        energyState: formData.energyState,
       };
       
       console.log('📤 Generating workout (v3):', generatePayload);
@@ -108,8 +102,6 @@ export default function TrainingAssessmentPage() {
       setIsSubmitting(false);
     }
   };
-
-  const energyStateLabel = ENERGY_STATE_LABELS?.[mapEnergyToState(formData.energyLevel)];
 
   const [showInfoBlock, setShowInfoBlock] = useState(true);
   const [isClosing, setIsClosing] = useState(false);
@@ -261,8 +253,8 @@ export default function TrainingAssessmentPage() {
             </div>
           </div>
 
-          {/* Вопрос 2: Уровень энергии */}
-          <div style={{ minHeight: '350px', marginBottom: '50px' }}>
+          {/* Вопрос 2: Состояние */}
+          <div>
             <h2 className="mb-6" style={{
               fontFamily: 'Overpass',
               fontWeight: 700,
@@ -272,17 +264,43 @@ export default function TrainingAssessmentPage() {
               textTransform: 'uppercase',
               color: '#F9F8FE'
             }}>
-              уровень энергии
+              твое состояние
             </h2>
-            <div className="mb-4 text-sm text-gray-300">
-              {energyStateLabel ? `${energyStateLabel.emoji} ${energyStateLabel.label}` : ''}
+            <div className="space-y-3">
+              {energyStates.map((state) => {
+                const info = ENERGY_STATE_LABELS[state];
+                if (!info) return null;
+                const isSelected = formData.energyState === state;
+                return (
+                  <button
+                    key={state}
+                    onClick={() => setFormData({ ...formData, energyState: state })}
+                    className="w-full transition-all duration-200 hover:scale-[1.02]"
+                    style={{
+                      height: '56px',
+                      padding: '16px',
+                      borderRadius: '12px',
+                      backgroundColor: isSelected ? '#A1FF4A' : '#AEABBB33',
+                      color: isSelected ? '#060919' : '#F9F8FE',
+                      fontFamily: 'Overpass',
+                      fontWeight: 700,
+                      fontSize: '14px',
+                      lineHeight: '120%',
+                      letterSpacing: '0.5px',
+                      textAlign: 'left',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px'
+                    }}
+                  >
+                    <span style={{ fontSize: '20px' }}>{info.emoji}</span>
+                    <span>{info.label}</span>
+                  </button>
+                );
+              })}
             </div>
-            <CircularSlider
-              value={formData.energyLevel}
-              min={0}
-              max={10}
-              onChange={(value) => setFormData({ ...formData, energyLevel: value })}
-            />
           </div>
         </div>
       </div>
