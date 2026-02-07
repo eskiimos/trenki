@@ -20,6 +20,21 @@ interface MultiLevelTagFilterProps {
   showApplyButton?: boolean; // Показывать ли кнопку применить
 }
 
+// Словарь переводов типов нагрузки
+const LOAD_TYPE_TRANSLATIONS: Record<string, string> = {
+  'AGILITY': 'Ловкость',
+  'MAX_STRENGTH': 'Максимальная сила',
+  'AEROBIC_ENDURANCE': 'Аэробная выносливость',
+  'SPEED': 'Скорость',
+  'POWER': 'Мощность',
+  'STRENGTH_ENDURANCE': 'Силовая выносливость',
+  'TECHNICAL_SKILL': 'Техника',
+  'DYNAMIC_STRETCH': 'Динамическая растяжка',
+  'STATIC_STRETCH': 'Статическая растяжка',
+  'PREHAB': 'Профилактика',
+  'ANAEROBIC_ENDURANCE': 'Анаэробная выносливость',
+};
+
 export default function MultiLevelTagFilter({ 
   selectedTags = [], 
   onTagsChange,
@@ -115,6 +130,15 @@ export default function MultiLevelTagFilter({
             <div className="flex flex-wrap" style={{ gap: '16px' }}>
               {categoryTags.map((tag) => {
                 const isSelected = selectedTags.includes(tag.name);
+                // Извлекаем ключ после двоеточия (напр. LoadType:AGILITY -> AGILITY)
+                const tagKey = tag.name.includes(':') ? tag.name.split(':')[1] : tag.name;
+                // Используем перевод если есть, иначе displayName из БД
+                const displayText = LOAD_TYPE_TRANSLATIONS[tagKey] || tag.displayName;
+                
+                // Для отладки - выводим в консоль
+                if (category.key === 'LOAD_TYPE' || category.key === 'LOAD') {
+                  console.log('Tag name:', tag.name, 'Key:', tagKey, 'Display:', displayText);
+                }
                 
                 return (
                   <button
@@ -142,7 +166,7 @@ export default function MultiLevelTagFilter({
                     }}
                     title={tag.description || undefined}
                   >
-                    {tag.displayName}
+                    {displayText}
                   </button>
                 );
               })}

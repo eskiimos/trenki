@@ -239,7 +239,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
       >
         <video
           ref={videoRef}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
           poster={short.thumbnail}
           playsInline
           loop

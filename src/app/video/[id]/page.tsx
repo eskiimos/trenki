@@ -78,7 +78,7 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [nextVideo, setNextVideo] = useState<VideoData | null>(null);
   const [showNextVideoPreview, setShowNextVideoPreview] = useState(false);
   const [countdown, setCountdown] = useState(5);
-  const [autoplayEnabled, setAutoplayEnabled] = useState(true);
+  const [autoplayEnabled, setAutoplayEnabled] = useState(false);
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Состояние для скачивания видео
