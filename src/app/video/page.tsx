@@ -365,7 +365,7 @@ const VideoPage = () => {
                     : video.likesCount} лайков
                 </span>
                 <span className="text-white/40"> | </span>
-                <span>оборудование ({video.equipment.join(' / ')})</span>
+                <span>оборудование ({video.equipment.join(', ')})</span>
               </div>
                   </div>
                 </div>

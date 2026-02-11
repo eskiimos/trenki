@@ -255,12 +255,8 @@ export default function VideoPage({ params }: VideoPageProps) {
         }
       }
 
-      // Проверяем достижение 99% для тренировки
-      if (!videoCompletedRef.current && progressPercent >= 99) {
-        console.log('🎯 Video reached 99%, completing...', { currentTime, duration, progressPercent });
-        videoCompletedRef.current = true;
-        await completeVideoInWorkout();
-      }
+      // В тренировке завершение происходит только при 100% (onEnded event)
+      // Прогресс только отслеживаем, но не завершаем видео
     } 
     // Для обычного просмотра - проверяем 99% для начисления баллов
     else if (!fromWorkout && videoId) {
