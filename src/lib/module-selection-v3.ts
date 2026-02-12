@@ -151,6 +151,11 @@ async function searchWithPriority(
         where.muscleGroup = { in: criteria.muscleGroups };
       }
       break;
+
+    case 'ANY_MODULE':
+      // Вообще любое видео нужного типа модуля (для разминки/заминки)
+      // Только moduleType и isPublished
+      break;
   }
 
   // Выполняем запрос

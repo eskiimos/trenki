@@ -274,16 +274,16 @@ export function getWorkoutStructure(
 export function getWarmupLoadTypes(energyState: EnergyState): LoadType[] {
   switch (energyState) {
     case EnergyState.TIRED:
-      return [LoadType.DYNAMIC_STRETCH];
+      return [LoadType.DYNAMIC_STRETCH, LoadType.AEROBIC_ENDURANCE];
 
     case EnergyState.IN_TONE:
-      return [LoadType.DYNAMIC_STRETCH, LoadType.POWER, LoadType.SPEED]; // динамическая растяжка или кроссфит
+      return [LoadType.DYNAMIC_STRETCH, LoadType.POWER, LoadType.SPEED, LoadType.AEROBIC_ENDURANCE]; // динамическая растяжка, кроссфит или аэробная
 
     case EnergyState.FULLY_CHARGED:
-      return [LoadType.POWER, LoadType.SPEED]; // кроссфит-комплекс
+      return [LoadType.POWER, LoadType.SPEED, LoadType.AEROBIC_ENDURANCE]; // кроссфит-комплекс или интенсивная аэробная
 
     default:
-      return [LoadType.DYNAMIC_STRETCH];
+      return [LoadType.DYNAMIC_STRETCH, LoadType.AEROBIC_ENDURANCE];
   }
 }
 
@@ -378,6 +378,7 @@ export interface ModuleSearchCriteria {
  * 3. Без учета возраста
  * 4. Без учета RPE
  * 5. Любое видео нужного модуля для возраста, направления и уровня
+ * 6. Вообще любое видео нужного модуля (для разминки/заминки)
  */
 export const FALLBACK_PRIORITIES = [
   'PERFECT_MATCH',      // все теги совпадают
@@ -385,6 +386,7 @@ export const FALLBACK_PRIORITIES = [
   'NO_AGE',             // без учета возраста
   'NO_RPE',             // без учета RPE
   'BASIC_MATCH',        // минимальные требования
+  'ANY_MODULE',         // вообще любое видео нужного типа
 ] as const;
 
 export type FallbackPriority = typeof FALLBACK_PRIORITIES[number];
