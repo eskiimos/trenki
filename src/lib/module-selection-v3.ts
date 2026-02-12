@@ -158,8 +158,8 @@ async function searchWithPriority(
       break;
   }
 
-  // Выполняем запрос
-  const video = await prisma.video.findFirst({
+  // Получаем все подходящие видео для случайного выбора
+  const videos = await prisma.video.findMany({
     where,
     include: {
       trainer: {
@@ -180,10 +180,16 @@ async function searchWithPriority(
         },
       },
     },
-    orderBy: { createdAt: 'desc' },
   });
 
-  return video;
+  // Если ничего не найдено, возвращаем null
+  if (videos.length === 0) {
+    return null;
+  }
+
+  // Выбираем случайное видео из найденных
+  const randomIndex = Math.floor(Math.random() * videos.length);
+  return videos[randomIndex];
 }
 
 /**
