@@ -96,7 +96,7 @@ export default function WorkoutReminder() {
   };
 
   return (
-    <div className="fixed left-0 right-0 bottom-24 z-50 px-4">
+    <div className="fixed left-0 right-0 z-50 px-4" style={{ bottom: 'calc(6rem + 30px)' }}>
       <div
         role="button"
         tabIndex={0}
