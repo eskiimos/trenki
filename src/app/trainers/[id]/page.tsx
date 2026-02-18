@@ -395,20 +395,22 @@ export default function TrainerPage() {
 
       {/* ТРЕНИРОВКИ (Длинные видео) */}
       <div className="mb-8 bg-[#060919] py-4">
-        <div className="px-4 mb-4 flex items-center justify-between">
-          <h3 className="text-white text-sm font-bold uppercase">
-            тренировки
-          </h3>
-          <div className="flex items-center gap-2">
-            <span className="text-[#f9f9f9] text-sm">({videos.length})</span>
-            <Image 
-              src="/icons/arrow.svg" 
-              alt="Показать все" 
-              width={16} 
-              height={16}
-            />
+        <Link href={`/trainers/${trainerId}/videos`}>
+          <div className="px-4 mb-4 flex items-center justify-between cursor-pointer">
+            <h3 className="text-white text-sm font-bold uppercase">
+              тренировки
+            </h3>
+            <div className="flex items-center gap-2">
+              <span className="text-[#f9f9f9] text-sm">({videos.length})</span>
+              <Image 
+                src="/icons/arrow.svg" 
+                alt="Показать все" 
+                width={16} 
+                height={16}
+              />
+            </div>
           </div>
-        </div>
+        </Link>
         
         {/* Горизонтальный скролл видео */}
         <div className="overflow-x-auto scrollbar-hide">
@@ -420,20 +422,29 @@ export default function TrainerPage() {
                   href={`/video/${video.id}`}
                   className="flex-shrink-0"
                 >
-                  <div className="w-[340px] h-[191px] bg-gray-800 rounded-lg overflow-hidden relative">
-                    {video.thumbnail ? (
-                      <Image 
-                        src={video.thumbnail}
-                        alt={video.title}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-gray-700 to-gray-800" />
-                    )}
-                    {/* Длительность */}
-                    <div className="absolute bottom-2 right-2 bg-black/70 px-2 py-1 rounded text-xs">
-                      {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
+                  <div className="w-[340px]">
+                    <div className="relative overflow-hidden rounded-lg">
+                      {video.thumbnail ? (
+                        <Image 
+                          src={video.thumbnail}
+                          alt={video.title}
+                          width={340}
+                          height={191}
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="w-[340px] h-[191px] bg-gradient-to-br from-gray-700 to-gray-800" />
+                      )}
+                      {/* Длительность */}
+                      <div className="absolute bottom-2 right-2 bg-black/70 px-2 py-1 rounded text-xs text-white">
+                        {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
+                      </div>
+                    </div>
+                    {/* Video Info */}
+                    <div className="px-0 py-2">
+                      <h3 className="text-white text-sm font-semibold line-clamp-2 leading-tight">
+                        {video.title.toUpperCase()}
+                      </h3>
                     </div>
                   </div>
                 </Link>

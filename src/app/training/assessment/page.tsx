@@ -192,13 +192,6 @@ export default function TrainingAssessmentPage() {
         </div>
       )}
 
-      {/* Прогресс */}
-      <div className="mb-6">
-        <div className="flex justify-between mb-2 text-sm text-gray-400">
-          <span>Оценка состояния</span>
-        </div>
-      </div>
-
       {/* Вопросы */}
       <div className="space-y-12">
         <div className="animate-fadeIn space-y-12">
