@@ -9,7 +9,7 @@ interface BottomNavigationProps {
 const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' }) => {
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 bg-[#101530] border-t border-[#2d3448] px-4 z-50"
+      className="fixed bottom-0 left-0 right-0 bg-[#101530] border-t border-[#2d3448] px-4 z-40"
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)', paddingTop: 12 }}
     >
       <div className="flex justify-around items-center max-w-md mx-auto">
