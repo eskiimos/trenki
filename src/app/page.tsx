@@ -761,7 +761,7 @@ const TrenkiSection = () => {
 
   return (
     <section style={{ paddingTop: '15px', paddingBottom: '15px' }}>
-      <h2 className="px-4 text-white text-lg font-semibold mb-3">Треньки</h2>
+      <h2 className="px-4 text-white text-lg font-semibold mb-3">Короткоформатные видео Треньки</h2>
       <div className="flex space-x-4 overflow-x-auto pb-4 px-4">
         {shorts.map((short) => (
           <ShortVideoPlayer 
