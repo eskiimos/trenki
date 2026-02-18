@@ -1194,6 +1194,7 @@ const VideoCardSkeleton = () => (
 const PromoBannerSection = () => {
   const [videos, setVideos] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1221,17 +1222,13 @@ const PromoBannerSection = () => {
 
   // Автоскроллинг видео
   useEffect(() => {
-    if (!scrollContainerRef.current || videos.length === 0 || isLoading) return;
+    if (!scrollContainerRef.current || videos.length === 0 || isLoading || hasUserInteracted) return;
 
     const scrollContainer = scrollContainerRef.current;
-    let isUserScrolling = false;
 
     // Слушаем события скролла пользователя
     const handleUserScroll = () => {
-      isUserScrolling = true;
-      setTimeout(() => {
-        isUserScrolling = false;
-      }, 3000); // Останавливаем автоскроллинг на 3 секунды после действия пользователя
+      setHasUserInteracted(true);
     };
 
     scrollContainer.addEventListener('scroll', handleUserScroll);
@@ -1239,7 +1236,7 @@ const PromoBannerSection = () => {
 
     // Автоскроллинг каждые 4 секунды
     const autoScrollInterval = setInterval(() => {
-      if (!isUserScrolling && scrollContainer) {
+      if (scrollContainer && !hasUserInteracted) {
         // Скроллим на ширину одного видео (примерно ширина экрана - 2rem)
         const scrollAmount = window.innerWidth - 32;
         
@@ -1266,7 +1263,7 @@ const PromoBannerSection = () => {
       scrollContainer.removeEventListener('scroll', handleUserScroll);
       scrollContainer.removeEventListener('touchstart', handleUserScroll);
     };
-  }, [videos, isLoading]);
+  }, [videos, isLoading, hasUserInteracted]);
 
   if (isLoading) {
     return (
