@@ -1123,7 +1123,7 @@ const VideoCard = ({ video }: VideoCardProps) => {
     <Link href={`/video/${video.id}`}>
       <div className="flex-shrink-0 w-[calc(100vw-2rem)] cursor-pointer">
         {/* Video Thumbnail */}
-        <div className="relative w-full aspect-video rounded overflow-hidden">
+        <div className="relative rounded overflow-hidden" style={{ width: '100%', height: 'auto', aspectRatio: '16/9', maxHeight: '280px' }}>
           {video.thumbnail && (
             <Image 
               src={video.thumbnail} 
@@ -1178,7 +1178,7 @@ const VideoCard = ({ video }: VideoCardProps) => {
 // Skeleton загрузчик для карточки видео
 const VideoCardSkeleton = () => (
   <div className="flex-shrink-0 w-[calc(100vw-2rem)]">
-    <div className="bg-gray-700/30 overflow-hidden relative aspect-video w-full animate-pulse" style={{ borderRadius: '4px' }}>
+    <div className="bg-gray-700/30 overflow-hidden rounded animate-pulse" style={{ borderRadius: '4px', width: '100%', height: 'auto', aspectRatio: '16/9', maxHeight: '280px' }}>
       <div className="absolute inset-0 bg-gradient-to-r from-gray-700/20 via-gray-600/30 to-gray-700/20" />
     </div>
     <div className="px-0 py-3">
