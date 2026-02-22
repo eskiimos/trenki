@@ -1191,22 +1191,6 @@ const VideoCardSkeleton = () => (
   </div>
 );
 
-// Компонент для слайда "Еще видео"
-const MoreVideosCard = () => {
-  return (
-    <Link href="/video">
-      <div className="flex-shrink-0 w-[calc(100vw-2rem)] cursor-pointer">
-        <div className="relative rounded overflow-hidden flex items-center justify-center" style={{ width: '100%', height: 'auto', aspectRatio: '16/9', maxHeight: '280px', background: 'linear-gradient(135deg, #A1FF4A 0%, #445CFF 100%)' }}>
-          <div className="text-center">
-            <div style={{ color: '#060919' }} className="text-3xl font-bold mb-2">↓</div>
-            <div style={{ color: '#060919' }} className="text-lg font-semibold">Еще видео</div>
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
-};
-
 const PromoBannerSection = () => {
   const [videos, setVideos] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -1223,9 +1207,8 @@ const PromoBannerSection = () => {
         if (allVideos.length > 0) {
           // Перемешиваем видео случайным образом
           allVideos = allVideos.sort(() => Math.random() - 0.5);
-          // Берем 7 видео
-          const videosToShow = allVideos.slice(0, 7);
-          setVideos(videosToShow);
+          // Показываем все видео
+          setVideos(allVideos);
         }
       } catch (error) {
         console.error('Error loading videos:', error);
@@ -1321,9 +1304,6 @@ const PromoBannerSection = () => {
             <VideoCard video={video} />
           </div>
         ))}
-        <div className="snap-start">
-          <MoreVideosCard />
-        </div>
       </div>
     </section>
   );
