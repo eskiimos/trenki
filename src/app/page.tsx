@@ -631,7 +631,7 @@ const HeroVideoSection = () => {
   if (isLoading) {
     return (
       <section className="px-4" style={{ paddingBottom: '15px' }}>
-        <div className="bg-gray-700/30 overflow-hidden relative aspect-video w-full animate-pulse" style={{ borderRadius: '4px' }}>
+        <div className="bg-gray-700/30 overflow-hidden animate-pulse" style={{ borderRadius: '4px', width: '100%', height: 'auto', aspectRatio: '16/9', maxHeight: '280px' }}>
           <div className="absolute inset-0 bg-gradient-to-r from-gray-700/20 via-gray-600/30 to-gray-700/20" />
         </div>
       </section>
@@ -655,7 +655,7 @@ const HeroVideoSection = () => {
       <Link href={`/video/${randomVideo.id}`}>
         <div>
           {/* Video Thumbnail */}
-          <div className="relative w-full aspect-video rounded overflow-hidden">
+          <div className="relative rounded overflow-hidden" style={{ width: '100%', height: 'auto', aspectRatio: '16/9', maxHeight: '280px' }}>
             {randomVideo.thumbnail && (
               <Image 
                 src={randomVideo.thumbnail} 
