@@ -369,6 +369,7 @@ export interface ModuleSearchCriteria {
   ageGroup?: AgeGroup;
   complexityLevels: ComplexityLevel[];
   rpeRange: RPERange;
+  trainingGoal?: TrainingGoal; // Цель пользователя для фильтрации по trainingGoals видео (для разминки/заминки)
 }
 
 /**

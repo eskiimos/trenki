@@ -83,6 +83,11 @@ async function searchWithPriority(
     moduleType: criteria.moduleType,
   };
 
+  // Фильтруем по trainingGoals если указана цель (для разминки и заминки)
+  if (criteria.trainingGoal) {
+    where.trainingGoals = { has: criteria.trainingGoal };
+  }
+
   // Применяем фильтры в зависимости от уровня приоритета
   switch (priority) {
     case 'PERFECT_MATCH':
@@ -215,7 +220,8 @@ export function createSearchCriteria(
   muscleGroups: MuscleGroup[],
   complexityLevels: ComplexityLevel[],
   rpeRange: RPERange,
-  ageGroup?: AgeGroup
+  ageGroup?: AgeGroup,
+  trainingGoal?: any // TrainingGoal для фильтрации разминки/заминки
 ): ModuleSearchCriteria {
   return {
     moduleType,
@@ -224,5 +230,6 @@ export function createSearchCriteria(
     complexityLevels,
     rpeRange,
     ageGroup,
+    trainingGoal,
   };
 }

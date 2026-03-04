@@ -316,7 +316,7 @@ async function buildWorkout(params: {
   }
 
   // ========================================================================
-  // 2. РАЗМИНКА (если нужна) - с привязкой к ФП
+  // 2. РАЗМИНКА (если нужна) - с привязкой к ФП и цели
   // ========================================================================
   if (structure.includeWarmup) {
     console.log('\n🔥 Подбираем РАЗМИНКУ...');
@@ -333,7 +333,8 @@ async function buildWorkout(params: {
       warmupMuscleGroups,
       complexityLevels,
       { min: 1, max: 5 }, // разминка всегда легкая
-      ageGroup
+      ageGroup,
+      goal // 🎯 Добавляем цель для фильтрации
     );
 
     const warmupResult = await selectModuleWithFallback(
@@ -355,7 +356,7 @@ async function buildWorkout(params: {
   }
 
   // ========================================================================
-  // 4. ЗАМИНКА (если нужна)
+  // 4. ЗАМИНКА (если нужна) - фильтруем по цели
   // ========================================================================
   if (structure.includeCooldown) {
     console.log('\n🧘 Подбираем ЗАМИНКУ...');
@@ -366,7 +367,8 @@ async function buildWorkout(params: {
       muscleGroups.cooldown,
       complexityLevels,
       { min: 1, max: 4 }, // заминка всегда легкая
-      ageGroup
+      ageGroup,
+      goal // 🎯 Добавляем цель для фильтрации
     );
 
     const cooldownResult = await selectModuleWithFallback(
