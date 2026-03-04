@@ -44,6 +44,24 @@ export async function POST(request: NextRequest) {
 
     console.log(`🔄 Замена модуля ${moduleIndex} в тренировке ${workoutSessionId}`);
 
+    // Получаем пользователя по telegramId или внутреннему id
+    let user = await prisma.user.findUnique({
+      where: { telegramId: userId },
+    });
+
+    if (!user) {
+      user = await prisma.user.findUnique({
+        where: { id: userId },
+      });
+    }
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Пользователь не найден' },
+        { status: 404 }
+      );
+    }
+
     // Получаем тренировку
     const workoutSession = await prisma.workoutSession.findUnique({
       where: { id: workoutSessionId },
@@ -74,7 +92,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Проверяем владельца
-    if (workoutSession.userId !== userId) {
+    if (workoutSession.userId !== user.id) {
       return NextResponse.json(
         { error: 'Доступ запрещен' },
         { status: 403 }
@@ -83,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     // Получаем профиль пользователя для подбора модуля
     const userProfile = await prisma.profile.findUnique({
-      where: { userId },
+      where: { userId: user.id },
     });
 
     if (!userProfile) {
