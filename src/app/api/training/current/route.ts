@@ -114,6 +114,7 @@ export async function GET(request: NextRequest) {
           rpeRange: `${wsVideo.video.rpeMin}-${wsVideo.video.rpeMax}`,
           videoUrl: wsVideo.video.videoUrl,
           thumbnail: wsVideo.video.thumbnail,
+          equipment: wsVideo.video.equipment || [],
           trainer: {
             id: wsVideo.video.trainer.id,
             name: wsVideo.video.trainer.name,

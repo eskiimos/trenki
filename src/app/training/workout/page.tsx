@@ -19,6 +19,7 @@ interface WorkoutModule {
   rpeRange: string;
   videoUrl: string;
   thumbnail: string | null;
+  equipment: string[];
   trainer: {
     id: string;
     name: string;
@@ -702,7 +703,7 @@ export default function WorkoutPage() {
               </div>
 
               {/* Кнопка замены модуля (нижний правый угол) */}
-              {!isCompleted && !isLocked && (
+              {!isCompleted && !isLocked && module.equipment && module.equipment.length > 0 && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
