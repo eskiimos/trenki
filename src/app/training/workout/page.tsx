@@ -134,6 +134,7 @@ export default function WorkoutPage() {
             типМодуля: m.типМодуля,
             completed: m.completed,
             order: m.order,
+            equipment: m.equipment || [],
           })),
         });
         setWorkout(data.workout);
@@ -181,7 +182,16 @@ export default function WorkoutPage() {
 
   // Функция замены модуля на другой подходящий
   const handleReplaceModule = async (moduleIndex: number) => {
-    if (!workout || !user?.id) return;
+    if (!workout || !user?.id) {
+      console.error('❌ Missing workout or user ID');
+      return;
+    }
+
+    console.log(`🔄 Replacing module ${moduleIndex}:`, {
+      workoutId: workout.id,
+      userId: user.id,
+      moduleTitle: workout.modules[moduleIndex]?.title,
+    });
 
     setReplacingModuleIndex(moduleIndex);
     setIsReplacingModule(true);
@@ -197,8 +207,11 @@ export default function WorkoutPage() {
         }),
       });
 
+      console.log(`📡 API Response status: ${response.status}`);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Module replaced successfully:', data.newModule.title);
         
         // Обновляем тренировку с новым модулем
         await loadWorkout();
@@ -209,13 +222,14 @@ export default function WorkoutPage() {
         });
       } else {
         const error = await response.json();
+        console.error('❌ API Error:', error);
         setToast({
           message: error.error || 'Не удалось заменить модуль',
           type: 'error',
         });
       }
     } catch (err) {
-      console.error('Ошибка при замене модуля:', err);
+      console.error('❌ Exception during module replacement:', err);
       setToast({
         message: 'Ошибка при замене модуля',
         type: 'error',
@@ -703,48 +717,59 @@ export default function WorkoutPage() {
               </div>
 
               {/* Кнопка замены модуля (нижний правый угол) */}
-              {!isCompleted && !isLocked && module.equipment && module.equipment.length > 0 && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleReplaceModule(index);
-                  }}
-                  disabled={replacingModuleIndex === index && isReplacingModule}
-                  style={{
-                    position: 'absolute',
-                    bottom: '12px',
-                    right: '12px',
-                    zIndex: 3,
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    backgroundColor: 'rgba(161, 255, 74, 0.2)',
-                    border: '1px solid rgba(161, 255, 74, 0.4)',
-                    color: '#A1FF4A',
-                    cursor: replacingModuleIndex === index && isReplacingModule ? 'wait' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.2s ease',
-                    padding: 0,
-                    fontSize: '16px',
-                    fontWeight: 'bold',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(161, 255, 74, 0.3)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(161, 255, 74, 0.2)';
-                  }}
-                  title="Заменить видео"
-                >
-                  {replacingModuleIndex === index && isReplacingModule ? (
-                    <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</span>
-                  ) : (
-                    '⟳'
-                  )}
-                </button>
-              )}
+              {(() => {
+                const canReplace = !isCompleted && !isLocked && module.equipment && module.equipment.length > 0;
+                if (index === 0 || index === 1) { // логируем первые два модуля для debug
+                  console.log(`Module ${index} (${module.title}):`, {
+                    completed: isCompleted,
+                    locked: isLocked,
+                    equipment: module.equipment,
+                    canReplace,
+                  });
+                }
+                return canReplace && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleReplaceModule(index);
+                    }}
+                    disabled={replacingModuleIndex === index && isReplacingModule}
+                    style={{
+                      position: 'absolute',
+                      bottom: '12px',
+                      right: '12px',
+                      zIndex: 3,
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      backgroundColor: 'rgba(161, 255, 74, 0.2)',
+                      border: '1px solid rgba(161, 255, 74, 0.4)',
+                      color: '#A1FF4A',
+                      cursor: replacingModuleIndex === index && isReplacingModule ? 'wait' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s ease',
+                      padding: 0,
+                      fontSize: '16px',
+                      fontWeight: 'bold',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(161, 255, 74, 0.3)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(161, 255, 74, 0.2)';
+                    }}
+                    title="Заменить видео"
+                  >
+                    {replacingModuleIndex === index && isReplacingModule ? (
+                      <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</span>
+                    ) : (
+                      '⟳'
+                    )}
+                  </button>
+                );
+              })()}
             </div>
           );
         })}
