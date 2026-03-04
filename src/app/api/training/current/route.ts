@@ -79,6 +79,18 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { createdAt: 'desc' },
       });
+
+      // \u0415\u0441\u043b\u0438 \u043d\u0430\u0448\u043b\u0430 \u043f\u043e\u0441\u043b\u0435\u0434\u043d\u044e\u044e \u0442\u0440\u0435\u043d\u0438\u0440\u043e\u0432\u043a\u0443 \u2014 \u043e\u0442\u043c\u0435\u043d\u044f\u0435\u043c \u0432\u0441\u0435 \u0431\u043e\u043b\u0435\u0435 \u0441\u0442\u0430\u0440\u044b\u0435 \u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0435 \u0441\u0435\u0441\u0441\u0438\u0438
+      if (workout) {
+        await prisma.workoutSession.updateMany({
+          where: {
+            userId: user.id,
+            status: { in: [WorkoutStatus.PENDING, WorkoutStatus.IN_PROGRESS] },
+            id: { not: workout.id },
+          },
+          data: { status: WorkoutStatus.SKIPPED },
+        });
+      }
     }
 
     if (!workout) {

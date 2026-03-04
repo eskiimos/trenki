@@ -89,10 +89,8 @@ const HomePage = () => {
     <div className="bg-[#060919] min-h-screen text-white pb-32">
       <Header />
       
-      {/* Напоминание о незавершенной тренировке - СКРЫТО */}
-      {/* <div className="px-4 mt-4">
-        <WorkoutReminder />
-      </div> */}
+      {/* Напоминание о незавершенной тренировке */}
+      <WorkoutReminder />
       
       {/* Секция с короткими видео (треньки) */}
       <TrenkiSection />
