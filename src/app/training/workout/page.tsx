@@ -45,7 +45,18 @@ interface Workout {
   createdAt: string;
   modules: WorkoutModule[];
   equipment?: string[];
+  trainingGoal?: string | null;
 }
+
+const GOAL_LABELS: Record<string, string> = {
+  POWERFUL_SHOT: 'Мощный бросок',
+  OUTRUN_OPPONENT: 'Убегаем от соперника',
+  STRENGTH_STABILITY: 'Силовая борьба',
+  SOFT_HANDS: 'Мягкие ручки',
+  FULL_GAME_ENDURANCE: 'Выносливость на всю игру',
+  AGILITY: 'Маневренность',
+  SPORT_LONGEVITY: 'Спортивное долголетие',
+};
 
 export default function WorkoutPage() {
   const router = useRouter();
@@ -514,6 +525,29 @@ export default function WorkoutPage() {
           }}>
             <span style={{color: '#A1FF4A'}}>ии-тренер</span> рекомендует пройти все модули по очереди, а потом хорошенько отдохнуть
           </div>
+        </div>
+      )}
+
+      {/* Выбранная цель тренировки */}
+      {workout.trainingGoal && GOAL_LABELS[workout.trainingGoal] && (
+        <div className="mb-4" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{
+            fontFamily: 'Overpass',
+            fontWeight: 400,
+            fontSize: '12px',
+            lineHeight: '120%',
+            letterSpacing: '0.5px',
+            color: '#9B99AA',
+          }}>ЦЕЛЬ:</span>
+          <span style={{
+            fontFamily: 'Overpass',
+            fontWeight: 700,
+            fontSize: '12px',
+            lineHeight: '120%',
+            letterSpacing: '0.5px',
+            textTransform: 'uppercase',
+            color: '#A1FF4A',
+          }}>{GOAL_LABELS[workout.trainingGoal]}</span>
         </div>
       )}
 

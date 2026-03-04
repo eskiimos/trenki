@@ -85,6 +85,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ workout: null });
     }
 
+    // Получаем цель тренировки из профиля пользователя
+    const ownerProfile = await prisma.profile.findUnique({
+      where: { userId: workout.userId },
+      select: { lastGoals: true },
+    });
+    const trainingGoal = ownerProfile?.lastGoals?.[0] || null;
+
     // Рассчитываем прогресс
     const totalVideos = workout.totalVideos;
     const completedVideos = workout.videos.filter((v) => v.completed).length;
@@ -103,6 +110,7 @@ export async function GET(request: NextRequest) {
         progress: Math.round(progress),
         startedAt: workout.startedAt,
         createdAt: workout.createdAt,
+        trainingGoal,
         modules: workout.videos.map((wsVideo) => ({
           id: wsVideo.video.id,
           sessionVideoId: wsVideo.id,
