@@ -285,12 +285,18 @@ export async function POST(request: NextRequest) {
 
     // Обновляем видео в тренировке
     try {
-      await prisma.workoutSessionVideo.update({
+      // Используем delete + create вместо update, чтобы избежать конфликта unique constraint
+      await prisma.workoutSessionVideo.delete({
         where: {
           id: currentVideo.id,
         },
+      });
+
+      await prisma.workoutSessionVideo.create({
         data: {
+          sessionId: currentVideo.sessionId,
           videoId: newModule.id,
+          order: currentVideo.order,
           completed: false,
         },
       });
