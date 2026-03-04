@@ -6,6 +6,7 @@ import {
   MuscleGroup,
   ComplexityLevel,
   TrainingGoal,
+  EnergyState,
 } from '@/generated/prisma';
 import {
   getComplexityLevel,
@@ -13,7 +14,6 @@ import {
   GOAL_TO_MUSCLE_GROUPS,
   GOAL_TO_LOAD_TYPES,
   getWarmupLoadTypes,
-  matchWarmupToFitness,
   applyAgeModifiers,
 } from '@/lib/training-algorithm-v3';
 import {
@@ -63,11 +63,6 @@ export async function POST(request: NextRequest) {
           },
           orderBy: { order: 'asc' },
         },
-        user: {
-          include: {
-            profile: true,
-          },
-        },
       },
     });
 
@@ -86,6 +81,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Получаем профиль пользователя для подбора модуля
+    const userProfile = await prisma.profile.findUnique({
+      where: { userId },
+    });
+
+    if (!userProfile) {
+      return NextResponse.json(
+        { error: 'Профиль пользователя не найден' },
+        { status: 404 }
+      );
+    }
+
     // Получаем индекс модуля (если он вне границ)
     if (moduleIndex < 0 || moduleIndex >= workoutSession.videos.length) {
       return NextResponse.json(
@@ -95,19 +102,19 @@ export async function POST(request: NextRequest) {
     }
 
     const currentVideo = workoutSession.videos[moduleIndex];
-    const profile = workoutSession.user.profile;
+    const profile = userProfile;
     const currentModuleType = currentVideo.video.moduleType;
 
     // Определяем уровень сложности и RPE диапазон
     const complexityLevel = getComplexityLevel(profile!.potential);
     const allowedComplexityLevels = getAllowedComplexityLevels(
       complexityLevel,
-      workoutSession.energyState as any
+      EnergyState.IN_TONE // Используем среднее значение для замены
     );
 
-    // Получаем информацию о тренировке из метаданных (если есть)
-    const trainingGoal = (workoutSession as any).goal as TrainingGoal | null;
-    const energyState = workoutSession.energyState;
+    // Получаем цель тренировки из последних целей пользователя (если есть)
+    const trainingGoal = profile.lastGoals?.[0] as TrainingGoal | null;
+    const energyState = EnergyState.IN_TONE; // По умолчанию используем IN_TONE
 
     console.log('📋 Текущий модуль:', currentModuleType);
 
@@ -115,10 +122,9 @@ export async function POST(request: NextRequest) {
 
     // Подбираем новый модуль того же типа
     if (currentModuleType === ModuleType.WARMUP) {
-      const warmupLoadTypes = getWarmupLoadTypes(energyState as any);
-      // Берем направления разминки из матрицы или используем все тело
+      const warmupLoadTypes = getWarmupLoadTypes(energyState);
       const muscleGroups = trainingGoal
-        ? GOAL_TO_MUSCLE_GROUPS[trainingGoal]?.warmup || [MuscleGroup.FULL_BODY]
+        ? GOAL_TO_MUSCLE_GROUPS[trainingGoal as TrainingGoal]?.warmup || [MuscleGroup.FULL_BODY]
         : [MuscleGroup.FULL_BODY];
 
       const criteria = createSearchCriteria(
@@ -127,13 +133,13 @@ export async function POST(request: NextRequest) {
         muscleGroups,
         allowedComplexityLevels,
         { min: 1, max: 5 },
-        profile?.ageGroup as any,
-        trainingGoal
+        profile.ageGroup || undefined,
+        trainingGoal || undefined
       );
 
       const result = await selectModuleWithFallback(
         criteria,
-        [currentVideo.videoId, ...workoutSession.videos.map(v => v.videoId)] // Исключаем текущий и все используемые
+        [currentVideo.videoId, ...workoutSession.videos.map(v => v.videoId)]
       );
 
       if (result.video) {
@@ -142,7 +148,7 @@ export async function POST(request: NextRequest) {
     } else if (currentModuleType === ModuleType.COOLDOWN) {
       // Заминка
       const muscleGroups = trainingGoal
-        ? GOAL_TO_MUSCLE_GROUPS[trainingGoal]?.cooldown || [MuscleGroup.FULL_BODY]
+        ? GOAL_TO_MUSCLE_GROUPS[trainingGoal as TrainingGoal]?.cooldown || [MuscleGroup.FULL_BODY]
         : [MuscleGroup.FULL_BODY];
 
       const criteria = createSearchCriteria(
@@ -151,8 +157,8 @@ export async function POST(request: NextRequest) {
         muscleGroups,
         allowedComplexityLevels,
         { min: 1, max: 4 },
-        profile?.ageGroup as any,
-        trainingGoal
+        profile.ageGroup || undefined,
+        trainingGoal || undefined
       );
 
       const result = await selectModuleWithFallback(
@@ -166,16 +172,16 @@ export async function POST(request: NextRequest) {
     } else if (currentModuleType === ModuleType.FITNESS) {
       // ОФП
       let loadTypes = trainingGoal
-        ? GOAL_TO_LOAD_TYPES[trainingGoal].fitness
+        ? GOAL_TO_LOAD_TYPES[trainingGoal as TrainingGoal].fitness
         : [LoadType.POWER];
 
       loadTypes = applyAgeModifiers(
         loadTypes,
-        profile?.ageGroup as any
+        profile.ageGroup || undefined
       );
 
       const muscleGroups = trainingGoal
-        ? GOAL_TO_MUSCLE_GROUPS[trainingGoal]?.fitness || [MuscleGroup.FULL_BODY]
+        ? GOAL_TO_MUSCLE_GROUPS[trainingGoal as TrainingGoal]?.fitness || [MuscleGroup.FULL_BODY]
         : [MuscleGroup.FULL_BODY];
 
       const rpeMin = Math.max(3, complexityLevel === ComplexityLevel.BEGINNER ? 3 : 4);
@@ -187,7 +193,7 @@ export async function POST(request: NextRequest) {
         muscleGroups,
         allowedComplexityLevels,
         { min: rpeMin, max: rpeMax },
-        profile?.ageGroup as any
+        profile.ageGroup || undefined
       );
 
       const result = await selectModuleWithFallback(
@@ -201,16 +207,16 @@ export async function POST(request: NextRequest) {
     } else if (currentModuleType === ModuleType.TECHNIQUE) {
       // Техника
       let loadTypes = trainingGoal
-        ? GOAL_TO_LOAD_TYPES[trainingGoal].technique
-        : [LoadType.TECHNIQUE];
+        ? GOAL_TO_LOAD_TYPES[trainingGoal as TrainingGoal].technique
+        : [LoadType.TECHNICAL_SKILL];
 
       loadTypes = applyAgeModifiers(
         loadTypes,
-        profile?.ageGroup as any
+        profile.ageGroup || undefined
       );
 
       const muscleGroups = trainingGoal
-        ? GOAL_TO_MUSCLE_GROUPS[trainingGoal]?.technique || [MuscleGroup.FULL_BODY]
+        ? GOAL_TO_MUSCLE_GROUPS[trainingGoal as TrainingGoal]?.technique || [MuscleGroup.FULL_BODY]
         : [MuscleGroup.FULL_BODY];
 
       const rpeMin = Math.max(2, complexityLevel === ComplexityLevel.BEGINNER ? 2 : 3);
@@ -222,7 +228,7 @@ export async function POST(request: NextRequest) {
         muscleGroups,
         allowedComplexityLevels,
         { min: rpeMin, max: rpeMax },
-        profile?.ageGroup as any
+        profile.ageGroup || undefined
       );
 
       const result = await selectModuleWithFallback(
