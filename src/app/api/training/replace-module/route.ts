@@ -44,14 +44,17 @@ export async function POST(request: NextRequest) {
 
     console.log(`🔄 Замена модуля ${moduleIndex} в тренировке ${workoutSessionId}`);
 
+    // Конвертируем userId в строку (Telegram передаёт ID как число)
+    const userIdStr = String(userId);
+
     // Получаем пользователя по telegramId или внутреннему id
     let user = await prisma.user.findUnique({
-      where: { telegramId: userId },
+      where: { telegramId: userIdStr },
     });
 
     if (!user) {
       user = await prisma.user.findUnique({
-        where: { id: userId },
+        where: { id: userIdStr },
       });
     }
 
