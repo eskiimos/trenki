@@ -702,6 +702,23 @@ export default function WorkoutPage() {
                 {info?.label || module.типМодуля || module.moduleType || 'МОДУЛЬ'}
               </div>
 
+              {/* Информация об оборудовании модуля */}
+              {module.equipment && module.equipment.length > 0 && (
+                <div style={{
+                  position: 'relative',
+                  zIndex: 2,
+                  fontFamily: 'Overpass',
+                  fontWeight: 400,
+                  fontSize: '11px',
+                  lineHeight: '110%',
+                  color: '#A1FF4A',
+                  textAlign: 'center',
+                  padding: '4px 16px 0 16px',
+                }}>
+                  ⚙️ {module.equipment.join(', ')}
+                </div>
+              )}
+
               {/* Кнопка замены модуля (нижний правый угол) */}
               {!isCompleted && !isLocked && module.equipment && module.equipment.length > 0 && (
                 <button
