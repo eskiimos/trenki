@@ -140,6 +140,7 @@ export async function POST(request: NextRequest) {
 
     // Подбираем новый модуль того же типа
     if (currentModuleType === ModuleType.WARMUP) {
+      console.log('🔍 Ищем РАЗМИНКУ...');
       const warmupLoadTypes = getWarmupLoadTypes(energyState);
       const muscleGroups = trainingGoal
         ? GOAL_TO_MUSCLE_GROUPS[trainingGoal as TrainingGoal]?.warmup || [MuscleGroup.FULL_BODY]
@@ -155,16 +156,24 @@ export async function POST(request: NextRequest) {
         trainingGoal || undefined
       );
 
+      console.log('📋 Критерии поиска:', JSON.stringify({
+        moduleType: criteria.moduleType,
+        loadTypes: criteria.loadTypes,
+        muscleGroups: criteria.muscleGroups,
+      }));
+
       const result = await selectModuleWithFallback(
         criteria,
         [currentVideo.videoId, ...workoutSession.videos.map(v => v.videoId)]
       );
 
+      console.log('🔎 Результат поиска:', result?.video?.title || 'не найдено');
       if (result.video) {
         newModule = result.video;
       }
     } else if (currentModuleType === ModuleType.COOLDOWN) {
       // Заминка
+      console.log('🔍 Ищем ЗАМИНКУ...');
       const muscleGroups = trainingGoal
         ? GOAL_TO_MUSCLE_GROUPS[trainingGoal as TrainingGoal]?.cooldown || [MuscleGroup.FULL_BODY]
         : [MuscleGroup.FULL_BODY];
@@ -184,11 +193,13 @@ export async function POST(request: NextRequest) {
         [currentVideo.videoId, ...workoutSession.videos.map(v => v.videoId)]
       );
 
+      console.log('🔎 Результат поиска:', result?.video?.title || 'не найдено');
       if (result.video) {
         newModule = result.video;
       }
     } else if (currentModuleType === ModuleType.FITNESS) {
       // ОФП
+      console.log('🔍 Ищем ОФП...');
       let loadTypes = trainingGoal
         ? GOAL_TO_LOAD_TYPES[trainingGoal as TrainingGoal].fitness
         : [LoadType.POWER];
@@ -219,11 +230,13 @@ export async function POST(request: NextRequest) {
         [currentVideo.videoId, ...workoutSession.videos.map(v => v.videoId)]
       );
 
+      console.log('🔎 Результат поиска:', result?.video?.title || 'не найдено');
       if (result.video) {
         newModule = result.video;
       }
     } else if (currentModuleType === ModuleType.TECHNIQUE) {
       // Техника
+      console.log('🔍 Ищем ТЕХНИКУ...');
       let loadTypes = trainingGoal
         ? GOAL_TO_LOAD_TYPES[trainingGoal as TrainingGoal].technique
         : [LoadType.TECHNICAL_SKILL];
@@ -254,49 +267,58 @@ export async function POST(request: NextRequest) {
         [currentVideo.videoId, ...workoutSession.videos.map(v => v.videoId)]
       );
 
+      console.log('🔎 Результат поиска:', result?.video?.title || 'не найдено');
       if (result.video) {
         newModule = result.video;
       }
     }
 
     if (!newModule) {
+      console.error('❌ Не найден подходящий модуль для замены');
       return NextResponse.json(
         { error: 'Не найден подходящий модуль для замены' },
         { status: 404 }
       );
     }
 
+    console.log(`✅ Найден новый модуль: ${newModule.title}`);
+
     // Обновляем видео в тренировке
-    await prisma.workoutSessionVideo.update({
-      where: {
-        id: currentVideo.id,
-      },
-      data: {
-        videoId: newModule.id,
-        completed: false,
-      },
-    });
-
-    console.log(`✅ Модуль заменен: ${newModule.title}`);
-
-    return NextResponse.json({
-      success: true,
-      newModule: {
-        id: newModule.id,
-        title: newModule.title,
-        description: newModule.description,
-        duration: newModule.duration,
-        videoUrl: newModule.videoUrl,
-        thumbnail: newModule.thumbnail,
-        moduleType: newModule.moduleType,
-        trainer: {
-          id: newModule.trainer.id,
-          name: newModule.trainer.name,
-          lastName: newModule.trainer.lastName,
-          avatar: newModule.trainer.avatar,
+    try {
+      await prisma.workoutSessionVideo.update({
+        where: {
+          id: currentVideo.id,
         },
-      },
-    });
+        data: {
+          videoId: newModule.id,
+          completed: false,
+        },
+      });
+
+      console.log(`✅ Модуль заменен: ${newModule.title}`);
+
+      return NextResponse.json({
+        success: true,
+        newModule: {
+          id: newModule.id,
+          title: newModule.title,
+          description: newModule.description,
+          duration: newModule.duration,
+          videoUrl: newModule.videoUrl,
+          thumbnail: newModule.thumbnail,
+          moduleType: newModule.moduleType,
+          trainer: newModule.trainer ? {
+            id: newModule.trainer.id,
+            name: newModule.trainer.name,
+            lastName: newModule.trainer.lastName,
+            avatar: newModule.trainer.avatar,
+          } : null,
+        },
+      });
+    } catch (dbError: any) {
+      console.error('❌ Ошибка при обновлении БД:', dbError.message);
+      throw dbError;
+    }
   } catch (error: any) {
     console.error('❌ Ошибка при замене модуля:', error);
     return NextResponse.json(
