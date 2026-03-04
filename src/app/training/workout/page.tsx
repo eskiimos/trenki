@@ -67,6 +67,10 @@ export default function WorkoutPage() {
   // Состояние для отображения заглушки при отсутствии видео
   const [noVideosAvailable, setNoVideosAvailable] = useState(false);
   const [missingModules, setMissingModules] = useState<string[]>([]);
+  
+  // Состояние для замены модуля
+  const [replacingModuleIndex, setReplacingModuleIndex] = useState<number | null>(null);
+  const [isReplacingModule, setIsReplacingModule] = useState(false);
 
   useEffect(() => {
     if (webApp) {
@@ -172,6 +176,53 @@ export default function WorkoutPage() {
     const targetModule = workout.modules[targetIndex];
 
     router.push(`/video/${targetModule.id}?fromWorkout=true&sessionId=${workout.id}`);
+  };
+
+  // Функция замены модуля на другой подходящий
+  const handleReplaceModule = async (moduleIndex: number) => {
+    if (!workout || !user?.id) return;
+
+    setReplacingModuleIndex(moduleIndex);
+    setIsReplacingModule(true);
+
+    try {
+      const response = await fetch('/api/training/replace-module', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workoutSessionId: workout.id,
+          moduleIndex,
+          userId: user.id,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Обновляем тренировку с новым модулем
+        await loadWorkout();
+        
+        setToast({
+          message: `✅ Модуль заменен на "${data.newModule.title}"`,
+          type: 'success',
+        });
+      } else {
+        const error = await response.json();
+        setToast({
+          message: error.error || 'Не удалось заменить модуль',
+          type: 'error',
+        });
+      }
+    } catch (err) {
+      console.error('Ошибка при замене модуля:', err);
+      setToast({
+        message: 'Ошибка при замене модуля',
+        type: 'error',
+      });
+    } finally {
+      setReplacingModuleIndex(null);
+      setIsReplacingModule(false);
+    }
   };
 
   const completeWorkout = async () => {
@@ -649,6 +700,50 @@ export default function WorkoutPage() {
               }}>
                 {info?.label || module.типМодуля || module.moduleType || 'МОДУЛЬ'}
               </div>
+
+              {/* Кнопка замены модуля (нижний правый угол) */}
+              {!isCompleted && !isLocked && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleReplaceModule(index);
+                  }}
+                  disabled={replacingModuleIndex === index && isReplacingModule}
+                  style={{
+                    position: 'absolute',
+                    bottom: '12px',
+                    right: '12px',
+                    zIndex: 3,
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(161, 255, 74, 0.2)',
+                    border: '1px solid rgba(161, 255, 74, 0.4)',
+                    color: '#A1FF4A',
+                    cursor: replacingModuleIndex === index && isReplacingModule ? 'wait' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s ease',
+                    padding: 0,
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(161, 255, 74, 0.3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(161, 255, 74, 0.2)';
+                  }}
+                  title="Заменить видео"
+                >
+                  {replacingModuleIndex === index && isReplacingModule ? (
+                    <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</span>
+                  ) : (
+                    '⟳'
+                  )}
+                </button>
+              )}
             </div>
           );
         })}
