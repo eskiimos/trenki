@@ -702,23 +702,6 @@ export default function WorkoutPage() {
                 {info?.label || module.типМодуля || module.moduleType || 'МОДУЛЬ'}
               </div>
 
-              {/* Информация об оборудовании модуля */}
-              {module.equipment && module.equipment.length > 0 && (
-                <div style={{
-                  position: 'relative',
-                  zIndex: 2,
-                  fontFamily: 'Overpass',
-                  fontWeight: 400,
-                  fontSize: '11px',
-                  lineHeight: '110%',
-                  color: '#A1FF4A',
-                  textAlign: 'center',
-                  padding: '4px 16px 0 16px',
-                }}>
-                  ⚙️ {module.equipment.join(', ')}
-                </div>
-              )}
-
               {/* Кнопка замены модуля (нижний правый угол) */}
               {!isCompleted && !isLocked && module.equipment && module.equipment.length > 0 && (
                 <button
@@ -788,33 +771,39 @@ export default function WorkoutPage() {
           ОБОРУДОВАНИЕ:
         </h3>
         <div className="space-y-3">
-          {workout.equipment && workout.equipment.length > 0 ? (
-            workout.equipment.map((item, index) => (
-              <div key={index} style={{
+          {(() => {
+            // Получаем текущий активный модуль (первый незавершенный)
+            const currentModule = workout?.modules?.find(m => !m.completed);
+            const equipment = currentModule?.equipment || [];
+            
+            return equipment.length > 0 ? (
+              equipment.map((item, index) => (
+                <div key={index} style={{
+                  fontFamily: 'Overpass',
+                  fontWeight: 400,
+                  fontSize: '14px',
+                  lineHeight: '120%',
+                  color: '#F9F8FE',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <span>{index + 1}.</span>
+                  <span>{item}</span>
+                </div>
+              ))
+            ) : (
+              <div style={{
                 fontFamily: 'Overpass',
                 fontWeight: 400,
                 fontSize: '14px',
                 lineHeight: '120%',
-                color: '#F9F8FE',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
+                color: '#F9F8FE'
               }}>
-                <span>{index + 1}.</span>
-                <span>{item}</span>
+                - (без специального оборудования)
               </div>
-            ))
-          ) : (
-            <div style={{
-              fontFamily: 'Overpass',
-              fontWeight: 400,
-              fontSize: '14px',
-              lineHeight: '120%',
-              color: '#F9F8FE'
-            }}>
-              - (без специального оборудования)
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
 
