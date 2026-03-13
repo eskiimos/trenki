@@ -97,18 +97,18 @@ const HomePage = () => {
 
       {/* Запланированная тренировка (за 1 час до старта) */}
       <ScheduledWorkoutSection />
-      
-      {/* Основное обучающее видео */}
-      <HeroVideoSection />
-      
+
       {/* Каталог тренировок */}
       <TrainingsSection />
+      
+      {/* Основное обучающее видео - СКРЫТО */}
+      {/* <HeroVideoSection /> */}
       
       {/* Список тренеров */} 
       <TrainersSection />
       
       {/* Промо-баннер */}
-      <PromoBannerSection />
+      <AllVideosSection />
       
       {/* Нижнее меню */}
       <BottomNavigation activeTab="home" />
@@ -666,9 +666,9 @@ const HeroVideoSection = () => {
             <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm text-white text-sm font-medium px-2.5 py-1 rounded-lg">
               {formatDuration(randomVideo.duration)}
             </div>
-            {/* "Новое" badge */}
+            {/* "Новинка" badge */}
             <div className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: '#A1FF4A', color: '#060919' }}>
-              Новое
+              Новинка
             </div>
           </div>
           
@@ -759,7 +759,7 @@ const TrenkiSection = () => {
 
   return (
     <section style={{ paddingTop: '15px', paddingBottom: '15px' }}>
-      <h2 className="px-4 text-white text-lg font-semibold mb-3">Короткоформатные видео Треньки</h2>
+      <h2 className="px-4 text-white font-semibold mb-3" style={{ fontSize: '12px' }}>КОРОТКИЕ ВИДЕО</h2>
       <div className="flex space-x-4 overflow-x-auto pb-4 px-4">
         {shorts.map((short) => (
           <ShortVideoPlayer 
@@ -781,48 +781,45 @@ const TrenkiSection = () => {
 
 const TrainingsSection = () => (
     <section className="px-4" style={{ paddingBottom: '15px' }}>
-        <div style={{width: '100%', height: '100%', flexDirection: 'column', gap: 8, display: 'flex'}}>
-            {/* Нижний ряд - 2 колонки */}
-            <div style={{width: '100%', height: '100%', justifyContent: 'center', alignItems: 'stretch', gap: 8, display: 'inline-flex'}}>
-                <Link href="/training/assessment" style={{flex: '1 1 0', textDecoration: 'none', display: 'flex'}}>
-                    <div style={{width: '100%', paddingLeft: 16, paddingRight: 16, paddingTop: 8, paddingBottom: 8, background: 'linear-gradient(180deg, rgba(87, 108, 255, 0) 0%, rgba(87, 108, 255, 0.50) 100%)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start', gap: 8, display: 'flex', cursor: 'pointer', transition: 'all 0.2s'}}>
-                        <Image 
-                            src="/icons/icon-cards.svg" 
-                            alt="ИИ тренер" 
-                            width={16} 
+        <div style={{width: '100%', flexDirection: 'column', gap: 8, display: 'flex'}}>
+            {/* Блок ИИ тренера — во всю ширину */}
+            <Link href="/training/assessment" style={{width: '100%', textDecoration: 'none'}}>
+                <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: '#445CFF', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex', cursor: 'pointer'}}>
+                    <Image
+                        src="/icons/icon-cards.svg"
+                        alt="ИИ тренер"
+                        width={24}
+                        height={24}
+                    />
+                    <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50}}>
+                        персональный <span style={{color: '#A1FF4A'}}>ИИ</span> тренер
+                    </div>
+                </div>
+            </Link>
+            {/* Нижний ряд — 2 блока в одну линию */}
+            <div style={{width: '100%', display: 'flex', gap: 8}}>
+                <Link href="/video" style={{flex: '1 1 0', textDecoration: 'none'}}>
+                    <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex'}}>
+                        <Image
+                            src="/icons/ant-design-thunderbolt-filled_f.svg"
+                            alt="Потенциал"
+                            width={16}
                             height={16}
                         />
-                        <div style={{alignSelf: 'stretch'}}>
-                            <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>
-                                персональный <span style={{color: '#A1FF4A'}}>ИИ</span> тренер
-                            </div>
-                        </div>
+                        <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>повышение потенциала</div>
                     </div>
                 </Link>
-                <div style={{flex: '1 1 0', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 8, display: 'inline-flex'}}>
-                    <Link href="/video" style={{width: '100%'}}>
-                        <div style={{alignSelf: 'stretch', paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 8, display: 'flex'}}>
-                            <Image 
-                                src="/icons/ant-design-thunderbolt-filled_f.svg" 
-                                alt="Потенциал" 
-                                width={16} 
-                                height={16}
-                            />
-                            <div style={{width: 146, color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>повышение потенциала</div>
-                        </div>
-                    </Link>
-                    <Link href="/shorts-catalog" style={{width: '100%'}}>
-                        <div style={{alignSelf: 'stretch', paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start', gap: 8, display: 'flex'}}>
-                            <Image 
-                                src="/icons/icon-cards-kl.svg" 
-                                alt="Треньки" 
-                                width={16} 
-                                height={16}
-                            />
-                            <div style={{alignSelf: 'stretch', color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>треньки, советы профи, разборы</div>
-                        </div>
-                    </Link>
-                </div>
+                <Link href="/shorts-catalog" style={{flex: '1 1 0', textDecoration: 'none'}}>
+                    <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex'}}>
+                        <Image
+                            src="/icons/icon-cards-kl.svg"
+                            alt="Треньки"
+                            width={16}
+                            height={16}
+                        />
+                        <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>треньки, советы профи, разборы</div>
+                    </div>
+                </Link>
             </div>
         </div>
     </section>
@@ -882,11 +879,11 @@ const TrainersSection = () => {
   }
 
   return (
-    <section style={{ paddingBottom: '15px' }}>
+    <section style={{ paddingBottom: '0px' }}>
         <div style={{
             width: '100%', 
             paddingTop: 24, 
-            paddingBottom: 24, 
+            paddingBottom: 0, 
             background: 'linear-gradient(180deg, #101530 0%, #060919 100%)', 
             borderRadius: 1, 
             flexDirection: 'column', 
@@ -914,17 +911,17 @@ const TrainersSection = () => {
                     letterSpacing: 0.50
                 }}>тренеры</div>
                 <div style={{
-                    width: 16, 
-                    height: 16, 
+                    width: 24, 
+                    height: 24, 
                     position: 'relative', 
                     overflow: 'hidden'
                 }}>
                     <Link href="/trainers">
                         <Image 
-                            src="/icons/arrow.svg" 
+                            src="/icons/action-arrow-right.svg" 
                             alt="Стрелка" 
-                            width={16} 
-                            height={16}
+                            width={24} 
+                            height={24}
                         />
                     </Link>
                 </div>
@@ -1109,7 +1106,7 @@ interface VideoCardProps {
   video: any;
 }
 
-const VideoCard = ({ video }: VideoCardProps) => {
+const VideoCard = ({ video, isNew }: VideoCardProps & { isNew?: boolean }) => {
   // Форматируем длительность видео
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -1135,6 +1132,12 @@ const VideoCard = ({ video }: VideoCardProps) => {
           <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm text-white text-sm font-medium px-2.5 py-1 rounded-lg">
             {formatDuration(video.duration)}
           </div>
+          {/* "Новинка" badge */}
+          {isNew && (
+            <div className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: '#A1FF4A', color: '#060919' }}>
+              Новинка
+            </div>
+          )}
         </div>
         
         {/* Video Info */}
@@ -1189,7 +1192,7 @@ const VideoCardSkeleton = () => (
   </div>
 );
 
-const PromoBannerSection = () => {
+const AllVideosSection = () => {
   const [videos, setVideos] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
@@ -1203,8 +1206,12 @@ const PromoBannerSection = () => {
         let allVideos = data.videos || [];
         
         if (allVideos.length > 0) {
-          // Перемешиваем видео случайным образом
-          allVideos = allVideos.sort(() => Math.random() - 0.5);
+          // Сортируем по дате создания - новые сначала
+          allVideos = allVideos.sort((a: any, b: any) => {
+            const dateA = new Date(a.createdAt).getTime();
+            const dateB = new Date(b.createdAt).getTime();
+            return dateB - dateA; // Десь в фирст - новые
+          });
           // Показываем все видео
           setVideos(allVideos);
         }
@@ -1293,13 +1300,29 @@ const PromoBannerSection = () => {
 
   return (
     <section className="px-4" style={{ paddingTop: '15px', paddingBottom: '15px' }}>
+      <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '12px'
+      }}>
+          <h2 className="text-white font-semibold" style={{ fontSize: '12px', paddingLeft: '0px', paddingRight: '0px', margin: 0 }}>ТРЕНИРОВКИ</h2>
+          <Link href="/video">
+              <Image 
+                  src="/icons/action-arrow-right.svg" 
+                  alt="Перейти ко всем" 
+                  width={24} 
+                  height={24}
+              />
+          </Link>
+      </div>
       <div 
         ref={scrollContainerRef}
         className="flex space-x-4 overflow-x-auto pb-4 snap-x snap-mandatory"
       >
-        {videos.map((video) => (
+        {videos.map((video, index) => (
           <div key={video.id} className="snap-start">
-            <VideoCard video={video} />
+            <VideoCard video={video} isNew={index === 0} />
           </div>
         ))}
       </div>
