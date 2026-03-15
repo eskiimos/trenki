@@ -66,15 +66,12 @@ const ProfileEditPage = () => {
             height: data.user?.profile?.height?.toString() || '',
             weight: data.user?.profile?.weight?.toString() || '',
             avatarUrl: data.user?.profile?.avatarUrl || '',
-            clubLogoUrl: data.user?.profile?.clubLogoUrl || ''
+            clubLogoUrl: '' // Логотип клуба загружается только при выборе файла
           });
           
-          // Устанавливаем превью если есть URL
+          // Устанавливаем превью только для аватара, если есть URL
           if (data.user?.profile?.avatarUrl) {
             setAvatarPreview(data.user.profile.avatarUrl);
-          }
-          if (data.user?.profile?.clubLogoUrl) {
-            setLogoPreview(data.user.profile.clubLogoUrl);
           }
         }
       } catch (error) {
