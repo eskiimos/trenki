@@ -140,6 +140,8 @@ export async function POST(request: NextRequest) {
         ageGroup,
         height: profile.height ? parseInt(profile.height) : null,
         weight: profile.weight ? parseInt(profile.weight) : null,
+        avatarUrl: profile.avatarUrl ? profile.avatarUrl : null,
+        clubLogoUrl: profile.clubLogoUrl ? profile.clubLogoUrl : null,
       };
     }
 
