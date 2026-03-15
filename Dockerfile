@@ -28,7 +28,10 @@ COPY . .
 # Отключение телеметрии Next.js
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Билд Next.js (включает generate:icons и prisma generate через postinstall)
+# Генерация Prisma клиента (создает src/generated/prisma)
+RUN npx prisma generate
+
+# Билд Next.js
 RUN npm run build
 
 # Production образ
