@@ -378,10 +378,10 @@ const ProfileEditPage = () => {
         </Link>
         <button
           onClick={handleSubmit}
-          disabled={isSaving}
+          disabled={isSaving || isUploadingAvatar || isUploadingLogo}
           className="bg-[#445CFF] hover:bg-[#3a4edb] disabled:bg-[#445CFF]/50 text-white px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wide"
         >
-          {isSaving ? 'Сохранение...' : 'Сохранить'}
+          {isSaving ? 'Сохранение...' : isUploadingAvatar || isUploadingLogo ? 'Загрузка...' : 'Сохранить'}
         </button>
       </div>
 
