@@ -559,6 +559,18 @@ enum ModuleType {
   COOLDOWN
 }
 
+model EmailOtp {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@map("email_otps")
+}
+
 enum LoadDirection {
   LIGHT
   MEDIUM

@@ -6,6 +6,8 @@ const publicRoutes = [
   '/login',
   '/api/auth/create-login-token',
   '/api/auth/check-login-token',
+  '/api/auth/email/send-code',
+  '/api/auth/email/verify-code',
   '/api/telegram',
 ];
 
