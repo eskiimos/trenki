@@ -8,13 +8,15 @@ import { useTelegram } from '../../hooks/useTelegram';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { ProfileSkeleton } from '../../components/Skeleton';
 import BottomNavigation from '@/components/BottomNavigation';
-import { clearAuth } from '@/lib/auth';
+import { clearAuth, getTelegramId } from '@/lib/auth';
+import { calculateAge } from '@/lib/age-utils';
 
 const ProfilePage = () => {
   const router = useRouter();
   const { user } = useTelegram();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [recentGains, setRecentGains] = useState<any>(null);
   
   // Push-уведомления
   const { 
@@ -59,12 +61,29 @@ const ProfilePage = () => {
         if (!cancelled) {
           setUserProfile(data.user);
           setIsLoading(false);
+          
+          // Загружаем последние приросты
+          if (data.user?.id) {
+            fetchRecentGains(data.user.id);
+          }
         }
       } catch (error) {
         if (!cancelled) {
           console.error('Ошибка загрузки профиля:', error);
           setIsLoading(false);
         }
+      }
+    };
+
+    const fetchRecentGains = async (userId: string) => {
+      try {
+        const response = await fetch(`/api/profile/recent-gains?userId=${userId}&limit=10`);
+        if (response.ok) {
+          const data = await response.json();
+          setRecentGains(data.totalGains);
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки приростов:', error);
       }
     };
 
@@ -98,6 +117,10 @@ const ProfilePage = () => {
     positionMap[userProfile.profile.position] || userProfile.profile.position :
     'Позиция не указана';
 
+  const displayAge = userProfile?.profile?.birthDate
+    ? calculateAge(new Date(userProfile.profile.birthDate))
+    : null;
+
   // Функция выхода
   const handleLogout = () => {
     if (confirm('Вы уверены, что хотите выйти?')) {
@@ -115,21 +138,32 @@ const ProfilePage = () => {
   return (
     <div className="bg-[#101530] min-h-screen text-white">
       {/* Шапка с кнопкой назад */}
-      <div className="flex items-center p-4 pt-[100px]">
+      <div className="flex items-center justify-between p-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
         <div className="flex items-center gap-4">
           <Link href="/" className="inline-block">
-            <div className="w-4 h-4 flex items-center justify-center">
+            <div className="w-8 h-8 flex items-center justify-center">
               <Image 
-                src="/icons/arrow.svg" 
+                src="/icons/icon-action-back.svg" 
                 alt="Назад" 
-                width={16} 
-                height={16}
-                style={{ transform: 'rotate(180deg)' }}
+                width={32} 
+                height={32}
               />
             </div>
           </Link>
-          <h1 className="text-white text-xs font-normal font-overpass">Профиль</h1>
+          <h1 className="text-white text-xs font-bold font-overpass leading-[120%] tracking-[0.5px] align-middle uppercase">Профиль</h1>
         </div>
+        
+        {/* Кнопка редактирования */}
+        <Link href="/profile/edit" className="inline-block">
+          <div className="w-6 h-6 flex items-center justify-center hover:opacity-80 transition-opacity">
+            <Image 
+              src="/icons/icon-edit.svg" 
+              alt="Редактировать профиль" 
+              width={24} 
+              height={24}
+            />
+          </div>
+        </Link>
       </div>
 
       {/* Основной контент */}
@@ -194,7 +228,7 @@ const ProfilePage = () => {
             {/* Возраст, рост, вес */}
             <div className="h-10 px-4 flex items-center">
               <div className="text-[#AEABBB] text-sm font-medium font-overpass uppercase">
-                {userProfile?.profile?.age || '-'} ГОД | {userProfile?.profile?.height || '-'} СМ | {userProfile?.profile?.weight || '-'} КГ
+                {displayAge ?? '-'} ЛЕТ | {userProfile?.profile?.height || '-'} СМ | {userProfile?.profile?.weight || '-'} КГ
               </div>
             </div>
           </div>
@@ -202,133 +236,232 @@ const ProfilePage = () => {
 
         {/* Секция потенциала */}
         <div className="mb-6">
-          <div className="bg-[#060919] rounded-lg p-6 relative overflow-hidden">
+          <div className="bg-[#060919] rounded-lg p-4 relative overflow-hidden">
             <div className="flex items-center justify-between">
               {/* Левая часть - характеристики */}
-              <div className="flex-1 space-y-6">
+              <div className="flex-1 space-y-3">
                 {/* Выносливость */}
-                <div className="flex items-center gap-3">
-                  <div className="text-[#AEABBB] text-xs font-medium font-overpass uppercase tracking-wide whitespace-nowrap">
-                    ВЫНОСЛИВОСТЬ
+                <div className="flex items-center">
+                  <div className="pr-1 text-white text-xs font-bold font-overpass uppercase leading-[100%] tracking-[0.5px]">
+                    выносливость
                   </div>
-                  <div className="flex-1 h-[1px] bg-[#445CFF]/30"></div>
-                  <div className="w-12 h-12 rounded-full border-2 border-[#445CFF] flex items-center justify-center">
-                    <span className="text-[#445CFF] text-lg font-black font-overpass">
-                      {userProfile?.profile?.ratingEndurance?.toFixed(0) || '-'}
-                    </span>
+                  <Image 
+                    src="/icons/Line - 1.svg"
+                    alt=""
+                    width={40}
+                    height={20}
+                    className="flex-shrink-0"
+                  />
+                  <div className="relative w-14 h-14 flex-shrink-0">
+                    <Image 
+                      src="/icons/Ellipse-care.svg"
+                      alt=""
+                      width={56}
+                      height={56}
+                      className="absolute inset-0"
+                    />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-[#445CFF] text-sm font-black font-overpass">
+                        {userProfile?.profile?.ratingEndurance?.toFixed(1) || '99'}
+                      </span>
+                      {recentGains?.gainEndurance > 0 && (
+                        <span className="text-green-400 text-[9px] font-semibold">
+                          +{recentGains.gainEndurance.toFixed(1)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 {/* Гибкость */}
-                <div className="flex items-center gap-3">
-                  <div className="text-[#AEABBB] text-xs font-medium font-overpass uppercase tracking-wide whitespace-nowrap">
-                    ГИБКОСТЬ
+                <div className="flex items-center">
+                  <div className="pr-1 text-white text-xs font-bold font-overpass uppercase leading-[100%] tracking-[0.5px]">
+                    гибкость
                   </div>
-                  <div className="flex-1 h-[1px] bg-[#445CFF]/30"></div>
-                  <div className="w-12 h-12 rounded-full border-2 border-[#445CFF] flex items-center justify-center">
-                    <span className="text-[#445CFF] text-lg font-black font-overpass">
-                      {userProfile?.profile?.ratingFlexibility?.toFixed(0) || '-'}
-                    </span>
+                  <Image 
+                    src="/icons/Line - 2.svg"
+                    alt=""
+                    width={52}
+                    height={20}
+                    className="flex-shrink-0"
+                  />
+                  <div className="relative w-14 h-14 flex-shrink-0">
+                    <Image 
+                      src="/icons/Ellipse-care.svg"
+                      alt=""
+                      width={56}
+                      height={56}
+                      className="absolute inset-0"
+                    />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-[#445CFF] text-sm font-black font-overpass">
+                        {userProfile?.profile?.ratingFlexibility?.toFixed(1) || '99'}
+                      </span>
+                      {recentGains?.gainFlexibility > 0 && (
+                        <span className="text-green-400 text-[9px] font-semibold">
+                          +{recentGains.gainFlexibility.toFixed(1)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 {/* Сила */}
-                <div className="flex items-center gap-3">
-                  <div className="text-[#AEABBB] text-xs font-medium font-overpass uppercase tracking-wide whitespace-nowrap">
-                    СИЛА
+                <div className="flex items-center">
+                  <div className="pr-1 text-white text-xs font-bold font-overpass uppercase leading-[100%] tracking-[0.5px]">
+                    сила
                   </div>
-                  <div className="flex-1 h-[1px] bg-[#445CFF]/30"></div>
-                  <div className="w-12 h-12 rounded-full border-2 border-[#445CFF] flex items-center justify-center">
-                    <span className="text-[#445CFF] text-lg font-black font-overpass">
-                      {userProfile?.profile?.ratingPower?.toFixed(0) || '-'}
-                    </span>
+                  <Image 
+                    src="/icons/Line - 3.svg"
+                    alt=""
+                    width={51}
+                    height={20}
+                    className="flex-shrink-0"
+                  />
+                  <div className="relative w-14 h-14 flex-shrink-0">
+                    <Image 
+                      src="/icons/Ellipse-care.svg"
+                      alt=""
+                      width={56}
+                      height={56}
+                      className="absolute inset-0"
+                    />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-[#445CFF] text-sm font-black font-overpass">
+                        {userProfile?.profile?.ratingPower?.toFixed(1) || '99'}
+                      </span>
+                      {recentGains?.gainPower > 0 && (
+                        <span className="text-green-400 text-[9px] font-semibold">
+                          +{recentGains.gainPower.toFixed(1)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 {/* Техника */}
-                <div className="flex items-center gap-3">
-                  <div className="text-[#AEABBB] text-xs font-medium font-overpass uppercase tracking-wide whitespace-nowrap">
-                    ТЕХНИКА
+                <div className="flex items-center">
+                  <div className="pr-1 text-white text-xs font-bold font-overpass uppercase leading-[100%] tracking-[0.5px]">
+                    техника
                   </div>
-                  <div className="flex-1 h-[1px] bg-[#445CFF]/30"></div>
-                  <div className="w-12 h-12 rounded-full border-2 border-[#445CFF] flex items-center justify-center">
-                    <span className="text-[#445CFF] text-lg font-black font-overpass">
-                      {userProfile?.profile?.ratingTechnique?.toFixed(0) || '-'}
-                    </span>
+                  <Image 
+                    src="/icons/Line - 4.svg"
+                    alt=""
+                    width={56}
+                    height={20}
+                    className="flex-shrink-0"
+                  />
+                  <div className="relative w-14 h-14 flex-shrink-0">
+                    <Image 
+                      src="/icons/Ellipse-care.svg"
+                      alt=""
+                      width={56}
+                      height={56}
+                      className="absolute inset-0"
+                    />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-[#445CFF] text-sm font-black font-overpass">
+                        {userProfile?.profile?.ratingTechnique?.toFixed(1) || '99'}
+                      </span>
+                      {recentGains?.gainTechnique > 0 && (
+                        <span className="text-green-400 text-[9px] font-semibold">
+                          +{recentGains.gainTechnique.toFixed(1)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 {/* Скорость */}
-                <div className="flex items-center gap-3">
-                  <div className="text-[#AEABBB] text-xs font-medium font-overpass uppercase tracking-wide whitespace-nowrap">
-                    СКОРОСТЬ
+                <div className="flex items-center">
+                  <div className="pr-1 text-white text-xs font-bold font-overpass uppercase leading-[100%] tracking-[0.5px]">
+                    скорость
                   </div>
-                  <div className="flex-1 h-[1px] bg-[#445CFF]/30"></div>
-                  <div className="w-12 h-12 rounded-full border-2 border-[#445CFF] flex items-center justify-center">
-                    <span className="text-[#445CFF] text-lg font-black font-overpass">
-                      {userProfile?.profile?.ratingSpeed?.toFixed(0) || '-'}
-                    </span>
+                  <Image 
+                    src="/icons/Line - 5.svg"
+                    alt=""
+                    width={80}
+                    height={20}
+                    className="flex-shrink-0"
+                  />
+                  <div className="relative w-14 h-14 flex-shrink-0">
+                    <Image 
+                      src="/icons/Ellipse-care.svg"
+                      alt=""
+                      width={56}
+                      height={56}
+                      className="absolute inset-0"
+                    />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-[#445CFF] text-sm font-black font-overpass">
+                        {userProfile?.profile?.ratingSpeed?.toFixed(1) || '99'}
+                      </span>
+                      {recentGains?.gainSpeed > 0 && (
+                        <span className="text-green-400 text-[9px] font-semibold">
+                          +{recentGains.gainSpeed.toFixed(1)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Правая часть - общий потенциал */}
-              <div className="ml-8 relative">
+              <div className="relative flex-shrink-0">
                 {/* Большой круг */}
-                <div className="relative w-40 h-40">
+                <div className="relative w-36 h-36">
                   {/* Внешнее кольцо с градиентом */}
-                  <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 160 160">
+                  <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 144 144">
                     <circle
-                      cx="80"
-                      cy="80"
-                      r="72"
+                      cx="72"
+                      cy="72"
+                      r="65"
                       fill="none"
                       stroke="#445CFF"
-                      strokeWidth="3"
+                      strokeWidth="2"
                       opacity="0.2"
                     />
                     <circle
-                      cx="80"
-                      cy="80"
-                      r="72"
+                      cx="72"
+                      cy="72"
+                      r="65"
                       fill="none"
-                      stroke="url(#gradient)"
-                      strokeWidth="6"
+                      stroke="#A1FF4A"
+                      strokeWidth="4"
                       strokeLinecap="round"
-                      strokeDasharray={`${(userProfile?.profile?.potential || 0) * 4.52} 1000`}
+                      strokeDasharray={`${(userProfile?.profile?.potential || 0) * 4.08} 1000`}
                     />
-                    <defs>
-                      <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#A1FF4A" />
-                        <stop offset="100%" stopColor="#7DFF8C" />
-                      </linearGradient>
-                    </defs>
                   </svg>
                   
                   {/* Внутренний контент */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <div className="text-[#A1FF4A] text-5xl font-black font-overpass leading-none">
-                      {userProfile?.profile?.potential?.toFixed(0) || '-'}
+                    <div className="text-[#A1FF4A] text-[42px] font-black font-overpass leading-none">
+                      {userProfile?.profile?.potential?.toFixed(1) || '99'}
                     </div>
-                    <div className="text-[#AEABBB] text-xs font-medium font-overpass uppercase mt-2 text-center leading-tight">
-                      ОБЩИЙ<br/>ПОТЕНЦИАЛ
+                    <div className="text-[#AEABBB] text-xs font-extrabold font-overpass uppercase mt-1 text-center leading-[100%] tracking-[0.5px] italic">
+                      общий<br/>потенциал
                     </div>
                   </div>
-                  
-                  {/* Декоративные точки вокруг */}
-                  <div className="absolute -top-1 left-1/2 w-2 h-2 rounded-full bg-[#A1FF4A]"></div>
-                  <div className="absolute top-8 -right-2 w-2 h-2 rounded-full bg-[#A1FF4A]"></div>
-                  <div className="absolute bottom-8 -right-2 w-2 h-2 rounded-full bg-[#A1FF4A]"></div>
-                  <div className="absolute top-1/4 -left-2 w-2 h-2 rounded-full bg-[#A1FF4A]"></div>
-                  <div className="absolute bottom-1/4 -left-2 w-2 h-2 rounded-full bg-[#A1FF4A]"></div>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Дневной прогресс */}
-        {userProfile?.profile?.potential !== undefined && userProfile?.profile?.potential > 0 && (
+        {/* Кнопка для прохождения опроса потенциала */}
+        {userProfile?.profile && (userProfile.profile.potential === undefined || userProfile.profile.potential < 10) && (
+          <div className="mb-6">
+            <button
+              onClick={() => router.push('/onboarding/characteristics')}
+              className="w-full bg-gradient-to-r from-[#445CFF] to-[#A1FF4A] text-white font-bold font-overpass text-base py-4 px-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
+            >
+              ✨ Узнать свой потенциал
+            </button>
+          </div>
+        )}
+
+        {/* Дневной прогресс - временно скрыто */}
+        {false && userProfile?.profile?.potential !== undefined && userProfile?.profile?.potential > 0 && (
           <div className="bg-[#2d3448] rounded-lg p-4 mb-6">
             <div className="text-white text-sm font-medium font-overpass mb-3">
               📅 Сегодня
@@ -382,9 +515,10 @@ const ProfilePage = () => {
         )}
 
         {/* Меню разделы */}
-        <div className="space-y-3 mb-6">
+        <div className="bg-[#060919] rounded-lg px-4 mb-6">
+          {/* ВРЕМЕННО СКРЫТО 
           <Link href="/training/history">
-            <div className="flex justify-between items-center py-3 cursor-pointer hover:opacity-80 transition-opacity">
+            <div className="flex justify-between items-center py-4 cursor-pointer hover:opacity-80 transition-opacity">
               <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИЗБРАННЫЕ ТРЕНЕРЫ</span>
               <Image 
                 src="/icons/arrow.svg" 
@@ -398,29 +532,34 @@ const ProfilePage = () => {
           
           <div className="h-[1px] bg-[#26252F]"></div>
           
-          <div className="flex justify-between items-center py-3">
-            <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИЗБРАННЫЕ ТРЕНИРОВКИ</span>
-            <Image 
-              src="/icons/arrow.svg" 
-              alt="Стрелка" 
-              width={20} 
-              height={20}
-              className="opacity-50"
-            />
-          </div>
+          <Link href="/favorites">
+            <div className="flex justify-between items-center py-4 cursor-pointer hover:opacity-80 transition-opacity">
+              <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИЗБРАННЫЕ ТРЕНИРОВКИ</span>
+              <Image 
+                src="/icons/arrow.svg" 
+                alt="Стрелка" 
+                width={20} 
+                height={20}
+                className="opacity-50"
+              />
+            </div>
+          </Link>
           
           <div className="h-[1px] bg-[#26252F]"></div>
+          */}
           
-          <div className="flex justify-between items-center py-3">
-            <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИСТОРИЯ ПРОСМОТРОВ</span>
-            <Image 
-              src="/icons/arrow.svg" 
-              alt="Стрелка" 
-              width={20} 
-              height={20}
-              className="opacity-50"
-            />
-          </div>
+          <Link href="/profile/watch-history">
+            <div className="flex justify-between items-center py-4 cursor-pointer hover:opacity-80 transition-opacity">
+              <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИСТОРИЯ ПРОСМОТРОВ</span>
+              <Image 
+                src="/icons/arrow.svg" 
+                alt="Стрелка" 
+                width={20} 
+                height={20}
+                className="opacity-50"
+              />
+            </div>
+          </Link>
         </div>
         
         {/* FAQ секция */}
@@ -429,23 +568,27 @@ const ProfilePage = () => {
             ЧАСТЫЕ ВОПРОСЫ
           </h2>
           <div className="space-y-2">
-            <FAQItem question="А что будет, если вот так?" />
-            <FAQItem question="А если вот так?" />
-            <FAQItem question="А вот так?" />
+            <FAQItem 
+              question="Как часто можно тренироваться?" 
+              answer="Рекомендуется тренироваться 3-5 раз в неделю с днями отдыха для восстановления. В приложении доступно до 2 тренировок в день."
+            />
+            <FAQItem 
+              question="Как растет мой потенциал?" 
+              answer="Потенциал растет по мере выполнения тренировок и модулей. Система анализирует ваш прогресс и автоматически обновляет характеристики: силу, выносливость, скорость, технику и гибкость."
+            />
+            <FAQItem 
+              question="Что такое модули тренировок?" 
+              answer="Модули — это короткие тренировочные блоки по 10-15 минут, сфокусированные на конкретных навыках. Вы можете выполнить до 4 модулей в день."
+            />
+            <FAQItem 
+              question="Можно ли тренироваться без инвентаря?" 
+              answer="Да! В приложении есть тренировки с собственным весом и минимальным инвентарем. Фильтруйте тренировки по доступному оборудованию."
+            />
           </div>
         </div>
 
         {/* Служебные кнопки */}
         <div className="space-y-2">
-          {/* Кнопка админки */}
-          <div>
-            <Link href="/admin">
-              <button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl">
-                🔧 Админка
-              </button>
-            </Link>
-          </div>
-          
           {/* Кнопка push-уведомлений */}
           {isSupported && (
             <div className="pt-2">
@@ -454,9 +597,9 @@ const ProfilePage = () => {
                 disabled={pushLoading}
                 className={`w-full ${
                   isSubscribed 
-                    ? 'bg-gray-600 hover:bg-gray-700' 
-                    : 'bg-green-600 hover:bg-green-700'
-                } text-white font-semibold py-4 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    ? 'bg-white/10 hover:bg-white/15' 
+                    : 'bg-white/10 hover:bg-white/15'
+                } text-white/70 font-medium py-3 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm`}
               >
                 {pushLoading ? '⏳ Загрузка...' : isSubscribed ? '🔕 Отключить уведомления' : '🔔 Включить уведомления'}
               </button>
@@ -470,7 +613,7 @@ const ProfilePage = () => {
           <div className="pt-2">
             <button 
               onClick={handleLogout}
-              className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-4 rounded-lg transition-all duration-300"
+              className="w-full bg-white/10 hover:bg-white/15 text-white/70 font-medium py-3 rounded-lg transition-all duration-300 text-sm"
             >
               🚪 Выйти
             </button>
@@ -541,13 +684,36 @@ const MenuSection = ({ title }: { title: string }) => (
 );
 
 // Компонент для FAQ
-const FAQItem = ({ question }: { question: string }) => (
-  <div className="bg-[#060919] rounded-lg px-4 py-3 flex justify-between items-center cursor-pointer hover:opacity-80 transition-opacity">
-    <span className="text-white text-sm font-normal font-overpass">{question}</span>
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0">
-      <path d="M4 6L8 10L12 6" stroke="#AEABBB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  </div>
-);
+const FAQItem = ({ question, answer }: { question: string; answer: string }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  return (
+    <div className="bg-[#060919] rounded-lg overflow-hidden">
+      <div 
+        className="px-4 py-3 flex justify-between items-center cursor-pointer hover:opacity-80 transition-opacity"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="text-white text-sm font-normal font-overpass">{question}</span>
+        <svg 
+          width="16" 
+          height="16" 
+          viewBox="0 0 16 16" 
+          fill="none" 
+          xmlns="http://www.w3.org/2000/svg" 
+          className={`flex-shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
+        >
+          <path d="M4 6L8 10L12 6" stroke="#AEABBB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+      {isOpen && (
+        <div className="px-4 pb-3 pt-0">
+          <p className="text-[#AEABBB] text-xs font-normal font-overpass leading-relaxed">
+            {answer}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default ProfilePage;
