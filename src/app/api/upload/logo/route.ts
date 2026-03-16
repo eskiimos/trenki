@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
           folder: 'trenki/logos',
           resource_type: 'image',
           transformation: [
-            { width: 500, height: 500, crop: 'fit' }
+            { width: 500, height: 500, crop: 'fill', gravity: 'center' }
           ]
         },
         (error, result) => {

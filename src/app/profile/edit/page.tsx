@@ -8,6 +8,7 @@ import { useTelegram } from '../../../hooks/useTelegram';
 import { ProfileEditSkeleton } from '../../../components/Skeleton';
 import BottomNavigation from '@/components/BottomNavigation';
 import { apiCache } from '@/lib/cache';
+import ImageCropper from '@/components/ImageCropper';
 
 const ProfileEditPage = () => {
   const { user } = useTelegram();
@@ -19,6 +20,7 @@ const ProfileEditPage = () => {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -212,26 +214,33 @@ const ProfileEditPage = () => {
     }
   };
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Сбрасываем input чтобы можно было выбрать тот же файл повторно
+    e.target.value = '';
 
-    // Показываем превью
     const reader = new FileReader();
     reader.onloadend = () => {
-      setLogoPreview(reader.result as string);
+      // Открываем кроппер вместо прямой загрузки
+      setCropImageSrc(reader.result as string);
     };
     reader.readAsDataURL(file);
+  };
 
-    // Загружаем на сервер
+  const handleCropDone = async (croppedBlob: Blob) => {
+    setCropImageSrc(null);
+    const objectUrl = URL.createObjectURL(croppedBlob);
+    setLogoPreview(objectUrl);
+
     setIsUploadingLogo(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      const fd = new FormData();
+      fd.append('file', croppedBlob, 'logo.jpg');
 
       const response = await fetch('/api/upload/logo', {
         method: 'POST',
-        body: formData,
+        body: fd,
       });
 
       const data = await response.json();
@@ -249,6 +258,10 @@ const ProfileEditPage = () => {
     } finally {
       setIsUploadingLogo(false);
     }
+  };
+
+  const handleCropCancel = () => {
+    setCropImageSrc(null);
   };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -368,6 +381,14 @@ const ProfileEditPage = () => {
 
   return (
     <div className="bg-[#101530] min-h-screen text-white pb-24">
+      {/* Кроппер логотипа — полноэкранный оверлей */}
+      {cropImageSrc && (
+        <ImageCropper
+          imageSrc={cropImageSrc}
+          onCropDone={handleCropDone}
+          onCancel={handleCropCancel}
+        />
+      )}
       {/* Шапка */}
       <div className="flex items-center justify-between p-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
         <Link href="/profile" className="inline-block">
@@ -593,7 +614,7 @@ const ProfileEditPage = () => {
           />
           <label
             htmlFor="logo-upload"
-            className="bg-[#3A3955] rounded-xl h-32 flex flex-col items-center justify-center cursor-pointer hover:opacity-90 transition-opacity relative overflow-hidden"
+            className="bg-[#3A3955] rounded-xl w-32 h-32 flex flex-col items-center justify-center cursor-pointer hover:opacity-90 transition-opacity relative overflow-hidden"
           >
             {logoPreview ? (
               <>
