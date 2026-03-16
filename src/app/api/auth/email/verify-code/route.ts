@@ -31,7 +31,18 @@ export async function POST(request: NextRequest) {
     // Помечаем OTP как использованный
     await prisma.emailOtp.update({ where: { id: otp.id }, data: { used: true } });
 
-    // Ищем или создаём пользователя
+    // Если пользователь уже авторизован через Telegram — он просто добавляет email к профилю
+    const cookieTelegramId = request.cookies.get('telegramId')?.value;
+    const isAlreadyAuthed = cookieTelegramId && !cookieTelegramId.startsWith('email_');
+    if (isAlreadyAuthed) {
+      return NextResponse.json({
+        success: true,
+        user: { telegramId: cookieTelegramId },
+        needsOnboarding: false,
+      });
+    }
+
+    // Ищем или создаём пользователя (только для входа через email)
     let user = await prisma.user.findUnique({ where: { email } });
     let needsOnboarding = false;
 

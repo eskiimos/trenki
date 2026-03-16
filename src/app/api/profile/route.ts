@@ -162,7 +162,12 @@ export async function POST(request: NextRequest) {
         where: { email, NOT: { telegramId } },
       });
       if (existing) {
-        return NextResponse.json({ error: 'Этот email уже используется другим аккаунтом' }, { status: 409 });
+        // Фантомный пользователь (создан при верификации email) — удаляем и продолжаем
+        if (existing.telegramId.startsWith('email_')) {
+          await prisma.user.delete({ where: { id: existing.id } });
+        } else {
+          return NextResponse.json({ error: 'Этот email уже используется другим аккаунтом' }, { status: 409 });
+        }
       }
     }
 
