@@ -20,3 +20,4 @@ jobs:
             git pull origin main
             docker-compose -f docker-compose.production.yml --env-file .env.production up -d --build app
             docker image prune -f
+            docker builder prune -f --filter until=24h
