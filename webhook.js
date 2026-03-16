@@ -3,7 +3,7 @@
 // ⚠️ ВАЖНО: НЕ храните токен в коде!
 // Используйте переменные окружения
 const BOT_TOKEN = process.env.BOT_TOKEN || 'YOUR_BOT_TOKEN_HERE';
-const WEBHOOK_URL = 'https://trenki.vercel.app/api/telegram';
+const WEBHOOK_URL = 'https://trenki.app/api/telegram';
 
 async function setWebhook() {
   try {

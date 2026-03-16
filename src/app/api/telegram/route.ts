@@ -54,7 +54,7 @@ interface InlineKeyboard {
 }
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const WEB_APP_URL = process.env.WEB_APP_URL || 'https://trenki.vercel.app';
+const WEB_APP_URL = process.env.WEB_APP_URL || 'https://trenki.app';
 
 // Функция отправки сообщения в Telegram
 async function sendMessage(chatId: number, text: string, replyMarkup?: InlineKeyboard) {
