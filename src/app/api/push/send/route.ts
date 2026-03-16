@@ -2,15 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import webpush from 'web-push';
 
-// Настройка VAPID ключей
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT || 'mailto:admin@trenki-hockey.ru',
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '',
-  process.env.VAPID_PRIVATE_KEY || ''
-);
-
 // POST - Отправка push-уведомления
 export async function POST(request: NextRequest) {
+  // Настройка VAPID ключей (внутри функции, чтобы не падало при сборке)
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT || 'mailto:admin@trenki-hockey.ru',
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '',
+    process.env.VAPID_PRIVATE_KEY || ''
+  );
   try {
     const body = await request.json();
     const { title, body: messageBody, icon, url, userId } = body;
