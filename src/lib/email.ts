@@ -28,7 +28,7 @@ export async function sendEmail({ to, subject, html, from }: SendEmailOptions) {
   try {
     const resend = getResend();
     const result = await resend.emails.send({
-      from: from || 'Треньки <onboarding@resend.dev>', // Замени на свой домен позже
+      from: from || 'Треньки <noreply@trenki.app>',
       to: Array.isArray(to) ? to : [to],
       subject,
       html,

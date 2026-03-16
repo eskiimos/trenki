@@ -52,3 +52,4 @@ logs/
 
 # PM2
 .pm2/
+.env*.local
