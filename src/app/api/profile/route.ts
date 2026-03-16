@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
     }
     
-    const { telegramId, firstName, lastName, username, profile } = body;
+    const { telegramId, firstName, lastName, username, profile, email } = body;
 
     if (!telegramId) {
       console.log('POST /api/profile - Missing telegramId');
@@ -155,12 +155,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Обновляем или создаем пользователя и профиль
+
+    // Если email передан, проверяем, что он не занят другим пользователем
+    if (email) {
+      const existing = await prisma.user.findFirst({
+        where: { email, NOT: { telegramId } },
+      });
+      if (existing) {
+        return NextResponse.json({ error: 'Этот email уже используется другим аккаунтом' }, { status: 409 });
+      }
+    }
+
     const user = await prisma.user.upsert({
       where: { telegramId },
       update: {
         firstName,
         lastName,
         username,
+        ...(email ? { email, emailVerified: true } : {}),
         profile: normalizedProfile ? {
           upsert: {
             create: normalizedProfile,

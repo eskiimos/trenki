@@ -31,6 +31,15 @@ const ProfileEditPage = () => {
     clubLogoUrl: ''
   });
 
+  // Email-верификация
+  const [emailInput, setEmailInput] = useState('');
+  const [currentEmail, setCurrentEmail] = useState(''); // email из БД
+  const [emailStep, setEmailStep] = useState<'idle' | 'sent' | 'verified'>('idle');
+  const [emailCode, setEmailCode] = useState('');
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailCountdown, setEmailCountdown] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -68,6 +77,13 @@ const ProfileEditPage = () => {
             avatarUrl: data.user?.profile?.avatarUrl || '',
             clubLogoUrl: '' // Логотип клуба загружается только при выборе файла
           });
+
+          // Заполняем email если уже есть
+          if (data.user?.email && !data.user.email.includes('@t.me')) {
+            setCurrentEmail(data.user.email);
+            setEmailInput(data.user.email);
+            setEmailStep('verified');
+          }
           
           // Устанавливаем превью только для аватара, если есть URL
           if (data.user?.profile?.avatarUrl) {
@@ -97,6 +113,54 @@ const ProfileEditPage = () => {
       cancelled = true;
     };
   }, [user?.id]); // Зависимость только от ID пользователя
+
+  // обратный отсчёт для повторной отправки
+  useEffect(() => {
+    if (emailCountdown <= 0) return;
+    const t = setTimeout(() => setEmailCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [emailCountdown]);
+
+  const handleSendEmailCode = async () => {
+    setEmailError(null);
+    setEmailLoading(true);
+    try {
+      const res = await fetch('/api/auth/email/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailInput }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setEmailError(data.error || 'Ошибка отправки'); return; }
+      setEmailStep('sent');
+      setEmailCountdown(60);
+    } catch {
+      setEmailError('Сетевая ошибка');
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  const handleVerifyEmailCode = async () => {
+    setEmailError(null);
+    setEmailLoading(true);
+    try {
+      const res = await fetch('/api/auth/email/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailInput, code: emailCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setEmailError(data.error || 'Неверный код'); return; }
+      setEmailStep('verified');
+      setCurrentEmail(emailInput);
+      setEmailCode('');
+    } catch {
+      setEmailError('Сетевая ошибка');
+    } finally {
+      setEmailLoading(false);
+    }
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -219,6 +283,7 @@ const ProfileEditPage = () => {
         firstName: formData.firstName,
         lastName: formData.lastName,
         username: user?.username,
+        email: emailStep === 'verified' ? currentEmail : undefined,
         profile: {
           position: formData.position || null,
           number: formData.number ? parseInt(formData.number) : null,
@@ -554,6 +619,105 @@ const ProfileEditPage = () => {
           <p className="text-[#AEABBB] text-xs text-center mt-3 leading-relaxed px-4">
             Загрузи логотип в формате png/jpg с максимальным разрешением 2500x2500px
           </p>
+        </div>
+
+        {/* Email */}
+        <div>
+          <label className="text-white text-sm mb-2 block uppercase">EMAIL ДЛЯ ВХОДА</label>
+
+          {emailStep === 'verified' ? (
+            <div className="flex items-center gap-3">
+              <div
+                className="flex-1 flex items-center gap-2 px-4 text-white"
+                style={{ background: '#AEABBB33', borderRadius: '32px', height: '44px', border: '1px solid #A1FF4A' }}
+              >
+                <span className="text-[#A1FF4A]">✓</span>
+                <span className="truncate text-sm">{currentEmail}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setEmailStep('idle'); setEmailInput(currentEmail); setEmailCode(''); setEmailError(null); }}
+                className="text-gray-400 hover:text-white text-sm px-3 py-2 rounded-full bg-[#AEABBB33] whitespace-nowrap"
+              >
+                Изменить
+              </button>
+            </div>
+          ) : emailStep === 'sent' ? (
+            <div className="space-y-3">
+              <div className="p-3 bg-[#A1FF4A]/10 border border-[#A1FF4A]/30 rounded-xl">
+                <p className="text-gray-400 text-xs text-center">
+                  Код отправлен на <span className="text-white">{emailInput}</span>
+                </p>
+              </div>
+              <input
+                type="text"
+                value={emailCode}
+                onChange={e => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onKeyDown={e => e.key === 'Enter' && emailCode.length === 6 && handleVerifyEmailCode()}
+                placeholder="000000"
+                maxLength={6}
+                inputMode="numeric"
+                autoFocus
+                className="w-full text-white placeholder-gray-500 px-4 text-center text-xl tracking-[0.4em] font-bold focus:outline-none"
+                style={{ background: '#AEABBB33', borderRadius: '32px', border: '1px solid #A1FF4A', height: '44px' }}
+              />
+              {emailError && <p className="text-red-400 text-xs text-center">{emailError}</p>}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleVerifyEmailCode}
+                  disabled={emailLoading || emailCode.length < 6}
+                  className="flex-1 py-2.5 rounded-full font-bold text-sm transition-all"
+                  style={{ background: emailCode.length === 6 ? '#A1FF4A' : '#AEABBB66', color: emailCode.length === 6 ? '#060919' : '#AEABBB' }}
+                >
+                  {emailLoading ? 'Проверка...' : 'Подтвердить'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setEmailStep('idle'); setEmailCode(''); setEmailError(null); }}
+                  className="px-4 py-2.5 rounded-full text-sm text-gray-400 bg-[#AEABBB33]"
+                >
+                  Отмена
+                </button>
+              </div>
+              <div className="text-center">
+                {emailCountdown > 0 ? (
+                  <span className="text-gray-500 text-xs">Повторить через {emailCountdown}с</span>
+                ) : (
+                  <button type="button" onClick={handleSendEmailCode} disabled={emailLoading} className="text-[#A1FF4A] text-xs hover:underline">
+                    Отправить снова
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={emailInput}
+                  onChange={e => { setEmailInput(e.target.value); setEmailError(null); }}
+                  onKeyDown={e => e.key === 'Enter' && emailInput && handleSendEmailCode()}
+                  placeholder="example@mail.ru"
+                  className="flex-1 text-white placeholder-gray-400 px-4 focus:outline-none"
+                  style={{ background: '#AEABBB33', borderRadius: '32px', border: '1px solid transparent', height: '44px' }}
+                  onFocus={e => (e.target.style.border = '1px solid #A1FF4A')}
+                  onBlur={e => (e.target.style.border = '1px solid transparent')}
+                />
+                <button
+                  type="button"
+                  onClick={handleSendEmailCode}
+                  disabled={emailLoading || !emailInput}
+                  className="px-4 py-2.5 rounded-full font-bold text-sm whitespace-nowrap transition-all"
+                  style={{ background: emailInput ? '#A1FF4A' : '#AEABBB66', color: emailInput ? '#060919' : '#AEABBB', cursor: emailInput ? 'pointer' : 'not-allowed' }}
+                >
+                  {emailLoading ? '...' : 'Получить код'}
+                </button>
+              </div>
+              {emailError && <p className="text-red-400 text-xs px-2">{emailError}</p>}
+              <p className="text-[#AEABBB] text-xs px-2">Подтверди email, чтобы входить в приложение без Telegram</p>
+            </div>
+          )}
         </div>
 
         {/* Игровое амплуа */}
