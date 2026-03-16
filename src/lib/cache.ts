@@ -20,6 +20,10 @@ class SimpleCache {
     return cached.data;
   }
 
+  delete(key: string) {
+    this.cache.delete(key);
+  }
+
   clear() {
     this.cache.clear();
   }

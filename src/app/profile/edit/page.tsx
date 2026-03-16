@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useTelegram } from '../../../hooks/useTelegram';
 import { ProfileEditSkeleton } from '../../../components/Skeleton';
 import BottomNavigation from '@/components/BottomNavigation';
+import { apiCache } from '@/lib/cache';
 
 const ProfileEditPage = () => {
   const { user } = useTelegram();
@@ -328,6 +329,9 @@ const ProfileEditPage = () => {
 
       if (response.ok) {
         console.log('Profile saved successfully, redirecting to profile page');
+        // Сбрасываем кэш чтобы header на главной обновил данные
+        const savedTelegramId = user?.id?.toString();
+        if (savedTelegramId) apiCache.delete(`user-status-${savedTelegramId}`);
         router.push('/profile');
       } else {
         console.error('Server error:', responseData);

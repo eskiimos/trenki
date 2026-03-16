@@ -286,6 +286,8 @@ const Header = () => {
             profileData.position = positionMap[cachedData.user.profile.position] || cachedData.user.profile.position;
             profileData.potential = 'высокий';
             profileData.clubLogoUrl = cachedData.user.profile.clubLogoUrl;
+          } else if (cachedData.user.profile) {
+            profileData.clubLogoUrl = cachedData.user.profile.clubLogoUrl;
           }
           
           setUserProfile(profileData);
@@ -352,6 +354,8 @@ const Header = () => {
             profileData.potential = 'высокий';
             profileData.clubLogoUrl = data.user.profile.clubLogoUrl;
             console.log('🏢 Club logo URL from API:', data.user.profile.clubLogoUrl);
+          } else if (data.user.profile) {
+            profileData.clubLogoUrl = data.user.profile.clubLogoUrl;
           }
           
           setUserProfile(profileData);

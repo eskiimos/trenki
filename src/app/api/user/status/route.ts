@@ -57,7 +57,9 @@ export async function GET(request: NextRequest) {
           shooting: user.profile.shooting,
           passing: user.profile.passing,
           checking: user.profile.checking,
-          overall: user.profile.overall
+          overall: user.profile.overall,
+          avatarUrl: user.profile.avatarUrl,
+          clubLogoUrl: user.profile.clubLogoUrl
         } : null
       } : null
     });
