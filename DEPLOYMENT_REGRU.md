@@ -3,15 +3,8 @@
 ## 📋 Данные сервера
 
 ```
-VPS IP: 89.108.113.230
-VPS Пароль: (из панели reg.ru)
-Регион: Москва-2
-
-БД Хост: 79.174.88.242
-БД Порт: 17396 (Master)
-БД Имя: trenki
-БД Пользователь: trenki_user
-БД Пароль: UCLwa6uf123@
+VPS IP: (из панели reg.ru)
+Все данные подключения хранить только в .env.production на сервере
 ```
 
 ---
@@ -63,7 +56,7 @@ NEXTAUTH_SECRET=your-secret-key-change-this
 NEXTAUTH_URL=https://89.108.113.230
 
 # Database
-DATABASE_URL="postgresql://trenki_user:UCLwa6uf123@79.174.88.242:17396/trenki"
+DATABASE_URL="postgresql://trenki_user:YOUR_DB_PASSWORD@YOUR_DB_HOST:YOUR_DB_PORT/trenki"
 
 # Telegram Bot (скопируй из Vercel)
 TELEGRAM_BOT_TOKEN=your-bot-token
