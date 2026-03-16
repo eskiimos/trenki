@@ -4,8 +4,7 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  // Standalone режим отключен для стабильности сборки
-  // output: 'standalone',
+  output: 'standalone',
   images: {
     remotePatterns: [
       {
