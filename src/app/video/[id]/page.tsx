@@ -1180,7 +1180,7 @@ export default function VideoPage({ params }: VideoPageProps) {
         >
           <div 
             ref={playerContainerRef}
-            className={`${isLandscape ? 'w-full h-full' : 'aspect-video max-h-52 md:max-h-72 lg:max-h-none lg:aspect-video'} relative overflow-hidden`}
+            className={`${isLandscape ? 'w-full h-full' : 'aspect-video'} relative overflow-hidden`}
             onMouseMove={handleVideoInteraction}
             onTouchStart={handleVideoInteraction}
             onClick={(e) => e.stopPropagation()}
@@ -1331,25 +1331,25 @@ export default function VideoPage({ params }: VideoPageProps) {
                 <div className={`absolute inset-0 bg-gradient-to-b from-transparent to-black/50 flex items-center justify-center transition-opacity duration-300 ${
                   showControls ? 'opacity-100' : 'opacity-0'
                 }`}>
-                  <div className="flex items-center gap-8 md:gap-12">
+                  <div className="flex items-center gap-6">
                     {/* Skip Backward 10s */}
                     <button
                       onClick={skipBackward}
-                      className="w-12 h-12 md:w-14 md:h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
+                      className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
                       title="Назад на 10 секунд"
                     >
                       <Image
                         src="/icons/video/player/carbon_rewind-10-l.svg"
                         alt="Назад на 10 секунд"
-                        width={28}
-                        height={28}
+                        width={18}
+                        height={18}
                       />
                     </button>
                     
                     {/* Play/Pause Button */}
                     <button
                       onClick={togglePlay}
-                      className="w-16 h-16 md:w-20 md:h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
+                      className="w-11 h-11 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
                     >
                       <Image
                         src={isPlaying 
@@ -1357,22 +1357,22 @@ export default function VideoPage({ params }: VideoPageProps) {
                           : '/icons/video/player/Play.svg'
                         }
                         alt={isPlaying ? 'Пауза' : 'Воспроизвести'}
-                        width={36}
-                        height={36}
+                        width={22}
+                        height={22}
                       />
                     </button>
                     
                     {/* Skip Forward 10s */}
                     <button
                       onClick={skipForward}
-                      className="w-12 h-12 md:w-14 md:h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
+                      className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
                       title="Вперед на 10 секунд"
                     >
                       <Image
                         src="/icons/video/player/carbon_rewind-10-r.svg"
                         alt="Вперед на 10 секунд"
-                        width={28}
-                        height={28}
+                        width={18}
+                        height={18}
                       />
                     </button>
                   </div>
@@ -1381,12 +1381,12 @@ export default function VideoPage({ params }: VideoPageProps) {
               
               {/* Video Controls - для всех видео */}
               {!showFullscreenHint && (
-            <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pt-12 ${isLandscape ? 'pb-8 px-6' : 'pb-4 px-4'} transition-opacity duration-300 ${
+            <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pt-8 ${isLandscape ? 'pb-6 px-5' : 'pb-2 px-3'} transition-opacity duration-300 ${
             showControls ? 'opacity-100' : 'opacity-0'
           }`}>
             {/* Progress Bar */}
             <div 
-              className={`flex-1 bg-white/30 rounded-full cursor-pointer mb-3 hover:h-2 transition-all relative ${isLandscape ? 'h-1.5' : 'h-1'}`}
+              className={`flex-1 bg-white/30 rounded-full cursor-pointer mb-2 hover:h-1.5 transition-all relative ${isLandscape ? 'h-1.5' : 'h-0.5'}`}
               onClick={handleSeek}
             >
               {/* Buffered (загруженная часть) */}
@@ -1403,11 +1403,11 @@ export default function VideoPage({ params }: VideoPageProps) {
             
             {/* Control Buttons */}
             <div className="flex items-center justify-between">
-              <div className={`flex items-center space-x-3 ${isLandscape ? 'space-x-4' : ''}`}>
+              <div className={`flex items-center space-x-2 ${isLandscape ? 'space-x-3' : ''}`}>
                 {/* Play/Pause Button */}
                 <button 
                   onClick={togglePlay}
-                  className={`transition-opacity hover:opacity-80 ${isLandscape ? 'w-12 h-12' : ''}`}
+                  className="transition-opacity hover:opacity-80"
                   title={isPlaying ? 'Пауза' : 'Воспроизвести'}
                 >
                   <Image
@@ -1416,8 +1416,8 @@ export default function VideoPage({ params }: VideoPageProps) {
                       : '/icons/video/player/Play.svg'
                     }
                     alt={isPlaying ? 'Пауза' : 'Воспроизвести'}
-                    width={isLandscape ? 28 : 24}
-                    height={isLandscape ? 28 : 24}
+                    width={isLandscape ? 24 : 18}
+                    height={isLandscape ? 24 : 18}
                   />
                 </button>
                 
@@ -1433,18 +1433,18 @@ export default function VideoPage({ params }: VideoPageProps) {
                       : '/icons/video/player/Volume=Yes.svg'
                     }
                     alt={isMuted ? 'Включить звук' : 'Выключить звук'}
-                    width={isLandscape ? 28 : 24}
-                    height={isLandscape ? 28 : 24}
+                    width={isLandscape ? 24 : 18}
+                    height={isLandscape ? 24 : 18}
                   />
                 </button>
                 
                 {/* Time Display */}
-                <span className={`text-white font-medium ${isLandscape ? 'text-base' : 'text-sm'}`}>
+                <span className={`text-white font-medium ${isLandscape ? 'text-sm' : 'text-xs'}`}>
                   {formatTime(currentTime)} / {formatTime(duration)}
                 </span>
               </div>
               
-              <div className={`flex items-center space-x-3 ${isLandscape ? 'space-x-4' : ''}`}>
+              <div className={`flex items-center space-x-2 ${isLandscape ? 'space-x-3' : ''}`}>
                 {/* Autoplay Toggle */}
                 <button 
                   onClick={() => setAutoplayEnabled(!autoplayEnabled)}
@@ -1457,8 +1457,8 @@ export default function VideoPage({ params }: VideoPageProps) {
                       : '/icons/video/player/material-symbols_autoplay def.svg'
                     }
                     alt="Автоплей"
-                    width={isLandscape ? 28 : 24}
-                    height={isLandscape ? 28 : 24}
+                    width={isLandscape ? 24 : 18}
+                    height={isLandscape ? 24 : 18}
                   />
                 </button>
 
@@ -1524,9 +1524,9 @@ export default function VideoPage({ params }: VideoPageProps) {
                       ? '/icons/video/player/Fulscreen=Yes.svg'
                       : '/icons/video/player/Fulscreen=No.svg'
                     }
-                    alt="Полноэкранный режим"
-                    width={isLandscape ? 28 : 24}
-                    height={isLandscape ? 28 : 24}
+                    alt="Понноэкранный режим"
+                    width={isLandscape ? 24 : 18}
+                    height={isLandscape ? 24 : 18}
                   />
                 </button>
               </div>
