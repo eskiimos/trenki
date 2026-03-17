@@ -198,14 +198,9 @@ const TagsSection: React.FC<TagsSectionProps> = ({
       {/* Video Title */}
       {title && (
         <div className="mb-4">
-          <h2 className="text-white text-lg font-semibold leading-snug">
+          <h2 className="text-white text-lg font-semibold leading-snug mb-2">
             {title}
           </h2>
-          {gainTag && (
-            <div className="mt-2">
-              {gainTag}
-            </div>
-          )}
         </div>
       )}
       
@@ -213,6 +208,7 @@ const TagsSection: React.FC<TagsSectionProps> = ({
       {(() => {
         const MODULE_TYPE_LABELS: Record<string, string> = {
           WARMUP: 'Разминка',
+          FITNESS: 'ОФП',
           GENERAL_PHYSICAL_PREP: 'ОФП',
           TECHNIQUE: 'Техника',
           COOLDOWN: 'Заминка',
@@ -221,30 +217,47 @@ const TagsSection: React.FC<TagsSectionProps> = ({
           STRETCHING: 'Растяжка',
         };
         const LOAD_TYPE_LABELS: Record<string, string> = {
-          MAX_STRENGTH: 'Макс. сила',
-          POWER: 'Мощность',
-          HYPERTROPHY: 'Гипертрофия',
-          ENDURANCE: 'Выносливость',
           SPEED: 'Скорость',
+          POWER: 'Мощность',
+          MAX_STRENGTH: 'Макс. сила',
+          STRENGTH_ENDURANCE: 'Силовая выносливость',
+          ANAEROBIC_ENDURANCE: 'Анаэробная выносливость',
+          AEROBIC_ENDURANCE: 'Аэробная выносливость',
+          AGILITY: 'Ловкость',
+          MOBILITY: 'Мобильность',
+          STATIC_STRETCH: 'Стат. растяжка',
+          DYNAMIC_STRETCH: 'Дин. растяжка',
+          PREHAB: 'Преабилитация',
+          TECHNICAL_SKILL: 'Техника',
+          HYPERTROPHY: 'Гипертрофия',
           FLEXIBILITY: 'Гибкость',
-          TECHNIQUE: 'Техника',
           RECOVERY: 'Восстановление',
         };
         const MUSCLE_GROUP_LABELS: Record<string, string> = {
+          LOWER_BODY: 'Низ тела',
+          UPPER_PULL: 'Верх — тяга',
+          UPPER_PUSH: 'Верх — жим',
+          CORE_STABILITY: 'Кор (стабилизация)',
+          CORE_DYNAMICS: 'Кор (динамика)',
+          PREHAB_SHOULDER: 'Плечи (преаб)',
+          PREHAB_KNEE: 'Колени (преаб)',
+          PREHAB_BACK: 'Спина (преаб)',
+          FULL_BODY: 'Всё тело',
           LEGS: 'Ноги',
           BACK: 'Спина',
           CHEST: 'Грудь',
           SHOULDERS: 'Плечи',
           ARMS: 'Руки',
           CORE: 'Кор',
-          FULL_BODY: 'Всё тело',
           GLUTES: 'Ягодицы',
           CARDIO: 'Кардио',
         };
         const DIFFICULTY_LABELS: Record<string, string> = {
           BEGINNER: 'Начинающий',
+          AMATEUR: 'Любитель',
           INTERMEDIATE: 'Средний',
           ADVANCED: 'Продвинутый',
+          PRO: 'Про',
         };
 
         const infoBubbles = [
@@ -259,10 +272,12 @@ const TagsSection: React.FC<TagsSectionProps> = ({
           },
         ].filter(Boolean) as { label: string }[];
 
-        if (infoBubbles.length === 0) return null;
+        const hasBubbles = infoBubbles.length > 0 || !!gainTag;
+        if (!hasBubbles) return null;
 
         return (
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            {gainTag}
             {infoBubbles.map((b, i) => (
               <div
                 key={i}
