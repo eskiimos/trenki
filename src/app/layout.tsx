@@ -13,8 +13,25 @@ const overpass = Overpass({
 });
 
 export const metadata: Metadata = {
-  title: "Треньки - Тренировки для хоккеистов",
-  description: "Персональные тренировки и упражнения для хоккеистов",
+  title: "Треньки — Тренировки для хоккеистов",
+  description: "Персональные видеотренировки и упражнения для хоккеистов. Разминка, ОФП, техника, заминка — всё в одном приложении.",
+  keywords: ["тренировки для хоккеистов", "хоккей упражнения", "ОФП хоккей", "видеотренировки", "треньки"],
+  metadataBase: new URL("https://trenki.app"),
+  alternates: {
+    canonical: "/",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  openGraph: {
+    title: "Треньки — Тренировки для хоккеистов",
+    description: "Персональные видеотренировки и упражнения для хоккеистов. Разминка, ОФП, техника, заминка — всё в одном приложении.",
+    url: "https://trenki.app",
+    siteName: "Треньки",
+    locale: "ru_RU",
+    type: "website",
+  },
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
