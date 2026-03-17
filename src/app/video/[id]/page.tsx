@@ -1318,19 +1318,23 @@ export default function VideoPage({ params }: VideoPageProps) {
                 </div>
               )}
               
-              {/* Buffering Indicator */}
-              {buffered < 100 && buffered > 0 && (
-                <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-full text-white text-xs">
-                  Загружено: {Math.round(buffered)}%
-                </div>
-              )}
-              
-              
-              {/* Play/Pause Overlay with Skip Buttons */}
+              {/* Play/Pause Overlay with Skip Buttons */
               {!showFullscreenHint && (
-                <div className={`absolute inset-0 bg-gradient-to-b from-transparent to-black/50 flex items-center justify-center transition-opacity duration-300 ${
-                  showControls ? 'opacity-100' : 'opacity-0'
-                }`}>
+                <div
+                  className={`absolute inset-0 bg-gradient-to-b from-transparent to-black/50 flex items-center justify-center transition-opacity duration-300 ${
+                    showControls ? 'opacity-100' : 'opacity-0'
+                  }`}
+                  onClick={() => {
+                    if (showControls) {
+                      // Если интерфейс виден — скрываем его сразу
+                      if (hideControlsTimeoutRef.current) clearTimeout(hideControlsTimeoutRef.current);
+                      setShowControls(false);
+                    } else {
+                      // Если скрыт — показываем с авто-скрытием
+                      showControlsTemporarily();
+                    }
+                  }}
+                >
                   <div className="flex items-center gap-6">
                     {/* Skip Backward 10s */}
                     <button
