@@ -1318,7 +1318,7 @@ export default function VideoPage({ params }: VideoPageProps) {
                 </div>
               )}
               
-              {/* Play/Pause Overlay with Skip Buttons */
+              {/* Play/Pause Overlay with Skip Buttons */}
               {!showFullscreenHint && (
                 <div
                   className={`absolute inset-0 bg-gradient-to-b from-transparent to-black/50 flex items-center justify-center transition-opacity duration-300 ${
