@@ -529,6 +529,20 @@ export default function VideoPage({ params }: VideoPageProps) {
     };
   }, []);
 
+  // Закрытие меню качества при клике вне его
+  useEffect(() => {
+    if (!showQualityMenu) return;
+    const handleClickOutside = () => setShowQualityMenu(false);
+    // Небольшая задержка чтобы клик открытия не закрыл меню сразу
+    const timeout = setTimeout(() => {
+      document.addEventListener('click', handleClickOutside);
+    }, 0);
+    return () => {
+      clearTimeout(timeout);
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [showQualityMenu]);
+
   // Загружаем статус лайка при открытии видео
   useEffect(() => {
     const loadLikeStatus = async () => {
@@ -715,6 +729,7 @@ export default function VideoPage({ params }: VideoPageProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownHintRef = useRef(false); // Флаг для показа подсказки только один раз
+  const pendingSeekRef = useRef<number | null>(null); // Позиция для восстановления после смены качества
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -929,22 +944,14 @@ export default function VideoPage({ params }: VideoPageProps) {
 
   // Функция для смены качества видео
   const handleQualityChange = (quality: string) => {
-    if (availableQualities[quality] && videoRef.current) {
-      const newUrl = availableQualities[quality];
-      const currentTime = videoRef.current.currentTime;
-      
-      // Обновляем URL видео
-      setSelectedQuality(quality);
-      setKinescopeDirectUrl(newUrl);
-      
-      // После обновления src, пытаемся восстановить позицию
-      if (videoRef.current) {
-        videoRef.current.currentTime = currentTime;
-      }
-      
-      setShowQualityMenu(false);
-      console.log('Video quality changed to:', quality);
-    }
+    if (!availableQualities[quality] || !videoRef.current) return;
+
+    // Сохраняем текущую позицию — восстановим в onCanPlay
+    pendingSeekRef.current = videoRef.current.currentTime;
+
+    setSelectedQuality(quality);
+    setKinescopeDirectUrl(availableQualities[quality]);
+    setShowQualityMenu(false);
   };
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -1244,14 +1251,21 @@ export default function VideoPage({ params }: VideoPageProps) {
                 }}
                 onCanPlay={(e) => {
                   const video = e.currentTarget;
+
+                  // Восстанавливаем позицию после смены качества
+                  if (pendingSeekRef.current !== null) {
+                    video.currentTime = pendingSeekRef.current;
+                    pendingSeekRef.current = null;
+                    video.play().catch(() => {});
+                    return;
+                  }
+
                   // Пытаемся начать воспроизведение когда видео готово
                   if (!isPlaying) {
                     video.play().then(() => {
                       setIsPlaying(true);
-                      console.log('Autoplay started successfully');
                     }).catch(err => {
                       console.log('Autoplay was prevented:', err);
-                      // Если autoplay заблокирован, ждем клика пользователя
                       setIsPlaying(false);
                     });
                   }
@@ -1448,6 +1462,57 @@ export default function VideoPage({ params }: VideoPageProps) {
                     height={isLandscape ? 28 : 24}
                   />
                 </button>
+
+                {/* Quality Selector — только если доступно несколько качеств */}
+                {Object.keys(availableQualities).length > 1 && (
+                  <div className="relative" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => {
+                        setShowQualityMenu(prev => !prev);
+                        showControlsTemporarily();
+                      }}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded border text-xs font-semibold transition-all ${
+                        showQualityMenu
+                          ? 'border-[#A1FF4A] text-[#A1FF4A] bg-white/10'
+                          : 'border-white/40 text-white hover:border-white/70 hover:bg-white/10'
+                      }`}
+                      title="Выбрать качество"
+                    >
+                      {selectedQuality || 'HD'}
+                    </button>
+
+                    {/* Popup меню качества */}
+                    {showQualityMenu && (
+                      <div
+                        className="absolute bottom-full mb-2 right-0 bg-black/90 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden shadow-2xl min-w-22.5 z-50"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="py-1">
+                          {(['1080p', '720p', '480p', '360p'] as const)
+                            .filter(q => availableQualities[q])
+                            .map((quality) => (
+                              <button
+                                key={quality}
+                                onClick={() => handleQualityChange(quality)}
+                                className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                                  selectedQuality === quality
+                                    ? 'text-[#A1FF4A] bg-white/10 font-semibold'
+                                    : 'text-white/80 hover:bg-white/10 hover:text-white'
+                                }`}
+                              >
+                                <span>{quality}</span>
+                                {selectedQuality === quality && (
+                                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                    <path d="M2 6L5 9L10 3" stroke="#A1FF4A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                )}
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 
                 {/* Fullscreen Button */}
                 <button 
