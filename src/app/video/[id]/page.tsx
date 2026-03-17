@@ -104,6 +104,11 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [selectedQuality, setSelectedQuality] = useState<string>('');
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   
+  // Double-tap seek
+  const doubleTapTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [seekFlash, setSeekFlash] = useState<'left' | 'right' | null>(null);
+  const seekFlashTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Состояние для скрытия/показа плеера
   const [isPlayerMinimized, setIsPlayerMinimized] = useState(false);
   const playerContainerRef = useRef<HTMLDivElement>(null);
@@ -1326,15 +1331,67 @@ export default function VideoPage({ params }: VideoPageProps) {
                   }`}
                   onClick={() => {
                     if (showControls) {
-                      // Если интерфейс виден — скрываем его сразу
                       if (hideControlsTimeoutRef.current) clearTimeout(hideControlsTimeoutRef.current);
                       setShowControls(false);
                     } else {
-                      // Если скрыт — показываем с авто-скрытием
                       showControlsTemporarily();
                     }
                   }}
+                  onTouchEnd={(e) => {
+                    const touch = e.changedTouches[0];
+                    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+                    const x = touch.clientX - rect.left;
+                    const isLeft = x < rect.width / 2;
+
+                    if (doubleTapTimerRef.current) {
+                      // Двойной тап — перемотка
+                      clearTimeout(doubleTapTimerRef.current);
+                      doubleTapTimerRef.current = null;
+                      e.preventDefault();
+
+                      if (isLeft) {
+                        skipBackward();
+                      } else {
+                        skipForward();
+                      }
+
+                      // Флэш анимации
+                      setSeekFlash(isLeft ? 'left' : 'right');
+                      if (seekFlashTimerRef.current) clearTimeout(seekFlashTimerRef.current);
+                      seekFlashTimerRef.current = setTimeout(() => setSeekFlash(null), 600);
+
+                      // Показываем интерфейс на время
+                      showControlsTemporarily();
+                    } else {
+                      // Первый тап — ждём второго
+                      doubleTapTimerRef.current = setTimeout(() => {
+                        doubleTapTimerRef.current = null;
+                      }, 280);
+                    }
+                  }}
                 >
+                  {/* Флэш double-tap назад */}
+                  {seekFlash === 'left' && (
+                    <div className="absolute left-0 top-0 bottom-0 w-1/2 flex items-center justify-center pointer-events-none">
+                      <div className="bg-white/20 rounded-full px-4 py-2 flex items-center gap-1 animate-ping-once">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                          <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/>
+                        </svg>
+                        <span className="text-white text-sm font-bold">-10</span>
+                      </div>
+                    </div>
+                  )}
+                  {/* Флэш double-tap вперед */}
+                  {seekFlash === 'right' && (
+                    <div className="absolute right-0 top-0 bottom-0 w-1/2 flex items-center justify-center pointer-events-none">
+                      <div className="bg-white/20 rounded-full px-4 py-2 flex items-center gap-1 animate-ping-once">
+                        <span className="text-white text-sm font-bold">+10</span>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                          <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/>
+                        </svg>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center gap-6">
                     {/* Skip Backward 10s */}
                     <button

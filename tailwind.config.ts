@@ -35,9 +35,15 @@ export default {
           '0%': { transform: 'translateY(100%)' },
           '100%': { transform: 'translateY(0)' },
         },
+        pingOnce: {
+          '0%': { transform: 'scale(1)', opacity: '1' },
+          '50%': { transform: 'scale(1.15)', opacity: '0.8' },
+          '100%': { transform: 'scale(1)', opacity: '0' },
+        },
       },
       animation: {
         'slide-up': 'slideUp 0.3s ease-out',
+        'ping-once': 'pingOnce 0.6s ease-out forwards',
       },
     },
   },
