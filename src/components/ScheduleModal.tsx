@@ -606,7 +606,7 @@ export default function ScheduleModal({ isOpen, onClose, videoId }: ScheduleModa
                 className="w-full py-4 rounded-full font-bold text-[14px] uppercase tracking-wider bg-[#A1FF4A] text-[#060919] hover:bg-[#8FE639] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Image 
-                  src="/icons/video/Type=calendar, Active=No.svg" 
+                  src="/icons/video/Type_calendar_No.svg" 
                   alt="Календарь" 
                   width={20} 
                   height={20} 

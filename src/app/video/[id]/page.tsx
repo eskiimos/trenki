@@ -1806,7 +1806,7 @@ export default function VideoPage({ params }: VideoPageProps) {
               onClick={() => setShowScheduleModal(true)}
               className="bg-[#AEABBB33] rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0 hover:opacity-80 transition-opacity"
             >
-              <Image src="/icons/video/Type=calendar, Active=No.svg" alt="Календарь" width={20} height={20} />
+              <Image src="/icons/video/Type_calendar_No.svg" alt="Календарь" width={20} height={20} />
               <span className="text-[#AEABBB] text-xs whitespace-nowrap">Календарь</span>
             </button>
             
