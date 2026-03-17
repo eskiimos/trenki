@@ -63,11 +63,13 @@ export function selectBestQuality(
   availableQualities: Record<string, string>,
   preferredQuality?: string
 ): string {
-  const qualityOrder = ['1080p', '720p', '480p', '360p', 'original'];
+  // По умолчанию предпочитаем 720p
+  const defaultQuality = preferredQuality || '720p';
+  const qualityOrder = ['720p', '1080p', '480p', '360p', 'original'];
   
-  // Если указано предпочитаемое качество и оно доступно
-  if (preferredQuality && availableQualities[preferredQuality]) {
-    return availableQualities[preferredQuality];
+  // Если указанное (или дефолтное) качество доступно — берём его
+  if (availableQualities[defaultQuality]) {
+    return availableQualities[defaultQuality];
   }
 
   // Иначе берём лучшее доступное
