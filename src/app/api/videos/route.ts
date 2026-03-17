@@ -84,6 +84,9 @@ export async function GET(request: NextRequest) {
         isPublished: video.isPublished,
         rpeMin: video.rpeMin,
         rpeMax: video.rpeMax,
+        moduleType: video.moduleType,
+        loadType: video.loadType,
+        muscleGroup: video.muscleGroup,
       };
     });
 

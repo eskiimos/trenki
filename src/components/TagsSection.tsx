@@ -45,9 +45,15 @@ interface TagsSectionProps {
   selectedTags?: string[];
   onTagsChange?: (tags: string[]) => void;
   multiSelect?: boolean;
-  showFilterTags?: boolean; // показывать теги из базы для фильтрации
-  tagFilterType?: 'load' | 'muscle' | 'complexity' | 'goal' | 'all'; // тип тегов для фильтрации
+  showFilterTags?: boolean;
+  tagFilterType?: 'load' | 'muscle' | 'complexity' | 'goal' | 'all';
   gainTag?: React.ReactNode;
+  // Информационные баблы
+  rpeMin?: number | null;
+  rpeMax?: number | null;
+  moduleType?: string | null;
+  loadType?: string | null;
+  muscleGroup?: string | null;
 }
 
 const TagsSection: React.FC<TagsSectionProps> = ({ 
@@ -65,6 +71,11 @@ const TagsSection: React.FC<TagsSectionProps> = ({
   showFilterTags = false,
   tagFilterType = 'all',
   gainTag,
+  rpeMin,
+  rpeMax,
+  moduleType,
+  loadType,
+  muscleGroup,
 }) => {
   const [dbTags, setDbTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(false);
@@ -198,6 +209,73 @@ const TagsSection: React.FC<TagsSectionProps> = ({
         </div>
       )}
       
+      {/* Информационные баблы видео */}
+      {(() => {
+        const MODULE_TYPE_LABELS: Record<string, string> = {
+          WARMUP: 'Разминка',
+          GENERAL_PHYSICAL_PREP: 'ОФП',
+          TECHNIQUE: 'Техника',
+          COOLDOWN: 'Заминка',
+          STRENGTH: 'Силовой',
+          CARDIO: 'Кардио',
+          STRETCHING: 'Растяжка',
+        };
+        const LOAD_TYPE_LABELS: Record<string, string> = {
+          MAX_STRENGTH: 'Макс. сила',
+          POWER: 'Мощность',
+          HYPERTROPHY: 'Гипертрофия',
+          ENDURANCE: 'Выносливость',
+          SPEED: 'Скорость',
+          FLEXIBILITY: 'Гибкость',
+          TECHNIQUE: 'Техника',
+          RECOVERY: 'Восстановление',
+        };
+        const MUSCLE_GROUP_LABELS: Record<string, string> = {
+          LEGS: 'Ноги',
+          BACK: 'Спина',
+          CHEST: 'Грудь',
+          SHOULDERS: 'Плечи',
+          ARMS: 'Руки',
+          CORE: 'Кор',
+          FULL_BODY: 'Всё тело',
+          GLUTES: 'Ягодицы',
+          CARDIO: 'Кардио',
+        };
+        const DIFFICULTY_LABELS: Record<string, string> = {
+          BEGINNER: 'Начинающий',
+          INTERMEDIATE: 'Средний',
+          ADVANCED: 'Продвинутый',
+        };
+
+        const infoBubbles = [
+          moduleType && { label: MODULE_TYPE_LABELS[moduleType] || moduleType },
+          loadType && { label: LOAD_TYPE_LABELS[loadType] || loadType },
+          muscleGroup && { label: MUSCLE_GROUP_LABELS[muscleGroup] || muscleGroup },
+          difficulty && { label: DIFFICULTY_LABELS[difficulty] || difficulty },
+          (rpeMin != null || rpeMax != null) && {
+            label: rpeMin != null && rpeMax != null
+              ? `RPE ${rpeMin}–${rpeMax}`
+              : rpeMin != null ? `RPE ${rpeMin}+` : `RPE ≤${rpeMax}`,
+          },
+        ].filter(Boolean) as { label: string }[];
+
+        if (infoBubbles.length === 0) return null;
+
+        return (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {infoBubbles.map((b, i) => (
+              <div
+                key={i}
+                className="px-3 py-1.5 rounded-full text-xs"
+                style={{ backgroundColor: '#AEABBB33', color: '#AEABBB' }}
+              >
+                {b.label}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       {/* Tags */}
       {allTags.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-4">

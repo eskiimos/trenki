@@ -47,6 +47,11 @@ interface VideoData {
   category: string;
   difficulty: string;
   level: string;
+  rpeMin?: number | null;
+  rpeMax?: number | null;
+  moduleType?: string | null;
+  loadType?: string | null;
+  muscleGroup?: string | null;
 }
 
 export default function VideoPage({ params }: VideoPageProps) {
@@ -1865,6 +1870,11 @@ export default function VideoPage({ params }: VideoPageProps) {
           lastName: videoData.trainer.lastName,
           avatar: videoData.trainer.avatar
         } : null}
+        rpeMin={videoData?.rpeMin}
+        rpeMax={videoData?.rpeMax}
+        moduleType={videoData?.moduleType}
+        loadType={videoData?.loadType}
+        muscleGroup={videoData?.muscleGroup}
         gainTag={calculateVideoGain() && (
           <div
             className="px-3 py-1 rounded-full text-xs whitespace-nowrap font-bold flex items-center gap-1 w-fit"
