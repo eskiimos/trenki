@@ -20,6 +20,7 @@ model User {
   updatedAt     DateTime          @updatedAt
   lastActivity  DateTime          @default(now())
   inviteCode    String?           // Код, с которым зарегистрировался пользователь
+  ageConsentAt  DateTime?         // Дата и время подтверждения возраста (18+ или законный представитель)
   favorites            FavoriteVideo[]
   profile              Profile?
   shortComments        ShortComment[]

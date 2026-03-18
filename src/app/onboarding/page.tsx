@@ -59,6 +59,7 @@ export default function OnboardingProfilePage() {
         lastName,
         birthDate,
         gender: selectedGender,
+        ageConsentAt: new Date().toISOString(),
       };
       
       console.log('📤 Sending registration data:', requestData);
