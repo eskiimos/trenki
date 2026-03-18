@@ -11,6 +11,7 @@ export default function OnboardingProfilePage() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [birthDate, setBirthDate] = useState('');
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
@@ -36,7 +37,8 @@ export default function OnboardingProfilePage() {
     firstName.trim() !== '' && 
     lastName.trim() !== '' && 
     birthDate.trim() !== '' && 
-    selectedGender !== null;
+    selectedGender !== null &&
+    ageConfirmed;
 
   const handleSubmit = async () => {
     if (!isFormValid) return;
@@ -224,6 +226,29 @@ export default function OnboardingProfilePage() {
               >
                 Не указывать
               </button>
+            </div>
+
+            {/* Чекбокс возраста */}
+            <div
+              className="flex items-start gap-3 mt-4 cursor-pointer"
+              onClick={() => setAgeConfirmed(v => !v)}
+            >
+              <div
+                className="flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all mt-0.5"
+                style={{
+                  background: ageConfirmed ? '#A1FF4A' : 'transparent',
+                  borderColor: ageConfirmed ? '#A1FF4A' : '#AEABBB',
+                }}
+              >
+                {ageConfirmed && (
+                  <svg width="12" height="9" viewBox="0 0 12 9" fill="none">
+                    <path d="M1 4L4.5 7.5L11 1" stroke="#0A0E1A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </div>
+              <p className="text-gray-400 text-xs leading-relaxed select-none">
+                Мне исполнилось 18 лет, либо я являюсь законным представителем несовершеннолетнего пользователя
+              </p>
             </div>
           </div>
         </div>
