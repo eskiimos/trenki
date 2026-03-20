@@ -4,7 +4,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  output: 'standalone',
   images: {
     remotePatterns: [
       {
@@ -39,7 +38,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  outputFileTracingRoot: process.cwd(),
 };
 
 export default nextConfig;
