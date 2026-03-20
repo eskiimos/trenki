@@ -4,13 +4,19 @@ import webpush from 'web-push';
 
 // POST - Отправка push-уведомления
 export async function POST(request: NextRequest) {
-  // Настройка VAPID ключей (внутри функции, чтобы не падало при сборке)
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || 'mailto:admin@trenki-hockey.ru',
-    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '',
-    process.env.VAPID_PRIVATE_KEY || ''
-  );
   try {
+    const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const privateKey = process.env.VAPID_PRIVATE_KEY;
+    const subject = process.env.VAPID_SUBJECT || 'mailto:admin@trenki-hockey.ru';
+
+    if (!publicKey || !privateKey) {
+      return NextResponse.json(
+        { error: 'VAPID ключи не настроены на сервере. Добавьте VAPID_PRIVATE_KEY и NEXT_PUBLIC_VAPID_PUBLIC_KEY в .env.production' },
+        { status: 500 }
+      );
+    }
+
+    webpush.setVapidDetails(subject, publicKey, privateKey);
     const body = await request.json();
     const { title, body: messageBody, icon, url, userId } = body;
 
