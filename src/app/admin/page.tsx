@@ -73,6 +73,14 @@ const AdminPage = () => {
               </div>
             </Link>
 
+            {/* Администраторы */}
+            <Link href="/admin/admins">
+              <div className="bg-[#1a1f3a] rounded-lg p-5 md:p-6 hover:bg-[#2d3448] transition-colors cursor-pointer h-full border border-white/5">
+                <h3 className="text-xl md:text-2xl font-bold">🔐 Администраторы</h3>
+                <p className="text-gray-400 text-sm mt-1">Назначить или снять права</p>
+              </div>
+            </Link>
+
             {/* Модерация отзывов */}
             <Link href="/admin/reviews">
               <div className="bg-[#1a1f3a] rounded-lg p-5 md:p-6 hover:bg-[#2d3448] transition-colors cursor-pointer h-full border border-white/5">
