@@ -18,7 +18,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' 
         <Link href="/" className="flex items-center justify-center p-2">
           <Image 
             src={activeTab === 'home'
-              ? '/icons/tapbar/new_active/Type=home, Active=Yes.svg'
+              ? '/icons/tapbar/new_active/Type_home.svg'
               : '/icons/tapbar/icon-type-home-active-no.svg'}
             alt="Главная" 
             width={32} 
@@ -29,7 +29,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' 
         <Link href="/shorts-catalog" className="flex items-center justify-center p-2">
           <Image 
             src={activeTab === 'shorts'
-              ? '/icons/tapbar/new_active/Type=play, Active=Yes.svg'
+              ? '/icons/tapbar/new_active/Type_play.svg'
               : '/icons/tapbar/icon-type-play-active-no.svg'}
             alt="Треньки" 
             width={32} 
@@ -40,7 +40,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' 
         <Link href="/video" className="flex items-center justify-center p-2">
           <Image 
             src={activeTab === 'video'
-              ? '/icons/tapbar/new_active/Type=hockey, Active=Yes.svg'
+              ? '/icons/tapbar/new_active/Type_hockey.svg'
               : '/icons/tapbar/icon-type-hockey-active-no.svg'}
             alt="Видео" 
             width={32} 
@@ -51,7 +51,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' 
         <Link href="/calendar" className="flex items-center justify-center p-2">
           <Image 
             src={activeTab === 'calendar'
-              ? '/icons/tapbar/new_active/Type=calendar, Active=Yes.svg'
+              ? '/icons/tapbar/new_active/Type_calendar.svg'
               : '/icons/tapbar/icon-type-calendar-active-no.svg'}
             alt="Расписание" 
             width={32} 
@@ -62,7 +62,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' 
         <Link href="/profile" className="flex items-center justify-center p-2">
           <Image 
             src={activeTab === 'profile'
-              ? '/icons/tapbar/new_active/Type=hockey-mask, Active=Yes.svg'
+              ? '/icons/tapbar/new_active/Type_hockey-mask.svg'
               : '/icons/tapbar/icon-type-hockey-mask-active-no.svg'}
             alt="Профиль" 
             width={32} 
