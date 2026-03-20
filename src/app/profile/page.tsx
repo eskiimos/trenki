@@ -177,7 +177,7 @@ const ProfilePage = () => {
       </div>
 
       {/* Основной контент */}
-      <div className="px-4 pb-20">
+      <div className="px-4 pb-32">
         {/* Профиль игрока - новый дизайн */}
         <div className="mb-6">
           {/* Карточка аватара */}
