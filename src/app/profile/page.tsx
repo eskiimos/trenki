@@ -17,6 +17,7 @@ const ProfilePage = () => {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [recentGains, setRecentGains] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   
   // Push-уведомления
   const { 
@@ -99,6 +100,15 @@ const ProfilePage = () => {
       cancelled = true;
     };
   }, [user?.id]); // Зависимость только от ID пользователя
+
+  useEffect(() => {
+    const telegramId = getTelegramId();
+    if (!telegramId) return;
+    fetch(`/api/user/is-admin?telegramId=${telegramId}`)
+      .then(r => r.json())
+      .then(d => setIsAdmin(d.isAdmin === true))
+      .catch(() => {});
+  }, []);
 
   // Определяем отображаемые данные
   const displayName = userProfile?.firstName || user?.first_name || 'ТРЕНЬКИ';
@@ -618,7 +628,17 @@ const ProfilePage = () => {
               🚪 Выйти
             </button>
           </div>
-        </div>
+          {/* Кнопка панели администратора */}
+          {isAdmin && (
+            <div className="pt-2">
+              <button
+                onClick={() => router.push('/admin')}
+                className="w-full bg-[#A1FF4A]/10 hover:bg-[#A1FF4A]/20 text-[#A1FF4A] font-bold py-3 rounded-lg transition-all duration-300 text-sm"
+              >
+                ⚙️ Панель администратора
+              </button>
+            </div>
+          )}        </div>
       </div>
       
       {/* Тапбар */}
