@@ -89,26 +89,29 @@ const HomePage = () => {
     <div className="bg-[#060919] min-h-screen text-white pb-32">
       <Header />
       
-      {/* Напоминание о незавершенной тренировке */}
-      <WorkoutReminder />
-      
-      {/* Секция с короткими видео (треньки) */}
-      <TrenkiSection />
+      {/* Контейнер с максимальной шириной для планшетов и десктопов */}
+      <div className="max-w-4xl mx-auto">
+        {/* Напоминание о незавершенной тренировке */}
+        <WorkoutReminder />
+        
+        {/* Секция с короткими видео (треньки) */}
+        <TrenkiSection />
 
-      {/* Запланированная тренировка (за 1 час до старта) */}
-      <ScheduledWorkoutSection />
+        {/* Запланированная тренировка (за 1 час до старта) */}
+        <ScheduledWorkoutSection />
 
-      {/* Каталог тренировок */}
-      <TrainingsSection />
-      
-      {/* Основное обучающее видео - СКРЫТО */}
-      {/* <HeroVideoSection /> */}
-      
-      {/* Список тренеров */} 
-      <TrainersSection />
-      
-      {/* Промо-баннер */}
-      <AllVideosSection />
+        {/* Каталог тренировок */}
+        <TrainingsSection />
+        
+        {/* Основное обучающее видео - СКРЫТО */}
+        {/* <HeroVideoSection /> */}
+        
+        {/* Список тренеров */} 
+        <TrainersSection />
+        
+        {/* Промо-баннер */}
+        <AllVideosSection />
+      </div>
       
       {/* Нижнее меню */}
       <BottomNavigation activeTab="home" />
