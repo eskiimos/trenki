@@ -76,6 +76,12 @@ body {
   background: var(--background);
 }
 
+@media (min-width: 429px) {
+  .mobile-container {
+    max-width: 100%;
+  }
+}
+
 /* Запрет горизонтального скролла */
 html, body {
   overflow-x: hidden;
