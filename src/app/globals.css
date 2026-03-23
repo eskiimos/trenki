@@ -27,7 +27,6 @@ body {
   margin: 0;
   padding: 0;
   overflow-x: hidden;
-  max-width: 428px;
   margin: 0 auto;
   position: relative;
   min-height: 100vh;
@@ -95,13 +94,11 @@ html, body {
 /* Адаптация для больших экранов */
 @media (min-width: 429px) {
   body {
-    max-width: 428px;
     margin: 0 auto;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
   }
   
   html {
-    background: #000;
+    background: #060919;
   }
 }
 
