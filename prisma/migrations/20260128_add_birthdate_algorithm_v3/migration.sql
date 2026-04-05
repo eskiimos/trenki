@@ -4,8 +4,6 @@
 -- Дата: 28 января 2026
 -- Цель: Обновить enums и добавить новые поля без потери данных
 
-BEGIN;
-
 -- ========================================================================
 -- 1. Создаем TrainingStatus (для старого алгоритма, если не существует)
 -- ========================================================================
@@ -22,14 +20,16 @@ END $$;
 -- Если TrainingGoal уже существует со старыми значениями, переименуем
 DO $$ 
 BEGIN
-  -- Проверяем есть ли старые значения в enum
-  IF EXISTS (
-    SELECT 1 FROM pg_enum 
-    WHERE enumtypid = 'TrainingGoal'::regtype 
-    AND enumlabel IN ('RECOVERY', 'DEVELOPMENT', 'PEAK')
-  ) THEN
-    -- Переименовываем старый enum
-    ALTER TYPE "TrainingGoal" RENAME TO "TrainingGoal_old";
+  -- Проверяем что тип существует И имеет старые значения
+  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TrainingGoal') THEN
+    IF EXISTS (
+      SELECT 1 FROM pg_enum 
+      WHERE enumtypid = (SELECT oid FROM pg_type WHERE typname = 'TrainingGoal')
+      AND enumlabel IN ('RECOVERY', 'DEVELOPMENT', 'PEAK')
+    ) THEN
+      -- Переименовываем старый enum
+      ALTER TYPE "TrainingGoal" RENAME TO "TrainingGoal_old";
+    END IF;
   END IF;
 END $$;
 
@@ -112,14 +112,13 @@ BEGIN
     SELECT 1 FROM information_schema.columns 
     WHERE table_name = 'videos' AND column_name = 'ageGroups'
   ) THEN
-    ALTER TABLE "videos" ADD COLUMN "ageGroups" "AgeGroup"[] DEFAULT ARRAY[]::AgeGroup[];
+    ALTER TABLE "videos" ADD COLUMN "ageGroups" "AgeGroup"[] DEFAULT ARRAY[]::"AgeGroup"[];
   END IF;
 END $$;
 
 -- ========================================================================
 -- ЗАВЕРШЕНИЕ
 -- ========================================================================
-COMMIT;
 
 -- Выводим информацию об успешном выполнении
 DO $$ 
