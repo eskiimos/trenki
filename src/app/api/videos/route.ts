@@ -9,10 +9,18 @@ export async function GET(request: NextRequest) {
     const difficulty = searchParams.get('difficulty');
     const trainerId = searchParams.get('trainerId');
     const userId = searchParams.get('userId');
+    const audience = searchParams.get('audience'); // HOCKEY | ADAPTIVE
 
     const where: any = {
       isPublished: true, // показываем только опубликованные видео
     };
+
+    // Фильтр по аудитории (для субдомена adaptive.trenki.app)
+    if (audience === 'ADAPTIVE') {
+      where.audience = { in: ['ADAPTIVE', 'ALL'] };
+    } else if (audience === 'HOCKEY') {
+      where.audience = { in: ['HOCKEY', 'ALL'] };
+    }
     
     if (category && category !== 'all') {
       where.category = category.toUpperCase();
@@ -140,6 +148,7 @@ export async function POST(request: NextRequest) {
       muscleGroup,
       ageGroups, // НОВОЕ для Алгоритма 2.0
       trainingGoals, // НОВОЕ для Алгоритма 2.0
+      audience,
     } = body;
 
     if (!title || !videoUrl || !category || !difficulty || !trainerId) {
@@ -223,6 +232,7 @@ export async function POST(request: NextRequest) {
         loadType: loadTypeValue as any,
         ageGroups: ageGroupsArray, // НОВОЕ
         trainingGoals: trainingGoalsArray, // НОВОЕ
+        audience: audience || 'HOCKEY',
       },
       include: {
         trainer: true

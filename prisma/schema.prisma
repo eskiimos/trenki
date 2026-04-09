@@ -160,6 +160,7 @@ model Video {
   moduleType      ModuleType?           // тип модуля (разминка/ОФП/техника/заминка)
   trainingGoals   TrainingGoal[]        // для каких целей подходит модуль (массив)
   ageGroups       AgeGroup[]            // целевые возрастные группы (массив)
+  audience        Audience              @default(HOCKEY) // для какого субдомена
   
   favorites       FavoriteVideo[]
   trainingModules TrainingModule[]
@@ -224,6 +225,7 @@ model Short {
   viewsCount  Int            @default(0)
   likesCount  Int            @default(0)
   order       Int            @default(0)
+  audience    Audience       @default(HOCKEY) // для какого субдомена
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   comments    ShortComment[]
@@ -449,6 +451,12 @@ model CharacteristicHistory {
 
   @@index([userId, createdAt])
   @@map("characteristic_history")
+}
+
+enum Audience {
+  HOCKEY
+  ADAPTIVE
+  ALL
 }
 
 enum VideoCategory {

@@ -93,6 +93,7 @@ export async function PUT(
         tags: body.tags || [],
         isPublished: body.isPublished,
         order: body.order,
+        audience: body.audience || undefined,
       },
     });
 

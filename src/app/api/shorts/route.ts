@@ -8,10 +8,18 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const trainerId = searchParams.get('trainerId');
+    const audience = searchParams.get('audience'); // HOCKEY | ADAPTIVE
     
     const whereClause: any = {
       isPublished: true,
     };
+
+    // Фильтр по аудитории
+    if (audience === 'ADAPTIVE') {
+      whereClause.audience = { in: ['ADAPTIVE', 'ALL'] };
+    } else if (audience === 'HOCKEY') {
+      whereClause.audience = { in: ['HOCKEY', 'ALL'] };
+    }
 
     // Фильтр по тренеру
     if (trainerId) {
@@ -104,6 +112,7 @@ export async function POST(request: NextRequest) {
         tags: body.tags || [],
         isPublished: body.isPublished ?? true,
         order: body.order || 0,
+        audience: body.audience || 'HOCKEY',
       },
     });
 

@@ -114,6 +114,7 @@ const AdminVideosPage = () => {
     // Новые поля для Алгоритма 2.0
     ageGroups: [] as string[],
     trainingGoals: [] as string[],
+    audience: 'HOCKEY',
   };
   
   // Данные формы
@@ -181,6 +182,7 @@ const AdminVideosPage = () => {
         // Новые поля для Алгоритма 2.0
         ageGroups: formData.ageGroups,
         trainingGoals: formData.trainingGoals,
+        audience: formData.audience,
       };
 
       console.log('Sending payload:', payload);
@@ -517,6 +519,7 @@ const AdminVideosPage = () => {
       // Новые поля для Алгоритма 2.0
       ageGroups: (video as any).ageGroups || [],
       trainingGoals: (video as any).trainingGoals || [],
+      audience: (video as any).audience || 'HOCKEY',
     });
     
     // Загружаем теги из базы данных для этого видео
@@ -1283,6 +1286,21 @@ const AdminVideosPage = () => {
                       <option value="INTERMEDIATE">🔵 Средний</option>
                       <option value="ADVANCED">🟠 Продвинутый</option>
                       <option value="EXPERT">🔴 Эксперт</option>
+                    </select>
+                  </div>
+
+                  {/* Аудитория */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Аудитория</label>
+                    <select
+                      name="audience"
+                      value={formData.audience}
+                      onChange={handleChange}
+                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    >
+                      <option value="HOCKEY">🏒 Хоккей (trenki.app)</option>
+                      <option value="ADAPTIVE">♿ Адаптивный (adaptive.trenki.app)</option>
+                      <option value="ALL">🌐 Все платформы</option>
                     </select>
                   </div>
 

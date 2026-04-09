@@ -85,6 +85,7 @@ export async function PUT(
       muscleGroup,
       ageGroups,
       trainingGoals,
+      audience,
     } = body;
 
     if (!title || !videoUrl || !category || !difficulty || !trainerId) {
@@ -166,6 +167,7 @@ export async function PUT(
         loadType: loadTypeValue as any,
         ageGroups: ageGroupsArray,
         trainingGoals: trainingGoalsArray,
+        audience: audience || undefined,
       },
       include: {
         trainer: {

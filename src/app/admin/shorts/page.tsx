@@ -42,6 +42,7 @@ export default function AdminShortsPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [order, setOrder] = useState(0);
   const [isPublished, setIsPublished] = useState(true);
+  const [audience, setAudience] = useState('HOCKEY');
 
   useEffect(() => {
     fetchShorts();
@@ -89,6 +90,7 @@ export default function AdminShortsPage() {
       tags,
       order,
       isPublished,
+      audience,
     };
 
     try {
@@ -125,6 +127,7 @@ export default function AdminShortsPage() {
     setTags(short.tags);
     setOrder(short.order);
     setIsPublished(short.isPublished);
+    setAudience((short as any).audience || 'HOCKEY');
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -154,6 +157,7 @@ export default function AdminShortsPage() {
     setTags([]);
     setOrder(0);
     setIsPublished(true);
+    setAudience('HOCKEY');
     setShowForm(false);
   };
 
@@ -345,6 +349,20 @@ export default function AdminShortsPage() {
                     {trainer.name} {trainer.lastName}
                   </option>
                 ))}
+              </select>
+            </div>
+
+            {/* Аудитория */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Аудитория</label>
+              <select
+                value={audience}
+                onChange={(e) => setAudience(e.target.value)}
+                className="w-full px-4 py-2 bg-[#2d3448] border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="HOCKEY">🏒 Хоккей (trenki.app)</option>
+                <option value="ADAPTIVE">♿ Адаптивный (adaptive.trenki.app)</option>
+                <option value="ALL">🌐 Все платформы</option>
               </select>
             </div>
 
