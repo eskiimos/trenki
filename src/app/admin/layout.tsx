@@ -16,6 +16,12 @@ export default function AdminLayout({
   const lastCheckTimeRef = useRef<number>(0);
 
   useEffect(() => {
+    // Страница логина не требует проверки авторизации
+    if (pathname === '/admin/login') {
+      setIsAuthenticated(true);
+      return;
+    }
+
     const checkAuth = async () => {
       try {
         const now = Date.now();

@@ -31,6 +31,7 @@ export default function AdminShortsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [editingShortId, setEditingShortId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   
   // Form state
   const [title, setTitle] = useState('');
@@ -209,6 +210,76 @@ export default function AdminShortsPage() {
     }
   };
 
+  const handleVideoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const videoName = file.name.replace(/\.[^/.]+$/, '');
+
+    try {
+      setUploadProgress(0);
+
+      const initRes = await fetch('/api/kinescope/upload-init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: videoName, filesize: file.size, filename: file.name }),
+      });
+
+      if (!initRes.ok) {
+        const err = await initRes.json();
+        alert(`Ошибка инициализации загрузки: ${err.error}`);
+        setUploadProgress(null);
+        return;
+      }
+
+      const { videoId, uploadUrl } = await initRes.json();
+
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', uploadUrl);
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setUploadProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else reject(new Error(`Upload failed: ${xhr.status}`));
+        };
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.send(file);
+      });
+
+      const kinescopeUrl = `https://kinescope.io/${videoId}`;
+      setVideoUrl(kinescopeUrl);
+      setUploadProgress(null);
+
+      // Авто-загрузка метаданных
+      try {
+        const metaRes = await fetch('/api/kinescope/metadata', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoUrl: kinescopeUrl }),
+        });
+        if (metaRes.ok) {
+          const meta = await metaRes.json();
+          if (!title) setTitle(meta.title || videoName);
+          if (!thumbnail) setThumbnail(meta.thumbnail || '');
+        }
+      } catch {
+        // метаданные ещё могут не быть готовы сразу
+      }
+
+      alert(`Тренька успешно загружена на Kinescope!\nURL: ${kinescopeUrl}`);
+    } catch (error: any) {
+      console.error('Video upload error:', error);
+      alert(`Ошибка загрузки: ${error.message}`);
+      setUploadProgress(null);
+    }
+
+    e.target.value = '';
+  };
+
   return (
     <div className="min-h-screen bg-[#101530] text-white p-6">
       <div className="max-w-7xl mx-auto">
@@ -296,6 +367,40 @@ export default function AdminShortsPage() {
                 >
                   🔄 Получить данные
                 </button>
+              </div>
+
+              {/* Загрузка файла напрямую на Kinescope */}
+              <div className="flex items-center gap-3 mt-3">
+                <div className="flex-1 h-px bg-gray-600"></div>
+                <span className="text-xs text-gray-400">или загрузить файл</span>
+                <div className="flex-1 h-px bg-gray-600"></div>
+              </div>
+              <div className="mt-2">
+                <label
+                  htmlFor="shortsVideoFileUpload"
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${uploadProgress !== null ? 'bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                >
+                  📁 Загрузить видеофайл на Kinescope
+                </label>
+                <input
+                  id="shortsVideoFileUpload"
+                  type="file"
+                  accept="video/*"
+                  onChange={handleVideoFileUpload}
+                  disabled={uploadProgress !== null}
+                  className="hidden"
+                />
+                {uploadProgress !== null && (
+                  <div className="mt-2">
+                    <div className="text-sm text-gray-400 mb-1">Загрузка на Kinescope: {uploadProgress}%</div>
+                    <div className="w-full bg-gray-700 rounded-full h-2">
+                      <div
+                        className="bg-green-500 h-2 rounded-full transition-all"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

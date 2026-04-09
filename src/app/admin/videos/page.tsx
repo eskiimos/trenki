@@ -71,6 +71,7 @@ const AdminVideosPage = () => {
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]); // ID тегов из базы
   const [activeTab, setActiveTab] = useState<'basic' | 'algorithm'>('basic');
   const [algorithmSubTab, setAlgorithmSubTab] = useState<'classification' | 'targeting'>('classification');
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const getMissingAlgorithmFields = (video: Video) => {
     const missing: string[] = [];
@@ -378,6 +379,87 @@ const AdminVideosPage = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleVideoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const videoName = file.name.replace(/\.[^/.]+$/, ''); // имя без расширения
+
+    try {
+      setUploadProgress(0);
+
+      // Шаг 1: получаем URL для загрузки от нашего сервера
+      const initRes = await fetch('/api/kinescope/upload-init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: videoName, filesize: file.size, filename: file.name }),
+      });
+
+      if (!initRes.ok) {
+        const err = await initRes.json();
+        alert(`Ошибка инициализации загрузки: ${err.error}`);
+        setUploadProgress(null);
+        return;
+      }
+
+      const { videoId, uploadUrl } = await initRes.json();
+
+      // Шаг 2: загружаем файл напрямую на Kinescope через XHR (чтобы отслеживать прогресс)
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', uploadUrl);
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setUploadProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error(`Upload failed: ${xhr.status} ${xhr.responseText}`));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Network error during upload'));
+        xhr.send(file);
+      });
+
+      // Шаг 3: сохраняем URL и автоматически получаем метаданные
+      const kinescopeUrl = `https://kinescope.io/${videoId}`;
+      setFormData(prev => ({ ...prev, videoUrl: kinescopeUrl }));
+      setUploadProgress(null);
+
+      // Авто-загрузка метаданных (превью, длительность)
+      try {
+        const metaRes = await fetch('/api/kinescope/metadata', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoUrl: kinescopeUrl }),
+        });
+        if (metaRes.ok) {
+          const meta = await metaRes.json();
+          setFormData(prev => ({
+            ...prev,
+            title: prev.title || meta.title || videoName,
+            thumbnail: prev.thumbnail || meta.thumbnail || '',
+            duration: meta.duration || prev.duration,
+          }));
+        }
+      } catch {
+        // метаданные ещё могут не быть готовы сразу после загрузки
+      }
+
+      alert(`Видео успешно загружено на Kinescope!\nURL: ${kinescopeUrl}`);
+    } catch (error: any) {
+      console.error('Video upload error:', error);
+      alert(`Ошибка загрузки: ${error.message}`);
+      setUploadProgress(null);
+    }
+
+    // Сбрасываем input
+    e.target.value = '';
   };
 
     const handleEditVideo = async (video: Video) => {
@@ -1068,6 +1150,40 @@ const AdminVideosPage = () => {
                     <p className="text-xs text-gray-400 mt-1">
                       💡 После вставки URL нажмите "Получить данные" для автозаполнения превью
                     </p>
+
+                    {/* Загрузка файла напрямую на Kinescope */}
+                    <div className="flex items-center gap-3 mt-3">
+                      <div className="flex-1 h-px bg-gray-600"></div>
+                      <span className="text-xs text-gray-400">или загрузить файл</span>
+                      <div className="flex-1 h-px bg-gray-600"></div>
+                    </div>
+                    <div className="mt-2">
+                      <label
+                        htmlFor="videoFileUpload"
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${uploadProgress !== null ? 'bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                      >
+                        📁 Загрузить видеофайл на Kinescope
+                      </label>
+                      <input
+                        id="videoFileUpload"
+                        type="file"
+                        accept="video/*"
+                        onChange={handleVideoFileUpload}
+                        disabled={uploadProgress !== null}
+                        className="hidden"
+                      />
+                      {uploadProgress !== null && (
+                        <div className="mt-2">
+                          <div className="text-sm text-gray-400 mb-1">Загрузка на Kinescope: {uploadProgress}%</div>
+                          <div className="w-full bg-gray-700 rounded-full h-2">
+                            <div
+                              className="bg-green-500 h-2 rounded-full transition-all"
+                              style={{ width: `${uploadProgress}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Превью */}
