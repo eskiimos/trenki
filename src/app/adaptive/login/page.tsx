@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { saveAuth } from '@/lib/auth';
 
 export default function AdaptiveLoginPage() {
   const router = useRouter();
@@ -44,6 +45,12 @@ export default function AdaptiveLoginPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Неверный код'); return; }
+      saveAuth({
+        telegramId: data.user.telegramId,
+        firstName: data.user.firstName,
+        lastName: data.user.lastName,
+        username: data.user.username,
+      });
       router.push('/adaptive/dashboard');
     } catch {
       setError('Сетевая ошибка.');

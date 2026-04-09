@@ -28,12 +28,28 @@ export function middleware(request: NextRequest) {
     (isLocalhost && request.nextUrl.searchParams.get('subdomain') === 'adaptive');
 
   if (isAdaptive) {
-    // Уже на /adaptive/* — не трогаем
-    if (pathname.startsWith('/adaptive')) {
-      return NextResponse.next();
-    }
     // Пропускаем API и статику
     if (pathname.startsWith('/api') || pathname.startsWith('/_next')) {
+      return NextResponse.next();
+    }
+
+    // Публичные маршруты adaptive (без авторизации)
+    const adaptivePublicPaths = ['/adaptive', '/adaptive/login', '/adaptive/about'];
+    const resolvedPath = pathname.startsWith('/adaptive') ? pathname : `/adaptive${pathname === '/' ? '' : pathname}`;
+    const isPublicAdaptive = adaptivePublicPaths.some(p => resolvedPath === p || resolvedPath === p + '/');
+
+    // Проверяем авторизацию для защищённых страниц
+    if (!isPublicAdaptive) {
+      const telegramId = request.cookies.get('telegramId')?.value;
+      if (!telegramId) {
+        const loginUrl = request.nextUrl.clone();
+        loginUrl.pathname = '/adaptive/login';
+        return NextResponse.redirect(loginUrl);
+      }
+    }
+
+    // Уже на /adaptive/* — не трогаем
+    if (pathname.startsWith('/adaptive')) {
       return NextResponse.next();
     }
     // Реврайт: / → /adaptive, /login → /adaptive/login и т.д.
@@ -79,48 +95,6 @@ export function middleware(request: NextRequest) {
 // Настраиваем, к каким маршрутам применяется middleware
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|manifest\\.json|sw\\.js|robots\\.txt|icons/|images/|avatars/|logos/|video/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|js|css|woff|woff2|ttf)$).*)',
-  ],
-};
-
-  // Пропускаем статические файлы и API маршруты (кроме защищённых)
-  if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/static') ||
-    pathname.includes('/api/') && !pathname.includes('/api/users/')
-  ) {
-    return NextResponse.next();
-  }
-
-  // Пропускаем публичные маршруты
-  if (isPublicRoute(pathname)) {
-    return NextResponse.next();
-  }
-
-  // Проверяем авторизацию (инвайт-коды отключены)
-  const telegramId = request.cookies.get('telegramId')?.value;
-
-  // Если пользователь не авторизован, редиректим на /login
-  if (!telegramId && pathname !== '/login') {
-    console.log(`🔒 Middleware: Неавторизованный доступ к ${pathname}, редирект на /login`);
-    const loginUrl = new URL('/login', request.url);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  return NextResponse.next();
-}
-
-// Настраиваем, к каким маршрутам применяется middleware
-export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files (images, etc.)
-     * - manifest.json, sw.js, robots.txt (PWA/SEO static files)
-     */
     '/((?!_next/static|_next/image|favicon.ico|manifest\\.json|sw\\.js|robots\\.txt|icons/|images/|avatars/|logos/|video/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|js|css|woff|woff2|ttf)$).*)',
   ],
 };
