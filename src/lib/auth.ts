@@ -150,8 +150,11 @@ export function getUserData() {
   }
   
   if (auth) {
+    // parseInt возвращает NaN для email-based telegramId (например "email_1776511893988_xxx")
+    // Используем числовой id для Telegram-пользователей, строку для email-пользователей
+    const numericId = parseInt(auth.telegramId);
     return {
-      id: parseInt(auth.telegramId) || 0,
+      id: isNaN(numericId) ? auth.telegramId : numericId,
       telegramId: auth.telegramId,
       firstName: auth.firstName,
       lastName: auth.lastName,
