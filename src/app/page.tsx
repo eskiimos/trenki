@@ -1123,7 +1123,7 @@ const VideoCard = ({ video, isNew }: VideoCardProps & { isNew?: boolean }) => {
 
   return (
     <Link href={`/video/${video.id}`}>
-      <div className="flex-shrink-0 w-[calc(100vw-2rem)] cursor-pointer">
+      <div className="flex-shrink-0 w-[calc(100vw-2rem)] sm:w-[calc(50vw-1rem)] cursor-pointer">
         {/* Video Thumbnail */}
         <div className="relative rounded overflow-hidden" style={{ width: '100%', height: 'auto', aspectRatio: '16/9', maxHeight: '280px' }}>
           {video.thumbnail && (

@@ -266,7 +266,7 @@ const VideoPage = () => {
             <p className="text-gray-500 text-sm mt-2">Попробуйте выбрать другой фильтр</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:grid sm:grid-cols-2 gap-4">
             {filteredVideos.map((video) => (
               <Link key={video.id} href={`/video/${video.id}`}>
                 <div>
