@@ -788,9 +788,9 @@ const TrenkiSection = () => {
 
 const TrainingsSection = () => (
     <section className="px-4" style={{ paddingBottom: '15px' }}>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            {/* Блок ИИ тренера */}
-            <Link href="/training/assessment" style={{textDecoration: 'none'}}>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2">
+            {/* Блок ИИ тренера - на мобилке во всю ширину, на планшете 1 из 3 */}
+            <Link href="/training/assessment" style={{textDecoration: 'none'}} className="col-span-2 sm:col-span-1">
                 <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: '#445CFF', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex', cursor: 'pointer'}}>
                     <Image
                         src="/icons/icon-cards.svg"
@@ -805,7 +805,7 @@ const TrainingsSection = () => (
             </Link>
             
             {/* Блок "Повышение потенциала" */}
-            <Link href="/video" style={{textDecoration: 'none'}}>
+            <Link href="/video" style={{textDecoration: 'none'}} className="sm:col-span-1">
                 <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex'}}>
                     <Image
                         src="/icons/ant-design-thunderbolt-filled_f.svg"
@@ -818,7 +818,7 @@ const TrainingsSection = () => (
             </Link>
             
             {/* Блок "Треньки" */}
-            <Link href="/shorts-catalog" style={{textDecoration: 'none'}}>
+            <Link href="/shorts-catalog" style={{textDecoration: 'none'}} className="sm:col-span-1">
                 <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex'}}>
                     <Image
                         src="/icons/icon-cards-kl.svg"
