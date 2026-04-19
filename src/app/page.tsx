@@ -788,9 +788,9 @@ const TrenkiSection = () => {
 
 const TrainingsSection = () => (
     <section className="px-4" style={{ paddingBottom: '15px' }}>
-        <div style={{width: '100%', flexDirection: 'column', gap: 8, display: 'flex'}}>
-            {/* Блок ИИ тренера — во всю ширину */}
-            <Link href="/training/assessment" style={{width: '100%', textDecoration: 'none'}}>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2">
+            {/* Блок ИИ тренера */}
+            <Link href="/training/assessment" style={{textDecoration: 'none'}}>
                 <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: '#445CFF', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex', cursor: 'pointer'}}>
                     <Image
                         src="/icons/icon-cards.svg"
@@ -803,31 +803,33 @@ const TrainingsSection = () => (
                     </div>
                 </div>
             </Link>
-            {/* Нижний ряд — 2 блока в одну линию */}
-            <div style={{width: '100%', display: 'flex', gap: 8}}>
-                <Link href="/video" style={{flex: '1 1 0', textDecoration: 'none'}}>
-                    <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex'}}>
-                        <Image
-                            src="/icons/ant-design-thunderbolt-filled_f.svg"
-                            alt="Потенциал"
-                            width={16}
-                            height={16}
-                        />
-                        <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>повышение потенциала</div>
-                    </div>
-                </Link>
-                <Link href="/shorts-catalog" style={{flex: '1 1 0', textDecoration: 'none'}}>
-                    <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex'}}>
-                        <Image
-                            src="/icons/icon-cards-kl.svg"
-                            alt="Треньки"
-                            width={16}
-                            height={16}
-                        />
-                        <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>треньки, советы профи, разборы</div>
-                    </div>
-                </Link>
-            </div>
+            
+            {/* Блок "Повышение потенциала" */}
+            <Link href="/video" style={{textDecoration: 'none'}}>
+                <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex'}}>
+                    <Image
+                        src="/icons/ant-design-thunderbolt-filled_f.svg"
+                        alt="Потенциал"
+                        width={16}
+                        height={16}
+                    />
+                    <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>повышение потенциала</div>
+                </div>
+            </Link>
+            
+            {/* Блок "Треньки" */}
+            <Link href="/shorts-catalog" style={{textDecoration: 'none'}}>
+                <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex'}}>
+                    <Image
+                        src="/icons/icon-cards-kl.svg"
+                        alt="Треньки"
+                        width={16}
+                        height={16}
+                    />
+                    <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>треньки, советы профи, разборы</div>
+                </div>
+            </Link>
+        </div>
         </div>
     </section>
 );
