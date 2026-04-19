@@ -830,7 +830,6 @@ const TrainingsSection = () => (
                 </div>
             </Link>
         </div>
-        </div>
     </section>
 );
 
