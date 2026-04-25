@@ -137,6 +137,16 @@ export default function VideoPage({ params }: VideoPageProps) {
         
         if (video) {
           setVideoData(video);
+          console.log('📺 Video loaded:', {
+            id: video.id,
+            title: video.title,
+            moduleType: video.moduleType,
+            loadType: video.loadType,
+            muscleGroup: video.muscleGroup,
+            difficulty: video.difficulty,
+            rpeMin: video.rpeMin,
+            rpeMax: video.rpeMax,
+          });
           
           // Находим следующее видео
           if (currentVideoIndex !== -1 && currentVideoIndex < videos.length - 1) {
