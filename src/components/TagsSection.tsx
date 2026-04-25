@@ -281,23 +281,32 @@ const TagsSection: React.FC<TagsSectionProps> = ({
               : rpeMin != null ? `RPE ${rpeMin}+` : `RPE ≤${rpeMax}`,
           },
         ].filter(Boolean) as { label: string }[];
-        console.log('🎯 InfoBubbles array:', infoBubbles);
+        console.log('🎯 Before render:', { moduleType, loadType, muscleGroup, difficulty, rpeMin, rpeMax });
         const hasBubbles = infoBubbles.length > 0 || !!gainTag;
         if (!hasBubbles) return null;
 
         return (
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            {gainTag}
-            {infoBubbles.map((b, i) => (
-              <div
-                key={i}
-                className="px-3 py-1.5 rounded-full text-xs"
-                style={{ backgroundColor: '#AEABBB33', color: '#AEABBB' }}
-              >
-                {b.label}
+          <>
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              {gainTag}
+              {infoBubbles.map((b, i) => (
+                <div
+                  key={i}
+                  className="px-3 py-1.5 rounded-full text-xs"
+                  style={{ backgroundColor: '#AEABBB33', color: '#AEABBB' }}
+                >
+                  {b.label}
+                </div>
+              ))}
+            </div>
+            
+            {/* DEBUG: Явный рендер для тестирования */}
+            {infoBubbles.length === 0 && (
+              <div className="bg-red-500/20 border border-red-500 p-2 text-red-300 text-xs mb-4 rounded">
+                ⚠️ NO INFO BUBBLES (gainTag={!!gainTag}): moduleType={moduleType}, loadType={loadType}, muscleGroup={muscleGroup}, difficulty={difficulty}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         );
       })()}
 
