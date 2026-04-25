@@ -1,30 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-
-// Проверка наличия валидной admin-сессии через cookie
-async function isAdminAuthenticated(request: NextRequest): Promise<boolean> {
-  const token = request.cookies.get('admin_token')?.value;
-  if (!token) return false;
-  // Импортируем карту сессий через API-запрос к /api/admin/auth
-  // В данной архитектуре validateSessionToken хранится в памяти auth/route.ts
-  // Поэтому делаем внутренний fetch на тот же origin
-  try {
-    const host = request.headers.get('host') || 'localhost:3000';
-    const proto = request.headers.get('x-forwarded-proto') || 'http';
-    const res = await fetch(`${proto}://${host}/api/admin/auth`, {
-      headers: { cookie: `admin_token=${token}` },
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+import { requireAdmin } from '@/lib/admin-session';
 
 /** GET /api/admin/admins — список всех администраторов */
 export async function GET(request: NextRequest) {
-  if (!(await isAdminAuthenticated(request))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = requireAdmin(request);
+  if (denied) return denied;
 
   const admins = await prisma.user.findMany({
     where: { isAdmin: true },
@@ -45,9 +26,8 @@ export async function GET(request: NextRequest) {
 
 /** POST /api/admin/admins — назначить пользователя админом */
 export async function POST(request: NextRequest) {
-  if (!(await isAdminAuthenticated(request))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = requireAdmin(request);
+  if (denied) return denied;
 
   const { telegramId } = await request.json();
   if (!telegramId) {
@@ -65,9 +45,8 @@ export async function POST(request: NextRequest) {
 
 /** DELETE /api/admin/admins — снять права администратора */
 export async function DELETE(request: NextRequest) {
-  if (!(await isAdminAuthenticated(request))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const denied = requireAdmin(request);
+  if (denied) return denied;
 
   const { telegramId } = await request.json();
   if (!telegramId) {

@@ -31,18 +31,10 @@ export async function POST(request: NextRequest) {
     // Помечаем OTP как использованный
     await prisma.emailOtp.update({ where: { id: otp.id }, data: { used: true } });
 
-    // Если пользователь уже авторизован через Telegram — он просто добавляет email к профилю
-    const cookieTelegramId = request.cookies.get('telegramId')?.value;
-    const isAlreadyAuthed = cookieTelegramId && !cookieTelegramId.startsWith('email_');
-    if (isAlreadyAuthed) {
-      return NextResponse.json({
-        success: true,
-        user: { telegramId: cookieTelegramId },
-        needsOnboarding: false,
-      });
-    }
-
-    // Ищем или создаём пользователя (только для входа через email)
+    // Ищем или создаём пользователя по email.
+    // Если в cookie уже есть telegramId — это никак не влияет: мы не верим
+    // содержимому cookie без проверки OTP, иначе можно подсунуть чужую cookie
+    // и пройти "вход" без знания кода.
     let user = await prisma.user.findUnique({ where: { email } });
     let needsOnboarding = false;
 
@@ -71,7 +63,7 @@ export async function POST(request: NextRequest) {
       needsOnboarding = !profile;
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       user: {
         telegramId: user.telegramId,
@@ -81,6 +73,19 @@ export async function POST(request: NextRequest) {
       },
       needsOnboarding,
     });
+
+    // Ставим cookie с сервера с правильными флагами безопасности.
+    // httpOnly пока НЕ включаем, т.к. клиент читает её для logout (lib/auth.ts).
+    // Это будет переведено на httpOnly + /api/auth/logout позже.
+    response.cookies.set('telegramId', user.telegramId, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30, // 30 дней
+    });
+
+    return response;
   } catch (error) {
     console.error('Error in verify-code:', error);
     return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });

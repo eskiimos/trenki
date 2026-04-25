@@ -14,6 +14,20 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Безопасность: пользователь может регистрировать только себя.
+    // Сравниваем telegramId из body с telegramId в cookie (она ставится после OTP/Telegram-логина).
+    const cookieTelegramId = request.cookies.get('telegramId')?.value;
+    if (!cookieTelegramId || cookieTelegramId !== telegramId) {
+      console.warn('❌ /api/users/register: cookie telegramId не совпадает с body', {
+        cookieTelegramId,
+        bodyTelegramId: telegramId,
+      });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
     
     // Вычисляем ageGroup из даты рождения
     const { calculateAgeData, isValidBirthDate } = await import('@/lib/age-utils');

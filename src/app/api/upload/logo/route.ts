@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
+import { requireUserOrAdmin } from '@/lib/admin-session';
 
 // Конфигурация Cloudinary
 cloudinary.config({
@@ -9,6 +10,8 @@ cloudinary.config({
 });
 
 export async function POST(request: NextRequest) {
+  const denied = requireUserOrAdmin(request);
+  if (denied) return denied;
   try {
     console.log('=== Club logo upload started ===');
     const formData = await request.formData();

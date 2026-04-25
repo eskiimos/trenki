@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@/generated/prisma';
-
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma';
+import { requireAdmin } from '@/lib/admin-session';
 
 export async function GET(request: NextRequest) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
   try {
     // Получаем все инвайт-коды с информацией о пользователях
     const inviteCodes = await prisma.inviteCode.findMany({
@@ -58,6 +59,8 @@ export async function GET(request: NextRequest) {
 
 // Деактивация кода
 export async function PATCH(request: NextRequest) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
   try {
     const { codeId, isActive } = await request.json();
 
@@ -78,6 +81,8 @@ export async function PATCH(request: NextRequest) {
 
 // Удаление кода
 export async function DELETE(request: NextRequest) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
   try {
     const { searchParams } = new URL(request.url);
     const codeId = searchParams.get('id');

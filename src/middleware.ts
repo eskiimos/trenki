@@ -59,9 +59,11 @@ export function middleware(request: NextRequest) {
   }
   // ────────────────────────────────────────────────────────────────────────
 
-  // 🔓 Пропускаем localhost без проверки авторизации (для разработки)
-  if (isLocalhost) {
-    console.log(`🔓 Middleware: localhost detected, skipping auth check`);
+  // 🔓 В dev-окружении пропускаем localhost без проверки авторизации.
+  // В проде НИКОГДА не пропускаем по hostname — иначе обратный прокси
+  // с Host: localhost обходит middleware.
+  if (isLocalhost && process.env.NODE_ENV !== 'production') {
+    console.log(`🔓 Middleware: localhost (dev), skipping auth check`);
     return NextResponse.next();
   }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { updateUserActivity } from '@/lib/updateUserActivity';
+import { requireAdmin } from '@/lib/admin-session';
 
 export async function GET(request: NextRequest) {
   try {
@@ -124,6 +125,8 @@ function formatDuration(seconds: number): string {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
   try {
     const body = await request.json();
     console.log('Received body:', body);
