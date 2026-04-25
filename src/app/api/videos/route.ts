@@ -62,9 +62,14 @@ export async function GET(request: NextRequest) {
     // Форматируем данные для фронтенда
     const formattedVideos = videos.map(video => {
       // Extract load types from video tags
-      const loadTypes = video.videoTags
+      const loadTypesFromTags = video.videoTags
         .filter(vt => vt.tag.tagType === 'LOAD' && vt.tag.loadType)
         .map(vt => vt.tag.loadType);
+
+      // Use tag loadTypes first, fallback to video.loadType if no tags
+      const loadTypes = loadTypesFromTags.length > 0 
+        ? loadTypesFromTags 
+        : (video.loadType ? [video.loadType] : []);
 
       return {
         id: video.id,
