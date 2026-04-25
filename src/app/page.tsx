@@ -1071,35 +1071,23 @@ const TrainersSection = () => {
                   </Link>
                 ))}
                 {hasMore && (
-                  <Link href="/trainers" style={{ flexShrink: 0 }}>
+                  <Link href="/trainers" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <div style={{
-                      width: '170px',
+                      width: 32,
                       height: 202,
-                      background: '#060919',
+                      background: 'transparent',
                       borderRadius: 8,
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'center',
                       alignItems: 'center',
-                      gap: 8,
-                      cursor: 'pointer',
-                      border: '2px dashed #445CFF'
+                      cursor: 'pointer'
                     }}>
                       <div style={{
-                        fontSize: 32,
-                        color: '#445CFF'
-                      }}>+</div>
-                      <div style={{
+                        fontSize: 24,
                         color: '#445CFF',
-                        fontSize: 14,
-                        fontFamily: 'Overpass',
-                        fontWeight: '700',
-                        textTransform: 'uppercase',
-                        textAlign: 'center',
-                        padding: '0 16px'
-                      }}>
-                        Еще тренеры
-                      </div>
+                        fontWeight: 'bold'
+                      }}>→</div>
                     </div>
                   </Link>
                 )}
