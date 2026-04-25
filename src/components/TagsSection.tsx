@@ -79,6 +79,16 @@ const TagsSection: React.FC<TagsSectionProps> = ({
 }) => {
   const [dbTags, setDbTags] = useState<Tag[]>([]);
 
+  console.log('🔍 TagsSection rendered with props:', {
+    moduleType,
+    loadType,
+    muscleGroup,
+    difficulty,
+    rpeMin,
+    rpeMax,
+    hasGainTag: !!gainTag,
+  });
+
   console.log('🔍 TagsSection props:', {
     moduleType,
     loadType,
@@ -300,12 +310,17 @@ const TagsSection: React.FC<TagsSectionProps> = ({
               ))}
             </div>
             
-            {/* DEBUG: Явный рендер для тестирования */}
-            {infoBubbles.length === 0 && (
-              <div className="bg-red-500/20 border border-red-500 p-2 text-red-300 text-xs mb-4 rounded">
-                ⚠️ NO INFO BUBBLES (gainTag={!!gainTag}): moduleType={moduleType}, loadType={loadType}, muscleGroup={muscleGroup}, difficulty={difficulty}
-              </div>
-            )}
+            {/* DEBUG: Очень видимый блок для проверки */}
+            <div className="bg-yellow-500 border-2 border-yellow-600 p-3 mb-4 rounded text-black font-bold text-sm">
+              <div>🔴 DEBUG INFO BUBBLES:</div>
+              <div>moduleType: {moduleType || '❌ NULL'}</div>
+              <div>loadType: {loadType || '❌ NULL'}</div>
+              <div>muscleGroup: {muscleGroup || '❌ NULL'}</div>
+              <div>difficulty: {difficulty || '❌ NULL'}</div>
+              <div>RPE: {rpeMin}–{rpeMax}</div>
+              <div>bubblesCount: {infoBubbles.length}</div>
+              <div>gainTag: {!!gainTag ? '✅ YES' : '❌ NO'}</div>
+            </div>
           </>
         );
       })()}
