@@ -296,32 +296,18 @@ const TagsSection: React.FC<TagsSectionProps> = ({
         if (!hasBubbles) return null;
 
         return (
-          <>
-            <div className="flex flex-wrap items-center gap-2 mb-4">
-              {gainTag}
-              {infoBubbles.map((b, i) => (
-                <div
-                  key={i}
-                  className="px-3 py-1.5 rounded-full text-xs"
-                  style={{ backgroundColor: '#AEABBB33', color: '#AEABBB' }}
-                >
-                  {b.label}
-                </div>
-              ))}
-            </div>
-            
-            {/* DEBUG: Очень видимый блок для проверки */}
-            <div className="bg-yellow-500 border-2 border-yellow-600 p-3 mb-4 rounded text-black font-bold text-sm">
-              <div>🔴 DEBUG INFO BUBBLES:</div>
-              <div>moduleType: {moduleType || '❌ NULL'}</div>
-              <div>loadType: {loadType || '❌ NULL'}</div>
-              <div>muscleGroup: {muscleGroup || '❌ NULL'}</div>
-              <div>difficulty: {difficulty || '❌ NULL'}</div>
-              <div>RPE: {rpeMin}–{rpeMax}</div>
-              <div>bubblesCount: {infoBubbles.length}</div>
-              <div>gainTag: {!!gainTag ? '✅ YES' : '❌ NO'}</div>
-            </div>
-          </>
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            {gainTag}
+            {infoBubbles.map((b, i) => (
+              <div
+                key={i}
+                className="px-3 py-1.5 rounded-full text-xs"
+                style={{ backgroundColor: '#AEABBB33', color: '#AEABBB' }}
+              >
+                {b.label}
+              </div>
+            ))}
+          </div>
         );
       })()}
 
