@@ -137,16 +137,6 @@ export default function VideoPage({ params }: VideoPageProps) {
         
         if (video) {
           setVideoData(video);
-          console.log('📺 Video loaded:', {
-            id: video.id,
-            title: video.title,
-            moduleType: video.moduleType,
-            loadType: video.loadType,
-            muscleGroup: video.muscleGroup,
-            difficulty: video.difficulty,
-            rpeMin: video.rpeMin,
-            rpeMax: video.rpeMax,
-          });
           
           // Находим следующее видео
           if (currentVideoIndex !== -1 && currentVideoIndex < videos.length - 1) {
@@ -1865,7 +1855,6 @@ export default function VideoPage({ params }: VideoPageProps) {
       </div>
 
       {/* Tags / Description / Trainer - скрываем при ландшафте на мобилке */}
-      {videoData && console.log('✅ About to render TagsSection with videoData:', videoData.title)}
       <div className={`${isLandscape ? 'hidden' : ''}`}>
       <TagsSection 
         tags={videoData?.tags}

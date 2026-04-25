@@ -45,6 +45,11 @@ interface Video {
     speciality: string;
   };
   createdAt: string;
+  moduleType?: string | null;
+  loadType?: string | null;
+  muscleGroup?: string | null;
+  rpeMin?: number | null;
+  rpeMax?: number | null;
 }
 
 const VideoPage = () => {
@@ -336,6 +341,89 @@ const VideoPage = () => {
                       {calculateVideoGain(video.loadTypes)}
                     </div>
                   )}
+                  
+                  {/* Info Bubbles: moduleType, loadType, muscleGroup, difficulty, RPE */}
+                  {(() => {
+                    const MODULE_TYPE_LABELS: Record<string, string> = {
+                      WARMUP: 'Разминка',
+                      FITNESS: 'ОФП',
+                      GENERAL_PHYSICAL_PREP: 'ОФП',
+                      TECHNIQUE: 'Техника',
+                      COOLDOWN: 'Заминка',
+                      STRENGTH: 'Силовой',
+                      CARDIO: 'Кардио',
+                      STRETCHING: 'Растяжка',
+                    };
+                    const LOAD_TYPE_LABELS: Record<string, string> = {
+                      SPEED: 'Скорость',
+                      POWER: 'Мощность',
+                      MAX_STRENGTH: 'Макс. сила',
+                      STRENGTH_ENDURANCE: 'Силовая выносливость',
+                      ANAEROBIC_ENDURANCE: 'Анаэробная выносливость',
+                      AEROBIC_ENDURANCE: 'Аэробная выносливость',
+                      AGILITY: 'Ловкость',
+                      MOBILITY: 'Мобильность',
+                      STATIC_STRETCH: 'Стат. растяжка',
+                      DYNAMIC_STRETCH: 'Дин. растяжка',
+                      PREHAB: 'Преабилитация',
+                      TECHNICAL_SKILL: 'Техника',
+                      HYPERTROPHY: 'Гипертрофия',
+                      FLEXIBILITY: 'Гибкость',
+                      RECOVERY: 'Восстановление',
+                    };
+                    const MUSCLE_GROUP_LABELS: Record<string, string> = {
+                      LOWER_BODY: 'Низ тела',
+                      UPPER_PULL: 'Верх — тяга',
+                      UPPER_PUSH: 'Верх — жим',
+                      CORE_STABILITY: 'Кор (стабилизация)',
+                      CORE_DYNAMICS: 'Кор (динамика)',
+                      PREHAB_SHOULDER: 'Плечи (преаб)',
+                      PREHAB_KNEE: 'Колени (преаб)',
+                      PREHAB_BACK: 'Спина (преаб)',
+                      FULL_BODY: 'Всё тело',
+                      LEGS: 'Ноги',
+                      BACK: 'Спина',
+                      CHEST: 'Грудь',
+                      SHOULDERS: 'Плечи',
+                      ARMS: 'Руки',
+                      CORE: 'Кор',
+                      GLUTES: 'Ягодицы',
+                      CARDIO: 'Кардио',
+                    };
+                    const DIFFICULTY_LABELS: Record<string, string> = {
+                      BEGINNER: 'Начинающий',
+                      AMATEUR: 'Любитель',
+                      INTERMEDIATE: 'Средний',
+                      ADVANCED: 'Продвинутый',
+                      PRO: 'Про',
+                    };
+
+                    const infoBubbles = [
+                      video.moduleType && { label: MODULE_TYPE_LABELS[video.moduleType] || video.moduleType },
+                      video.loadType && { label: LOAD_TYPE_LABELS[video.loadType] || video.loadType },
+                      video.muscleGroup && { label: MUSCLE_GROUP_LABELS[video.muscleGroup] || video.muscleGroup },
+                      video.difficulty && { label: DIFFICULTY_LABELS[video.difficulty] || video.difficulty },
+                      (video.rpeMin != null || video.rpeMax != null) && {
+                        label: video.rpeMin != null && video.rpeMax != null
+                          ? `RPE ${video.rpeMin}–${video.rpeMax}`
+                          : video.rpeMin != null ? `RPE ${video.rpeMin}+` : `RPE ≤${video.rpeMax}`,
+                      },
+                    ].filter(Boolean);
+
+                    return infoBubbles.map((bubble: any, i) => (
+                      <span
+                        key={`info-${i}`}
+                        className="px-3 py-1 rounded-full text-xs whitespace-nowrap"
+                        style={{
+                          backgroundColor: '#AEABBB33',
+                          color: '#AEABBB',
+                        }}
+                      >
+                        {bubble.label}
+                      </span>
+                    ));
+                  })()}
+                  
                   {video.tags.map((tag) => (
                     <span
                       key={tag}

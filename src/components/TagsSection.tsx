@@ -79,16 +79,6 @@ const TagsSection: React.FC<TagsSectionProps> = ({
 }) => {
   const [dbTags, setDbTags] = useState<Tag[]>([]);
 
-  console.log('🔍 TagsSection rendered with props:', {
-    moduleType,
-    loadType,
-    muscleGroup,
-    difficulty,
-    rpeMin,
-    rpeMax,
-    hasGainTag: !!gainTag,
-  });
-
   console.log('🔍 TagsSection props:', {
     moduleType,
     loadType,
