@@ -183,12 +183,12 @@ const ProfilePage = () => {
           {/* Карточка аватара */}
           <div className="bg-[#060919] rounded-lg overflow-hidden">
             {/* Аватар пользователя */}
-            <div className="w-[235px] h-[235px] relative mx-auto">
+            <div className="w-full aspect-square relative">
               <Image 
                 src={userProfile?.profile?.avatarUrl || "/avatars/Avatar.png"}
                 alt="Игрок" 
-                width={235} 
-                height={235} 
+                width={400} 
+                height={400} 
                 className="w-full h-full object-cover"
               />
               
