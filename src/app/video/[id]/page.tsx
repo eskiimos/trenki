@@ -1865,6 +1865,7 @@ export default function VideoPage({ params }: VideoPageProps) {
       </div>
 
       {/* Tags / Description / Trainer - скрываем при ландшафте на мобилке */}
+      {videoData && console.log('✅ About to render TagsSection with videoData:', videoData.title)}
       <div className={`${isLandscape ? 'hidden' : ''}`}>
       <TagsSection 
         tags={videoData?.tags}
