@@ -579,10 +579,10 @@ export default function WorkoutPage() {
           
           // Определяем фоновое изображение
           const backgroundImages: Record<string, string> = {
-            'WARMUP': '/images/warm-up-1.png',
-            'TECHNIQUE': '/images/Technic-3.png',
-            'FITNESS': '/images/physical-training-2.png',
-            'COOLDOWN': '/images/hitch-4.png',
+            'WARMUP': '/images/AI_t/1_warm_up.webp',
+            'TECHNIQUE': '/images/AI_t/3_technic.webp',
+            'FITNESS': '/images/AI_t/2_physical_training.webp',
+            'COOLDOWN': '/images/AI_t/4_the_hitch.webp',
           };
           
           const bgImage = backgroundImages[moduleType] || '/images/warm-up-1.png';
