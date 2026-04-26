@@ -1313,7 +1313,7 @@ export default function VideoPage({ params }: VideoPageProps) {
                   />
                   
                   {/* Заголовок */}
-                  <h2 className="text-white text-[18px] font-bold uppercase text-center max-w-xs px-4 leading-tight">
+                  <h2 className="text-white text-[14px] font-bold uppercase text-center max-w-xs px-4 leading-tight">
                     переверни телефон для выхода в полноэкранный режим
                   </h2>
                 </div>
