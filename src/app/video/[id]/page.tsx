@@ -1303,28 +1303,19 @@ export default function VideoPage({ params }: VideoPageProps) {
                   className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-50"
                   onClick={() => setShowFullscreenHint(false)}
                 >
-                  {/* Иконка сверху */}
-                  <div className="mb-4 md:mb-6">
-                    <div className="w-12 h-12 md:w-16 md:h-16 bg-[#A1FF4A] rounded-full flex items-center justify-center">
-                      <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M8 10L2 4M2 4H8M2 4V10" stroke="#060919" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M24 22L30 28M30 28H24M30 28V22" stroke="#060919" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </div>
-                  </div>
+                  {/* Иконка поворота */}
+                  <Image
+                    src="/icons/video/player/icon-park-solid_rotate.svg"
+                    alt="Повернуть телефон"
+                    width={40}
+                    height={40}
+                    className="mb-6"
+                  />
                   
-                  {/* Текстовое сообщение */}
-                  <div className="text-center max-w-xs px-4">
-                    <h2 className="text-white text-base md:text-lg font-bold mb-2 md:mb-4">Полноэкранный режим</h2>
-                    <p className="text-white/80 text-xs md:text-sm leading-relaxed">
-                      Переверни телефон в горизонтальное положение
-                    </p>
-                  </div>
-                  
-                  {/* Стрелка вниз для закрытия */}
-                  <div className="mt-4 md:mt-6 text-white/60 text-[10px] md:text-xs">
-                    Нажми чтобы закрыть
-                  </div>
+                  {/* Заголовок */}
+                  <h2 className="text-white text-[28px] font-bold uppercase text-center max-w-xs px-4 leading-tight">
+                    переверни телефон для выхода в полноэкранный режим
+                  </h2>
                 </div>
               )}
               
