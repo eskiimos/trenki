@@ -16,7 +16,7 @@ import {
   getRPERange,
 } from '@/lib/training-algorithm-v3';
 
-import { requireAdmin } from '@/lib/admin-session';
+import { requireAdminAsync } from '@/lib/admin-session';
 
 /**
  * GET /api/admin/content-check
@@ -86,7 +86,7 @@ interface GapAnalysis {
 }
 
 export async function GET(request: NextRequest) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdminAsync(request);
   if (denied) return denied;
   try {
     // Получаем все видео

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAdmin } from '@/lib/admin-session';
+import { requireAdminAsync } from '@/lib/admin-session';
 
 export async function GET(request: NextRequest) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdminAsync(request);
   if (denied) return denied;
   try {
     const now = new Date();

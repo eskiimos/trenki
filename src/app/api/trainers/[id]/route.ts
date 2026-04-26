@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAdmin } from '@/lib/admin-session';
+import { requireAdminAsync } from '@/lib/admin-session';
 
 export async function GET(
   request: NextRequest,
@@ -33,7 +33,7 @@ export async function PUT(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdminAsync(request);
   if (denied) return denied;
   try {
     const { id } = await context.params;
@@ -64,16 +64,17 @@ export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdminAsync(request);
   if (denied) return denied;
   try {
     const { id } = await context.params;
 
-    // Проверяем, есть ли у тренера привязанные видео
+    // Проверяем, есть ли у тренера привязанные видео или шортсы
     const trainer = await prisma.trainer.findUnique({
       where: { id },
       include: {
-        videos: true
+        videos: { select: { id: true } },
+        shorts: { select: { id: true } }
       }
     });
 
@@ -81,9 +82,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Trainer not found' }, { status: 404 });
     }
 
-    if (trainer.videos.length > 0) {
-      return NextResponse.json({ 
-        error: 'Cannot delete trainer with existing videos. Please reassign or delete videos first.' 
+    if (trainer.videos.length > 0 || trainer.shorts.length > 0) {
+      return NextResponse.json({
+        error: `Нельзя удалить тренера: у него ${trainer.videos.length} тренировок и ${trainer.shorts.length} шортсов. Сначала переназначьте или удалите контент.`
       }, { status: 400 });
     }
 

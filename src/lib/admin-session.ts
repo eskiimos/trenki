@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { prisma } from '@/lib/prisma';
 
 // Хранилище активных admin-сессий в памяти процесса.
 // При рестарте контейнера админы перелогинятся — приемлемо для текущего этапа.
@@ -53,6 +54,39 @@ export function requireAdmin(request: NextRequest): NextResponse | null {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   return null;
+}
+
+/**
+ * Асинхронная версия requireAdmin: принимает либо валидный admin_token cookie
+ * (классический логин по логину/паролю), либо telegramId cookie + флаг
+ * isAdmin=true у соответствующего пользователя в БД.
+ *
+ * Это нужно потому, что admin-layout пускает Telegram-админов в /admin/*
+ * без установки admin_token cookie, и без этого хелпера все защищённые
+ * API-роуты возвращали бы им 401.
+ */
+export async function requireAdminAsync(request: NextRequest): Promise<NextResponse | null> {
+  // 1) Классическая admin-сессия
+  const adminToken = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
+  if (validateAdminSessionToken(adminToken)) {
+    return null;
+  }
+
+  // 2) Telegram-админ (юзер с isAdmin=true в БД)
+  const telegramId = request.cookies.get('telegramId')?.value;
+  if (telegramId) {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { telegramId },
+        select: { isAdmin: true },
+      });
+      if (user?.isAdmin) return null;
+    } catch (err) {
+      console.error('requireAdminAsync: prisma error', err);
+    }
+  }
+
+  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 }
 
 /**

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAdmin } from '@/lib/admin-session';
+import { requireAdminAsync } from '@/lib/admin-session';
 
 export async function GET() {
   try {
@@ -48,11 +48,11 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdminAsync(request);
   if (denied) return denied;
   try {
     const body = await request.json();
-    const { name, lastName, speciality, experience, avatar, description } = body;
+    const { name, lastName, speciality, experience, rating, avatar, description } = body;
 
     if (!name || !lastName || !speciality) {
       return NextResponse.json({ 
@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
         lastName,
         speciality,
         experience: experience || 0,
+        rating: typeof rating === 'number' ? rating : 5.0,
         avatar,
         description
       }

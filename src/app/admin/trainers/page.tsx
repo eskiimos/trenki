@@ -76,9 +76,12 @@ export default function AdminTrainersPage() {
         alert(editingTrainerId ? 'Тренер обновлён!' : 'Тренер добавлен!');
         resetForm();
         fetchTrainers();
+      } else if (response.status === 401) {
+        alert('Сессия администратора истекла. Войдите заново.');
+        window.location.href = '/admin/login';
       } else {
-        const errorData = await response.json();
-        alert(`Ошибка: ${errorData.error}`);
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        alert(`Ошибка: ${errorData.error || response.statusText}`);
       }
     } catch (error) {
       console.error('Ошибка сохранения тренера:', error);

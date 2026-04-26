@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAdmin } from '@/lib/admin-session';
+import { requireAdminAsync } from '@/lib/admin-session';
 
 export async function GET(request: NextRequest) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdminAsync(request);
   if (denied) return denied;
   try {
     // Получаем всех пользователей с их профилями и связанными данными
@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdminAsync(request);
   if (denied) return denied;
   try {
     const { searchParams } = new URL(request.url);

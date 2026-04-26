@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAdmin } from '@/lib/admin-session';
+import { requireAdminAsync } from '@/lib/admin-session';
 
 export async function GET(request: NextRequest) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdminAsync(request);
   if (denied) return denied;
   try {
     // Получаем все инвайт-коды с информацией о пользователях
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
 
 // Деактивация кода
 export async function PATCH(request: NextRequest) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdminAsync(request);
   if (denied) return denied;
   try {
     const { codeId, isActive } = await request.json();
@@ -81,7 +81,7 @@ export async function PATCH(request: NextRequest) {
 
 // Удаление кода
 export async function DELETE(request: NextRequest) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdminAsync(request);
   if (denied) return denied;
   try {
     const { searchParams } = new URL(request.url);

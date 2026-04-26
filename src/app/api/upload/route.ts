@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
-import { requireAdmin } from '@/lib/admin-session';
+import { requireAdminAsync } from '@/lib/admin-session';
 
 // Конфигурация Cloudinary
 cloudinary.config({
@@ -10,7 +10,7 @@ cloudinary.config({
 });
 
 export async function POST(request: NextRequest) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdminAsync(request);
   if (denied) return denied;
   try {
     console.log('=== Thumbnail upload started ===');

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireAdmin } from '@/lib/admin-session';
+import { requireAdminAsync } from '@/lib/admin-session';
 
 /** GET /api/admin/admins — список всех администраторов */
 export async function GET(request: NextRequest) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdminAsync(request);
   if (denied) return denied;
 
   const admins = await prisma.user.findMany({
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
 /** POST /api/admin/admins — назначить пользователя админом */
 export async function POST(request: NextRequest) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdminAsync(request);
   if (denied) return denied;
 
   const { telegramId } = await request.json();
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
 /** DELETE /api/admin/admins — снять права администратора */
 export async function DELETE(request: NextRequest) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdminAsync(request);
   if (denied) return denied;
 
   const { telegramId } = await request.json();
