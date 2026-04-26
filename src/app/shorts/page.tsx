@@ -258,8 +258,8 @@ const ShortsContent = () => {
         initialSlide={startIndex}
         virtual={{
           enabled: true,
-          addSlidesAfter: 2,
-          addSlidesBefore: 2,
+          addSlidesAfter: 1,
+          addSlidesBefore: 1,
         }}
         mousewheel={{
           sensitivity: 1,

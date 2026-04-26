@@ -48,12 +48,19 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Ref для актуального значения isActive в обработчиках событий (избегаем stale closure)
+  const isActiveRef = useRef(isActive);
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true); // Начинаем с muted для автовоспроизведения
   const [showDescription, setShowDescription] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [videoUrl, setVideoUrl] = useState<string>('');
+
+  // Синхронизируем ref с актуальным значением
+  useEffect(() => {
+    isActiveRef.current = isActive;
+  }, [isActive]);
 
   // Управление воспроизведением при смене активного слайда
   useEffect(() => {
@@ -62,23 +69,26 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
 
     if (isActive) {
       // Слайд стал активным - запускаем воспроизведение
-      if (video.src && video.readyState >= 2) {
-        video.play().then(() => {
+      // Сначала с muted (для надёжного autoplay), потом включаем звук
+      video.muted = true;
+      const playPromise = video.play();
+      if (playPromise) {
+        playPromise.then(() => {
+          // Проверяем ещё раз — пока промис resolve, слайд мог стать неактивным
+          if (!isActiveRef.current) return;
           setIsPlaying(true);
-          // Включаем звук для активного видео
-          setTimeout(() => {
-            video.muted = false;
-            setIsMuted(false);
-          }, 100);
-        }).catch(err => {
-          console.log('Play on active failed:', err);
+          video.muted = false;
+          setIsMuted(false);
+        }).catch(() => {
+          // Autoplay заблокирован — оставляем muted
+          setIsPlaying(false);
         });
       }
     } else {
-      // Слайд стал неактивным - ставим на паузу и сбрасываем на начало
-      video.pause();
-      video.currentTime = 0;
+      // Слайд стал неактивным — гарантированно глушим и останавливаем
       video.muted = true;
+      video.pause();
+      try { video.currentTime = 0; } catch (e) { /* ignore */ }
       setIsPlaying(false);
       setIsMuted(true);
     }
@@ -86,6 +96,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
 
   // Загрузка URL видео (обработка Kinescope)
   useEffect(() => {
+    let cancelled = false;
     const loadVideoUrl = async () => {
       setIsLoading(true);
       
@@ -98,27 +109,25 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
       // Если это Kinescope URL - получаем прямую ссылку
       if (isKinescopeUrl(short.videoUrl)) {
         try {
-          console.log('Loading Kinescope URL:', short.videoUrl);
           const result = await getKinescopeDirectUrl(short.videoUrl);
+          if (cancelled) return;
           if (result.directUrl) {
-            console.log('Got direct URL:', result.directUrl);
             setVideoUrl(result.directUrl);
           } else {
-            console.error('Failed to get Kinescope direct URL');
             setVideoUrl(short.videoUrl);
           }
         } catch (error) {
           console.error('Error loading Kinescope URL:', error);
-          setVideoUrl(short.videoUrl);
+          if (!cancelled) setVideoUrl(short.videoUrl);
         }
       } else {
         // Обычный URL
-        console.log('Using direct URL:', short.videoUrl);
-        setVideoUrl(short.videoUrl);
+        if (!cancelled) setVideoUrl(short.videoUrl);
       }
     };
 
     loadVideoUrl();
+    return () => { cancelled = true; };
   }, [short.videoUrl, short.id]);
 
   // Воспроизведение видео когда URL готов
@@ -131,18 +140,26 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
 
     const handleCanPlay = () => {
       setIsLoading(false);
-      // Автовоспроизведение только для активного слайда
-      if (!isActive) return;
+      // Автовоспроизведение только для активного слайда (читаем актуальное значение через ref)
+      if (!isActiveRef.current) {
+        // Гарантированно глушим неактивное видео при готовности
+        video.muted = true;
+        video.pause();
+        return;
+      }
       
       // Сначала запускаем с muted для гарантированного автовоспроизведения
       video.muted = true;
       video.play().then(() => {
+        // Проверяем что слайд всё ещё активен
+        if (!isActiveRef.current) {
+          video.pause();
+          video.muted = true;
+          return;
+        }
         setIsPlaying(true);
-        // После успешного воспроизведения включаем звук
-        setTimeout(() => {
-          video.muted = false;
-          setIsMuted(false);
-        }, 100);
+        video.muted = false;
+        setIsMuted(false);
       }).catch(err => {
         console.log('Autoplay blocked:', err);
         setIsPlaying(false);
@@ -152,17 +169,20 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
     const handleWaiting = () => setIsLoading(true);
     const handlePlaying = () => {
       setIsLoading(false);
-      setIsPlaying(true);
-      // Еще раз убеждаемся что звук включен
-      if (video.muted) {
-        video.muted = false;
-        setIsMuted(false);
+      // Если слайд уже неактивен — немедленно ставим на паузу и глушим
+      if (!isActiveRef.current) {
+        video.muted = true;
+        video.pause();
+        return;
       }
+      setIsPlaying(true);
     };
     const handlePause = () => setIsPlaying(false);
     const handleEnded = () => {
+      // Зацикливание только для активного слайда
+      if (!isActiveRef.current) return;
       video.currentTime = 0;
-      video.play();
+      video.play().catch(() => {});
     };
     const handleError = (e: Event) => {
       console.error('Video error:', e, 'URL:', videoUrl);
@@ -188,6 +208,9 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
       video.removeEventListener('ended', handleEnded);
       video.removeEventListener('error', handleError);
       video.pause();
+      video.muted = true;
+      video.removeAttribute('src');
+      video.load();
     };
   }, [videoUrl]);
 
@@ -244,7 +267,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
           playsInline
           loop
           muted
-          preload="auto"
+          preload={isActive ? 'auto' : 'metadata'}
         />
 
         {/* Loading Spinner */}
