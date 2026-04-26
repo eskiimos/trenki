@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAdminAsync } from '@/lib/admin-session';
 
 // GET /api/training/modules/:id - Получить модуль по ID
 export async function GET(
@@ -51,6 +52,8 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireAdminAsync(request);
+  if (denied) return denied;
   try {
     const { id } = await params;
     const body = await request.json();
@@ -168,6 +171,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireAdminAsync(request);
+  if (denied) return denied;
   try {
     const { id } = await params;
     // Проверяем, используется ли видео в тренировках

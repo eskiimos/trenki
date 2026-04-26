@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAdminAsync } from '@/lib/admin-session';
 
 // GET /api/videos/[id]/tags - Получить теги видео
 export async function GET(
@@ -35,6 +36,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireAdminAsync(request);
+  if (denied) return denied;
   try {
     const { id } = await params;
     const body = await request.json();
@@ -59,22 +62,16 @@ export async function POST(
       );
     }
 
-    // Создаем связи VideoTag для каждого тега
-    const videoTags = await Promise.all(
-      tagIds.map(tagId =>
-        prisma.videoTag.create({
-          data: {
-            videoId: id,
-            tagId: tagId,
-          },
-        })
-      )
-    );
+    // Используем createMany с skipDuplicates чтобы не падать на дублях
+    const result = await prisma.videoTag.createMany({
+      data: tagIds.map((tagId: string) => ({ videoId: id, tagId })),
+      skipDuplicates: true,
+    });
 
-    return NextResponse.json({ 
-      success: true, 
-      count: videoTags.length,
-      message: `Добавлено ${videoTags.length} тегов` 
+    return NextResponse.json({
+      success: true,
+      count: result.count,
+      message: `Добавлено ${result.count} тегов`
     });
   } catch (error) {
     console.error('Error adding video tags:', error);
@@ -90,6 +87,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireAdminAsync(request);
+  if (denied) return denied;
   try {
     const { id } = await params;
 

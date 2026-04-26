@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdminAsync } from '@/lib/admin-session';
 
 export async function POST(request: NextRequest) {
+  const denied = await requireAdminAsync(request);
+  if (denied) return denied;
   try {
     const { title, filesize, filename } = await request.json();
 

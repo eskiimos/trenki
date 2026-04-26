@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAdminAsync } from '@/lib/admin-session';
 
 // GET /api/training/modules - Получить все модули
 export async function GET(request: NextRequest) {
@@ -48,6 +49,8 @@ export async function GET(request: NextRequest) {
 
 // POST /api/training/modules - Создать новый модуль
 export async function POST(request: NextRequest) {
+  const denied = await requireAdminAsync(request);
+  if (denied) return denied;
   try {
     const body = await request.json();
     const {

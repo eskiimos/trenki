@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { updateUserActivity } from '@/lib/updateUserActivity';
+import { requireAdminAsync } from '@/lib/admin-session';
 
 // GET - получить все опубликованные shorts
 export async function GET(request: NextRequest) {
@@ -98,9 +99,17 @@ export async function GET(request: NextRequest) {
 
 // POST - создать новый short
 export async function POST(request: NextRequest) {
+  const denied = await requireAdminAsync(request);
+  if (denied) return denied;
   try {
     const body = await request.json();
-    console.log('Received short body:', body);
+
+    if (!body?.title || !body?.videoUrl) {
+      return NextResponse.json(
+        { error: 'title и videoUrl обязательны' },
+        { status: 400 }
+      );
+    }
 
     const short = await prisma.short.create({
       data: {
@@ -115,8 +124,6 @@ export async function POST(request: NextRequest) {
         audience: body.audience || 'HOCKEY',
       },
     });
-
-    console.log('Created short:', short);
 
     return NextResponse.json({ short });
   } catch (error: any) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAdminAsync } from '@/lib/admin-session';
 
 // GET - получить short по ID
 export async function GET(
@@ -78,6 +79,8 @@ export async function PUT(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireAdminAsync(request);
+  if (denied) return denied;
   try {
     const { id } = await context.params;
     const body = await request.json();
@@ -112,6 +115,8 @@ export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireAdminAsync(request);
+  if (denied) return denied;
   try {
     const { id } = await context.params;
 
