@@ -1,5 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// In-memory кэш метаданных Kinescope.
+// Kinescope CDN ссылки на assets обычно не меняются для одного видео,
+// поэтому кэшируем результат на 30 минут — это убирает повторные походы
+// в Kinescope API при заходе на одну и ту же страницу /video/[id].
+type CachedMetadata = {
+  data: any;
+  expiresAt: number;
+};
+const metadataCache = new Map<string, CachedMetadata>();
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 минут
+
+// Дедупликация одновременных запросов: если один и тот же videoId
+// запрашивается параллельно, ждём один и тот же промис.
+const inflight = new Map<string, Promise<any>>();
+
 export async function POST(request: NextRequest) {
   try {
     const { videoUrl } = await request.json();
@@ -29,7 +44,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid Kinescope URL or Video ID' }, { status: 400 });
     }
 
-    console.log('Fetching metadata for video ID:', videoId);
+    // Проверяем кэш
+    const cached = metadataCache.get(videoId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return NextResponse.json(cached.data, {
+        headers: {
+          'X-Cache': 'HIT',
+          'Cache-Control': 'public, max-age=300, s-maxage=1800',
+        },
+      });
+    }
+
+    // Проверяем inflight (дедупликация параллельных запросов)
+    const existing = inflight.get(videoId);
+    if (existing) {
+      const data = await existing;
+      return NextResponse.json(data, { headers: { 'X-Cache': 'INFLIGHT' } });
+    }
 
     // Получаем API ключ из переменных окружения
     const apiKey = process.env.KINESCOPE_API_KEY;
@@ -42,89 +73,104 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Запрос к Kinescope API
-    const apiUrl = `https://api.kinescope.io/v1/videos/${videoId}`;
-    console.log('Requesting:', apiUrl);
+    // Создаём промис запроса и кладём в inflight
+    const fetchPromise = (async () => {
+      const apiUrl = `https://api.kinescope.io/v1/videos/${videoId}`;
 
-    const response = await fetch(apiUrl, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-    });
+      const response = await fetch(apiUrl, {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    console.log('Kinescope API response status:', response.status);
+      if (!response.ok) {
+        const errorText = await response.text();
+        const err: any = new Error(`Kinescope API error: ${response.status}`);
+        err.status = response.status;
+        err.details = errorText;
+        throw err;
+      }
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Kinescope API error response:', errorText);
+      const data = await response.json();
+
+      // Извлекаем данные из ответа
+      const videoData = data.data || data;
+      const duration = Math.round(videoData.duration || 0);
+      const thumbnail = videoData.poster?.original || videoData.poster?.md || videoData.poster?.sm || '';
+      const title = videoData.title || videoData.name || '';
+      const description = videoData.description || videoData.subtitle || '';
+
+      // Извлекаем прямые ссылки на видео в разных качествах
+      const assets = videoData.assets || [];
+      const videoQualities: Record<string, string> = {};
+      const qualityOrder = ['480p', '720p', '360p', '1080p', 'original'];
       
-      return NextResponse.json({ 
-        error: `Kinescope API error: ${response.status}`,
-        details: errorText,
-        message: 'Проверьте правильность URL видео и API ключа'
-      }, { status: response.status });
-    }
+      assets.forEach((asset: any) => {
+        if (asset.filetype === 'mp4' && asset.url) {
+          const quality = asset.quality || 'unknown';
+          videoQualities[quality] = asset.url;
+        }
+      });
 
-    const data = await response.json();
-    console.log('Kinescope API response data:', JSON.stringify(data, null, 2));
-
-    // Извлекаем данные из ответа
-    const videoData = data.data || data;
-    const duration = Math.round(videoData.duration || 0);
-    // Берём превью: original (высокое качество), md (среднее) или sm (маленькое)
-    const thumbnail = videoData.poster?.original || videoData.poster?.md || videoData.poster?.sm || '';
-    const title = videoData.title || videoData.name || '';
-    const description = videoData.description || videoData.subtitle || '';
-
-    // Извлекаем прямые ссылки на видео в разных качествах
-    const assets = videoData.assets || [];
-    const videoQualities: Record<string, string> = {};
-    
-    // Сортируем по качеству (от лучшего к худшему)
-    const qualityOrder = ['1080p', '720p', '480p', '360p', 'original'];
-    
-    assets.forEach((asset: any) => {
-      if (asset.filetype === 'mp4' && asset.url) {
-        const quality = asset.quality || 'unknown';
-        videoQualities[quality] = asset.url;
+      let directVideoUrl = '';
+      for (const quality of qualityOrder) {
+        if (videoQualities[quality]) {
+          directVideoUrl = videoQualities[quality];
+          break;
+        }
       }
-    });
 
-    // Выбираем оптимальное качество (720p по умолчанию, или лучшее доступное)
-    let directVideoUrl = '';
-    for (const quality of qualityOrder) {
-      if (videoQualities[quality]) {
-        directVideoUrl = videoQualities[quality];
-        break;
+      if (!directVideoUrl && videoData.hls_link) {
+        directVideoUrl = videoData.hls_link;
       }
+
+      const result = {
+        success: true,
+        duration,
+        thumbnail,
+        title,
+        description,
+        videoId,
+        directVideoUrl,
+        availableQualities: videoQualities,
+        hlsUrl: videoData.hls_link,
+      };
+
+      // Сохраняем в кэш
+      metadataCache.set(videoId, {
+        data: result,
+        expiresAt: Date.now() + CACHE_TTL_MS,
+      });
+
+      return result;
+    })();
+
+    inflight.set(videoId, fetchPromise);
+    
+    try {
+      const data = await fetchPromise;
+      return NextResponse.json(data, {
+        headers: {
+          'X-Cache': 'MISS',
+          'Cache-Control': 'public, max-age=300, s-maxage=1800',
+        },
+      });
+    } catch (err: any) {
+      if (err.status) {
+        return NextResponse.json(
+          {
+            error: `Kinescope API error: ${err.status}`,
+            details: err.details,
+            message: 'Проверьте правильность URL видео и API ключа',
+          },
+          { status: err.status }
+        );
+      }
+      throw err;
+    } finally {
+      inflight.delete(videoId);
     }
-
-    // Если не нашли MP4, используем HLS ссылку
-    if (!directVideoUrl && videoData.hls_link) {
-      directVideoUrl = videoData.hls_link;
-    }
-
-    console.log('Extracted data:', { 
-      duration, 
-      thumbnail, 
-      title, 
-      description,
-      availableQualities: Object.keys(videoQualities),
-      directVideoUrl: directVideoUrl ? 'found' : 'not found'
-    });
-
-    return NextResponse.json({ 
-      success: true,
-      duration,
-      thumbnail,
-      title,
-      description,
-      videoId,
-      directVideoUrl, // Прямая ссылка на видео
-      availableQualities: videoQualities, // Все доступные качества
-      hlsUrl: videoData.hls_link, // HLS ссылка для adaptive streaming
-    });
   } catch (error: any) {
     console.error('Error fetching Kinescope metadata:', error);
     return NextResponse.json({ 

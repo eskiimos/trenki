@@ -13,6 +13,8 @@ export interface VideoQuality {
  * @returns качество видео ('1080p', '720p', '480p', '360p')
  */
 export function getOptimalQuality(): string {
+  // По умолчанию выбираем 480p — оптимальный баланс между качеством и скоростью старта.
+  // Пользователь сможет переключить на 720p/1080p вручную через меню качества.
   // Проверяем API Network Information (поддерживается не везде)
   if ('connection' in navigator) {
     const connection = (navigator as any).connection;
@@ -21,11 +23,11 @@ export function getOptimalQuality(): string {
     // effectiveType: 'slow-2g', '2g', '3g', '4g'
     switch (effectiveType) {
       case '4g':
-        return '1080p';
-      case '3g':
         return '720p';
-      case '2g':
+      case '3g':
         return '480p';
+      case '2g':
+        return '360p';
       case 'slow-2g':
         return '360p';
     }
@@ -33,24 +35,15 @@ export function getOptimalQuality(): string {
     // Проверяем downlink (скорость в Mbps)
     const downlink = connection?.downlink;
     if (downlink) {
-      if (downlink >= 10) return '1080p';
-      if (downlink >= 5) return '720p';
-      if (downlink >= 2) return '480p';
+      if (downlink >= 10) return '720p';
+      if (downlink >= 5) return '480p';
+      if (downlink >= 2) return '360p';
       return '360p';
     }
   }
 
-  // Определяем по типу устройства
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const screenWidth = window.innerWidth;
-
-  if (isMobile) {
-    // На мобильных выбираем среднее качество
-    return screenWidth > 1080 ? '1080p' : '720p';
-  } else {
-    // На десктопе высокое качество
-    return screenWidth > 1920 ? '1080p' : '720p';
-  }
+  // Дефолт для всех устройств — 480p (быстрый старт)
+  return '480p';
 }
 
 /**
@@ -63,9 +56,9 @@ export function selectBestQuality(
   availableQualities: Record<string, string>,
   preferredQuality?: string
 ): string {
-  // По умолчанию предпочитаем 720p
-  const defaultQuality = preferredQuality || '720p';
-  const qualityOrder = ['720p', '1080p', '480p', '360p', 'original'];
+  // По умолчанию предпочитаем 480p — быстрый старт
+  const defaultQuality = preferredQuality || '480p';
+  const qualityOrder = ['480p', '720p', '360p', '1080p', 'original'];
   
   // Если указанное (или дефолтное) качество доступно — берём его
   if (availableQualities[defaultQuality]) {

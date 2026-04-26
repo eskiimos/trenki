@@ -395,9 +395,23 @@ export default function VideoPage({ params }: VideoPageProps) {
     
     const loadKinescopeUrl = async () => {
       if (videoData?.videoUrl && isKinescopeUrl(videoData.videoUrl)) {
-        // Проверяем кэш сначала
+        // Проверяем кэш сначала (localStorage переживает перезагрузку, в отличие от sessionStorage)
         const cacheKey = `kinescope_url_${videoData.videoUrl}`;
-        const cached = sessionStorage.getItem(cacheKey);
+        // Дефолтное качество — 480p для быстрого старта
+        const PREFERRED_QUALITY = '480p';
+        const pickQuality = (qs: Record<string, string>): string => {
+          // Приоритет: 480p → 720p → 360p → 1080p → первое доступное
+          const order = ['480p', '720p', '360p', '1080p', 'original'];
+          for (const q of order) {
+            if (qs[q]) return q;
+          }
+          return Object.keys(qs)[0] || '';
+        };
+
+        let cached: string | null = null;
+        try {
+          cached = localStorage.getItem(cacheKey) || sessionStorage.getItem(cacheKey);
+        } catch (e) { /* ignore */ }
         
         if (cached) {
           try {
@@ -405,16 +419,19 @@ export default function VideoPage({ params }: VideoPageProps) {
             // Используем кэш если он не старше 1 часа
             if (Date.now() - cachedData.timestamp < 3600000) {
               if (!ignore) {
-                setKinescopeDirectUrl(cachedData.url);
-                if (cachedData.availableQualities) {
-                  setAvailableQualities(cachedData.availableQualities);
-                  // По умолчанию используем 720p, если доступно
+                if (cachedData.availableQualities && Object.keys(cachedData.availableQualities).length > 0) {
                   const qs = cachedData.availableQualities;
-                  const defaultQ = qs['720p'] ? '720p' : Object.keys(qs)[0];
+                  setAvailableQualities(qs);
+                  const defaultQ = pickQuality(qs);
                   if (defaultQ) {
                     setSelectedQuality(defaultQ);
+                    // Устанавливаем src ОДИН раз — без промежуточной установки
                     setKinescopeDirectUrl(qs[defaultQ]);
+                  } else {
+                    setKinescopeDirectUrl(cachedData.url);
                   }
+                } else {
+                  setKinescopeDirectUrl(cachedData.url);
                 }
                 console.log('Using cached Kinescope URL');
               }
@@ -428,31 +445,32 @@ export default function VideoPage({ params }: VideoPageProps) {
         setIsKinescopeLoading(true);
         try {
           const result = await getKinescopeDirectUrl(videoData.videoUrl);
-          console.log('Kinescope result:', {
-            directUrl: result.directUrl ? 'found' : 'not found',
-            availableQualities: Object.keys(result.availableQualities || {}),
-            qualitiesLength: Object.keys(result.availableQualities || {}).length
-          });
           
           if (!ignore && result.directUrl) {
-            setKinescopeDirectUrl(result.directUrl);
-            // Сохраняем доступные качества
-            if (result.availableQualities && Object.keys(result.availableQualities).length > 0) {
-              const qs = result.availableQualities;
+            // Выбираем качество ОДИН раз и устанавливаем src единственный раз —
+            // это убирает повторную загрузку в <video> и ускоряет старт
+            const qs = result.availableQualities || {};
+            let finalUrl = result.directUrl;
+            
+            if (Object.keys(qs).length > 0) {
               setAvailableQualities(qs);
-              // По умолчанию загружаем 720p, если доступно
-              const defaultQ = qs['720p'] ? '720p' : Object.keys(qs)[0];
-              if (defaultQ) {
+              const defaultQ = pickQuality(qs);
+              if (defaultQ && qs[defaultQ]) {
                 setSelectedQuality(defaultQ);
-                setKinescopeDirectUrl(qs[defaultQ]);
+                finalUrl = qs[defaultQ];
               }
             }
-            // Кэшируем URL и качества
-            sessionStorage.setItem(cacheKey, JSON.stringify({
-              url: result.directUrl,
-              availableQualities: result.availableQualities,
-              timestamp: Date.now()
-            }));
+            
+            setKinescopeDirectUrl(finalUrl);
+            
+            // Кэшируем в localStorage (переживёт перезагрузку)
+            try {
+              localStorage.setItem(cacheKey, JSON.stringify({
+                url: finalUrl,
+                availableQualities: result.availableQualities,
+                timestamp: Date.now()
+              }));
+            } catch (e) { /* localStorage may be full */ }
           }
         } catch (error) {
           console.error('Error loading Kinescope direct URL:', error);
