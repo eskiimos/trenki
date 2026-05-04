@@ -11,6 +11,259 @@ import BottomNavigation from '@/components/BottomNavigation';
 import { clearAuth, getTelegramId } from '@/lib/auth';
 import { calculateAge } from '@/lib/age-utils';
 
+// ======================== PotentialSection ========================
+// Чистый CSS/inline-SVG, без svg-файлов из /icons.
+// Левая колонка — 5 характеристик (название + линия + кружок).
+// Правая часть — большое кольцо общего потенциала с динамическим цветом
+// и декоративными точками-маркерами по периметру.
+
+interface PotentialSectionProps {
+  ratingEndurance?: number;
+  ratingTechnique?: number;
+  ratingPower?: number;
+  ratingSpeed?: number;
+  ratingFlexibility?: number;
+  potential?: number;
+  gains?: {
+    endurance?: number;
+    technique?: number;
+    power?: number;
+    speed?: number;
+    flexibility?: number;
+  };
+}
+
+// Цвет в зависимости от значения потенциала (0-20 → orange, 20-50 → orange→yellow, 50-70 → yellow→green, 70+ → green)
+function potentialColor(p: number): string {
+  if (p <= 0) return '#AEABBB';
+  if (p <= 20) return '#FF8C4A';
+  if (p <= 50) {
+    const t = (p - 20) / 30;
+    const g = Math.round(140 + (201 - 140) * t);
+    return `rgb(255,${g},74)`;
+  }
+  if (p < 70) {
+    const t = (p - 50) / 20;
+    const r = Math.round(255 + (161 - 255) * t);
+    const g = Math.round(201 + (255 - 201) * t);
+    return `rgb(${r},${g},74)`;
+  }
+  return '#A1FF4A';
+}
+
+interface CharRowProps {
+  label: string;
+  value?: number;
+  gain?: number;
+  /** длина соединительной линии (px) */
+  lineWidth: number;
+}
+
+function CharRow({ label, value, gain, lineWidth }: CharRowProps) {
+  const hasValue = typeof value === 'number' && !Number.isNaN(value) && value > 0;
+  const display = hasValue ? value!.toFixed(1) : '–';
+
+  return (
+    <div className="flex items-center">
+      <div
+        className="text-white uppercase select-none"
+        style={{
+          fontFamily: 'Overpass, sans-serif',
+          fontWeight: 800,
+          fontSize: 12,
+          letterSpacing: '0.5px',
+          lineHeight: '100%',
+        }}
+      >
+        {label}
+      </div>
+
+      {/* Соединительная линия */}
+      <div
+        style={{
+          width: lineWidth,
+          height: 1,
+          background: 'linear-gradient(90deg, rgba(68,92,255,0) 0%, rgba(68,92,255,0.5) 50%, rgba(68,92,255,0.9) 100%)',
+          marginLeft: 6,
+          marginRight: -1,
+          flexShrink: 0,
+        }}
+      />
+
+      {/* Маленький круг с числом */}
+      <div className="relative flex-shrink-0" style={{ width: 56, height: 56 }}>
+        <svg viewBox="0 0 56 56" className="absolute inset-0 w-full h-full">
+          {/* Внешнее тонкое кольцо */}
+          <circle cx="28" cy="28" r="26" fill="none" stroke="#445CFF" strokeWidth="1.5" opacity="0.55" />
+          {/* Внутренний slight glow */}
+          <circle cx="28" cy="28" r="22" fill="rgba(68,92,255,0.06)" />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span
+            className="font-overpass"
+            style={{
+              color: hasValue ? '#F9F8FE' : '#AEABBB',
+              fontWeight: 900,
+              fontSize: hasValue ? 15 : 18,
+              lineHeight: '100%',
+            }}
+          >
+            {display}
+          </span>
+          {gain && gain > 0 && (
+            <span
+              className="font-overpass"
+              style={{
+                color: '#A1FF4A',
+                fontWeight: 700,
+                fontSize: 9,
+                marginTop: 2,
+              }}
+            >
+              +{gain.toFixed(1)}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PotentialSection({
+  ratingEndurance,
+  ratingTechnique,
+  ratingPower,
+  ratingSpeed,
+  ratingFlexibility,
+  potential,
+  gains,
+}: PotentialSectionProps) {
+  const p = potential || 0;
+  const ringColor = potentialColor(p);
+
+  // Большое кольцо
+  const RING_SIZE = 144;
+  const RING_RADIUS = 65;
+  const RING_CIRC = 2 * Math.PI * RING_RADIUS;
+
+  // Декоративные точки по периметру (12 шт.) — тёмно-зелёные, разные оттенки
+  const DOT_COUNT = 12;
+  const dots = Array.from({ length: DOT_COUNT }, (_, i) => {
+    const angle = (i / DOT_COUNT) * 2 * Math.PI - Math.PI / 2; // старт сверху
+    const x = RING_SIZE / 2 + RING_RADIUS * Math.cos(angle);
+    const y = RING_SIZE / 2 + RING_RADIUS * Math.sin(angle);
+    return { x, y, key: i };
+  });
+
+  // Порядок согласно Figma: Выносливость, Техника, Сила, Скорость, Гибкость
+  const rows: CharRowProps[] = [
+    { label: 'выносливость', value: ratingEndurance, gain: gains?.endurance, lineWidth: 28 },
+    { label: 'техника', value: ratingTechnique, gain: gains?.technique, lineWidth: 64 },
+    { label: 'сила', value: ratingPower, gain: gains?.power, lineWidth: 88 },
+    { label: 'скорость', value: ratingSpeed, gain: gains?.speed, lineWidth: 60 },
+    { label: 'гибкость', value: ratingFlexibility, gain: gains?.flexibility, lineWidth: 70 },
+  ];
+
+  return (
+    <div
+      className="relative overflow-hidden"
+      style={{
+        backgroundColor: '#060919',
+        borderRadius: 12,
+        padding: '18px 16px',
+      }}
+    >
+      <div className="flex items-stretch gap-2">
+        {/* Левая колонка — 5 характеристик */}
+        <div className="flex-1 flex flex-col justify-between" style={{ minHeight: RING_SIZE + 32, gap: 10 }}>
+          {rows.map((r) => (
+            <CharRow key={r.label} {...r} />
+          ))}
+        </div>
+
+        {/* Правая часть — большое кольцо */}
+        <div className="relative flex-shrink-0 self-center" style={{ width: RING_SIZE, height: RING_SIZE }}>
+          <svg
+            viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
+            className="absolute inset-0 w-full h-full"
+            style={{ transform: 'rotate(-90deg)' }}
+          >
+            {/* Базовое тёмное кольцо */}
+            <circle
+              cx={RING_SIZE / 2}
+              cy={RING_SIZE / 2}
+              r={RING_RADIUS}
+              fill="none"
+              stroke="#1F2540"
+              strokeWidth="6"
+            />
+            {/* Полоса заполнения */}
+            <circle
+              cx={RING_SIZE / 2}
+              cy={RING_SIZE / 2}
+              r={RING_RADIUS}
+              fill="none"
+              stroke={ringColor}
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeDasharray={`${(p / 100) * RING_CIRC} ${RING_CIRC}`}
+              style={{ transition: 'stroke-dasharray 0.6s ease, stroke 0.6s ease' }}
+            />
+          </svg>
+
+          {/* Декоративные точки */}
+          <svg
+            viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
+            className="absolute inset-0 w-full h-full pointer-events-none"
+          >
+            {dots.map((d) => (
+              <circle
+                key={d.key}
+                cx={d.x}
+                cy={d.y}
+                r={2}
+                fill="#A1FF4A"
+                opacity={0.7}
+              />
+            ))}
+          </svg>
+
+          {/* Внутренний контент */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <div
+              className="font-overpass"
+              style={{
+                color: ringColor,
+                fontWeight: 900,
+                fontSize: 42,
+                lineHeight: '100%',
+                transition: 'color 0.6s ease',
+              }}
+            >
+              {p > 0 ? p.toFixed(1) : '–'}
+            </div>
+            <div
+              className="font-overpass uppercase italic mt-1 text-center"
+              style={{
+                color: '#AEABBB',
+                fontWeight: 800,
+                fontSize: 11,
+                letterSpacing: '0.5px',
+                lineHeight: '100%',
+              }}
+            >
+              общий
+              <br />
+              потенциал
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+// ======================== /PotentialSection ========================
+
 const ProfilePage = () => {
   const router = useRouter();
   const { user } = useTelegram();
@@ -244,265 +497,23 @@ const ProfilePage = () => {
           </div>
         </div>
 
-        {/* Секция потенциала */}
+        {/* Секция потенциала — pure CSS/SVG, повторяет дизайн из Figma */}
         <div className="mb-6">
-          <div className="bg-[#060919] rounded-lg p-4 relative overflow-hidden">
-            <div className="flex items-center justify-between">
-              {/* Левая часть - характеристики */}
-              <div className="flex-1 space-y-3">
-                {/* Выносливость */}
-                <div className="flex items-center">
-                  <div className="pr-1 text-white text-xs font-bold font-overpass uppercase leading-[100%] tracking-[0.5px]">
-                    выносливость
-                  </div>
-                  <Image 
-                    src="/icons/Line - 1.svg"
-                    alt=""
-                    width={40}
-                    height={20}
-                    className="flex-shrink-0"
-                  />
-                  <div className="relative w-14 h-14 flex-shrink-0">
-                    <Image 
-                      src="/icons/Ellipse-care.svg"
-                      alt=""
-                      width={56}
-                      height={56}
-                      className="absolute inset-0"
-                    />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-[#445CFF] text-sm font-black font-overpass">
-                        {userProfile?.profile?.ratingEndurance?.toFixed(1) || '99'}
-                      </span>
-                      {recentGains?.gainEndurance > 0 && (
-                        <span className="text-green-400 text-[9px] font-semibold">
-                          +{recentGains.gainEndurance.toFixed(1)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Гибкость */}
-                <div className="flex items-center">
-                  <div className="pr-1 text-white text-xs font-bold font-overpass uppercase leading-[100%] tracking-[0.5px]">
-                    гибкость
-                  </div>
-                  <Image 
-                    src="/icons/Line - 2.svg"
-                    alt=""
-                    width={52}
-                    height={20}
-                    className="flex-shrink-0"
-                  />
-                  <div className="relative w-14 h-14 flex-shrink-0">
-                    <Image 
-                      src="/icons/Ellipse-care.svg"
-                      alt=""
-                      width={56}
-                      height={56}
-                      className="absolute inset-0"
-                    />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-[#445CFF] text-sm font-black font-overpass">
-                        {userProfile?.profile?.ratingFlexibility?.toFixed(1) || '99'}
-                      </span>
-                      {recentGains?.gainFlexibility > 0 && (
-                        <span className="text-green-400 text-[9px] font-semibold">
-                          +{recentGains.gainFlexibility.toFixed(1)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Сила */}
-                <div className="flex items-center">
-                  <div className="pr-1 text-white text-xs font-bold font-overpass uppercase leading-[100%] tracking-[0.5px]">
-                    сила
-                  </div>
-                  <Image 
-                    src="/icons/Line - 3.svg"
-                    alt=""
-                    width={51}
-                    height={20}
-                    className="flex-shrink-0"
-                  />
-                  <div className="relative w-14 h-14 flex-shrink-0">
-                    <Image 
-                      src="/icons/Ellipse-care.svg"
-                      alt=""
-                      width={56}
-                      height={56}
-                      className="absolute inset-0"
-                    />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-[#445CFF] text-sm font-black font-overpass">
-                        {userProfile?.profile?.ratingPower?.toFixed(1) || '99'}
-                      </span>
-                      {recentGains?.gainPower > 0 && (
-                        <span className="text-green-400 text-[9px] font-semibold">
-                          +{recentGains.gainPower.toFixed(1)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Техника */}
-                <div className="flex items-center">
-                  <div className="pr-1 text-white text-xs font-bold font-overpass uppercase leading-[100%] tracking-[0.5px]">
-                    техника
-                  </div>
-                  <Image 
-                    src="/icons/Line - 4.svg"
-                    alt=""
-                    width={56}
-                    height={20}
-                    className="flex-shrink-0"
-                  />
-                  <div className="relative w-14 h-14 flex-shrink-0">
-                    <Image 
-                      src="/icons/Ellipse-care.svg"
-                      alt=""
-                      width={56}
-                      height={56}
-                      className="absolute inset-0"
-                    />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-[#445CFF] text-sm font-black font-overpass">
-                        {userProfile?.profile?.ratingTechnique?.toFixed(1) || '99'}
-                      </span>
-                      {recentGains?.gainTechnique > 0 && (
-                        <span className="text-green-400 text-[9px] font-semibold">
-                          +{recentGains.gainTechnique.toFixed(1)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Скорость */}
-                <div className="flex items-center">
-                  <div className="pr-1 text-white text-xs font-bold font-overpass uppercase leading-[100%] tracking-[0.5px]">
-                    скорость
-                  </div>
-                  <Image 
-                    src="/icons/Line - 5.svg"
-                    alt=""
-                    width={80}
-                    height={20}
-                    className="flex-shrink-0"
-                  />
-                  <div className="relative w-14 h-14 flex-shrink-0">
-                    <Image 
-                      src="/icons/Ellipse-care.svg"
-                      alt=""
-                      width={56}
-                      height={56}
-                      className="absolute inset-0"
-                    />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-[#445CFF] text-sm font-black font-overpass">
-                        {userProfile?.profile?.ratingSpeed?.toFixed(1) || '99'}
-                      </span>
-                      {recentGains?.gainSpeed > 0 && (
-                        <span className="text-green-400 text-[9px] font-semibold">
-                          +{recentGains.gainSpeed.toFixed(1)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Правая часть - общий потенциал */}
-              <div className="relative flex-shrink-0">
-                {/* Большой круг */}
-                <div className="relative w-36 h-36">
-                  {/* Цвет кольца: 0-20→#FF8C4A, 21-50→#FF8C4A→#FFC94A, 50-70→#FFC94A→#a1ff4a, 70+→#a1ff4a */}
-                  {(() => {
-                    const p = userProfile?.profile?.potential || 0;
-                    // #FF8C4A = rgb(255,140,74)
-                    // #FFC94A = rgb(255,201,74)
-                    // #a1ff4a = rgb(161,255,74)
-                    let ringColor: string;
-                    if (p <= 20) {
-                      ringColor = '#FF8C4A';
-                    } else if (p <= 50) {
-                      // #FF8C4A → #FFC94A: r фиксирован 255, g 140→201, b 74→74 (не меняется)
-                      const t = (p - 20) / 30;
-                      const g = Math.round(140 + (201 - 140) * t);
-                      ringColor = `rgb(255,${g},74)`;
-                    } else if (p < 70) {
-                      // #FFC94A → #a1ff4a: r 255→161, g 201→255, b 74→74
-                      const t = (p - 50) / 20;
-                      const r = Math.round(255 + (161 - 255) * t);
-                      const g = Math.round(201 + (255 - 201) * t);
-                      ringColor = `rgb(${r},${g},74)`;
-                    } else {
-                      ringColor = '#a1ff4a';
-                    }
-                    return (
-                      <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 144 144">
-                        <circle
-                          cx="72"
-                          cy="72"
-                          r="65"
-                          fill="none"
-                          stroke="#445CFF"
-                          strokeWidth="2"
-                          opacity="0.2"
-                        />
-                        <circle
-                          cx="72"
-                          cy="72"
-                          r="65"
-                          fill="none"
-                          stroke={ringColor}
-                          strokeWidth="4"
-                          strokeLinecap="round"
-                          strokeDasharray={`${p * 4.08} 1000`}
-                          style={{ transition: 'stroke-dasharray 0.6s ease, stroke 0.6s ease' }}
-                        />
-                      </svg>
-                    );
-                  })()}
-                  
-                  {/* Внутренний контент */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <div
-                      className="text-[42px] font-black font-overpass leading-none"
-                      style={{
-                        color: (() => {
-                          const p = userProfile?.profile?.potential || 0;
-                          if (p <= 20) return '#FF8C4A';
-                          if (p <= 50) {
-                            const t = (p - 20) / 30;
-                            const g = Math.round(140 + (201 - 140) * t);
-                            return `rgb(255,${g},74)`;
-                          }
-                          if (p < 70) {
-                            const t = (p - 50) / 20;
-                            const r = Math.round(255 + (161 - 255) * t);
-                            const g = Math.round(201 + (255 - 201) * t);
-                            return `rgb(${r},${g},74)`;
-                          }
-                          return '#a1ff4a';
-                        })(),
-                        transition: 'color 0.6s ease',
-                      }}
-                    >
-                      {userProfile?.profile?.potential?.toFixed(1) || '99'}
-                    </div>
-                    <div className="text-[#AEABBB] text-xs font-extrabold font-overpass uppercase mt-1 text-center leading-[100%] tracking-[0.5px] italic">
-                      общий<br/>потенциал
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <PotentialSection
+            ratingEndurance={userProfile?.profile?.ratingEndurance}
+            ratingTechnique={userProfile?.profile?.ratingTechnique}
+            ratingPower={userProfile?.profile?.ratingPower}
+            ratingSpeed={userProfile?.profile?.ratingSpeed}
+            ratingFlexibility={userProfile?.profile?.ratingFlexibility}
+            potential={userProfile?.profile?.potential}
+            gains={{
+              endurance: recentGains?.gainEndurance,
+              technique: recentGains?.gainTechnique,
+              power: recentGains?.gainPower,
+              speed: recentGains?.gainSpeed,
+              flexibility: recentGains?.gainFlexibility,
+            }}
+          />
         </div>
 
         {/* Кнопка для прохождения опроса потенциала */}
