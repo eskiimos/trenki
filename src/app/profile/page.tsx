@@ -420,32 +420,79 @@ const ProfilePage = () => {
               <div className="relative flex-shrink-0">
                 {/* Большой круг */}
                 <div className="relative w-36 h-36">
-                  {/* Внешнее кольцо с градиентом */}
-                  <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 144 144">
-                    <circle
-                      cx="72"
-                      cy="72"
-                      r="65"
-                      fill="none"
-                      stroke="#445CFF"
-                      strokeWidth="2"
-                      opacity="0.2"
-                    />
-                    <circle
-                      cx="72"
-                      cy="72"
-                      r="65"
-                      fill="none"
-                      stroke="#A1FF4A"
-                      strokeWidth="4"
-                      strokeLinecap="round"
-                      strokeDasharray={`${(userProfile?.profile?.potential || 0) * 4.08} 1000`}
-                    />
-                  </svg>
+                  {/* Цвет кольца: 0-20→#FF8C4A, 21-50→#FF8C4A→#FFC94A, 50-70→#FFC94A→#a1ff4a, 70+→#a1ff4a */}
+                  {(() => {
+                    const p = userProfile?.profile?.potential || 0;
+                    // #FF8C4A = rgb(255,140,74)
+                    // #FFC94A = rgb(255,201,74)
+                    // #a1ff4a = rgb(161,255,74)
+                    let ringColor: string;
+                    if (p <= 20) {
+                      ringColor = '#FF8C4A';
+                    } else if (p <= 50) {
+                      // #FF8C4A → #FFC94A: r фиксирован 255, g 140→201, b 74→74 (не меняется)
+                      const t = (p - 20) / 30;
+                      const g = Math.round(140 + (201 - 140) * t);
+                      ringColor = `rgb(255,${g},74)`;
+                    } else if (p < 70) {
+                      // #FFC94A → #a1ff4a: r 255→161, g 201→255, b 74→74
+                      const t = (p - 50) / 20;
+                      const r = Math.round(255 + (161 - 255) * t);
+                      const g = Math.round(201 + (255 - 201) * t);
+                      ringColor = `rgb(${r},${g},74)`;
+                    } else {
+                      ringColor = '#a1ff4a';
+                    }
+                    return (
+                      <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 144 144">
+                        <circle
+                          cx="72"
+                          cy="72"
+                          r="65"
+                          fill="none"
+                          stroke="#445CFF"
+                          strokeWidth="2"
+                          opacity="0.2"
+                        />
+                        <circle
+                          cx="72"
+                          cy="72"
+                          r="65"
+                          fill="none"
+                          stroke={ringColor}
+                          strokeWidth="4"
+                          strokeLinecap="round"
+                          strokeDasharray={`${p * 4.08} 1000`}
+                          style={{ transition: 'stroke-dasharray 0.6s ease, stroke 0.6s ease' }}
+                        />
+                      </svg>
+                    );
+                  })()}
                   
                   {/* Внутренний контент */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <div className="text-[#A1FF4A] text-[42px] font-black font-overpass leading-none">
+                    <div
+                      className="text-[42px] font-black font-overpass leading-none"
+                      style={{
+                        color: (() => {
+                          const p = userProfile?.profile?.potential || 0;
+                          if (p <= 20) return '#FF8C4A';
+                          if (p <= 50) {
+                            const t = (p - 20) / 30;
+                            const g = Math.round(140 + (201 - 140) * t);
+                            return `rgb(255,${g},74)`;
+                          }
+                          if (p < 70) {
+                            const t = (p - 50) / 20;
+                            const r = Math.round(255 + (161 - 255) * t);
+                            const g = Math.round(201 + (255 - 201) * t);
+                            return `rgb(${r},${g},74)`;
+                          }
+                          return '#a1ff4a';
+                        })(),
+                        transition: 'color 0.6s ease',
+                      }}
+                    >
                       {userProfile?.profile?.potential?.toFixed(1) || '99'}
                     </div>
                     <div className="text-[#AEABBB] text-xs font-extrabold font-overpass uppercase mt-1 text-center leading-[100%] tracking-[0.5px] italic">
