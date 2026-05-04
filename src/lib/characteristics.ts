@@ -135,25 +135,14 @@ export function calculateGain(
  * 
  * @param moduleTags - массив тегов LoadType из всех модулей тренировки
  * @param currentCharacteristics - текущие значения характеристик
- * @param isWarmup - является ли модуль разминкой
+ * @param isWarmupOrCooldown - является ли модуль разминкой или заминкой (x0.5 поинтов)
  * @returns объект с приростами для каждой характеристики
  */
 export function calculateWorkoutGains(
   moduleTags: string[][],
   currentCharacteristics: Record<CharacteristicType, number>,
-  isWarmup: boolean[] = []
+  isWarmupOrCooldown: boolean[] = []
 ): Record<CharacteristicType, number> {
-  // Счетчик вхождений каждого типа нагрузки
-  const tagCounts: Record<string, number> = {};
-  
-  // Подсчитываем вхождения тегов
-  moduleTags.forEach((tags, moduleIndex) => {
-    tags.forEach(tag => {
-      tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-    });
-  });
-  
-  // Временное хранилище для приростов
   const characteristicGains: Record<CharacteristicType, number> = {
     ratingPower: 0,
     ratingSpeed: 0,
@@ -161,30 +150,36 @@ export function calculateWorkoutGains(
     ratingTechnique: 0,
     ratingFlexibility: 0,
   };
-  
-  // Обрабатываем каждый тег
-  Object.entries(tagCounts).forEach(([loadType, count]) => {
-    const gains = LOAD_TYPE_TO_CHARACTERISTICS[loadType];
-    
-    if (gains) {
-      gains.forEach(({ characteristic, multiplier }) => {
-        const currentValue = currentCharacteristics[characteristic];
-        const singleGain = calculateGain(currentValue, BASE_GAIN, multiplier);
-        
-        // Умножаем на количество модулей с этим тегом
-        const totalGain = singleGain * count;
-        
-        characteristicGains[characteristic] += totalGain;
-      });
-    }
+
+  // Обрабатываем каждый модуль отдельно, чтобы учитывать moduleMultiplier
+  moduleTags.forEach((tags, moduleIndex) => {
+    // Разминка и заминка дают половину поинтов
+    const moduleMultiplier = isWarmupOrCooldown[moduleIndex] ? 0.5 : 1;
+
+    // Считаем вхождения тегов внутри модуля
+    const tagCounts: Record<string, number> = {};
+    tags.forEach(tag => {
+      tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+    });
+
+    Object.entries(tagCounts).forEach(([loadType, count]) => {
+      const gains = LOAD_TYPE_TO_CHARACTERISTICS[loadType];
+      if (gains) {
+        gains.forEach(({ characteristic, multiplier }) => {
+          const currentValue = currentCharacteristics[characteristic];
+          const singleGain = calculateGain(currentValue, BASE_GAIN * moduleMultiplier, multiplier);
+          characteristicGains[characteristic] += singleGain * count;
+        });
+      }
+    });
   });
-  
+
   // Округляем до 4 знаков после запятой
   Object.keys(characteristicGains).forEach(key => {
     const charKey = key as CharacteristicType;
     characteristicGains[charKey] = parseFloat(characteristicGains[charKey].toFixed(4));
   });
-  
+
   return characteristicGains;
 }
 

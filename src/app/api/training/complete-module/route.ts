@@ -80,10 +80,14 @@ export async function POST(request: NextRequest) {
       ratingFlexibility: user.profile.ratingFlexibility,
     };
 
+    // Флаг разминки/заминки — дают x0.5 поинтов
+    const isWarmupOrCooldown = video.moduleType === 'WARMUP' || video.moduleType === 'COOLDOWN';
+
     // Рассчитываем прирост за один модуль
     const gains = calculateWorkoutGains(
       [loadTypeTags], // массив массивов тегов (один модуль)
-      currentCharacteristics
+      currentCharacteristics,
+      [isWarmupOrCooldown]
     );
 
     console.log('📈 Calculated gains:', gains);

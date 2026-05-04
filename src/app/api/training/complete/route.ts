@@ -99,10 +99,17 @@ export async function POST(request: NextRequest) {
         .map(vt => vt.tag.loadType as string);
     });
 
+    // Флаги разминки/заминки — дают x0.5 поинтов
+    const isWarmupOrCooldown = session.videos.map(wsVideo => {
+      const mt = wsVideo.video.moduleType;
+      return mt === 'WARMUP' || mt === 'COOLDOWN';
+    });
+
     console.log('🎯 Workout completed - calculating progress:', {
       sessionId,
       modulesCount: moduleTags.length,
       moduleTags,
+      isWarmupOrCooldown,
     });
 
     // Текущие характеристики
@@ -115,7 +122,7 @@ export async function POST(request: NextRequest) {
     };
 
     // Рассчитываем прирост за всю тренировку
-    const gains = calculateWorkoutGains(moduleTags, currentCharacteristics);
+    const gains = calculateWorkoutGains(moduleTags, currentCharacteristics, isWarmupOrCooldown);
 
     console.log('📈 Total workout gains:', gains);
 
