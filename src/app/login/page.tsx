@@ -220,9 +220,11 @@ export default function LoginPage() {
       <div className="mt-8 text-center">
         <p className="text-gray-500 text-xs max-w-md">
           Нажимая кнопку входа, вы соглашаетесь с{' '}
-          <a href="/terms" className="text-[#A1FF4A] hover:underline">условиями использования</a>
+          <a href="/legal/offer" className="text-[#A1FF4A] hover:underline">публичной офертой</a>
+          ,{' '}
+          <a href="/legal/terms" className="text-[#A1FF4A] hover:underline">пользовательским соглашением</a>
           {' '}и{' '}
-          <a href="/privacy" className="text-[#A1FF4A] hover:underline">политикой конфиденциальности</a>
+          <a href="/legal/privacy" className="text-[#A1FF4A] hover:underline">политикой конфиденциальности</a>
         </p>
       </div>
     </div>
