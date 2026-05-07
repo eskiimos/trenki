@@ -462,14 +462,14 @@ export const GOAL_LABELS: Record<string, { emoji: string; label: string; descrip
 export const ENERGY_STATE_LABELS: Record<string, { emoji: string; label: string }> = {
   'FULLY_CHARGED': {
     emoji: '🔋',
-    label: 'Заряжен на все 100%',
+    label: 'Заряжен',
   },
   'IN_TONE': {
     emoji: '⚡️',
-    label: 'В тонусе, но не супер',
+    label: 'В тонусе',
   },
   'TIRED': {
     emoji: '😴',
-    label: 'Устал / восстанавливаюсь',
+    label: 'Устал',
   },
 };

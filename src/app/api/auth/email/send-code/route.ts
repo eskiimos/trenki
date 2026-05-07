@@ -28,6 +28,21 @@ export async function POST(request: NextRequest) {
     // Создаём новый OTP
     await prisma.emailOtp.create({ data: { email, code, expiresAt } });
 
+    // 🔧 DEV MODE: если нет RESEND_API_KEY или мы не в production —
+    // не пытаемся слать письмо, а просто отдаём код в ответе и пишем в консоль.
+    // Это позволяет логиниться локально без настройки Resend.
+    const isDevBypass =
+      process.env.NODE_ENV !== 'production' || !process.env.RESEND_API_KEY;
+
+    if (isDevBypass) {
+      console.log('\n========================================');
+      console.log('🔧 DEV LOGIN CODE');
+      console.log(`   email: ${email}`);
+      console.log(`   code:  ${code}`);
+      console.log('========================================\n');
+      return NextResponse.json({ success: true, devCode: code });
+    }
+
     // Отправляем письмо
     const result = await sendEmail({
       to: email,

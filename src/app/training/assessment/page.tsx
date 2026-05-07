@@ -8,6 +8,16 @@ import { GOAL_LABELS, ENERGY_STATE_LABELS } from '@/lib/training-algorithm-v3';
 
 const trainingGoals = Object.values(TrainingGoal) as TrainingGoal[];
 
+const GOAL_ICONS: Record<string, string> = {
+  POWERFUL_SHOT:       'A_powerful_throw.svg',
+  OUTRUN_OPPONENT:     'Running_away_from_the_opponent.svg',
+  STRENGTH_STABILITY:  'Power_struggle_and_resilience.svg',
+  SOFT_HANDS:          'Soft_handles.svg',
+  FULL_GAME_ENDURANCE: 'Endurance_for_the_whole_game.svg',
+  AGILITY:             'maneuverability.svg',
+  SPORT_LONGEVITY:     'athletic_longevity.svg',
+};
+
 type EnergyStateValue = 'FULLY_CHARGED' | 'IN_TONE' | 'TIRED';
 
 const energyStates: EnergyStateValue[] = ['FULLY_CHARGED', 'IN_TONE', 'TIRED'];
@@ -103,15 +113,26 @@ export default function TrainingAssessmentPage() {
     }
   };
 
-  const [showInfoBlock, setShowInfoBlock] = useState(true);
+  const [showInfoBlock, setShowInfoBlock] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+
+  // Читаем из localStorage после монтирования
+  useEffect(() => {
+    const dismissed = localStorage.getItem('assessment_info_dismissed');
+    if (!dismissed) setShowInfoBlock(true);
+  }, []);
 
   const handleCloseInfo = () => {
     setIsClosing(true);
     setTimeout(() => {
       setShowInfoBlock(false);
       setIsClosing(false);
+      localStorage.setItem('assessment_info_dismissed', '1');
     }, 300);
+  };
+
+  const handleOpenInfo = () => {
+    setShowInfoBlock(true);
   };
 
   return (
@@ -128,10 +149,37 @@ export default function TrainingAssessmentPage() {
           lineHeight: '120%',
           letterSpacing: '0.5px',
           textTransform: 'uppercase',
-          color: '#F9F8FE'
+          color: '#F9F8FE',
+          flex: 1
         }}>
           ПЕРСОНАЛЬНАЯ ТРЕНИРОВКА
         </h1>
+        {/* Кнопка "i" — показывается когда блок скрыт */}
+        {!showInfoBlock && (
+          <button
+            onClick={handleOpenInfo}
+            style={{
+              width: '24px',
+              height: '24px',
+              borderRadius: '50%',
+              border: '1.5px solid rgba(255,255,255,0.4)',
+              background: 'transparent',
+              color: '#F9F8FE',
+              fontFamily: 'Overpass',
+              fontWeight: 700,
+              fontSize: '13px',
+              lineHeight: 1,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+            aria-label="Показать подсказку"
+          >
+            i
+          </button>
+        )}
       </div>
 
       {/* Информационный блок */}
@@ -213,34 +261,43 @@ export default function TrainingAssessmentPage() {
                 const info = GOAL_LABELS[goal];
                 if (!info) return null;
                 const isSelected = formData.goal === goal;
+                const iconFile = GOAL_ICONS[goal];
                 return (
-                  <button
-                    key={goal}
-                    onClick={() => setFormData({ ...formData, goal })}
-                    className="transition-all duration-200 hover:scale-105"
-                    style={{
-                      height: '44px',
-                      paddingTop: '12px',
-                      paddingRight: '16px',
-                      paddingBottom: '12px',
-                      paddingLeft: '16px',
-                      borderRadius: '32px',
-                      backgroundColor: isSelected ? '#A1FF4A' : '#AEABBB33',
-                      color: isSelected ? '#060919' : '#F9F8FE',
-                      fontFamily: 'Overpass',
-                      fontWeight: 700,
-                      fontSize: '14px',
-                      lineHeight: '120%',
-                      letterSpacing: '0.5px',
-                      textAlign: 'center',
-                      opacity: 1,
-                      whiteSpace: 'nowrap',
-                      border: 'none',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {info.emoji} {info.label}
-                  </button>
+                  <div key={goal} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {iconFile && (
+                      <img
+                        src={`/images/AI_t/${iconFile}`}
+                        alt=""
+                        style={{ height: '44px', width: 'auto', display: 'block' }}
+                      />
+                    )}
+                    <button
+                      onClick={() => setFormData({ ...formData, goal })}
+                      className="transition-all duration-200 hover:scale-105"
+                      style={{
+                        height: '44px',
+                        paddingTop: '12px',
+                        paddingRight: '16px',
+                        paddingBottom: '12px',
+                        paddingLeft: '16px',
+                        borderRadius: '32px',
+                        backgroundColor: isSelected ? '#A1FF4A' : '#AEABBB33',
+                        color: isSelected ? '#060919' : '#F9F8FE',
+                        fontFamily: 'Overpass',
+                        fontWeight: 700,
+                        fontSize: '14px',
+                        lineHeight: '120%',
+                        letterSpacing: '0.5px',
+                        textAlign: 'center',
+                        opacity: 1,
+                        whiteSpace: 'nowrap',
+                        border: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {info.label}
+                    </button>
+                  </div>
                 );
               })}
             </div>
@@ -259,7 +316,7 @@ export default function TrainingAssessmentPage() {
             }}>
               твое состояние
             </h2>
-            <div className="space-y-3">
+            <div style={{ display: 'flex', gap: '12px' }}>
               {energyStates.map((state) => {
                 const info = ENERGY_STATE_LABELS[state];
                 if (!info) return null;
@@ -268,11 +325,12 @@ export default function TrainingAssessmentPage() {
                   <button
                     key={state}
                     onClick={() => setFormData({ ...formData, energyState: state })}
-                    className="w-full transition-all duration-200 hover:scale-[1.02]"
+                    className="transition-all duration-200 hover:scale-105"
                     style={{
-                      height: '56px',
-                      padding: '16px',
-                      borderRadius: '12px',
+                      flex: 1,
+                      height: '44px',
+                      padding: '12px 16px',
+                      borderRadius: '32px',
                       backgroundColor: isSelected ? '#A1FF4A' : '#AEABBB33',
                       color: isSelected ? '#060919' : '#F9F8FE',
                       fontFamily: 'Overpass',
@@ -280,16 +338,13 @@ export default function TrainingAssessmentPage() {
                       fontSize: '14px',
                       lineHeight: '120%',
                       letterSpacing: '0.5px',
-                      textAlign: 'left',
+                      textAlign: 'center',
                       border: 'none',
                       cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px'
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    <span style={{ fontSize: '20px' }}>{info.emoji}</span>
-                    <span>{info.label}</span>
+                    {info.label}
                   </button>
                 );
               })}

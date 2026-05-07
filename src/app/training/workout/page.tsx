@@ -64,8 +64,14 @@ export default function WorkoutPage() {
   
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [showInfoBlock, setShowInfoBlock] = useState(true);
+  const [showInfoBlock, setShowInfoBlock] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+
+  // Читаем из localStorage после монтирования
+  useEffect(() => {
+    const dismissed = localStorage.getItem('workout_info_dismissed');
+    if (!dismissed) setShowInfoBlock(true);
+  }, []);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   
   // Состояние для модалки прироста характеристик
@@ -173,7 +179,12 @@ export default function WorkoutPage() {
     setTimeout(() => {
       setShowInfoBlock(false);
       setIsClosing(false);
+      localStorage.setItem('workout_info_dismissed', '1');
     }, 300);
+  };
+
+  const handleOpenInfo = () => {
+    setShowInfoBlock(true);
   };
 
   const startOrContinueWorkout = () => {
@@ -472,10 +483,36 @@ export default function WorkoutPage() {
           lineHeight: '120%',
           letterSpacing: '0.5px',
           textTransform: 'uppercase',
-          color: '#F9F8FE'
+          color: '#F9F8FE',
+          flex: 1
         }}>
           ПЕРСОНАЛЬНАЯ ТРЕНИРОВКА
         </h1>
+        {!showInfoBlock && (
+          <button
+            onClick={handleOpenInfo}
+            style={{
+              width: '24px',
+              height: '24px',
+              borderRadius: '50%',
+              border: '1.5px solid rgba(255,255,255,0.4)',
+              background: 'transparent',
+              color: '#F9F8FE',
+              fontFamily: 'Overpass',
+              fontWeight: 700,
+              fontSize: '13px',
+              lineHeight: 1,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+            aria-label="Показать подсказку"
+          >
+            i
+          </button>
+        )}
       </div>
 
       {/* Информационный блок */}

@@ -35,6 +35,11 @@ function EmailLoginForm() {
         setError(data.error || 'Ошибка отправки');
         return;
       }
+      // 🔧 DEV MODE: сервер вернул код напрямую (нет Resend) — подставим его сразу
+      if (data.devCode) {
+        setCode(data.devCode);
+        console.log('🔧 DEV LOGIN CODE:', data.devCode);
+      }
       setStep('code');
       setCountdown(60);
     } catch {
