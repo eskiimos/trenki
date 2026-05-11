@@ -69,7 +69,7 @@ function EmailLoginForm() {
         lastName: data.user.lastName,
         username: data.user.username,
       });
-      window.location.href = data.needsOnboarding ? '/onboarding' : '/';
+      window.location.href = data.needsOnboarding ? '/onboarding/welcome' : '/';
     } catch {
       setError('Сетевая ошибка. Проверьте подключение.');
     } finally {

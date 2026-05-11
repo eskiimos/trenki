@@ -55,18 +55,22 @@ interface CharRowProps {
   label: string;
   value?: number;
   gain?: number;
-  /** длина соединительной линии (px) */
-  lineWidth: number;
+  /** отступ справа — круг сдвигается влево, линия становится короче */
+  insetRight: number;
 }
 
-function CharRow({ label, value, gain, lineWidth }: CharRowProps) {
+function CharRow({ label, value, gain, insetRight }: CharRowProps) {
   const hasValue = typeof value === 'number' && !Number.isNaN(value) && value > 0;
   const display = hasValue ? value!.toFixed(1) : '–';
+  const hasGain = typeof gain === 'number' && !Number.isNaN(gain) && gain > 0;
 
   return (
-    <div className="flex items-center">
+    <div
+      className="flex items-center"
+      style={{ paddingRight: insetRight }}
+    >
       <div
-        className="text-white uppercase select-none"
+        className="text-white uppercase select-none shrink-0"
         style={{
           fontFamily: 'Overpass, sans-serif',
           fontWeight: 800,
@@ -78,51 +82,52 @@ function CharRow({ label, value, gain, lineWidth }: CharRowProps) {
         {label}
       </div>
 
-      {/* Соединительная линия */}
+      {/* Соединительная линия — растягивается на оставшееся место */}
       <div
         style={{
-          width: lineWidth,
+          flex: 1,
+          minWidth: 8,
           height: 1,
           background: 'linear-gradient(90deg, rgba(68,92,255,0) 0%, rgba(68,92,255,0.5) 50%, rgba(68,92,255,0.9) 100%)',
           marginLeft: 6,
           marginRight: -1,
-          flexShrink: 0,
         }}
       />
 
       {/* Маленький круг с числом */}
-      <div className="relative flex-shrink-0" style={{ width: 56, height: 56 }}>
+      <div className="relative shrink-0" style={{ width: 56, height: 56, zIndex: 2 }}>
         <svg viewBox="0 0 56 56" className="absolute inset-0 w-full h-full">
           {/* Внешнее тонкое кольцо */}
-          <circle cx="28" cy="28" r="26" fill="none" stroke="#445CFF" strokeWidth="1.5" opacity="0.55" />
+          <circle cx="28" cy="28" r="26" fill="none" stroke="#445CFF" strokeWidth="1.5" opacity="0.7" />
           {/* Внутренний slight glow */}
           <circle cx="28" cy="28" r="22" fill="rgba(68,92,255,0.06)" />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span
-            className="font-overpass"
-            style={{
-              color: hasValue ? '#F9F8FE' : '#AEABBB',
-              fontWeight: 900,
-              fontSize: hasValue ? 15 : 18,
-              lineHeight: '100%',
-            }}
-          >
-            {display}
-          </span>
-          {gain && gain > 0 && (
+          {hasGain && (
             <span
               className="font-overpass"
               style={{
                 color: '#A1FF4A',
                 fontWeight: 700,
                 fontSize: 9,
-                marginTop: 2,
+                lineHeight: '100%',
+                marginBottom: 1,
               }}
             >
-              +{gain.toFixed(1)}
+              +{gain!.toFixed(1)}
             </span>
           )}
+          <span
+            className="font-overpass"
+            style={{
+              color: hasValue ? '#445CFF' : '#AEABBB',
+              fontWeight: 900,
+              fontSize: hasValue ? 16 : 18,
+              lineHeight: '100%',
+            }}
+          >
+            {display}
+          </span>
         </div>
       </div>
     </div>
@@ -156,17 +161,19 @@ function PotentialSection({
   });
 
   // Порядок согласно Figma: Выносливость, Техника, Сила, Скорость, Гибкость
+  // insetRight: дуга, выгнутая ВЛЕВО (как ")"). Сила в центре имеет
+  // самую короткую линию (круг ближе к лейблу), крайние строки — длиннее.
   const rows: CharRowProps[] = [
-    { label: 'выносливость', value: ratingEndurance, gain: gains?.endurance, lineWidth: 28 },
-    { label: 'техника', value: ratingTechnique, gain: gains?.technique, lineWidth: 64 },
-    { label: 'сила', value: ratingPower, gain: gains?.power, lineWidth: 88 },
-    { label: 'скорость', value: ratingSpeed, gain: gains?.speed, lineWidth: 60 },
-    { label: 'гибкость', value: ratingFlexibility, gain: gains?.flexibility, lineWidth: 70 },
+    { label: 'выносливость', value: ratingEndurance,   gain: gains?.endurance,   insetRight: 0  },
+    { label: 'техника',      value: ratingTechnique,   gain: gains?.technique,   insetRight: 24 },
+    { label: 'сила',         value: ratingPower,       gain: gains?.power,       insetRight: 40 },
+    { label: 'скорость',     value: ratingSpeed,       gain: gains?.speed,       insetRight: 24 },
+    { label: 'гибкость',     value: ratingFlexibility, gain: gains?.flexibility, insetRight: 0  },
   ];
 
   return (
     <div
-      className="relative overflow-hidden"
+      className="relative"
       style={{
         backgroundColor: '#060919',
         borderRadius: 12,
@@ -182,7 +189,7 @@ function PotentialSection({
         </div>
 
         {/* Правая часть — большое кольцо */}
-        <div className="relative flex-shrink-0 self-center" style={{ width: RING_SIZE, height: RING_SIZE }}>
+        <div className="relative shrink-0 self-center" style={{ width: RING_SIZE, height: RING_SIZE, zIndex: 1 }}>
           <svg
             viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
             className="absolute inset-0 w-full h-full"
@@ -245,11 +252,11 @@ function PotentialSection({
             <div
               className="font-overpass uppercase italic mt-1 text-center"
               style={{
-                color: '#AEABBB',
+                color: '#F9F8FE',
                 fontWeight: 800,
                 fontSize: 11,
                 letterSpacing: '0.5px',
-                lineHeight: '100%',
+                lineHeight: '110%',
               }}
             >
               общий
