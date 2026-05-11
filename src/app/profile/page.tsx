@@ -148,15 +148,18 @@ function PotentialSection({
 
   // Большое кольцо
   const RING_SIZE = 144;
-  const RING_RADIUS = 65;
+  const RING_RADIUS = 60;          // основное кольцо
+  const RING_INNER_RADIUS = 52;    // декоративное внутреннее
+  const RING_OUTER_RADIUS = 68;    // декоративное внешнее
+  const DOTS_RADIUS = 72;          // радиус, на котором сидят точки
   const RING_CIRC = 2 * Math.PI * RING_RADIUS;
 
-  // Декоративные точки по периметру (12 шт.) — тёмно-зелёные, разные оттенки
-  const DOT_COUNT = 12;
+  // 10 точек — делят круг на 10 секторов (каждая = 10 единиц потенциала)
+  const DOT_COUNT = 10;
   const dots = Array.from({ length: DOT_COUNT }, (_, i) => {
     const angle = (i / DOT_COUNT) * 2 * Math.PI - Math.PI / 2; // старт сверху
-    const x = RING_SIZE / 2 + RING_RADIUS * Math.cos(angle);
-    const y = RING_SIZE / 2 + RING_RADIUS * Math.sin(angle);
+    const x = RING_SIZE / 2 + DOTS_RADIUS * Math.cos(angle);
+    const y = RING_SIZE / 2 + DOTS_RADIUS * Math.sin(angle);
     return { x, y, key: i };
   });
 
@@ -195,7 +198,27 @@ function PotentialSection({
             className="absolute inset-0 w-full h-full"
             style={{ transform: 'rotate(-90deg)' }}
           >
-            {/* Базовое тёмное кольцо */}
+            {/* Внешнее декоративное тонкое кольцо */}
+            <circle
+              cx={RING_SIZE / 2}
+              cy={RING_SIZE / 2}
+              r={RING_OUTER_RADIUS}
+              fill="none"
+              stroke={ringColor}
+              strokeWidth="1"
+              opacity="0.35"
+            />
+            {/* Внутреннее декоративное тонкое кольцо */}
+            <circle
+              cx={RING_SIZE / 2}
+              cy={RING_SIZE / 2}
+              r={RING_INNER_RADIUS}
+              fill="none"
+              stroke={ringColor}
+              strokeWidth="1"
+              opacity="0.35"
+            />
+            {/* Базовое тёмное кольцо (фон под прогресс) */}
             <circle
               cx={RING_SIZE / 2}
               cy={RING_SIZE / 2}
@@ -211,14 +234,14 @@ function PotentialSection({
               r={RING_RADIUS}
               fill="none"
               stroke={ringColor}
-              strokeWidth="4"
+              strokeWidth="6"
               strokeLinecap="round"
               strokeDasharray={`${(p / 100) * RING_CIRC} ${RING_CIRC}`}
               style={{ transition: 'stroke-dasharray 0.6s ease, stroke 0.6s ease' }}
             />
           </svg>
 
-          {/* Декоративные точки */}
+          {/* Декоративные точки — 10 шт, делят кольцо на 10 секторов */}
           <svg
             viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
             className="absolute inset-0 w-full h-full pointer-events-none"
@@ -229,8 +252,8 @@ function PotentialSection({
                 cx={d.x}
                 cy={d.y}
                 r={2}
-                fill="#A1FF4A"
-                opacity={0.7}
+                fill={ringColor}
+                opacity={0.55}
               />
             ))}
           </svg>
@@ -242,7 +265,7 @@ function PotentialSection({
               style={{
                 color: ringColor,
                 fontWeight: 900,
-                fontSize: 42,
+                fontSize: 32,
                 lineHeight: '100%',
                 transition: 'color 0.6s ease',
               }}
