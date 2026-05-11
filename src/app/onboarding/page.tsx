@@ -112,7 +112,7 @@ export default function OnboardingProfilePage() {
       <div className="relative z-10 flex-1 flex flex-col justify-between px-6 py-8">
         {/* Кнопка назад */}
         <button
-          onClick={() => router.back()}
+          onClick={() => router.push('/onboarding/welcome')}
           className="self-start mb-4"
         >
           <Image

@@ -29,7 +29,14 @@ export default function OnboardingWelcomePage() {
   return (
     <div className="min-h-screen bg-[#101530] flex flex-col">
       {/* Верхняя часть — фото с заголовком */}
-      <div className="relative w-full" style={{ aspectRatio: '375 / 320', flexShrink: 0 }}>
+      <div
+        className="relative w-full overflow-hidden"
+        style={{
+          aspectRatio: '375 / 320',
+          flexShrink: 0,
+          borderRadius: '0 0 16px 16px',
+        }}
+      >
         <Image
           src="/images/onboarding/1_start.webp"
           alt="Тренировка на льду"
@@ -38,15 +45,8 @@ export default function OnboardingWelcomePage() {
           sizes="100vw"
           style={{ objectFit: 'cover' }}
         />
-        {/* Затемнение снизу для плавного перехода */}
-        <div
-          className="absolute inset-x-0 bottom-0 h-32 pointer-events-none"
-          style={{
-            background: 'linear-gradient(180deg, rgba(16,21,48,0) 0%, #101530 100%)',
-          }}
-        />
-        {/* Логотип */}
-        <div className="absolute inset-0 flex items-end justify-center pb-6">
+        {/* Логотип — по центру картинки */}
+        <div className="absolute inset-0 flex items-center justify-center">
           <h1
             className="font-overpass text-white"
             style={{
