@@ -120,8 +120,6 @@ function EmailLoginForm() {
             </div>
             <span className="text-gray-400 text-xs leading-relaxed">
               Я прочитал(а) и согласен(а) с{' '}
-              <a href="/legal/offer" target="_blank" className="text-[#A1FF4A] hover:underline">публичной офертой</a>
-              {' '}и{' '}
               <a href="/legal/terms" target="_blank" className="text-[#A1FF4A] hover:underline">пользовательским соглашением</a>
             </span>
           </label>
