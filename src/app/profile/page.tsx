@@ -431,7 +431,7 @@ const ProfilePage = () => {
   return (
     <div className="bg-[#101530] min-h-screen text-white">
       {/* Шапка с кнопкой назад */}
-      <div className="flex items-center justify-between p-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
+      <div className="flex items-center justify-between p-4 max-w-3xl md:mx-auto md:px-8" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
         <div className="flex items-center gap-4">
           <Link href="/" className="inline-block">
             <div className="w-8 h-8 flex items-center justify-center">
@@ -460,9 +460,11 @@ const ProfilePage = () => {
       </div>
 
       {/* Основной контент */}
-      <div className="px-4 pb-32">
+      <div className="px-4 pb-32 max-w-3xl md:mx-auto md:px-8">
+        {/* Верхний блок: на планшете аватар и потенциал — в 2 колонки */}
+        <div className="md:grid md:grid-cols-2 md:gap-6 md:items-start">
         {/* Профиль игрока - новый дизайн */}
-        <div className="mb-6">
+        <div className="mb-6 md:mb-0">
           {/* Карточка аватара */}
           <div className="bg-[#060919] rounded-lg overflow-hidden">
             {/* Аватар пользователя */}
@@ -528,7 +530,7 @@ const ProfilePage = () => {
         </div>
 
         {/* Секция потенциала — pure CSS/SVG, повторяет дизайн из Figma */}
-        <div className="mb-6">
+        <div className="mb-6 md:mb-0">
           <PotentialSection
             ratingEndurance={userProfile?.profile?.ratingEndurance}
             ratingTechnique={userProfile?.profile?.ratingTechnique}
@@ -545,6 +547,10 @@ const ProfilePage = () => {
             }}
           />
         </div>
+        </div>
+
+        {/* На планшете возвращаем нижний отступ после двухколоночного блока */}
+        <div className="hidden md:block md:h-6" />
 
         {/* Кнопка для прохождения опроса потенциала */}
         {userProfile?.profile && (userProfile.profile.potential === undefined || userProfile.profile.potential < 10) && (
@@ -665,7 +671,7 @@ const ProfilePage = () => {
           <h2 className="text-white text-sm font-medium font-overpass uppercase tracking-wide mb-4">
             ЧАСТЫЕ ВОПРОСЫ
           </h2>
-          <div className="space-y-2">
+          <div className="space-y-2 md:space-y-0 md:grid md:grid-cols-2 md:gap-3">
             <FAQItem 
               question="Как часто можно тренироваться?" 
               answer="Рекомендуется тренироваться 3-5 раз в неделю с днями отдыха для восстановления. В приложении доступно до 2 тренировок в день."
