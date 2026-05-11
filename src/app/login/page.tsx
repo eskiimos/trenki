@@ -14,6 +14,8 @@ function EmailLoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(0);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -92,6 +94,67 @@ function EmailLoginForm() {
             autoComplete="email"
           />
         </div>
+        {/* Чекбоксы согласия */}
+        <div className="flex flex-col gap-3">
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <div className="relative mt-0.5 shrink-0">
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={e => setAcceptedTerms(e.target.checked)}
+                className="sr-only"
+              />
+              <div
+                className="w-5 h-5 rounded border-2 flex items-center justify-center transition-all"
+                style={{
+                  borderColor: acceptedTerms ? '#A1FF4A' : '#4a4f6a',
+                  backgroundColor: acceptedTerms ? '#A1FF4A' : 'transparent',
+                }}
+              >
+                {acceptedTerms && (
+                  <svg width="11" height="8" viewBox="0 0 11 8" fill="none">
+                    <path d="M1 4L4 7L10 1" stroke="#101530" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </div>
+            </div>
+            <span className="text-gray-400 text-xs leading-relaxed">
+              Я прочитал(а) и согласен(а) с{' '}
+              <a href="/legal/offer" target="_blank" className="text-[#A1FF4A] hover:underline">публичной офертой</a>
+              {' '}и{' '}
+              <a href="/legal/terms" target="_blank" className="text-[#A1FF4A] hover:underline">пользовательским соглашением</a>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <div className="relative mt-0.5 shrink-0">
+              <input
+                type="checkbox"
+                checked={acceptedPrivacy}
+                onChange={e => setAcceptedPrivacy(e.target.checked)}
+                className="sr-only"
+              />
+              <div
+                className="w-5 h-5 rounded border-2 flex items-center justify-center transition-all"
+                style={{
+                  borderColor: acceptedPrivacy ? '#A1FF4A' : '#4a4f6a',
+                  backgroundColor: acceptedPrivacy ? '#A1FF4A' : 'transparent',
+                }}
+              >
+                {acceptedPrivacy && (
+                  <svg width="11" height="8" viewBox="0 0 11 8" fill="none">
+                    <path d="M1 4L4 7L10 1" stroke="#101530" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </div>
+            </div>
+            <span className="text-gray-400 text-xs leading-relaxed">
+              Я даю согласие на обработку персональных данных в соответствии с{' '}
+              <a href="/legal/privacy" target="_blank" className="text-[#A1FF4A] hover:underline">политикой конфиденциальности</a>
+            </span>
+          </label>
+        </div>
+
         {error && (
           <div className="p-3 bg-red-500/20 border border-red-500 rounded-lg">
             <p className="text-red-400 text-sm text-center">{error}</p>
@@ -99,7 +162,7 @@ function EmailLoginForm() {
         )}
         <button
           onClick={handleSendCode}
-          disabled={loading || !email}
+          disabled={loading || !email || !acceptedTerms || !acceptedPrivacy}
           className="w-full bg-[#A1FF4A] hover:bg-[#8fe63a] disabled:bg-gray-600 disabled:cursor-not-allowed text-[#101530] font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all"
         >
           {loading ? (
@@ -216,17 +279,7 @@ export default function LoginPage() {
         <EmailLoginForm />
       </div>
 
-      {/* Нижний текст */}
-      <div className="mt-8 text-center">
-        <p className="text-gray-500 text-xs max-w-md">
-          Нажимая кнопку входа, вы соглашаетесь с{' '}
-          <a href="/legal/offer" className="text-[#A1FF4A] hover:underline">публичной офертой</a>
-          ,{' '}
-          <a href="/legal/terms" className="text-[#A1FF4A] hover:underline">пользовательским соглашением</a>
-          {' '}и{' '}
-          <a href="/legal/privacy" className="text-[#A1FF4A] hover:underline">политикой конфиденциальности</a>
-        </p>
-      </div>
+
     </div>
   );
 }
