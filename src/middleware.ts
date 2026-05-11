@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server';
 // Публичные маршруты, которые доступны без авторизации
 const publicRoutes = [
   '/login',
+  '/legal',
   '/api/auth/create-login-token',
   '/api/auth/check-login-token',
   '/api/auth/email/send-code',
