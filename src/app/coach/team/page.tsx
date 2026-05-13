@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNavigationCoach from '@/components/BottomNavigationCoach';
-import AccountSwitcher from '@/components/AccountSwitcher';
 import { useToast } from '@/lib/coach/use-toast';
 
 type SortKey = 'name' | 'potential' | 'status';
@@ -302,10 +301,6 @@ export default function CoachTeamPage() {
           ))}
         </div>
 
-        {/* Переключатель аккаунтов (виден только когда сохранено >=2 аккаунта) */}
-        <div className="mt-6">
-          <AccountSwitcher />
-        </div>
       </div>
 
       <BottomNavigationCoach activeTab="team" />

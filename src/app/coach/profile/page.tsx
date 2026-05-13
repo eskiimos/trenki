@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNavigationCoach from '@/components/BottomNavigationCoach';
 import { clearAuth } from '@/lib/auth';
+import AccountSwitcher from '@/components/AccountSwitcher';
 
 interface MeData {
   firstName: string;
@@ -52,9 +53,13 @@ export default function CoachProfilePage() {
           <LinkButton label="Задания" onClick={() => router.push('/coach/assignments')} />
         </div>
 
+        <div className="mt-6">
+          <AccountSwitcher />
+        </div>
+
         <button
           onClick={handleLogout}
-          className="w-full font-overpass uppercase mt-6"
+          className="w-full font-overpass uppercase mt-4"
           style={{
             background: 'transparent',
             color: '#F9F8FE',
