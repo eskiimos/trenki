@@ -3,7 +3,82 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAuthenticated, saveAuth } from '@/lib/auth';
-import { isAddingAccount } from '@/lib/multi-account';
+import { isAddingAccount, consumeAddingAccount } from '@/lib/multi-account';
+
+// ─────────────────────────────────────────────
+// Упрощённый вход только по email (для добавления второго аккаунта)
+// ─────────────────────────────────────────────
+function DirectEmailLoginForm() {
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLogin = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/email/direct-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Ошибка входа');
+        return;
+      }
+      consumeAddingAccount();
+      saveAuth({
+        telegramId: data.user.telegramId,
+        firstName: data.user.firstName,
+        lastName: data.user.lastName,
+        username: data.user.username,
+      });
+      window.location.href = data.needsOnboarding ? '/onboarding/role' : '/';
+    } catch {
+      setError('Сетевая ошибка. Проверьте подключение.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <label className="block text-gray-400 text-sm mb-2">Email</label>
+        <input
+          type="email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && !loading && email && handleLogin()}
+          placeholder="example@mail.ru"
+          className="w-full bg-[#0A0E1A] text-white border border-[#2a2f4a] rounded-xl px-4 py-3 focus:outline-none focus:border-[#A1FF4A] transition-colors placeholder-gray-600"
+          autoComplete="email"
+          autoFocus
+        />
+      </div>
+      {error && (
+        <div className="p-3 bg-red-500/20 border border-red-500 rounded-lg">
+          <p className="text-red-400 text-sm text-center">{error}</p>
+        </div>
+      )}
+      <button
+        onClick={handleLogin}
+        disabled={loading || !email}
+        className="w-full bg-[#A1FF4A] hover:bg-[#8fe63a] disabled:bg-gray-600 disabled:cursor-not-allowed text-[#101530] font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all"
+      >
+        {loading ? (
+          <span className="flex items-center gap-2">
+            <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#101530] inline-block"></span>
+            Вход...
+          </span>
+        ) : (
+          'Войти'
+        )}
+      </button>
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────
 // Email-логин: отправка кода и верификация
@@ -251,11 +326,14 @@ function EmailLoginForm() {
 export default function LoginPage() {
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
+  const [addingAccount, setAddingAccount] = useState(false);
 
   useEffect(() => {
+    const adding = isAddingAccount();
+    setAddingAccount(adding);
     // Если пользователь идёт сюда для ДОБАВЛЕНИЯ второго аккаунта (мульти-аккаунт),
-    // не редиректим — даём ему войти под другим Telegram/email.
-    if (isAuthenticated() && !isAddingAccount()) {
+    // не редиректим — даём ему войти под другим email.
+    if (isAuthenticated() && !adding) {
       router.push('/');
       return;
     }
@@ -284,10 +362,10 @@ export default function LoginPage() {
       {/* Основной контейнер */}
       <div className="w-full max-w-md bg-[#1a1f3a] rounded-2xl p-8 shadow-2xl">
         <h2 className="text-white text-2xl font-bold text-center mb-6">
-          Вход через Email
+          {addingAccount ? 'Добавить аккаунт' : 'Вход через Email'}
         </h2>
 
-        <EmailLoginForm />
+        {addingAccount ? <DirectEmailLoginForm /> : <EmailLoginForm />}
       </div>
 
 
