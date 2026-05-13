@@ -5,6 +5,7 @@ import type { NextRequest } from 'next/server';
 const publicRoutes = [
   '/login',
   '/legal',
+  '/join',
   '/api/auth/create-login-token',
   '/api/auth/check-login-token',
   '/api/auth/email/send-code',

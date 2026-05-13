@@ -22,8 +22,10 @@ model User {
   inviteCode    String?           // Код, с которым зарегистрировался пользователь
   ageConsentAt  DateTime?         // Дата и время подтверждения возраста (18+ или законный представитель)
   isAdmin       Boolean           @default(false) // Доступ к админ-панели
+  role          UserRole          @default(ATHLETE) // Роль: спортсмен или тренер
   favorites            FavoriteVideo[]
   profile              Profile?
+  coachProfile         CoachProfile?
   shortComments        ShortComment[]
   shortLikes           ShortLike[]
   sessions             TrainingSession[]
@@ -31,6 +33,10 @@ model User {
   characteristicHistory CharacteristicHistory[]
   scheduledWorkouts    ScheduledWorkout[]
   trainerReviews       TrainerReview[]
+  coachTeams           Team[]                @relation("CoachTeams")
+  teamMemberships      TeamMember[]
+  coachAssignments     TrainingAssignment[]  @relation("CoachAssignments")
+  athleteAssignments   TrainingAssignment[]  @relation("AthleteAssignments")
 
   @@map("users")
 }
@@ -170,6 +176,7 @@ model Video {
   trainer         Trainer               @relation(fields: [trainerId], references: [id])
   workoutSessions WorkoutSessionVideo[]
   scheduledWorkouts ScheduledWorkout[]
+  trainingAssignments TrainingAssignment[]
 
   @@map("videos")
 }
@@ -653,4 +660,95 @@ model InviteCode {
   description String?   // Описание (например, "Бета-тестирование 25 человек")
 
   @@map("invite_codes")
+}
+
+// ========================================
+// Coach module: команда, члены, задания
+// ========================================
+
+enum UserRole {
+  ATHLETE
+  COACH
+}
+
+enum TeamMemberRole {
+  PLAYER
+  ASSISTANT_COACH
+}
+
+enum TeamMemberStatus {
+  INVITED
+  ACTIVE
+  DECLINED
+}
+
+enum AssignmentStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+model CoachProfile {
+  userId          String   @id
+  clubName        String?
+  position        String?  // главный тренер, ассистент и т.п.
+  experienceYears Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("coach_profiles")
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  clubName    String?
+  logoUrl     String?
+  inviteCode  String   @unique
+  createdBy   String   // userId тренера-владельца
+  coach       User     @relation("CoachTeams", fields: [createdBy], references: [id], onDelete: Cascade)
+  members     TeamMember[]
+  assignments TrainingAssignment[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([createdBy])
+  @@map("teams")
+}
+
+model TeamMember {
+  id       String           @id @default(cuid())
+  teamId   String
+  userId   String
+  role     TeamMemberRole   @default(PLAYER)
+  status   TeamMemberStatus @default(ACTIVE)
+  joinedAt DateTime         @default(now())
+  team     Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([userId])
+  @@map("team_members")
+}
+
+model TrainingAssignment {
+  id          String            @id @default(cuid())
+  coachId     String
+  athleteId   String
+  teamId      String?
+  videoId     String            // ссылка на существующий каталог (Video)
+  dueDate     DateTime
+  status      AssignmentStatus  @default(PENDING)
+  notes       String?
+  assignedAt  DateTime          @default(now())
+  completedAt DateTime?
+  coach       User    @relation("CoachAssignments",   fields: [coachId],   references: [id], onDelete: Cascade)
+  athlete     User    @relation("AthleteAssignments", fields: [athleteId], references: [id], onDelete: Cascade)
+  team        Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  video       Video   @relation(fields: [videoId], references: [id], onDelete: Restrict)
+
+  @@index([athleteId, status])
+  @@index([coachId, dueDate])
+  @@map("training_assignments")
 }

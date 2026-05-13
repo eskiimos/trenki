@@ -693,6 +693,29 @@ const ProfilePage = () => {
 
         {/* Служебные кнопки */}
         <div className="space-y-2">
+          {/* Задания от тренера */}
+          <div className="pt-2">
+            <button
+              onClick={() => router.push('/profile/assignments')}
+              className="w-full bg-white/10 hover:bg-white/15 text-white font-medium py-3 rounded-lg transition-all duration-300 text-sm"
+            >
+              📋 Задания от тренера
+            </button>
+          </div>
+
+          {/* Вступить в команду по коду */}
+          <div className="pt-2">
+            <button
+              onClick={() => {
+                const code = prompt('Введи код приглашения');
+                if (code?.trim()) router.push(`/join/${code.trim().toUpperCase()}`);
+              }}
+              className="w-full bg-white/10 hover:bg-white/15 text-white font-medium py-3 rounded-lg transition-all duration-300 text-sm"
+            >
+              👥 Вступить в команду
+            </button>
+          </div>
+
           {/* Кнопка push-уведомлений */}
           {isSupported && (
             <div className="pt-2">

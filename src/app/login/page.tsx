@@ -71,7 +71,17 @@ function EmailLoginForm() {
         lastName: data.user.lastName,
         username: data.user.username,
       });
-      window.location.href = data.needsOnboarding ? '/onboarding/welcome' : '/';
+
+      // Если пользователь приходил по приглашению — возвращаем его на /join/CODE
+      let pendingJoinCode: string | null = null;
+      try { pendingJoinCode = localStorage.getItem('pendingJoinCode'); } catch { }
+      if (pendingJoinCode) {
+        try { localStorage.removeItem('pendingJoinCode'); } catch { }
+        window.location.href = `/join/${pendingJoinCode}`;
+        return;
+      }
+
+      window.location.href = data.needsOnboarding ? '/onboarding/role' : '/';
     } catch {
       setError('Сетевая ошибка. Проверьте подключение.');
     } finally {
