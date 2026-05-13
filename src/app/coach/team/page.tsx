@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNavigationCoach from '@/components/BottomNavigationCoach';
+import AccountSwitcher from '@/components/AccountSwitcher';
 import { useToast } from '@/lib/coach/use-toast';
 
 type SortKey = 'name' | 'potential' | 'status';
@@ -299,6 +300,11 @@ export default function CoachTeamPage() {
           {!isLoading && sortedMembers.map((m) => (
             <PlayerRow key={m.memberId} member={m} onClick={() => router.push(`/coach/athletes/${m.userId}`)} />
           ))}
+        </div>
+
+        {/* Переключатель аккаунтов (виден только когда сохранено >=2 аккаунта) */}
+        <div className="mt-6">
+          <AccountSwitcher hideWhenSingle />
         </div>
       </div>
 

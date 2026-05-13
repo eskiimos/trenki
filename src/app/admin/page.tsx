@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import AccountSwitcher from '@/components/AccountSwitcher';
 
 const AdminPage = () => {
   return (
@@ -13,6 +14,11 @@ const AdminPage = () => {
             <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
           </Link>
           <h1 className="text-3xl md:text-4xl font-bold">Админ-панель</h1>
+        </div>
+
+        {/* Переключатель мульти-аккаунта (виден всегда для админа: чтобы можно было добавить второй) */}
+        <div className="mb-6 max-w-md">
+          <AccountSwitcher />
         </div>
         
         {/* КОНТЕНТ */}

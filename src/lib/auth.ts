@@ -40,13 +40,23 @@ export function saveAuth(authData: Omit<AuthData, 'deviceId' | 'lastLogin'>): vo
     deviceId: getDeviceId(),
     lastLogin: new Date().toISOString(),
   };
-  
-  // Сохраняем в localStorage
+
+  // Сохраняем в localStorage (активный аккаунт)
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data));
-  
+
   // Сохраняем telegramId в cookies для middleware
   document.cookie = `telegramId=${data.telegramId}; path=/; max-age=${60 * 60 * 24 * 30}`; // 30 дней
-  
+
+  // Добавляем/обновляем в общем списке аккаунтов (мульти-аккаунт)
+  // Импорт через require, чтобы избежать циклической зависимости при SSR.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { upsertAccount } = require('./multi-account') as typeof import('./multi-account');
+    upsertAccount(data);
+  } catch {
+    // Игнорируем — в SSR-окружении модуль может быть недоступен.
+  }
+
   console.log('Auth saved:', data);
   console.log('Cookie set:', `telegramId=${data.telegramId}`);
 }
@@ -91,14 +101,29 @@ export function updateLastLogin(): void {
 }
 
 /**
- * Очищает данные авторизации (выход)
+ * Очищает данные авторизации (выход).
+ *
+ * Если у пользователя несколько аккаунтов (мульти-аккаунт), удаляет только активный
+ * и переключается на следующий. Если аккаунт один — полный выход.
  */
 export function clearAuth(): void {
-  localStorage.removeItem(AUTH_STORAGE_KEY);
-  
-  // Удаляем cookie
-  document.cookie = 'telegramId=; path=/; max-age=0';
-  
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require('./multi-account') as typeof import('./multi-account');
+    const accounts = mod.getAccounts();
+    const activeId = accounts[0]?.telegramId;
+    if (accounts.length > 1 && activeId) {
+      // Удаляем только активный — переключение на следующий произойдёт внутри removeAccount
+      mod.removeAccount(activeId);
+      console.log('Auth: removed active account, switched to next');
+      return;
+    }
+    // Один или ноль аккаунтов — полная очистка
+    mod.clearAllAccounts();
+  } catch {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    document.cookie = 'telegramId=; path=/; max-age=0';
+  }
   console.log('Auth cleared (localStorage + cookie)');
 }
 

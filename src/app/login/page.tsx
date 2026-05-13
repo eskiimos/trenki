@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAuthenticated, saveAuth } from '@/lib/auth';
+import { isAddingAccount } from '@/lib/multi-account';
 
 // ─────────────────────────────────────────────
 // Email-логин: отправка кода и верификация
@@ -252,7 +253,9 @@ export default function LoginPage() {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    if (isAuthenticated()) {
+    // Если пользователь идёт сюда для ДОБАВЛЕНИЯ второго аккаунта (мульти-аккаунт),
+    // не редиректим — даём ему войти под другим Telegram/email.
+    if (isAuthenticated() && !isAddingAccount()) {
       router.push('/');
       return;
     }

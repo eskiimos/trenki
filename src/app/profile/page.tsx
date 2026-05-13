@@ -8,6 +8,7 @@ import { useTelegram } from '../../hooks/useTelegram';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { ProfileSkeleton } from '../../components/Skeleton';
 import BottomNavigation from '@/components/BottomNavigation';
+import AccountSwitcher from '@/components/AccountSwitcher';
 import { clearAuth, getTelegramId } from '@/lib/auth';
 import { calculateAge } from '@/lib/age-utils';
 
@@ -713,6 +714,11 @@ const ProfilePage = () => {
 
         {/* Служебные кнопки */}
         <div className="space-y-2">
+          {/* Переключатель аккаунтов: видим для админа всегда (включая «+ Добавить»),
+              для обычного пользователя — только если уже есть >=2 аккаунтов */}
+          <div className="pt-2">
+            <AccountSwitcher hideWhenSingle={!isAdmin} />
+          </div>
           {/* Задания от тренера */}
           <div className="pt-2">
             <button
