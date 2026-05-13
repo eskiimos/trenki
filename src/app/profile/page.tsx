@@ -717,7 +717,7 @@ const ProfilePage = () => {
           {/* Переключатель аккаунтов: видим для админа всегда (включая «+ Добавить»),
               для обычного пользователя — только если уже есть >=2 аккаунтов */}
           <div className="pt-2">
-            <AccountSwitcher hideWhenSingle={!isAdmin} />
+            <AccountSwitcher hideWhenSingle={!(isAdmin || userProfile?.role === 'COACH')} />
           </div>
           {/* Задания от тренера */}
           <div className="pt-2">

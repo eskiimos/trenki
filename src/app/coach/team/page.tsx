@@ -304,7 +304,7 @@ export default function CoachTeamPage() {
 
         {/* Переключатель аккаунтов (виден только когда сохранено >=2 аккаунта) */}
         <div className="mt-6">
-          <AccountSwitcher hideWhenSingle />
+          <AccountSwitcher />
         </div>
       </div>
 
