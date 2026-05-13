@@ -83,7 +83,10 @@ export default function OnboardingRolePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#101530] text-white flex flex-col px-6 py-10 max-w-3xl md:mx-auto md:px-8">
+    <div
+      className="min-h-screen bg-[#101530] text-white flex flex-col px-6 pb-10 max-w-3xl md:mx-auto md:px-8"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 40px)' }}
+    >
       {/* Заголовок */}
       <div className="mb-8 md:mb-12">
         <h1

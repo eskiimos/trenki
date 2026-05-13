@@ -7,7 +7,10 @@ import AccountSwitcher from '@/components/AccountSwitcher';
 
 const AdminPage = () => {
   return (
-    <div className="min-h-screen bg-[#101530] text-white p-4 md:p-8">
+    <div
+      className="min-h-screen bg-[#101530] text-white px-4 pb-4 md:px-8 md:pb-8"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
+    >
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center gap-4 mb-6 md:mb-8">
           <Link href="/" className="text-white hover:text-gray-300 transition-colors">

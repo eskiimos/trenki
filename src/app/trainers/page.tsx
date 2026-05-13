@@ -54,7 +54,10 @@ const TrainersPage = () => {
   return (
     <div className="bg-[#101530] min-h-screen text-white">
       {/* Верхняя панель с кнопками */}
-      <div className="p-4 pt-4">
+      <div
+        className="px-4 pb-4"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
+      >
         <div className="flex items-center gap-3 justify-between">
           {/* Кнопка назад */}
           <Link href="/" className="inline-block flex-shrink-0">

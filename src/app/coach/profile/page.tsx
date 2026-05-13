@@ -32,7 +32,10 @@ export default function CoachProfilePage() {
 
   return (
     <div className="min-h-screen bg-[#101530] text-white pb-24">
-      <div className="px-5 py-6 max-w-3xl md:mx-auto md:px-8">
+      <div
+        className="px-5 pb-6 max-w-3xl md:mx-auto md:px-8"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 24px)' }}
+      >
         <h1 className="font-overpass uppercase" style={{ fontWeight: 900, fontSize: 22 }}>
           Профиль тренера
         </h1>

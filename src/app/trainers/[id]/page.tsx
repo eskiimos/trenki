@@ -118,7 +118,10 @@ export default function TrainerPage() {
   return (
     <div className="min-h-screen text-white pb-20" style={{ background: 'linear-gradient(182.77deg, #101530 69.24%, #060919 97.69%)' }}>
       {/* Шапка с кнопкой назад */}
-      <div className="px-4 pt-4 mb-4">
+      <div
+        className="px-4 mb-4"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
+      >
         <Link href="/" className="inline-block">
           <div className="w-10 h-10 flex items-center justify-center">
             <Image 

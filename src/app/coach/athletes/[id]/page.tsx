@@ -78,7 +78,10 @@ export default function CoachAthleteDetailPage({ params }: { params: Promise<{ i
 
   return (
     <div className="min-h-screen bg-[#101530] text-white pb-16">
-      <div className="px-5 py-6 max-w-3xl md:mx-auto md:px-8">
+      <div
+        className="px-5 pb-6 max-w-3xl md:mx-auto md:px-8"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 24px)' }}
+      >
         <button onClick={() => router.back()} className="font-overpass mb-4" style={{ color: '#AEABBB', fontSize: 13 }}>
           ← К команде
         </button>
