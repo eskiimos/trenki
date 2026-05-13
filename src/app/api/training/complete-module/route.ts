@@ -5,6 +5,7 @@ import {
   calculatePotential,
   CharacteristicType 
 } from '@/lib/characteristics';
+import { markAssignmentsCompletedForVideos } from '@/lib/coach/auto-complete';
 
 /**
  * POST /api/training/complete-module
@@ -193,6 +194,13 @@ export async function POST(request: NextRequest) {
           completed: true,
           completedAt: new Date(),
         },
+      });
+    }
+
+    // Автозакрытие тренерских заданий по этому видео
+    if (videoId) {
+      markAssignmentsCompletedForVideos(userId, [videoId]).catch((e) => {
+        console.error('auto-complete assignments error:', e);
       });
     }
 

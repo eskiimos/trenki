@@ -6,6 +6,7 @@ import {
   calculatePotential,
   CharacteristicType 
 } from '@/lib/characteristics';
+import { markAssignmentsCompletedForVideos } from '@/lib/coach/auto-complete';
 
 /**
  * POST /api/training/complete
@@ -224,6 +225,12 @@ export async function POST(request: NextRequest) {
       status: updatedSession.status,
       newPotential,
       trainingsToday: trainingsToday + 1,
+    });
+
+    // Автозакрытие тренерских заданий по этим видео
+    const completedVideoIds = session.videos.map((v) => v.videoId);
+    markAssignmentsCompletedForVideos(userId, completedVideoIds).catch((e) => {
+      console.error('auto-complete assignments error:', e);
     });
 
     return NextResponse.json({

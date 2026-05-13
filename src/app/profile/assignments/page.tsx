@@ -19,6 +19,7 @@ export default function MyAssignmentsPage() {
   const router = useRouter();
   const [list, setList] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<'active' | 'completed' | 'all'>('active');
 
   useEffect(() => {
     (async () => {
@@ -61,6 +62,33 @@ export default function MyAssignmentsPage() {
           Задания от тренера
         </h1>
 
+        <div className="mt-4 flex gap-2">
+          {([
+            { key: 'active' as const, label: 'Активные' },
+            { key: 'completed' as const, label: 'Выполненные' },
+            { key: 'all' as const, label: 'Все' },
+          ]).map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className="font-overpass uppercase"
+              style={{
+                background: filter === f.key ? '#445CFF' : 'transparent',
+                color: filter === f.key ? '#F9F8FE' : '#AEABBB',
+                border: filter === f.key ? 'none' : '1px solid #26252F',
+                borderRadius: 999,
+                padding: '6px 12px',
+                fontWeight: 800,
+                fontSize: 10,
+                letterSpacing: '0.05em',
+                cursor: 'pointer',
+              }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
         <div className="mt-5 flex flex-col gap-3">
           {loading && <div className="text-center py-6" style={{ color: '#AEABBB' }}>Загрузка...</div>}
           {!loading && list.length === 0 && (
@@ -71,7 +99,15 @@ export default function MyAssignmentsPage() {
               Заданий пока нет
             </div>
           )}
-          {list.map((a) => (
+          {!loading && list.length > 0 && list.filter((a) => filter === 'all' ? true : filter === 'completed' ? a.status === 'COMPLETED' : a.status !== 'COMPLETED').length === 0 && (
+            <div
+              className="text-center py-10 font-overpass"
+              style={{ color: '#AEABBB', fontSize: 14, background: '#060919', borderRadius: 14, border: '1px dashed #26252F' }}
+            >
+              Нет заданий в этой категории
+            </div>
+          )}
+          {list.filter((a) => filter === 'all' ? true : filter === 'completed' ? a.status === 'COMPLETED' : a.status !== 'COMPLETED').map((a) => (
             <div key={a.id} style={{ background: '#060919', border: '1px solid #26252F', borderRadius: 14, padding: '14px 16px' }}>
               <div className="flex items-center justify-between">
                 <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 12 }}>

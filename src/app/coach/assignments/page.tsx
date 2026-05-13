@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNavigationCoach from '@/components/BottomNavigationCoach';
+import { useToast } from '@/lib/coach/use-toast';
 
 interface Assignment {
   id: string;
@@ -14,21 +15,49 @@ interface Assignment {
   team: { id: string; name: string } | null;
 }
 
+type Filter = 'active' | 'completed' | 'all';
+
 export default function CoachAssignmentsPage() {
   const router = useRouter();
+  const toast = useToast();
   const [list, setList] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<Filter>('active');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const res = await fetch('/api/assignments?role=coach', { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        setList(data.assignments ?? []);
-      }
-      setLoading(false);
-    })();
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch('/api/assignments?role=coach', { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      setList(data.assignments ?? []);
+    }
+    setLoading(false);
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Удалить задание?')) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/assignments/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setList((prev) => prev.filter((a) => a.id !== id));
+        toast.show('Задание удалено', 'success');
+      } else {
+        toast.show('Не удалось удалить', 'error');
+      }
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const filtered = list.filter((a) => {
+    if (filter === 'all') return true;
+    if (filter === 'completed') return a.status === 'COMPLETED';
+    return a.status !== 'COMPLETED';
+  });
 
   return (
     <div className="min-h-screen bg-[#101530] text-white pb-24">
@@ -55,18 +84,55 @@ export default function CoachAssignmentsPage() {
           </button>
         </div>
 
+        {/* Фильтры */}
+        <div className="mt-4 flex gap-2">
+          {([
+            { key: 'active' as Filter, label: 'Активные' },
+            { key: 'completed' as Filter, label: 'Выполненные' },
+            { key: 'all' as Filter, label: 'Все' },
+          ]).map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className="font-overpass uppercase"
+              style={{
+                background: filter === f.key ? '#445CFF' : 'transparent',
+                color: filter === f.key ? '#F9F8FE' : '#AEABBB',
+                border: filter === f.key ? 'none' : '1px solid #26252F',
+                borderRadius: 999,
+                padding: '6px 12px',
+                fontWeight: 800,
+                fontSize: 10,
+                letterSpacing: '0.05em',
+                cursor: 'pointer',
+              }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
         <div className="mt-5 flex flex-col gap-3">
-          {loading && <div className="text-center py-6" style={{ color: '#AEABBB' }}>Загрузка...</div>}
-          {!loading && list.length === 0 && (
+          {loading && (
+            <>
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </>
+          )}
+          {!loading && filtered.length === 0 && (
             <div
-              className="text-center py-10 font-overpass"
+              className="text-center py-10 font-overpass whitespace-pre-line"
               style={{ color: '#AEABBB', fontSize: 14, background: '#060919', borderRadius: 14, border: '1px dashed #26252F' }}
             >
-              Пока нет заданий.<br />
-              Назначь первую тренировку игроку.
+              {filter === 'completed'
+                ? 'Пока нет выполненных заданий.'
+                : list.length === 0
+                  ? 'Пока нет заданий.\nНазначь первую тренировку игроку.'
+                  : 'Нет заданий в этой категории.'}
             </div>
           )}
-          {list.map((a) => (
+          {filtered.map((a) => (
             <div
               key={a.id}
               style={{
@@ -85,8 +151,28 @@ export default function CoachAssignmentsPage() {
               <div className="font-overpass mt-2" style={{ color: '#AEABBB', fontSize: 13 }}>
                 {a.video.title}
               </div>
-              <div className="font-overpass mt-2" style={{ color: '#9B99AA', fontSize: 11 }}>
-                Срок: {new Date(a.dueDate).toLocaleDateString('ru-RU')}
+              <div className="flex items-center justify-between mt-2">
+                <div className="font-overpass" style={{ color: '#9B99AA', fontSize: 11 }}>
+                  Срок: {new Date(a.dueDate).toLocaleDateString('ru-RU')}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(a.id)}
+                  disabled={deletingId === a.id}
+                  className="font-overpass uppercase"
+                  style={{
+                    background: 'transparent',
+                    color: '#FF6B6B',
+                    border: 'none',
+                    fontWeight: 800,
+                    fontSize: 10,
+                    letterSpacing: '0.05em',
+                    cursor: deletingId === a.id ? 'not-allowed' : 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  {deletingId === a.id ? '...' : 'Удалить'}
+                </button>
               </div>
             </div>
           ))}
@@ -94,6 +180,26 @@ export default function CoachAssignmentsPage() {
       </div>
 
       <BottomNavigationCoach activeTab="assignments" />
+    </div>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div
+      style={{
+        background: '#060919',
+        border: '1px solid #26252F',
+        borderRadius: 14,
+        padding: '14px 16px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+      }}
+    >
+      <div className="skeleton-loading" style={{ height: 14, width: '50%', borderRadius: 4 }} />
+      <div className="skeleton-loading" style={{ height: 12, width: '80%', borderRadius: 4 }} />
+      <div className="skeleton-loading" style={{ height: 10, width: '30%', borderRadius: 4 }} />
     </div>
   );
 }

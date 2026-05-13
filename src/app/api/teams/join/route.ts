@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
 import { isValidInviteCodeFormat } from '@/lib/coach/invite-code';
+import { rateLimit } from '@/lib/coach/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,15 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   const auth = await requireAuthUser(request);
   if ('response' in auth) return auth.response;
+
+  // Защита от перебора: 10 попыток в минуту на пользователя
+  const rl = rateLimit(`join:${auth.user.id}`, 10, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'Слишком много попыток. Попробуй позже.' },
+      { status: 429 }
+    );
+  }
 
   if (auth.user.role === 'COACH') {
     return NextResponse.json({ error: 'Тренер не может вступать в команду' }, { status: 400 });

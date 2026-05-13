@@ -72,13 +72,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  // Защита: тренер не может назначить задание самому себе
+  const selfFiltered = athleteIds.filter((id) => id !== auth.user.id);
+  if (selfFiltered.length === 0) {
+    return NextResponse.json({ error: 'Нельзя назначить задание самому себе' }, { status: 400 });
+  }
+
   // Проверяем, что все указанные athleteIds — действительно члены команды
   const members = await prisma.teamMember.findMany({
-    where: { teamId, status: 'ACTIVE', userId: { in: athleteIds } },
+    where: { teamId, status: 'ACTIVE', userId: { in: selfFiltered } },
     select: { userId: true },
   });
   const validIds = new Set(members.map((m) => m.userId));
-  const filtered = athleteIds.filter((id) => validIds.has(id));
+  const filtered = selfFiltered.filter((id) => validIds.has(id));
   if (filtered.length === 0) {
     return NextResponse.json({ error: 'Игроки не найдены в команде' }, { status: 400 });
   }

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -9,6 +9,25 @@ interface BottomNavigationProps {
 }
 
 const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' }) => {
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch('/api/assignments?role=athlete', { cache: 'no-store' });
+        if (!res.ok) return;
+        const d = await res.json();
+        if (cancelled) return;
+        const list = (d.assignments ?? []) as Array<{ status: string }>;
+        setPendingCount(list.filter((a) => a.status !== 'COMPLETED').length);
+      } catch {}
+    };
+    load();
+    const t = setInterval(load, 60_000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, []);
+
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 bg-[#060919] border-t border-[#101530] px-4 z-40"
@@ -59,7 +78,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' 
           />
         </Link>
         
-        <Link href="/profile" className="flex items-center justify-center p-2">
+        <Link href="/profile" className="flex items-center justify-center p-2 relative">
           <Image 
             src={activeTab === 'profile'
               ? '/icons/tapbar/new_active/Type_hockey-mask.svg'
@@ -68,6 +87,30 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' 
             width={32} 
             height={32} 
           />
+          {pendingCount > 0 && (
+            <span
+              className="font-overpass"
+              style={{
+                position: 'absolute',
+                top: 2,
+                right: 2,
+                background: '#A1FF4A',
+                color: '#101530',
+                borderRadius: 999,
+                fontSize: 10,
+                fontWeight: 900,
+                minWidth: 16,
+                height: 16,
+                padding: '0 4px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                lineHeight: 1,
+              }}
+            >
+              {pendingCount > 9 ? '9+' : pendingCount}
+            </span>
+          )}
         </Link>
       </div>
     </nav>

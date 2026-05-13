@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getTelegramId } from '@/lib/auth';
+import { ToastProvider } from '@/lib/coach/use-toast';
 
 /**
  * Layout для тренерских страниц. Проверяет:
@@ -53,5 +54,5 @@ export default function CoachLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  return <div className="min-h-screen bg-[#101530]">{children}</div>;
+  return <ToastProvider><div className="min-h-screen bg-[#101530]">{children}</div></ToastProvider>;
 }

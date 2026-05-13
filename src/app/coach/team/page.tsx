@@ -3,6 +3,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNavigationCoach from '@/components/BottomNavigationCoach';
+import { useToast } from '@/lib/coach/use-toast';
+
+type SortKey = 'name' | 'potential' | 'status';
 
 interface Team {
   id: string;
@@ -33,11 +36,14 @@ interface Member {
 
 export default function CoachTeamPage() {
   const router = useRouter();
+  const toast = useToast();
   const [team, setTeam] = useState<Team | null>(null);
   const [stats, setStats] = useState<TeamStats | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>('potential');
+  const [regenerating, setRegenerating] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -65,12 +71,55 @@ export default function CoachTeamPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleCopyCode = () => {
+  const handleCopyCode = async () => {
     if (!team) return;
-    navigator.clipboard?.writeText(team.inviteCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard?.writeText(team.inviteCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+      toast.show('Код скопирован', 'success');
+    } catch {
+      toast.show('Не удалось скопировать', 'error');
+    }
   };
+
+  const handleShare = async () => {
+    if (!team) return;
+    const url = `${location.origin}/join/${team.inviteCode}`;
+    const text = `Присоединяйся к команде «${team.name}» в Треньки! Код: ${team.inviteCode}`;
+    type ShareNav = Navigator & { share?: (d: ShareData) => Promise<void> };
+    const nav = navigator as ShareNav;
+    if (nav.share) {
+      try { await nav.share({ title: 'Команда', text, url }); } catch {}
+    } else {
+      handleCopyCode();
+    }
+  };
+
+  const handleRegenerate = async () => {
+    if (!team) return;
+    if (!confirm('Сгенерировать новый код? Старый перестанет работать.')) return;
+    setRegenerating(true);
+    try {
+      const res = await fetch(`/api/teams/${team.id}/regenerate-code`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setTeam((prev) => prev ? { ...prev, inviteCode: data.team.inviteCode } : prev);
+        toast.show('Новый код создан', 'success');
+      } else {
+        toast.show('Ошибка генерации', 'error');
+      }
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
+  const sortedMembers = [...members].sort((a, b) => {
+    if (sortKey === 'name') return `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`);
+    if (sortKey === 'potential') return b.potential - a.potential;
+    const rank = (s: Member['assignmentStatus']) => s === 'in_progress' ? 0 : s === 'pending' ? 1 : 2;
+    return rank(a.assignmentStatus) - rank(b.assignmentStatus);
+  });
 
   return (
     <div className="min-h-screen bg-[#101530] text-white pb-24">
@@ -90,7 +139,7 @@ export default function CoachTeamPage() {
         {/* Invite-код */}
         {team && (
           <div
-            className="mt-5 flex items-center justify-between"
+            className="mt-5"
             style={{
               background: '#060919',
               border: '1px solid #26252F',
@@ -98,38 +147,78 @@ export default function CoachTeamPage() {
               padding: '14px 16px',
             }}
           >
-            <div>
-              <div
+            <div className="flex items-center justify-between">
+              <div>
+                <div
+                  className="font-overpass uppercase"
+                  style={{ color: '#9B99AA', fontWeight: 700, fontSize: 10, letterSpacing: '0.5px' }}
+                >
+                  Код приглашения
+                </div>
+                <div
+                  className="font-overpass"
+                  style={{ color: '#A1FF4A', fontWeight: 900, fontSize: 22, letterSpacing: '0.25em', marginTop: 2 }}
+                >
+                  {team.inviteCode}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleShare}
                 className="font-overpass uppercase"
-                style={{ color: '#9B99AA', fontWeight: 700, fontSize: 10, letterSpacing: '0.5px' }}
+                style={{
+                  background: '#A1FF4A',
+                  color: '#101530',
+                  borderRadius: 999,
+                  padding: '10px 14px',
+                  fontWeight: 900,
+                  fontSize: 11,
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
               >
-                Код приглашения
-              </div>
-              <div
-                className="font-overpass"
-                style={{ color: '#A1FF4A', fontWeight: 900, fontSize: 22, letterSpacing: '0.25em', marginTop: 2 }}
-              >
-                {team.inviteCode}
-              </div>
+                Поделиться
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={handleCopyCode}
-              className="font-overpass uppercase"
-              style={{
-                background: copied ? '#A1FF4A' : 'transparent',
-                color: copied ? '#101530' : '#F9F8FE',
-                border: copied ? 'none' : '1px solid #445CFF',
-                borderRadius: 999,
-                padding: '10px 16px',
-                fontWeight: 800,
-                fontSize: 11,
-                letterSpacing: '0.02em',
-                cursor: 'pointer',
-              }}
-            >
-              {copied ? 'Скопировано' : 'Копировать'}
-            </button>
+            <div className="flex gap-2 mt-3">
+              <button
+                type="button"
+                onClick={handleCopyCode}
+                className="flex-1 font-overpass uppercase"
+                style={{
+                  background: copied ? '#A1FF4A' : 'transparent',
+                  color: copied ? '#101530' : '#F9F8FE',
+                  border: copied ? 'none' : '1px solid #26252F',
+                  borderRadius: 999,
+                  padding: '8px 12px',
+                  fontWeight: 800,
+                  fontSize: 10,
+                  letterSpacing: '0.05em',
+                  cursor: 'pointer',
+                }}
+              >
+                {copied ? 'Скопировано' : 'Копировать'}
+              </button>
+              <button
+                type="button"
+                onClick={handleRegenerate}
+                disabled={regenerating}
+                className="font-overpass uppercase"
+                style={{
+                  background: 'transparent',
+                  color: '#AEABBB',
+                  border: '1px solid #26252F',
+                  borderRadius: 999,
+                  padding: '8px 12px',
+                  fontWeight: 800,
+                  fontSize: 10,
+                  letterSpacing: '0.05em',
+                  cursor: regenerating ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {regenerating ? '...' : 'Новый код'}
+              </button>
+            </div>
           </div>
         )}
 
@@ -164,9 +253,39 @@ export default function CoachTeamPage() {
           </button>
         </div>
 
+        {/* Сортировка */}
+        {members.length > 1 && (
+          <div className="mt-3 flex gap-2">
+            {(['potential', 'name', 'status'] as SortKey[]).map((key) => (
+              <button
+                key={key}
+                onClick={() => setSortKey(key)}
+                className="font-overpass uppercase"
+                style={{
+                  background: sortKey === key ? '#445CFF' : 'transparent',
+                  color: sortKey === key ? '#F9F8FE' : '#AEABBB',
+                  border: sortKey === key ? 'none' : '1px solid #26252F',
+                  borderRadius: 999,
+                  padding: '6px 12px',
+                  fontWeight: 800,
+                  fontSize: 10,
+                  letterSpacing: '0.05em',
+                  cursor: 'pointer',
+                }}
+              >
+                {key === 'potential' ? 'Потенциал' : key === 'name' ? 'Имя' : 'Статус'}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="mt-3 flex flex-col gap-2">
           {isLoading && (
-            <div className="text-center py-6" style={{ color: '#AEABBB' }}>Загрузка...</div>
+            <>
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+            </>
           )}
           {!isLoading && members.length === 0 && (
             <div
@@ -177,7 +296,7 @@ export default function CoachTeamPage() {
               Поделись кодом <span style={{ color: '#A1FF4A', fontWeight: 800 }}>{team?.inviteCode}</span> с командой.
             </div>
           )}
-          {members.map((m) => (
+          {!isLoading && sortedMembers.map((m) => (
             <PlayerRow key={m.memberId} member={m} onClick={() => router.push(`/coach/athletes/${m.userId}`)} />
           ))}
         </div>
@@ -209,6 +328,28 @@ function StatCard({ label, value, suffix }: { label: string; value: number | str
         style={{ color: '#F9F8FE', fontSize: 20, fontWeight: 900 }}
       >
         {value}{suffix ?? ''}
+      </div>
+    </div>
+  );
+}
+
+function SkeletonRow() {
+  return (
+    <div
+      style={{
+        background: '#060919',
+        border: '1px solid #26252F',
+        borderRadius: 14,
+        padding: '12px 14px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+      }}
+    >
+      <div className="skeleton-loading" style={{ width: 42, height: 42, borderRadius: '50%' }} />
+      <div className="flex-1 flex flex-col gap-2">
+        <div className="skeleton-loading" style={{ height: 12, width: '60%', borderRadius: 4 }} />
+        <div className="skeleton-loading" style={{ height: 10, width: '40%', borderRadius: 4 }} />
       </div>
     </div>
   );

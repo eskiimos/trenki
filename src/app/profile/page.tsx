@@ -393,6 +393,26 @@ const ProfilePage = () => {
       .catch(() => {});
   }, []);
 
+  // Команда атлета (для кнопки "Покинуть")
+  const [athleteTeam, setAthleteTeam] = useState<{ id: string; name: string } | null>(null);
+  useEffect(() => {
+    fetch('/api/teams', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.teams?.[0]) setAthleteTeam({ id: d.teams[0].id, name: d.teams[0].name });
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleLeaveTeam = async () => {
+    if (!athleteTeam) return;
+    if (!confirm(`Покинуть команду «${athleteTeam.name}»?`)) return;
+    const res = await fetch(`/api/teams/${athleteTeam.id}/leave`, { method: 'DELETE' });
+    if (res.ok) {
+      setAthleteTeam(null);
+    }
+  };
+
   // Определяем отображаемые данные
   const displayName = userProfile?.firstName || user?.first_name || 'ТРЕНЬКИ';
   const displayLastName = userProfile?.lastName || user?.last_name || 'ТРЕНЬКИ';
@@ -703,17 +723,26 @@ const ProfilePage = () => {
             </button>
           </div>
 
-          {/* Вступить в команду по коду */}
+          {/* Вступить в команду по коду / Покинуть команду */}
           <div className="pt-2">
-            <button
-              onClick={() => {
-                const code = prompt('Введи код приглашения');
-                if (code?.trim()) router.push(`/join/${code.trim().toUpperCase()}`);
-              }}
-              className="w-full bg-white/10 hover:bg-white/15 text-white font-medium py-3 rounded-lg transition-all duration-300 text-sm"
-            >
-              👥 Вступить в команду
-            </button>
+            {athleteTeam ? (
+              <button
+                onClick={handleLeaveTeam}
+                className="w-full bg-white/10 hover:bg-white/15 text-white font-medium py-3 rounded-lg transition-all duration-300 text-sm"
+              >
+                🚪 Покинуть команду «{athleteTeam.name}»
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  const code = prompt('Введи код приглашения');
+                  if (code?.trim()) router.push(`/join/${code.trim().toUpperCase()}`);
+                }}
+                className="w-full bg-white/10 hover:bg-white/15 text-white font-medium py-3 rounded-lg transition-all duration-300 text-sm"
+              >
+                👥 Вступить в команду
+              </button>
+            )}
           </div>
 
           {/* Кнопка push-уведомлений */}

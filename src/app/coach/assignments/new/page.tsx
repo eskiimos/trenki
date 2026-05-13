@@ -209,6 +209,37 @@ export default function CoachAssignmentNewPage() {
 
         {/* Дата */}
         <Section title="Сроки">
+          <div className="flex gap-2 mb-3 flex-wrap">
+            {([
+              { label: '3 дня', days: 3 },
+              { label: '1 неделя', days: 7 },
+              { label: '2 недели', days: 14 },
+            ]).map((p) => (
+              <button
+                key={p.days}
+                type="button"
+                onClick={() => {
+                  const d = new Date();
+                  d.setDate(d.getDate() + p.days);
+                  setDueDate(d.toISOString().slice(0, 10));
+                }}
+                className="font-overpass uppercase"
+                style={{
+                  background: 'transparent',
+                  color: '#AEABBB',
+                  border: '1px solid #26252F',
+                  borderRadius: 999,
+                  padding: '6px 12px',
+                  fontWeight: 800,
+                  fontSize: 10,
+                  letterSpacing: '0.05em',
+                  cursor: 'pointer',
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
           <input
             type="date"
             value={dueDate}
