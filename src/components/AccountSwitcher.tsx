@@ -36,12 +36,22 @@ export default function AccountSwitcher({ hideWhenSingle = false }: Props) {
   const active = accounts[0];
   const others = accounts.slice(1);
 
-  const handleSwitch = (telegramId: string) => {
+  const handleSwitch = async (telegramId: string) => {
     const ok = setActiveAccount(telegramId);
-    if (ok) {
-      // Полный reload, чтобы все запросы пошли с новой cookie
-      window.location.href = '/';
+    if (!ok) return;
+    // Определяем роль нового аккаунта, чтобы открыть подходящий интерфейс.
+    let target = '/';
+    try {
+      const res = await fetch('/api/users/me', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.role === 'COACH') target = '/coach/team';
+      }
+    } catch {
+      // если запрос не удался — fallback на главную
     }
+    // Полный reload, чтобы все запросы пошли с новой cookie
+    window.location.href = target;
   };
 
   const handleAdd = () => {

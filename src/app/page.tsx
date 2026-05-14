@@ -50,7 +50,7 @@ const HomePage = () => {
   
   // Проверяем авторизацию при загрузке страницы
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       // 🔓 Пропускаем проверку авторизации на localhost
       const isLocalhost = typeof window !== 'undefined' && 
         (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
@@ -70,6 +70,19 @@ const HomePage = () => {
       }
       
       console.log('✅ Пользователь авторизован:', telegramId);
+      // Если активный аккаунт — тренер, отправляем его в кабинет тренера
+      try {
+        const res = await fetch('/api/users/me', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.role === 'COACH') {
+            router.replace('/coach/team');
+            return;
+          }
+        }
+      } catch {
+        // игнорируем — продолжаем как обычный пользователь
+      }
       setIsCheckingAuth(false);
     };
 
