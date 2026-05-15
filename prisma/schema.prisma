@@ -37,6 +37,8 @@ model User {
   teamMemberships      TeamMember[]
   coachAssignments     TrainingAssignment[]  @relation("CoachAssignments")
   athleteAssignments   TrainingAssignment[]  @relation("AthleteAssignments")
+  athletePoseSessions  PoseSession[]         @relation("AthletePoseSessions")
+  coachPoseReviews     PoseSession[]         @relation("CoachPoseReviews")
 
   @@map("users")
 }
@@ -177,6 +179,7 @@ model Video {
   workoutSessions WorkoutSessionVideo[]
   scheduledWorkouts ScheduledWorkout[]
   trainingAssignments TrainingAssignment[]
+  poseSessions    PoseSession[]
 
   @@map("videos")
 }
@@ -751,4 +754,25 @@ model TrainingAssignment {
   @@index([athleteId, status])
   @@index([coachId, dueDate])
   @@map("training_assignments")
+}
+
+model PoseSession {
+  id              String   @id @default(cuid())
+  athleteId       String
+  videoId         String
+  durationSec     Int      @default(0)
+  framesCount     Int      @default(0)
+  avgConfidence   Float?
+  coachId         String?
+  coachRating     Int?
+  coachComment    String?
+  reviewedAt      DateTime?
+  createdAt       DateTime @default(now())
+  athlete         User     @relation("AthletePoseSessions", fields: [athleteId], references: [id], onDelete: Cascade)
+  coach           User?    @relation("CoachPoseReviews",   fields: [coachId],   references: [id], onDelete: SetNull)
+  video           Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([athleteId, createdAt])
+  @@index([videoId])
+  @@map("pose_sessions")
 }

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Heart, MessageCircle, Share, Download, CheckCircle } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import TagsSection from '@/components/TagsSection';
 import BottomNavigation from '@/components/BottomNavigation';
 import CharacteristicsGainModal from '@/components/CharacteristicsGainModal';
@@ -19,6 +20,9 @@ import {
   deleteVideo,
   type OfflineVideo 
 } from '@/lib/offlineVideos';
+
+// Pose-трекер грузим только в браузере: модель MediaPipe из CDN — нет смысла на SSR
+const PoseTracker = dynamic(() => import('@/components/PoseTracker'), { ssr: false });
 
 interface VideoPageProps {
   params: Promise<{
@@ -90,7 +94,10 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [isDownloaded, setIsDownloaded] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
-  
+
+  // Pose-трекер (камера + отслеживание суставов)
+  const [poseTrackerOpen, setPoseTrackerOpen] = useState(false);
+
   // Состояние для модалки прироста характеристик
   const [showGainsModal, setShowGainsModal] = useState(false);
   const [characteristicsGains, setCharacteristicsGains] = useState<any>(null);
@@ -1859,6 +1866,19 @@ export default function VideoPage({ params }: VideoPageProps) {
               <Image src="/icons/video/action-share.svg" alt="Поделиться" width={20} height={20} />
               <span className="text-[#AEABBB] text-xs whitespace-nowrap">Поделиться</span>
             </div>
+
+            {/* Pose tracker */}
+            <button
+              onClick={() => setPoseTrackerOpen((v) => !v)}
+              className={`rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0 transition-all ${
+                poseTrackerOpen ? 'bg-[#A1FF4A] text-[#101530]' : 'bg-[#AEABBB33] hover:opacity-80'
+              }`}
+              aria-label="Включить камеру"
+            >
+              <span className="text-xs whitespace-nowrap" style={{ color: poseTrackerOpen ? '#101530' : '#AEABBB', fontWeight: 700 }}>
+                {poseTrackerOpen ? '● Камера' : 'Камера'}
+              </span>
+            </button>
           </div>
         </div>
       </div>
@@ -1906,6 +1926,11 @@ export default function VideoPage({ params }: VideoPageProps) {
       
       {/* Скрываем BottomNavigation в горизонтальном режиме */}
       {!isLandscape && <BottomNavigation activeTab="video" />}
+
+      {/* Виджет камеры с отслеживанием суставов */}
+      {poseTrackerOpen && videoId && (
+        <PoseTracker videoId={videoId} onClose={() => setPoseTrackerOpen(false)} />
+      )}
       
       {/* Модалка прироста характеристик */}
       {showGainsModal && characteristicsGains && newCharacteristics && (

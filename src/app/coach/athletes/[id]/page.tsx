@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
+import CoachPoseSessionsSection from '@/components/CoachPoseSessionsSection';
 
 interface Assignment {
   id: string;
@@ -166,6 +167,9 @@ export default function CoachAthleteDetailPage({ params }: { params: Promise<{ i
             </div>
           ))}
         </div>
+
+        {/* Сессии трекинга движений с камеры */}
+        <CoachPoseSessionsSection athleteId={athlete.id} />
 
         <button
           onClick={() => router.push('/coach/assignments/new')}
