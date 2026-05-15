@@ -43,8 +43,14 @@ export default function PoseReplay({ sessionId, open }: Props) {
     if (!open || session || loading) return;
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/pose-sessions/${sessionId}`)
-      .then((r) => r.json())
+    // Таймаут на случай если эндпоинт ещё не задеплоен или висит
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    fetch(`/api/pose-sessions/${sessionId}`, { signal: controller.signal })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data) => {
         if (cancelled) return;
         if (!data?.session) {
@@ -63,13 +69,21 @@ export default function PoseReplay({ sessionId, open }: Props) {
         });
       })
       .catch((e) => {
-        if (!cancelled) setError(e?.message || 'Ошибка загрузки');
+        if (cancelled) return;
+        if (e?.name === 'AbortError') {
+          setError('Превышено время ожидания. Возможно, сервер ещё не обновлён.');
+        } else {
+          setError(e?.message || 'Ошибка загрузки');
+        }
       })
       .finally(() => {
+        clearTimeout(timeoutId);
         if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
+      controller.abort();
     };
   }, [open, sessionId, session, loading]);
 
