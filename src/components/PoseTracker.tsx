@@ -33,6 +33,12 @@ export default function PoseTracker({ videoId, onClose }: Props) {
   const framesRef = useRef<number>(0);
   const confSumRef = useRef<number>(0);
   const confCountRef = useRef<number>(0);
+  // Записанные кадры скелета для воспроизведения тренеру.
+  // Каждый кадр: [t_ms, x0,y0,v0, x1,y1,v1, ... x32,y32,v32] (x,y *1000 -> int; v *100 -> int)
+  const recordedRef = useRef<number[][]>([]);
+  const lastSampleAtRef = useRef<number>(0);
+  const SAMPLE_FPS = 5; // достаточно для воспроизведения движений
+  const MAX_FRAMES = SAMPLE_FPS * 60 * 5; // максимум 5 минут записи
 
   const [status, setStatus] = useState<'init' | 'ready' | 'tracking' | 'error' | 'saving' | 'done'>('init');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -135,6 +141,25 @@ export default function PoseTracker({ videoId, onClose }: Props) {
             confCountRef.current += 1;
           }
 
+          // Сэмплируем кадр для записи (с ограничением частоты и размера)
+          const nowMs = performance.now();
+          if (
+            recordedRef.current.length < MAX_FRAMES &&
+            nowMs - lastSampleAtRef.current >= 1000 / SAMPLE_FPS
+          ) {
+            lastSampleAtRef.current = nowMs;
+            const t = Math.round(Date.now() - startedAtRef.current);
+            const flat: number[] = [t];
+            for (const p of lm) {
+              flat.push(
+                Math.round(p.x * 1000),
+                Math.round(p.y * 1000),
+                Math.round((p.visibility ?? 0) * 100),
+              );
+            }
+            recordedRef.current.push(flat);
+          }
+
           // Рисуем точки
           ctx.fillStyle = '#A1FF4A';
           for (const p of lm) {
@@ -195,6 +220,8 @@ export default function PoseTracker({ videoId, onClose }: Props) {
           durationSec,
           framesCount: framesRef.current,
           avgConfidence,
+          fps: SAMPLE_FPS,
+          frames: recordedRef.current,
         }),
       });
     } catch (err) {

@@ -1,6 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
+
+// Плеер скелета — только в браузере (canvas)
+const PoseReplay = dynamic(() => import('./PoseReplay'), { ssr: false });
 
 interface SessionItem {
   id: string;
@@ -156,6 +160,9 @@ function SessionRow({
 
       {open && (
         <div className="mt-3 flex flex-col gap-2">
+          {/* Воспроизведение записанного скелета */}
+          <PoseReplay sessionId={session.id} open={open} />
+
           <div className="flex gap-1">
             {[1, 2, 3, 4, 5].map((n) => (
               <button

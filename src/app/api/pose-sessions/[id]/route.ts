@@ -1,8 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireCoach } from '@/lib/coach/guards';
+import { requireAuthUser, requireCoach } from '@/lib/coach/guards';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * GET /api/pose-sessions/[id]
+ * Возвращает одну сессию с записанными кадрами скелета (frames).
+ * Доступ: тренер (любая сессия) или сам атлет-владелец.
+ */
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  const auth = await requireAuthUser(request);
+  if ('response' in auth) return auth.response;
+
+  const { id } = await context.params;
+  const session = await prisma.poseSession.findUnique({
+    where: { id },
+    include: {
+      video: { select: { id: true, title: true, thumbnail: true } },
+      athlete: { select: { id: true, firstName: true, lastName: true } },
+    },
+  });
+  if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  if (auth.user.role !== 'COACH' && session.athleteId !== auth.user.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  return NextResponse.json({ session });
+}
 
 /**
  * PATCH /api/pose-sessions/[id]

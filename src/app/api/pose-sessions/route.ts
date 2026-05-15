@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 /**
  * POST /api/pose-sessions
  * Атлет сохраняет результат сессии трекинга движений.
- * Body: { videoId, durationSec, framesCount, avgConfidence? }
+ * Body: { videoId, durationSec, framesCount, avgConfidence?, fps?, frames? }
  */
 export async function POST(request: NextRequest) {
   const auth = await requireAuthUser(request);
@@ -24,6 +24,18 @@ export async function POST(request: NextRequest) {
       ? null
       : Math.max(0, Math.min(1, Number(body.avgConfidence)));
 
+  // Сжатые кадры скелета для воспроизведения тренеру. Ограничиваем сверху.
+  const fps =
+    body.fps === undefined || body.fps === null ? null : Math.max(1, Math.min(30, Math.floor(Number(body.fps))));
+  let frames: number[][] | null = null;
+  if (Array.isArray(body.frames)) {
+    // До 5 минут записи при 30fps = 9000 кадров максимум
+    const arr = body.frames.slice(0, 9000) as unknown[];
+    frames = arr
+      .filter((f): f is number[] => Array.isArray(f) && f.length > 0 && f.length <= 200)
+      .map((f) => f.map((n) => Math.round(Number(n) || 0)));
+  }
+
   if (!videoId) return NextResponse.json({ error: 'videoId is required' }, { status: 400 });
 
   const video = await prisma.video.findUnique({ where: { id: videoId } });
@@ -36,10 +48,12 @@ export async function POST(request: NextRequest) {
       durationSec,
       framesCount,
       avgConfidence: avgConfidence ?? undefined,
+      fps: fps ?? undefined,
+      frames: frames ?? undefined,
     },
   });
 
-  return NextResponse.json({ ok: true, session });
+  return NextResponse.json({ ok: true, session: { id: session.id } });
 }
 
 /**
@@ -67,7 +81,20 @@ export async function GET(request: NextRequest) {
     where,
     orderBy: { createdAt: 'desc' },
     take: 50,
-    include: {
+    // В списке frames не нужны — экономим трафик
+    select: {
+      id: true,
+      athleteId: true,
+      videoId: true,
+      durationSec: true,
+      framesCount: true,
+      avgConfidence: true,
+      fps: true,
+      coachId: true,
+      coachRating: true,
+      coachComment: true,
+      reviewedAt: true,
+      createdAt: true,
       video: { select: { id: true, title: true, thumbnail: true } },
       athlete: { select: { id: true, firstName: true, lastName: true } },
     },

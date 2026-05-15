@@ -763,6 +763,8 @@ model PoseSession {
   durationSec     Int      @default(0)
   framesCount     Int      @default(0)
   avgConfidence   Float?
+  fps             Int?     // Частота сэмплирования скелета (кадров в секунду)
+  frames          Json?    // Записанные кадры: { fps, frames: number[][] } (квантованные landmarks)
   coachId         String?
   coachRating     Int?
   coachComment    String?
