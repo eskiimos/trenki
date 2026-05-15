@@ -41,17 +41,32 @@ export async function POST(request: NextRequest) {
   const video = await prisma.video.findUnique({ where: { id: videoId } });
   if (!video) return NextResponse.json({ error: 'Video not found' }, { status: 404 });
 
-  const session = await prisma.poseSession.create({
-    data: {
-      athleteId: auth.user.id,
-      videoId,
-      durationSec,
-      framesCount,
-      avgConfidence: avgConfidence ?? undefined,
-      fps: fps ?? undefined,
-      frames: frames ?? undefined,
-    },
-  });
+  // На проде колонок fps/frames может ещё не быть — пытаемся, при ошибке без них
+  let session;
+  try {
+    session = await prisma.poseSession.create({
+      data: {
+        athleteId: auth.user.id,
+        videoId,
+        durationSec,
+        framesCount,
+        avgConfidence: avgConfidence ?? undefined,
+        fps: fps ?? undefined,
+        frames: frames ?? undefined,
+      },
+    });
+  } catch (err) {
+    console.warn('pose-sessions create: fallback без fps/frames', err);
+    session = await prisma.poseSession.create({
+      data: {
+        athleteId: auth.user.id,
+        videoId,
+        durationSec,
+        framesCount,
+        avgConfidence: avgConfidence ?? undefined,
+      },
+    });
+  }
 
   return NextResponse.json({ ok: true, session: { id: session.id } });
 }
@@ -77,28 +92,54 @@ export async function GET(request: NextRequest) {
   }
   if (videoIdParam) where.videoId = videoIdParam;
 
-  const sessions = await prisma.poseSession.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    take: 50,
-    // В списке frames не нужны — экономим трафик
-    select: {
-      id: true,
-      athleteId: true,
-      videoId: true,
-      durationSec: true,
-      framesCount: true,
-      avgConfidence: true,
-      fps: true,
-      coachId: true,
-      coachRating: true,
-      coachComment: true,
-      reviewedAt: true,
-      createdAt: true,
-      video: { select: { id: true, title: true, thumbnail: true } },
-      athlete: { select: { id: true, firstName: true, lastName: true } },
-    },
-  });
+  // На проде колонка fps могла ещё не появиться — пытаемся с ней, при ошибке fallback
+  let sessions;
+  try {
+    sessions = await prisma.poseSession.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      // В списке frames не нужны — экономим трафик
+      select: {
+        id: true,
+        athleteId: true,
+        videoId: true,
+        durationSec: true,
+        framesCount: true,
+        avgConfidence: true,
+        fps: true,
+        coachId: true,
+        coachRating: true,
+        coachComment: true,
+        reviewedAt: true,
+        createdAt: true,
+        video: { select: { id: true, title: true, thumbnail: true } },
+        athlete: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+  } catch (err) {
+    console.warn('pose-sessions list: fallback без fps (миграция не применена?)', err);
+    sessions = await prisma.poseSession.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        athleteId: true,
+        videoId: true,
+        durationSec: true,
+        framesCount: true,
+        avgConfidence: true,
+        coachId: true,
+        coachRating: true,
+        coachComment: true,
+        reviewedAt: true,
+        createdAt: true,
+        video: { select: { id: true, title: true, thumbnail: true } },
+        athlete: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+  }
 
   return NextResponse.json({ sessions });
 }

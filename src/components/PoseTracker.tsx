@@ -37,8 +37,8 @@ export default function PoseTracker({ videoId, onClose }: Props) {
   // Каждый кадр: [t_ms, x0,y0,v0, x1,y1,v1, ... x32,y32,v32] (x,y *1000 -> int; v *100 -> int)
   const recordedRef = useRef<number[][]>([]);
   const lastSampleAtRef = useRef<number>(0);
-  const SAMPLE_FPS = 5; // достаточно для воспроизведения движений
-  const MAX_FRAMES = SAMPLE_FPS * 60 * 5; // максимум 5 минут записи
+  const SAMPLE_FPS = 3; // достаточно для воспроизведения, резко уменьшает объём данных
+  const MAX_FRAMES = SAMPLE_FPS * 60 * 2; // максимум 2 минуты записи
 
   const [status, setStatus] = useState<'init' | 'ready' | 'tracking' | 'error' | 'saving' | 'done'>('init');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);

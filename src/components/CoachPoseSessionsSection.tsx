@@ -30,22 +30,41 @@ interface Props {
 export default function CoachPoseSessionsSection({ athleteId }: Props) {
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     (async () => {
-      const res = await fetch(`/api/pose-sessions?athleteId=${encodeURIComponent(athleteId)}`, {
-        cache: 'no-store',
-      });
-      if (cancelled) return;
-      if (res.ok) {
-        const data = await res.json();
-        setSessions(data.sessions || []);
+      try {
+        const res = await fetch(`/api/pose-sessions?athleteId=${encodeURIComponent(athleteId)}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        if (cancelled) return;
+        if (!res.ok) {
+          setError(`Ошибка сервера (${res.status})`);
+        } else {
+          const data = await res.json();
+          setSessions(data.sessions || []);
+        }
+      } catch (e: unknown) {
+        if (cancelled) return;
+        if (e instanceof Error && e.name === 'AbortError') {
+          setError('Долгий ответ сервера. Попробуйте позже.');
+        } else {
+          setError(e instanceof Error ? e.message : 'Ошибка загрузки');
+        }
+      } finally {
+        clearTimeout(timeoutId);
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
     })();
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
+      controller.abort();
     };
   }, [athleteId]);
 
@@ -66,7 +85,15 @@ export default function CoachPoseSessionsSection({ athleteId }: Props) {
             Загрузка…
           </div>
         )}
-        {!loading && sessions.length === 0 && (
+        {!loading && error && (
+          <div
+            className="text-center py-4 font-overpass"
+            style={{ color: '#FF6B6B', fontSize: 12, background: '#060919', borderRadius: 14, border: '1px solid #26252F' }}
+          >
+            {error}
+          </div>
+        )}
+        {!loading && !error && sessions.length === 0 && (
           <div
             className="text-center py-6 font-overpass"
             style={{ color: '#AEABBB', fontSize: 13, background: '#060919', borderRadius: 14, border: '1px dashed #26252F' }}
