@@ -130,44 +130,56 @@ export default function VideoPage({ params }: VideoPageProps) {
     const getParams = async () => {
       const resolvedParams = await params;
       setVideoId(resolvedParams.id);
-      
-      // Загружаем данные видео
+
+      // Главный путь: дёргаем ТОЛЬКО нужное видео — не ждём массив всех.
+      // На больших каталогах это ускоряет первый кадр в разы и сразу
+      // даёт thumbnail для poster'а пока резолвится Kinescope direct URL.
       try {
         setIsLoading(true);
-        const response = await fetch('/api/videos');
-        const data = await response.json();
-        const videos = data.videos || [];
-        setAllVideos(videos);
-        
-        const currentVideoIndex = videos.findIndex((v: VideoData) => v.id === resolvedParams.id);
-        const video = videos[currentVideoIndex];
-        
-        if (video) {
+        const response = await fetch(`/api/videos/${resolvedParams.id}`);
+        if (response.ok) {
+          const video = await response.json();
           setVideoData(video);
-          
-          // Находим следующее видео
-          if (currentVideoIndex !== -1 && currentVideoIndex < videos.length - 1) {
-            setNextVideo(videos[currentVideoIndex + 1]);
-          } else {
-            // Если это последнее видео, берем первое (цикл)
-            setNextVideo(videos[0]);
-          }
-        }
-
-        // Fetch profile
-        const telegramId = getTelegramId();
-        if (telegramId) {
-          const profileResponse = await fetch(`/api/profile?telegramId=${telegramId}`);
-          if (profileResponse.ok) {
-            const profileData = await profileResponse.json();
-            setUserProfile(profileData.user?.profile);
-          }
         }
       } catch (error) {
         console.error('Error loading video:', error);
       } finally {
         setIsLoading(false);
       }
+
+      // В фоне (не блокируем UI) подтягиваем nextVideo и список всех — нужны
+      // только для оверлея «следующее видео» в конце просмотра. Профиль тоже
+      // лениво.
+      void (async () => {
+        try {
+          const listRes = await fetch('/api/videos', { cache: 'no-store' });
+          if (!listRes.ok) return;
+          const listData = await listRes.json();
+          const videos: VideoData[] = listData.videos || [];
+          setAllVideos(videos);
+
+          const idx = videos.findIndex((v) => v.id === resolvedParams.id);
+          if (idx !== -1 && idx < videos.length - 1) {
+            setNextVideo(videos[idx + 1]);
+          } else if (videos.length > 0) {
+            setNextVideo(videos[0]);
+          }
+        } catch (e) {
+          console.error('next video fetch failed', e);
+        }
+      })();
+
+      void (async () => {
+        try {
+          const profileResponse = await fetch('/api/profile');
+          if (profileResponse.ok) {
+            const profileData = await profileResponse.json();
+            setUserProfile(profileData.user?.profile);
+          }
+        } catch (e) {
+          console.error('profile fetch failed', e);
+        }
+      })();
     };
     getParams();
   }, [params]);
@@ -988,15 +1000,6 @@ export default function VideoPage({ params }: VideoPageProps) {
     setShowQualityMenu(false);
   };
 
-  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (videoRef.current) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const pos = (e.clientX - rect.left) / rect.width;
-      videoRef.current.currentTime = pos * duration;
-    }
-    showControlsTemporarily();
-  };
-
   const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
@@ -1220,26 +1223,24 @@ export default function VideoPage({ params }: VideoPageProps) {
             onTouchStart={handleVideoInteraction}
             onClick={(e) => e.stopPropagation()}
           >
-          {isLoading ? (
-            <div className="w-full h-full flex items-center justify-center bg-black">
-              <div className="text-white">Загрузка...</div>
-            </div>
-          ) : isKinescopeLoading ? (
-            // Загрузка прямой ссылки Kinescope - показываем превью
+          {isLoading || isKinescopeLoading ? (
+            // Пока резолвится URL — показываем превью видео, чтобы пользователь
+            // сразу видел кадр, а не чёрный экран. Spinner ненавязчивый,
+            // в углу — основное место под poster.
             <div className="w-full h-full relative bg-black">
               {videoData?.thumbnail && (
                 <Image
                   src={videoData.thumbnail}
-                  alt={videoData.title}
+                  alt={videoData.title || ''}
                   fill
                   className="object-cover"
+                  priority
                 />
               )}
-              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-3"></div>
-                  <div className="text-white text-sm">Подготовка видео...</div>
-                </div>
+              {/* Лёгкое затемнение, чтобы spinner был виден на светлом превью */}
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/10 to-black/30 pointer-events-none" />
+              <div className="absolute bottom-4 right-4">
+                <div className="w-8 h-8 border-2 border-white/40 border-t-white rounded-full animate-spin" />
               </div>
             </div>
           ) : (
@@ -1466,21 +1467,46 @@ export default function VideoPage({ params }: VideoPageProps) {
             <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pt-8 ${isLandscape ? 'pb-6 px-5' : 'pb-2 px-3'} transition-opacity duration-300 ${
             showControls ? 'opacity-100' : 'opacity-0'
           }`}>
-            {/* Progress Bar */}
-            <div 
-              className={`flex-1 bg-white/30 rounded-full cursor-pointer mb-2 hover:h-1.5 transition-all relative ${isLandscape ? 'h-1.5' : 'h-0.5'}`}
-              onClick={handleSeek}
+            {/* Scrubber: цветная полоса + прозрачный input range поверх с круглым thumb.
+                Полоса отрисовывается div'ами (buffered + current), input ловит drag/touch. */}
+            <div
+              className="relative mb-2 select-none"
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
             >
-              {/* Buffered (загруженная часть) */}
-              <div 
-                className="absolute h-full bg-white/40 rounded-full transition-all"
-                style={{ width: `${buffered}%` }}
-              ></div>
-              {/* Current progress (текущая позиция) */}
-              <div 
-                className="absolute h-full bg-blue-500 rounded-full transition-all"
-                style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
-              ></div>
+              {/* Визуальный трек: тонкий в портрете, чуть толще в landscape */}
+              <div
+                className={`absolute left-0 right-0 top-1/2 -translate-y-1/2 bg-white/30 rounded-full pointer-events-none ${
+                  isLandscape ? 'h-1.5' : 'h-1'
+                }`}
+              >
+                <div
+                  className="absolute left-0 top-0 h-full bg-white/40 rounded-full"
+                  style={{ width: `${buffered}%` }}
+                />
+                <div
+                  className="absolute left-0 top-0 h-full bg-blue-500 rounded-full"
+                  style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+                />
+              </div>
+              {/* Реальный input: drag, клавиатура, accessibility */}
+              <input
+                type="range"
+                min={0}
+                max={duration || 0}
+                step={0.1}
+                value={currentTime}
+                aria-label="Перемотка видео"
+                onChange={(e) => {
+                  const t = Number(e.target.value);
+                  setCurrentTime(t);
+                  if (videoRef.current) {
+                    videoRef.current.currentTime = t;
+                  }
+                  showControlsTemporarily();
+                }}
+                className="video-scrubber relative w-full"
+              />
             </div>
             
             {/* Control Buttons */}
