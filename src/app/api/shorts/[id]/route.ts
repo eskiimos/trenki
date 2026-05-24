@@ -105,7 +105,6 @@ export async function PUT(
     console.error('Error updating short:', error);
     return NextResponse.json({ 
       error: 'Failed to update short',
-      details: error.message 
     }, { status: 500 });
   }
 }
@@ -129,7 +128,6 @@ export async function DELETE(
     console.error('Error deleting short:', error);
     return NextResponse.json({ 
       error: 'Failed to delete short',
-      details: error.message 
     }, { status: 500 });
   }
 }
@@ -164,7 +162,6 @@ export async function PATCH(
     console.error('Error patching short:', error);
     return NextResponse.json({ 
       error: 'Failed to patch short',
-      details: error.message 
     }, { status: 500 });
   }
 }

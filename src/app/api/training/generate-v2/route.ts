@@ -19,7 +19,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 });
     }
 
-    console.log('🎯 Generating workout with LoadType algorithm:', { userId, loadDirection, availableTime });
 
     // Находим пользователя по telegramId
     const user = await prisma.user.findUnique({
@@ -117,7 +116,6 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    console.log('✅ WorkoutSession created:', workoutSession.id);
 
     return NextResponse.json({
       success: true,
@@ -138,7 +136,6 @@ export async function POST(request: NextRequest) {
     console.error('❌ Error generating workout:', error);
     return NextResponse.json({ 
       error: 'Failed to generate workout',
-      details: error.message,
       missingModules: error.missingModules || []
     }, { status: 500 });
   }
@@ -215,7 +212,6 @@ async function buildWorkout(params: {
     });
     totalDuration += warmup.duration;
   } else {
-    console.log('⚠️ РАЗМИНКА не найдена. Требуется видео с LoadType: MOBILITY или DYNAMIC_STRETCH, длительность до 10 минут');
     missingModules.push('РАЗМИНКА (LoadType: MOBILITY или DYNAMIC_STRETCH)');
   }
 
@@ -261,7 +257,6 @@ async function buildWorkout(params: {
 
   // Если не нашли идеальное видео, берём любое с LoadType (кроме WARMUP/COOLDOWN типов)
   if (!mainWorkout) {
-    console.log('⚠️ Не найдено идеальное видео для MAIN, ищем запасной вариант...');
     mainWorkout = await prisma.video.findFirst({
       where: {
         isPublished: true,
@@ -376,7 +371,6 @@ async function buildWorkout(params: {
     });
     totalDuration += cooldown.duration;
   } else {
-    console.log('⚠️ ЗАМИНКА не найдена. Требуется видео с LoadType: STATIC_STRETCH или MOBILITY, длительность до 10 минут');
     missingModules.push('ЗАМИНКА (LoadType: STATIC_STRETCH или MOBILITY)');
   }
 

@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
             });
           }
           
-          return { success: false, endpoint: sub.endpoint, error: error.message };
+          return { success: false, endpoint: sub.endpoint };
         }
       })
     );
@@ -102,8 +102,8 @@ export async function POST(request: NextRequest) {
       message: `Уведомление отправлено ${successCount} из ${subscriptions.length} подписчикам`,
       sentCount: successCount,
       totalSubscriptions: subscriptions.length,
-      results: results.map((r: any) => 
-        r.status === 'fulfilled' ? r.value : { success: false, error: r.reason }
+      results: results.map((r: any) =>
+        r.status === 'fulfilled' ? r.value : { success: false }
       ),
     });
 

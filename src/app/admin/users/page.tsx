@@ -154,6 +154,42 @@ export default function AdminUsersPage() {
     }
   };
 
+  // Привязать/сменить email у выбранного пользователя.
+  // Нужно, когда Telegram-only аккаунт без настоящего email — он не может войти OTP-ом.
+  const handleAttachEmail = async (user: User) => {
+    const current = user.email && !user.email.endsWith('@t.me') ? user.email : '';
+    const input = window.prompt(
+      `Email для пользователя ${user.firstName || user.telegramId}:`,
+      current,
+    );
+    if (input == null) return;
+    const email = input.trim().toLowerCase();
+    if (!email) return;
+
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert(data?.error || 'Не удалось привязать email');
+        return;
+      }
+      // Локально обновляем список и выбранного юзера
+      setUsers(prev =>
+        prev.map(u => (u.id === user.id ? { ...u, email, emailVerified: true } : u)),
+      );
+      if (selectedUser?.id === user.id) {
+        setSelectedUser({ ...selectedUser, email, emailVerified: true });
+      }
+    } catch (e) {
+      console.error('attach email failed', e);
+      alert('Сетевая ошибка');
+    }
+  };
+
   // Фильтрация и сортировка
   const filteredUsers = users
     .filter(user => {
@@ -489,6 +525,15 @@ export default function AdminUsersPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleAttachEmail(selectedUser)}
+                    className="px-4 py-2 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors text-sm font-medium"
+                    title="Привязать или сменить email — нужно, чтобы пользователь без email мог войти OTP-ом"
+                  >
+                    {selectedUser.email && !selectedUser.email.endsWith('@t.me')
+                      ? 'Сменить email'
+                      : 'Привязать email'}
+                  </button>
                   <button
                     onClick={() => handleDeleteUser(selectedUser)}
                     disabled={isDeletingUserId === selectedUser.id}

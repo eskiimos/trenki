@@ -436,10 +436,10 @@ const ProfilePage = () => {
     : null;
 
   // Функция выхода
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (confirm('Вы уверены, что хотите выйти?')) {
-      clearAuth();
-      router.push('/');
+      await clearAuth();
+      router.push('/login');
       router.refresh();
     }
   };

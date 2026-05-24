@@ -1,10 +1,13 @@
-// Библиотека для работы с авторизацией
+// Клиентский auth-хелпер.
+// ВАЖНО: с клиента мы БОЛЬШЕ НЕ ставим cookie. Источник истины — httpOnly JWT,
+// который сервер выдаёт в /api/auth/email/verify-code и проверяет в middleware/guards.
+// Здесь только локальный кеш профиля для UX (имя, аватар) и хелперы.
 
 const AUTH_STORAGE_KEY = 'trenki_auth';
 const DEVICE_ID_KEY = 'trenki_device_id';
 
 export interface AuthData {
-  telegramId: string;
+  telegramId: string; // historical: User.telegramId (для email-юзеров — "email_..." id)
   firstName?: string;
   lastName?: string;
   username?: string;
@@ -12,87 +15,58 @@ export interface AuthData {
   lastLogin: string;
 }
 
-/**
- * Генерирует уникальный ID устройства
- */
+function isBrowser(): boolean {
+  return typeof window !== 'undefined';
+}
+
 export function generateDeviceId(): string {
+  if (!isBrowser()) return 'ssr';
   const existing = localStorage.getItem(DEVICE_ID_KEY);
   if (existing) return existing;
-  
-  const deviceId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   localStorage.setItem(DEVICE_ID_KEY, deviceId);
   return deviceId;
 }
 
-/**
- * Получает ID устройства
- */
 export function getDeviceId(): string {
+  if (!isBrowser()) return 'ssr';
   return localStorage.getItem(DEVICE_ID_KEY) || generateDeviceId();
 }
 
 /**
- * Сохраняет данные авторизации
+ * Кешируем имя/фамилию в localStorage после логина. К безопасности отношения не имеет.
  */
 export function saveAuth(authData: Omit<AuthData, 'deviceId' | 'lastLogin'>): void {
+  if (!isBrowser()) return;
   const data: AuthData = {
     ...authData,
     deviceId: getDeviceId(),
     lastLogin: new Date().toISOString(),
   };
-
-  // Сохраняем в localStorage (активный аккаунт)
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(data));
-
-  // Сохраняем telegramId в cookies для middleware
-  document.cookie = `telegramId=${data.telegramId}; path=/; max-age=${60 * 60 * 24 * 30}`; // 30 дней
-
-  // Добавляем/обновляем в общем списке аккаунтов (мульти-аккаунт)
-  // Импорт через require, чтобы избежать циклической зависимости при SSR.
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { upsertAccount } = require('./multi-account') as typeof import('./multi-account');
-    upsertAccount(data);
-  } catch {
-    // Игнорируем — в SSR-окружении модуль может быть недоступен.
-  }
-
-  console.log('Auth saved:', data);
-  console.log('Cookie set:', `telegramId=${data.telegramId}`);
 }
 
-/**
- * Получает сохранённые данные авторизации
- */
 export function getAuth(): AuthData | null {
+  if (!isBrowser()) return null;
   try {
     const data = localStorage.getItem(AUTH_STORAGE_KEY);
     if (!data) return null;
-    
     const authData = JSON.parse(data) as AuthData;
-    
-    // Проверяем, не истёк ли срок (например, 30 дней)
+
     const lastLogin = new Date(authData.lastLogin);
     const daysSinceLogin = (Date.now() - lastLogin.getTime()) / (1000 * 60 * 60 * 24);
-    
     if (daysSinceLogin > 30) {
-      console.log('Auth expired (30+ days), clearing...');
-      clearAuth();
+      localStorage.removeItem(AUTH_STORAGE_KEY);
       return null;
     }
-    
-    console.log('Auth loaded:', authData);
     return authData;
-  } catch (error) {
-    console.error('Error loading auth:', error);
+  } catch {
     return null;
   }
 }
 
-/**
- * Обновляет время последнего входа
- */
 export function updateLastLogin(): void {
+  if (!isBrowser()) return;
   const auth = getAuth();
   if (auth) {
     auth.lastLogin = new Date().toISOString();
@@ -101,91 +75,46 @@ export function updateLastLogin(): void {
 }
 
 /**
- * Очищает данные авторизации (выход).
- *
- * Если у пользователя несколько аккаунтов (мульти-аккаунт), удаляет только активный
- * и переключается на следующий. Если аккаунт один — полный выход.
+ * Выход: дёргает серверный logout (он удалит httpOnly cookie), чистит локальный кеш.
+ * Возвращает Promise, но вызовы могут не ожидать его — это ок, мы потом редиректим.
  */
-export function clearAuth(): void {
+export async function clearAuth(): Promise<void> {
+  if (!isBrowser()) return;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod = require('./multi-account') as typeof import('./multi-account');
-    const accounts = mod.getAccounts();
-    const activeId = accounts[0]?.telegramId;
-    if (accounts.length > 1 && activeId) {
-      // Удаляем только активный — переключение на следующий произойдёт внутри removeAccount
-      mod.removeAccount(activeId);
-      console.log('Auth: removed active account, switched to next');
-      return;
-    }
-    // Один или ноль аккаунтов — полная очистка
-    mod.clearAllAccounts();
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
   } catch {
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-    document.cookie = 'telegramId=; path=/; max-age=0';
+    // даже если сервер недоступен, локально дочистим
   }
-  console.log('Auth cleared (localStorage + cookie)');
+  localStorage.removeItem(AUTH_STORAGE_KEY);
+  // Старая неподписанная cookie могла висеть после миграции
+  document.cookie = 'telegramId=; path=/; max-age=0';
 }
 
-/**
- * Проверяет, авторизован ли пользователь
- */
 export function isAuthenticated(): boolean {
   return getAuth() !== null;
 }
 
 /**
- * Получает Telegram ID из сохранённых данных или из WebApp
+ * Совместимость со старым кодом. Telegram-интеграция отключена,
+ * поэтому возвращаем telegramId из локального кеша (если есть).
  */
 export function getTelegramId(): string | null {
-  if (typeof window === 'undefined') return null;
-  
-  // Сначала пытаемся получить из Telegram WebApp
-  const telegramUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
-  if (telegramUser?.id) {
-    return telegramUser.id.toString();
-  }
-  
-  // Если не получилось, берём из сохранённых данных
-  const auth = getAuth();
-  if (auth) {
-    return auth.telegramId;
-  }
-  
-  return null;
+  return getAuth()?.telegramId ?? null;
 }
 
 /**
- * Получает данные пользователя (объединяет Telegram и сохранённые данные)
+ * Возвращает данные пользователя для отображения. Источник — localStorage-кеш
+ * (записывается после успешного логина). Это НЕ источник истины для auth.
  */
 export function getUserData() {
-  const telegramUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
   const auth = getAuth();
-  
-  if (telegramUser) {
-    return {
-      id: telegramUser.id,
-      telegramId: telegramUser.id.toString(),
-      firstName: telegramUser.first_name,
-      lastName: telegramUser.last_name,
-      username: telegramUser.username,
-      photoUrl: telegramUser.photo_url,
-      languageCode: telegramUser.language_code,
-    };
-  }
-  
-  if (auth) {
-    // parseInt возвращает NaN для email-based telegramId (например "email_1776511893988_xxx")
-    // Используем числовой id для Telegram-пользователей, строку для email-пользователей
-    const numericId = parseInt(auth.telegramId);
-    return {
-      id: isNaN(numericId) ? auth.telegramId : numericId,
-      telegramId: auth.telegramId,
-      firstName: auth.firstName,
-      lastName: auth.lastName,
-      username: auth.username,
-    };
-  }
-
-  return null;
+  if (!auth) return null;
+  const numericId = parseInt(auth.telegramId, 10);
+  return {
+    id: Number.isNaN(numericId) ? auth.telegramId : numericId,
+    telegramId: auth.telegramId,
+    firstName: auth.firstName,
+    lastName: auth.lastName,
+    username: auth.username,
+  };
 }

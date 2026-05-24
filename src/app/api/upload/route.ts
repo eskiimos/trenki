@@ -13,11 +13,9 @@ export async function POST(request: NextRequest) {
   const denied = await requireAdminAsync(request);
   if (denied) return denied;
   try {
-    console.log('=== Thumbnail upload started ===');
     const formData = await request.formData();
     const file = formData.get('file') as File;
 
-    console.log('File received:', file ? file.name : 'no file');
 
     if (!file) {
       console.error('No file in formData');
@@ -30,8 +28,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Only images are allowed' }, { status: 400 });
     }
 
-    console.log('File type:', file.type);
-    console.log('File size:', file.size);
 
     // Проверяем размер файла (макс 5MB)
     if (file.size > 5 * 1024 * 1024) {
@@ -59,8 +55,6 @@ export async function POST(request: NextRequest) {
       ).end(buffer);
     });
 
-    console.log('Cloudinary upload successful:', uploadResponse.secure_url);
-    console.log('=== Thumbnail upload completed ===');
 
     return NextResponse.json({ 
       success: true, 
@@ -72,7 +66,6 @@ export async function POST(request: NextRequest) {
     console.error('Error uploading thumbnail:', error);
     return NextResponse.json({ 
       error: 'Failed to upload thumbnail',
-      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 }

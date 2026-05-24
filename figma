@@ -1,7 +1,0 @@
-<div className="w-80 px-4 py-6 bg-indigo-500 rounded-2xl inline-flex flex-col justify-start items-center gap-4">
-    <div className="text-center justify-start text-black text-2xl font-bold font-['Overpass'] leading-6">🥇</div>
-    <div className="self-stretch text-center justify-start text-slate-50 text-2xl font-bold font-['Overpass'] leading-6">Да ты жаждешь побед! Так держать!</div>
-    <div data-active="Yes" data-color="Green" className="self-stretch h-12 px-6 py-3 bg-lime-400 rounded-[32px] inline-flex justify-center items-center gap-2.5">
-        <div className="justify-center text-slate-950 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">поехали тренироваться!</div>
-    </div>
-</div>

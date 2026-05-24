@@ -18,7 +18,23 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      "src/generated/**",
     ],
+  },
+  {
+    // `console.log` оставлен только для отладки. Новый код должен использовать
+    // `src/lib/logger.ts`. Warn (а не error), чтобы не блокировать билд, пока
+    // мигрируем старые роуты.
+    rules: {
+      "no-console": ["warn", { allow: ["warn", "error"] }],
+    },
+  },
+  {
+    // logger.ts — единственное место, где console.log/warn/error ожидаемы.
+    files: ["src/lib/logger.ts"],
+    rules: {
+      "no-console": "off",
+    },
   },
 ];
 

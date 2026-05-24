@@ -1,49 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getSessionUserId } from '@/lib/auth-server';
 
+/**
+ * GET /api/users/check
+ * Возвращает существование/базовый профиль ТЕКУЩЕГО (по сессии) пользователя.
+ * Раньше принимал telegramId из query — это позволяло проверять чужие аккаунты.
+ */
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const telegramId = searchParams.get('telegramId');
-
-    console.log('Checking user with telegramId:', telegramId);
-
-    if (!telegramId) {
-      console.log('No telegramId provided');
-      return NextResponse.json(
-        { error: 'Telegram ID is required' },
-        { status: 400 }
-      );
+    const userId = await getSessionUserId(request);
+    if (!userId) {
+      return NextResponse.json({ exists: false, user: null }, { status: 401 });
     }
 
-    // Проверяем, существует ли пользователь и его профиль
     const user = await prisma.user.findUnique({
-      where: { telegramId },
-      select: { 
-        id: true, 
-        telegramId: true, 
+      where: { id: userId },
+      select: {
+        id: true,
+        telegramId: true,
         firstName: true,
         profile: {
           select: {
             birthDate: true,
-            gender: true
-          }
-        }
-      }
+            gender: true,
+          },
+        },
+      },
     });
 
-    console.log('User found:', user ? 'Yes' : 'No');
-    console.log('User details:', JSON.stringify(user, null, 2));
-
-    return NextResponse.json({
-      exists: !!user,
-      user: user
-    });
+    return NextResponse.json({ exists: !!user, user });
   } catch (error) {
     console.error('Error checking user:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -53,7 +53,6 @@ export async function GET(
     console.error('Error fetching video:', error);
     return NextResponse.json({ 
       error: 'Internal server error', 
-      details: error.message 
     }, { status: 500 });
   }
 }
@@ -260,7 +259,6 @@ export async function PUT(
     console.error('Error updating video:', error);
     return NextResponse.json({ 
       error: 'Internal server error',
-      details: error.message 
     }, { status: 500 });
   }
 }
@@ -300,7 +298,6 @@ export async function DELETE(
     console.error('Error deleting video:', error);
     return NextResponse.json({ 
       error: 'Internal server error',
-      details: error.message 
     }, { status: 500 });
   }
 }

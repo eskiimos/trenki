@@ -40,7 +40,6 @@ export async function GET(
       {
         success: false,
         error: 'Ошибка при получении модуля',
-        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );
@@ -159,7 +158,6 @@ export async function PUT(
       {
         success: false,
         error: 'Ошибка при обновлении модуля',
-        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );
@@ -205,7 +203,6 @@ export async function DELETE(
       {
         success: false,
         error: 'Ошибка при удалении модуля',
-        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );

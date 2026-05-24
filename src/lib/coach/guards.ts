@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import type { User } from '../../generated/prisma';
+import { getSessionFromRequest } from '@/lib/session';
 
 /**
- * Достаёт текущего пользователя по cookie telegramId.
+ * Достаёт текущего пользователя по подписанной сессии (httpOnly cookie).
  * Возвращает либо пользователя, либо NextResponse с 401.
  */
 export async function requireAuthUser(
   request: NextRequest,
 ): Promise<{ user: User } | { response: NextResponse }> {
-  const telegramId = request.cookies.get('telegramId')?.value;
-  if (!telegramId) {
+  const session = await getSessionFromRequest(request);
+  if (!session) {
     return { response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   }
-  const user = await prisma.user.findUnique({ where: { telegramId } });
+  const user = await prisma.user.findUnique({ where: { id: session.uid } });
   if (!user) {
     return { response: NextResponse.json({ error: 'User not found' }, { status: 401 }) };
   }

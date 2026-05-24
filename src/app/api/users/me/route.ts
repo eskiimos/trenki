@@ -1,21 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getSessionUserId } from '@/lib/auth-server';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/users/me
- * Возвращает данные текущего пользователя по cookie telegramId.
- * Включает role, наличие профиля игрока, наличие профиля тренера, активную команду.
+ * Возвращает данные текущего пользователя (по подписанной сессии).
  */
 export async function GET(request: NextRequest) {
-  const telegramId = request.cookies.get('telegramId')?.value;
-  if (!telegramId) {
+  const userId = await getSessionUserId(request);
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const user = await prisma.user.findUnique({
-    where: { telegramId },
+    where: { id: userId },
     include: {
       profile: { select: { id: true } },
       coachProfile: { select: { userId: true, clubName: true } },
@@ -26,7 +26,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
-  // Для тренера — первая (активная) команда
   let activeTeamId: string | null = null;
   if (user.role === 'COACH') {
     const team = await prisma.team.findFirst({

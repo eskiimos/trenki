@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuthUser, requireCoach } from '@/lib/coach/guards';
+import { POSE_FRAMES_ENCODING, signPoseFramesUrl } from '@/lib/pose-storage';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/pose-sessions/[id]
- * Возвращает одну сессию с записанными кадрами скелета (frames).
- * Доступ: тренер (любая сессия) или сам атлет-владелец.
+ * Тренер видит любую сессию, атлет — только свою.
+ *
+ * Кадры скелета НЕ возвращаются в ответе:
+ *  - новые сессии: возвращаем `framesUrl` (signed, TTL 1 час) — клиент сам качает с Cloudinary;
+ *  - старые сессии (до миграции): возвращаем `frames` напрямую из БД.
  */
 export async function GET(
   request: NextRequest,
@@ -30,13 +34,47 @@ export async function GET(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  return NextResponse.json({ session });
+  // Не возвращаем сырую `frames` JSON-колонку наружу: она тяжёлая и используется
+  // только как legacy-фолбэк. Вместо неё — signed URL.
+  let framesUrl: string | null = null;
+  let framesEncoding: string | null = null;
+  let legacyFrames: number[][] | null = null;
+
+  if (session.framesUrl) {
+    framesUrl = signPoseFramesUrl(session.framesUrl);
+    framesEncoding = session.framesEncoding ?? POSE_FRAMES_ENCODING;
+  } else if (session.frames) {
+    // Старая сессия: до бэкфилла отдаём кадры напрямую, чтобы плеер тренера
+    // продолжал работать. После бэкфилла этой ветки не будет.
+    legacyFrames = session.frames as unknown as number[][];
+  }
+
+  return NextResponse.json({
+    session: {
+      id: session.id,
+      athleteId: session.athleteId,
+      videoId: session.videoId,
+      durationSec: session.durationSec,
+      framesCount: session.framesCount,
+      avgConfidence: session.avgConfidence,
+      fps: session.fps,
+      coachId: session.coachId,
+      coachRating: session.coachRating,
+      coachComment: session.coachComment,
+      reviewedAt: session.reviewedAt,
+      createdAt: session.createdAt,
+      video: session.video,
+      athlete: session.athlete,
+      framesUrl,
+      framesEncoding,
+      frames: legacyFrames,
+    },
+  });
 }
 
 /**
  * PATCH /api/pose-sessions/[id]
  * Тренер ставит оценку и комментарий к сессии трекинга движений атлета.
- * Body: { rating: 1..5, comment?: string }
  */
 export async function PATCH(
   request: NextRequest,

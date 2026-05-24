@@ -42,7 +42,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`🔄 Замена модуля ${moduleIndex} в тренировке ${workoutSessionId}`);
 
     // Конвертируем userId в строку (Telegram передаёт ID как число)
     const userIdStr = String(userId);
@@ -137,13 +136,11 @@ export async function POST(request: NextRequest) {
     const trainingGoal = profile.lastGoals?.[0] as TrainingGoal | null;
     const energyState = EnergyState.IN_TONE; // По умолчанию используем IN_TONE
 
-    console.log('📋 Текущий модуль:', currentModuleType);
 
     let newModule: any = null;
 
     // Подбираем новый модуль того же типа
     if (currentModuleType === ModuleType.WARMUP) {
-      console.log('🔍 Ищем РАЗМИНКУ...');
       const warmupLoadTypes = getWarmupLoadTypes(energyState);
       const muscleGroups = trainingGoal
         ? GOAL_TO_MUSCLE_GROUPS[trainingGoal as TrainingGoal]?.warmup || [MuscleGroup.FULL_BODY]
@@ -170,13 +167,11 @@ export async function POST(request: NextRequest) {
         [currentVideo.videoId, ...workoutSession.videos.map(v => v.videoId)]
       );
 
-      console.log('🔎 Результат поиска:', result?.video?.title || 'не найдено');
       if (result.video) {
         newModule = result.video;
       }
     } else if (currentModuleType === ModuleType.COOLDOWN) {
       // Заминка
-      console.log('🔍 Ищем ЗАМИНКУ...');
       const muscleGroups = trainingGoal
         ? GOAL_TO_MUSCLE_GROUPS[trainingGoal as TrainingGoal]?.cooldown || [MuscleGroup.FULL_BODY]
         : [MuscleGroup.FULL_BODY];
@@ -196,13 +191,11 @@ export async function POST(request: NextRequest) {
         [currentVideo.videoId, ...workoutSession.videos.map(v => v.videoId)]
       );
 
-      console.log('🔎 Результат поиска:', result?.video?.title || 'не найдено');
       if (result.video) {
         newModule = result.video;
       }
     } else if (currentModuleType === ModuleType.FITNESS) {
       // ОФП
-      console.log('🔍 Ищем ОФП...');
       let loadTypes = trainingGoal
         ? GOAL_TO_LOAD_TYPES[trainingGoal as TrainingGoal].fitness
         : [LoadType.POWER];
@@ -233,13 +226,11 @@ export async function POST(request: NextRequest) {
         [currentVideo.videoId, ...workoutSession.videos.map(v => v.videoId)]
       );
 
-      console.log('🔎 Результат поиска:', result?.video?.title || 'не найдено');
       if (result.video) {
         newModule = result.video;
       }
     } else if (currentModuleType === ModuleType.TECHNIQUE) {
       // Техника
-      console.log('🔍 Ищем ТЕХНИКУ...');
       let loadTypes = trainingGoal
         ? GOAL_TO_LOAD_TYPES[trainingGoal as TrainingGoal].technique
         : [LoadType.TECHNICAL_SKILL];
@@ -270,7 +261,6 @@ export async function POST(request: NextRequest) {
         [currentVideo.videoId, ...workoutSession.videos.map(v => v.videoId)]
       );
 
-      console.log('🔎 Результат поиска:', result?.video?.title || 'не найдено');
       if (result.video) {
         newModule = result.video;
       }
@@ -284,7 +274,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`✅ Найден новый модуль: ${newModule.title}`);
 
     // Обновляем видео в тренировке
     try {
@@ -304,7 +293,6 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      console.log(`✅ Модуль заменен: ${newModule.title}`);
 
       return NextResponse.json({
         success: true,
@@ -333,7 +321,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: 'Не удалось заменить модуль',
-        details: error.message,
       },
       { status: 500 }
     );

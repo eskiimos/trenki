@@ -11,8 +11,8 @@ export default function ClearCachePage() {
   useEffect(() => {
     const clearEverything = async () => {
       try {
-        // 1. Очистить auth данные
-        clearAuth();
+        // 1. Очистить auth данные (httpOnly cookie снимает сервер /api/auth/logout)
+        await clearAuth();
         setStatus('✅ Auth очищен');
 
         // 2. Очистить весь localStorage

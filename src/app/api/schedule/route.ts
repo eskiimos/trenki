@@ -1,22 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getTelegramId } from '@/lib/auth-server';
-import { sendTelegramMessage, formatWorkoutTime } from '@/lib/telegram';
+import { requireAuthUser } from '@/lib/coach/guards';
 
 export async function GET(req: NextRequest) {
   try {
-    const telegramId = getTelegramId(req);
-    if (!telegramId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { telegramId },
-    });
-
-    if (!user) {
-      return NextResponse.json([]);
-    }
+    const auth = await requireAuthUser(req);
+    if ('response' in auth) return auth.response;
+    const user = auth.user;
 
     const { searchParams } = new URL(req.url);
     const month = searchParams.get('month');
@@ -54,204 +44,94 @@ export async function GET(req: NextRequest) {
                 name: true,
                 lastName: true,
                 avatar: true,
-              }
-            }
+              },
+            },
           },
         },
       },
-      orderBy: {
-        date: 'asc',
-      },
+      orderBy: { date: 'asc' },
     });
 
     return NextResponse.json(scheduledWorkouts);
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching scheduled workouts:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error', 
-      details: error.message,
-      stack: error.stack 
-    }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const telegramId = getTelegramId(req);
-    console.log('POST /api/schedule - telegramId:', telegramId);
-    
-    if (!telegramId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    let user = await prisma.user.findUnique({
-      where: { telegramId },
-    });
-    console.log('POST /api/schedule - user found:', user ? user.id : 'null');
-
-    if (!user) {
-      // Create user if not found (auto-registration for guests)
-      try {
-        user = await prisma.user.create({
-          data: {
-            telegramId,
-            firstName: 'Guest',
-            profile: {
-              create: {
-                strength: 16,
-                endurance: 22,
-                speed: 55,
-                technique: 22,
-                overall: 28,
-                dailyProgress: 0,
-                maxDailyGoal: 10
-              }
-            }
-          }
-        });
-        console.log('POST /api/schedule - user created:', user.id);
-      } catch (createError: any) {
-        console.error('POST /api/schedule - error creating user:', createError);
-        // If creation fails (e.g. race condition), try to find again
-        user = await prisma.user.findUnique({ where: { telegramId } });
-        if (!user) {
-           throw new Error(`Failed to create user: ${createError.message}`);
-        }
-      }
-    }
+    const auth = await requireAuthUser(req);
+    if ('response' in auth) return auth.response;
+    const user = auth.user;
 
     const body = await req.json();
-    console.log('POST /api/schedule - body:', JSON.stringify(body));
     const { videoId, dates } = body;
 
-    if (!videoId || !dates || !Array.isArray(dates)) {
+    if (!videoId || !Array.isArray(dates)) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    const createdSchedules = [];
-
-    // Получаем информацию о видео для уведомления
     const video = await prisma.video.findUnique({
       where: { id: videoId },
-      select: {
-        id: true,
-        title: true,
-        duration: true,
-        trainer: {
-          select: {
-            name: true,
-            lastName: true,
-          }
-        }
-      }
+      select: { id: true },
     });
+    if (!video) {
+      return NextResponse.json({ error: 'Video not found' }, { status: 404 });
+    }
 
-    for (const dateString of dates) {
-      const date = new Date(dateString);
-      
-      // Check if already scheduled for this video on this date
-      const existing = await prisma.scheduledWorkout.findFirst({
+    // Нормализуем и дедуплицируем даты на стороне приложения.
+    const parsedDates = (dates as string[])
+      .map(d => new Date(d))
+      .filter(d => !Number.isNaN(d.getTime()));
+    const uniqueDates = Array.from(new Set(parsedDates.map(d => d.toISOString()))).map(
+      iso => new Date(iso),
+    );
+
+    if (uniqueDates.length === 0) {
+      return NextResponse.json([]);
+    }
+
+    // Атомарно: ищем уже существующие записи и одной операцией добавляем недостающие.
+    const created = await prisma.$transaction(async tx => {
+      const existing = await tx.scheduledWorkout.findMany({
         where: {
           userId: user.id,
           videoId,
-          date,
+          date: { in: uniqueDates },
         },
+        select: { date: true },
       });
+      const existingIso = new Set(existing.map(e => e.date.toISOString()));
+      const toCreate = uniqueDates
+        .filter(d => !existingIso.has(d.toISOString()))
+        .map(d => ({ userId: user.id, videoId, date: d, notificationSent: true }));
 
-      if (!existing) {
-        const schedule = await prisma.scheduledWorkout.create({
-          data: {
-            userId: user.id,
-            videoId,
-            date,
-            notificationSent: true, // Помечаем, что уведомление о создании будет отправлено
-          },
-        });
-        createdSchedules.push(schedule);
-      }
-    }
+      if (toCreate.length === 0) return [];
 
-    // Отправляем уведомление пользователю о запланированных тренировках
-    if (createdSchedules.length > 0 && video) {
-      const trainerName = `${video.trainer.name} ${video.trainer.lastName}`;
-      
-      if (createdSchedules.length === 1) {
-        const workoutTime = formatWorkoutTime(createdSchedules[0].date);
-        const message = `✅ Тренировка запланирована!
+      await tx.scheduledWorkout.createMany({ data: toCreate });
+      return tx.scheduledWorkout.findMany({
+        where: {
+          userId: user.id,
+          videoId,
+          date: { in: toCreate.map(d => d.date) },
+        },
+        orderBy: { date: 'asc' },
+      });
+    });
 
-🎬 ${video.title}
-👤 Тренер: ${trainerName}
-⏱ Длительность: ${Math.round(video.duration / 60)} мин
-📅 ${workoutTime}
-
-Мы напомним тебе за 30 и 10 минут до начала! ⏰`;
-
-        await sendTelegramMessage(user.telegramId, message, {
-          parseMode: 'HTML',
-          replyMarkup: {
-            inline_keyboard: [
-              [
-                {
-                  text: '📱 Открыть приложение',
-                  web_app: { url: process.env.WEB_APP_URL || 'https://trenki.vercel.app' }
-                }
-              ]
-            ]
-          }
-        });
-      } else {
-        // Несколько тренировок запланировано
-        const message = `✅ Запланировано тренировок: ${createdSchedules.length}
-
-🎬 ${video.title}
-👤 Тренер: ${trainerName}
-⏱ Длительность: ${Math.round(video.duration / 60)} мин
-
-${createdSchedules.map((s, i) => `${i + 1}. ${formatWorkoutTime(s.date)}`).join('\n')}
-
-Мы напомним тебе за 30 и 10 минут до каждой! ⏰`;
-
-        await sendTelegramMessage(user.telegramId, message, {
-          parseMode: 'HTML',
-          replyMarkup: {
-            inline_keyboard: [
-              [
-                {
-                  text: '📱 Открыть приложение',
-                  web_app: { url: process.env.WEB_APP_URL || 'https://trenki.vercel.app' }
-                }
-              ]
-            ]
-          }
-        });
-      }
-    }
-
-    return NextResponse.json(createdSchedules);
-  } catch (error: any) {
+    return NextResponse.json(created);
+  } catch (error) {
     console.error('Error creating scheduled workouts:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error', 
-      details: error.message,
-      stack: error.stack 
-    }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function DELETE(req: NextRequest) {
   try {
-    const telegramId = getTelegramId(req);
-    if (!telegramId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { telegramId },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
+    const auth = await requireAuthUser(req);
+    if ('response' in auth) return auth.response;
+    const user = auth.user;
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
@@ -260,7 +140,6 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Schedule ID required' }, { status: 400 });
     }
 
-    // Verify ownership
     const schedule = await prisma.scheduledWorkout.findUnique({
       where: { id },
     });
@@ -278,11 +157,8 @@ export async function DELETE(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error deleting scheduled workout:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error', 
-      details: error.message 
-    }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

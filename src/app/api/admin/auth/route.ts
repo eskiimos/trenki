@@ -3,11 +3,13 @@ import crypto from 'crypto';
 import {
   ADMIN_COOKIE_NAME,
   ADMIN_SESSION_DURATION_MS,
+  cleanupExpiredAdminSessions,
   destroyAdminSession,
   generateAdminSessionToken,
-  touchAdminSession,
   validateAdminSessionToken,
 } from '@/lib/admin-session';
+
+export const dynamic = 'force-dynamic';
 
 // Учётные данные админа берутся ТОЛЬКО из env. Без дефолтов.
 const ADMIN_LOGIN = process.env.ADMIN_LOGIN;
@@ -26,11 +28,8 @@ function timingSafeEqualStr(a: string, b: string): boolean {
 export async function POST(request: NextRequest) {
   try {
     if (!ADMIN_LOGIN || !ADMIN_PASSWORD) {
-      console.error('❌ ADMIN_LOGIN/ADMIN_PASSWORD не заданы в env');
-      return NextResponse.json(
-        { error: 'Admin auth is not configured' },
-        { status: 500 }
-      );
+      console.error('ADMIN_LOGIN/ADMIN_PASSWORD не заданы в env');
+      return NextResponse.json({ error: 'Admin auth is not configured' }, { status: 500 });
     }
 
     const body = await request.json().catch(() => null);
@@ -38,24 +37,21 @@ export async function POST(request: NextRequest) {
     const password = typeof body?.password === 'string' ? body.password : '';
 
     if (!login || !password) {
-      return NextResponse.json(
-        { error: 'Login and password are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Login and password are required' }, { status: 400 });
     }
 
     const okLogin = timingSafeEqualStr(login, ADMIN_LOGIN);
     const okPass = timingSafeEqualStr(password, ADMIN_PASSWORD);
 
     if (!okLogin || !okPass) {
-      console.error(`❌ Failed admin login attempt: ${login}`);
-      return NextResponse.json(
-        { error: 'Invalid credentials' },
-        { status: 401 }
-      );
+      console.error(`Failed admin login attempt: ${login}`);
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    const token = generateAdminSessionToken();
+    // Удобный момент почистить протухшее.
+    await cleanupExpiredAdminSessions().catch(() => {});
+
+    const token = await generateAdminSessionToken();
 
     const response = NextResponse.json({ success: true });
     response.cookies.set(ADMIN_COOKIE_NAME, token, {
@@ -69,32 +65,25 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     console.error('Error in admin auth:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 /**
  * GET /api/admin/auth — проверка валидности текущей сессии.
+ * `validateAdminSessionToken` сам обновит lastSeenAt/expiresAt (sliding session).
  */
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
-
-    if (!validateAdminSessionToken(token)) {
+    const ok = await validateAdminSessionToken(token);
+    if (!ok) {
       return NextResponse.json({ authenticated: false }, { status: 401 });
     }
-
-    touchAdminSession(token!);
     return NextResponse.json({ authenticated: true });
   } catch (error) {
     console.error('Error checking admin session:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -104,16 +93,13 @@ export async function GET(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const token = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
-    if (token) destroyAdminSession(token);
+    if (token) await destroyAdminSession(token);
 
     const response = NextResponse.json({ success: true, message: 'Logged out' });
     response.cookies.delete(ADMIN_COOKIE_NAME);
     return response;
   } catch (error) {
     console.error('Error logging out admin:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

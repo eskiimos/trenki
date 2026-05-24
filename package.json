@@ -7,6 +7,9 @@
     "build": "npm run generate:icons && next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "postinstall": "prisma generate",
     "seed": "tsx prisma/seed.ts",
     "generate:icons": "node scripts/generate-icons.js"
@@ -19,6 +22,7 @@
     "@prisma/extension-accelerate": "^2.0.2",
     "@react-email/render": "^2.0.0",
     "cloudinary": "^2.8.0",
+    "jose": "^6.2.3",
     "lucide-react": "^0.542.0",
     "next": "^16.0.7",
     "prisma": "^6.16.1",
@@ -36,10 +40,12 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
+    "@vitest/coverage-v8": "^4.1.7",
     "eslint": "^9",
     "eslint-config-next": "^16.0.7",
     "tailwindcss": "^4",
     "tsx": "^4.20.5",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.7"
   }
 }

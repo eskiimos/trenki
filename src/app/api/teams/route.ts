@@ -52,23 +52,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Название команды обязательно' }, { status: 400 });
   }
 
-  // Генерируем уникальный код (с защитой от коллизии)
-  let inviteCode = generateInviteCode();
-  for (let i = 0; i < 5; i += 1) {
-    const exists = await prisma.team.findUnique({ where: { inviteCode } });
-    if (!exists) break;
-    inviteCode = generateInviteCode();
+  // Insert-with-retry: полагаемся на UNIQUE-индекс Team.inviteCode, ловим P2002.
+  // Старая схема «findUnique → create» допускала гонку (двое тренеров одновременно
+  // могли получить один и тот же inviteCode).
+  let team: Awaited<ReturnType<typeof prisma.team.create>> | null = null;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const inviteCode = generateInviteCode();
+    try {
+      team = await prisma.team.create({
+        data: {
+          name,
+          clubName,
+          logoUrl,
+          inviteCode,
+          createdBy: auth.user.id,
+        },
+      });
+      break;
+    } catch (err: any) {
+      // P2002 — нарушение уникальности (inviteCode). Перегенерируем и повторим.
+      if (err?.code === 'P2002') continue;
+      throw err;
+    }
   }
 
-  const team = await prisma.team.create({
-    data: {
-      name,
-      clubName,
-      logoUrl,
-      inviteCode,
-      createdBy: auth.user.id,
-    },
-  });
+  if (!team) {
+    return NextResponse.json(
+      { error: 'Не удалось сгенерировать уникальный код. Попробуйте ещё раз.' },
+      { status: 503 },
+    );
+  }
 
   return NextResponse.json({
     success: true,

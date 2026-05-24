@@ -51,7 +51,6 @@ export async function GET(request: NextRequest) {
     console.error('Error fetching reviews:', error);
     return NextResponse.json({ 
       error: 'Internal server error', 
-      details: error.message 
     }, { status: 500 });
   }
 }

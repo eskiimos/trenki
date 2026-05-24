@@ -47,7 +47,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('🎯 Генерация тренировки 2.0:', { userId, goal, energyState });
 
     // Получаем пользователя и профиль
     const user = await prisma.user.findUnique({
@@ -88,7 +87,6 @@ export async function POST(request: NextRequest) {
       profile.potential
     );
 
-    console.log('📝 Структура тренировки:', structure);
 
     // Определяем диапазон RPE
     const rpeRange = getRPERange(
@@ -97,7 +95,6 @@ export async function POST(request: NextRequest) {
       profile.ageGroup as AgeGroup | undefined
     );
 
-    console.log('💪 Диапазон RPE:', rpeRange);
 
     // Получаем направления и типы нагрузки из матриц
     const muscleGroups = GOAL_TO_MUSCLE_GROUPS[goal as TrainingGoal];
@@ -113,9 +110,6 @@ export async function POST(request: NextRequest) {
       profile.ageGroup as AgeGroup | undefined
     );
 
-    console.log('🎯 Цель тренировки:', goal);
-    console.log('🏋️ Типы нагрузки:', loadTypes);
-    console.log('💪 Мышечные группы:', muscleGroups);
 
     // Собираем тренировку
     const workout = await buildWorkout({
@@ -173,7 +167,6 @@ export async function POST(request: NextRequest) {
       previousGoals.length >= 2 &&
       previousGoals.slice(0, 2).every((g) => g === goal);
 
-    console.log('✅ Тренировка создана:', workoutSession.id);
 
     return NextResponse.json({
       success: true,
@@ -198,7 +191,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: 'Не удалось сгенерировать тренировку',
-        details: error.message,
       },
       { status: 500 }
     );
@@ -256,7 +248,6 @@ async function buildWorkout(params: {
   const shouldSelectTechnique = structure.includeTechnique || selectTechniqueInsteadOfFitness;
 
   if (shouldSelectFitness) {
-    console.log('\n💪 Подбираем ФИЗИЧЕСКУЮ ПОДГОТОВКУ...');
 
     const fitnessCriteria = createSearchCriteria(
       ModuleType.FITNESS,
@@ -281,12 +272,10 @@ async function buildWorkout(params: {
       );
     } else {
       missingModules.push('ФИЗ ПОДГОТОВКА');
-      console.log('❌ ФИЗ ПОДГОТОВКА не найдена');
     }
   }
 
   if (shouldSelectTechnique) {
-    console.log('\n🏒 Подбираем ТЕХНИКУ...');
 
     const techniqueCriteria = createSearchCriteria(
       ModuleType.TECHNIQUE,
@@ -311,7 +300,6 @@ async function buildWorkout(params: {
       );
     } else {
       missingModules.push('ТЕХНИКА');
-      console.log('❌ ТЕХНИКА не найдена');
     }
   }
 
@@ -319,7 +307,6 @@ async function buildWorkout(params: {
   // 2. РАЗМИНКА (если нужна) - с привязкой к ФП и цели
   // ========================================================================
   if (structure.includeWarmup) {
-    console.log('\n🔥 Подбираем РАЗМИНКУ...');
 
     const warmupLoadTypes = getWarmupLoadTypes(energyState);
     const fitnessMuscleGroup = selectedFitness?.muscleGroup;
@@ -351,7 +338,6 @@ async function buildWorkout(params: {
       );
     } else {
       missingModules.push('РАЗМИНКА');
-      console.log('❌ РАЗМИНКА не найдена');
     }
   }
 
@@ -359,7 +345,6 @@ async function buildWorkout(params: {
   // 4. ЗАМИНКА (если нужна) - фильтруем по цели
   // ========================================================================
   if (structure.includeCooldown) {
-    console.log('\n🧘 Подбираем ЗАМИНКУ...');
 
     const cooldownCriteria = createSearchCriteria(
       ModuleType.COOLDOWN,
@@ -385,7 +370,6 @@ async function buildWorkout(params: {
       );
     } else {
       missingModules.push('ЗАМИНКА');
-      console.log('❌ ЗАМИНКА не найдена');
     }
   }
 
@@ -394,7 +378,6 @@ async function buildWorkout(params: {
   if (selectedTechnique) modules.push(selectedTechnique);
   if (selectedCooldown) modules.push(selectedCooldown);
 
-  console.log(`\n📊 Итого модулей: ${modules.length}`);
   console.log(`⏱️ Общая длительность: ${Math.floor(totalDuration / 60)} мин`);
 
   return {

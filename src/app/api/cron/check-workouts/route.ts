@@ -216,8 +216,6 @@ export async function GET(request: NextRequest) {
     console.error('❌ Error in check-workouts cron:', error);
     return NextResponse.json({
       error: 'Internal server error',
-      details: error.message,
-      stack: error.stack
     }, { status: 500 });
   }
 }

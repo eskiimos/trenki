@@ -130,7 +130,6 @@ export async function POST(request: NextRequest) {
     console.error('Error creating short:', error);
     return NextResponse.json({ 
       error: 'Failed to create short',
-      details: error.message 
     }, { status: 500 });
   }
 }

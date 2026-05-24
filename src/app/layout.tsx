@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Overpass } from "next/font/google";
 import Script from "next/script";
+import { headers } from "next/headers";
 import "./globals.css";
-import TelegramProvider from "@/components/TelegramProvider";
 import OnboardingWrapper from "@/components/OnboardingWrapper";
 import PWAInit from "@/components/PWAInit";
 import OfflineHandler from "@/components/OfflineHandler";
@@ -58,11 +58,13 @@ export const viewport = {
   viewportFit: 'cover',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // middleware кладёт nonce для CSP; в dev (или если middleware не отработал) пустая строка ок.
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   return (
     <html lang="ru" suppressHydrationWarning>
       <head>
@@ -75,10 +77,9 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/icons/icon-app.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-        <script src="https://telegram.org/js/telegram-web-app.js" async></script>
       </head>
       <body className={`${overpass.variable} antialiased mobile-layout`}>
-        <Script id="yandex-metrika" strategy="afterInteractive">
+        <Script id="yandex-metrika" strategy="afterInteractive" nonce={nonce}>
           {`(function(m,e,t,r,i,k,a){
             m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
             m[i].l=1*new Date();
@@ -93,13 +94,11 @@ export default function RootLayout({
         <AppLoader />
         <PWAInit />
         <OfflineHandler />
-        <TelegramProvider>
-          <OnboardingWrapper>
-            <div className="mobile-container">
-              {children}
-            </div>
-          </OnboardingWrapper>
-        </TelegramProvider>
+        <OnboardingWrapper>
+          <div className="mobile-container">
+            {children}
+          </div>
+        </OnboardingWrapper>
       </body>
     </html>
   );

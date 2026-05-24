@@ -23,9 +23,9 @@ export default function CoachProfilePage() {
     })();
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (confirm('Выйти из аккаунта?')) {
-      clearAuth();
+      await clearAuth();
       router.push('/login');
     }
   };

@@ -24,6 +24,21 @@ interface SessionPayload {
 }
 
 /**
+ * Скачивает gzip-сжатый JSON с Cloudinary и распаковывает через нативный
+ * DecompressionStream (поддерживается всеми текущими браузерами и iOS Safari 16+).
+ */
+async function fetchPoseFramesFromUrl(url: string): Promise<number[][]> {
+  const res = await fetch(url);
+  if (!res.ok || !res.body) throw new Error(`pose frames fetch: HTTP ${res.status}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ds: any = new (globalThis as any).DecompressionStream('gzip');
+  const stream = res.body.pipeThrough(ds);
+  const text = await new Response(stream).text();
+  const doc = JSON.parse(text) as { fps?: number | null; frames?: unknown };
+  return Array.isArray(doc.frames) ? (doc.frames as number[][]) : [];
+}
+
+/**
  * Воспроизведение записанного скелета атлета для тренера.
  * Кадр: [t_ms, x0,y0,v0, x1,y1,v1, ...] (x,y *1000 -> int; v *100 -> int).
  */
@@ -46,19 +61,40 @@ export default function PoseReplay({ sessionId, open }: Props) {
     // Таймаут на случай если эндпоинт ещё не задеплоен или висит
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
-    fetch(`/api/pose-sessions/${sessionId}`, { signal: controller.signal })
-      .then(async (r) => {
+    (async () => {
+      try {
+        const r = await fetch(`/api/pose-sessions/${sessionId}`, { signal: controller.signal });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((data) => {
+        const data = await r.json();
         if (cancelled) return;
         if (!data?.session) {
           setError('Сессия не найдена');
           return;
         }
-        const s = data.session as SessionPayload & { frames?: unknown };
-        const frames = Array.isArray(s.frames) ? (s.frames as number[][]) : [];
+        const s = data.session as SessionPayload & {
+          frames?: unknown;
+          framesUrl?: string | null;
+          framesEncoding?: string | null;
+        };
+
+        // Новые сессии — кадры лежат в Cloudinary, бэкенд дал signed URL.
+        // Старые (до бэкфилла) — frames приходят inline в `frames`.
+        let frames: number[][] = [];
+        if (s.framesUrl) {
+          try {
+            frames = await fetchPoseFramesFromUrl(s.framesUrl);
+          } catch (e) {
+            if (!cancelled) {
+              setError('Не удалось загрузить запись скелета');
+            }
+            console.error('pose frames fetch failed', e);
+            return;
+          }
+        } else if (Array.isArray(s.frames)) {
+          frames = s.frames as number[][];
+        }
+        if (cancelled) return;
+
         framesRef.current = frames;
         setSession({
           id: s.id,
@@ -67,19 +103,19 @@ export default function PoseReplay({ sessionId, open }: Props) {
           framesCount: s.framesCount,
           frames,
         });
-      })
-      .catch((e) => {
+      } catch (e: unknown) {
         if (cancelled) return;
-        if (e?.name === 'AbortError') {
+        const err = e as { name?: string; message?: string };
+        if (err?.name === 'AbortError') {
           setError('Превышено время ожидания. Возможно, сервер ещё не обновлён.');
         } else {
-          setError(e?.message || 'Ошибка загрузки');
+          setError(err?.message || 'Ошибка загрузки');
         }
-      })
-      .finally(() => {
+      } finally {
         clearTimeout(timeoutId);
         if (!cancelled) setLoading(false);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
       clearTimeout(timeoutId);

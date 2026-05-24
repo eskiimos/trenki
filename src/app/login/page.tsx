@@ -3,82 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAuthenticated, saveAuth } from '@/lib/auth';
-import { isAddingAccount, consumeAddingAccount } from '@/lib/multi-account';
-
-// ─────────────────────────────────────────────
-// Упрощённый вход только по email (для добавления второго аккаунта)
-// ─────────────────────────────────────────────
-function DirectEmailLoginForm() {
-  const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleLogin = async () => {
-    setError(null);
-    setLoading(true);
-    try {
-      const res = await fetch('/api/auth/email/direct-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Ошибка входа');
-        return;
-      }
-      consumeAddingAccount();
-      saveAuth({
-        telegramId: data.user.telegramId,
-        firstName: data.user.firstName,
-        lastName: data.user.lastName,
-        username: data.user.username,
-      });
-      window.location.href = data.needsOnboarding ? '/onboarding/role' : '/';
-    } catch {
-      setError('Сетевая ошибка. Проверьте подключение.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <label className="block text-gray-400 text-sm mb-2">Email</label>
-        <input
-          type="email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && !loading && email && handleLogin()}
-          placeholder="example@mail.ru"
-          className="w-full bg-[#0A0E1A] text-white border border-[#2a2f4a] rounded-xl px-4 py-3 focus:outline-none focus:border-[#A1FF4A] transition-colors placeholder-gray-600"
-          autoComplete="email"
-          autoFocus
-        />
-      </div>
-      {error && (
-        <div className="p-3 bg-red-500/20 border border-red-500 rounded-lg">
-          <p className="text-red-400 text-sm text-center">{error}</p>
-        </div>
-      )}
-      <button
-        onClick={handleLogin}
-        disabled={loading || !email}
-        className="w-full bg-[#A1FF4A] hover:bg-[#8fe63a] disabled:bg-gray-600 disabled:cursor-not-allowed text-[#101530] font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all"
-      >
-        {loading ? (
-          <span className="flex items-center gap-2">
-            <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#101530] inline-block"></span>
-            Вход...
-          </span>
-        ) : (
-          'Войти'
-        )}
-      </button>
-    </div>
-  );
-}
 
 // ─────────────────────────────────────────────
 // Email-логин: отправка кода и верификация
@@ -113,7 +37,7 @@ function EmailLoginForm() {
         setError(data.error || 'Ошибка отправки');
         return;
       }
-      // 🔧 DEV MODE: сервер вернул код напрямую (нет Resend) — подставим его сразу
+      // DEV: сервер возвращает код напрямую (без Resend)
       if (data.devCode) {
         setCode(data.devCode);
         console.log('🔧 DEV LOGIN CODE:', data.devCode);
@@ -135,6 +59,7 @@ function EmailLoginForm() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code }),
+        credentials: 'include',
       });
       const data = await res.json();
       if (!res.ok) {
@@ -142,7 +67,7 @@ function EmailLoginForm() {
         return;
       }
       saveAuth({
-        telegramId: data.user.telegramId,
+        telegramId: data.user.id, // сервер вернул User.id — этого достаточно для UX-кеша
         firstName: data.user.firstName,
         lastName: data.user.lastName,
         username: data.user.username,
@@ -150,9 +75,13 @@ function EmailLoginForm() {
 
       // Если пользователь приходил по приглашению — возвращаем его на /join/CODE
       let pendingJoinCode: string | null = null;
-      try { pendingJoinCode = localStorage.getItem('pendingJoinCode'); } catch { }
+      try {
+        pendingJoinCode = localStorage.getItem('pendingJoinCode');
+      } catch {}
       if (pendingJoinCode) {
-        try { localStorage.removeItem('pendingJoinCode'); } catch { }
+        try {
+          localStorage.removeItem('pendingJoinCode');
+        } catch {}
         window.location.href = `/join/${pendingJoinCode}`;
         return;
       }
@@ -180,7 +109,6 @@ function EmailLoginForm() {
             autoComplete="email"
           />
         </div>
-        {/* Чекбоксы согласия */}
         <div className="flex flex-col gap-3">
           <label className="flex items-start gap-3 cursor-pointer group">
             <div className="relative mt-0.5 shrink-0">
@@ -199,14 +127,16 @@ function EmailLoginForm() {
               >
                 {acceptedTerms && (
                   <svg width="11" height="8" viewBox="0 0 11 8" fill="none">
-                    <path d="M1 4L4 7L10 1" stroke="#101530" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M1 4L4 7L10 1" stroke="#101530" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 )}
               </div>
             </div>
             <span className="text-gray-400 text-xs leading-relaxed">
               Я прочитал(а) и согласен(а) с{' '}
-              <a href="/legal/terms" target="_blank" className="text-[#A1FF4A] hover:underline">пользовательским соглашением</a>
+              <a href="/legal/terms" target="_blank" className="text-[#A1FF4A] hover:underline">
+                пользовательским соглашением
+              </a>
             </span>
           </label>
 
@@ -227,14 +157,16 @@ function EmailLoginForm() {
               >
                 {acceptedPrivacy && (
                   <svg width="11" height="8" viewBox="0 0 11 8" fill="none">
-                    <path d="M1 4L4 7L10 1" stroke="#101530" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M1 4L4 7L10 1" stroke="#101530" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 )}
               </div>
             </div>
             <span className="text-gray-400 text-xs leading-relaxed">
               Я даю согласие на обработку персональных данных в соответствии с{' '}
-              <a href="/legal/privacy" target="_blank" className="text-[#A1FF4A] hover:underline">политикой конфиденциальности</a>
+              <a href="/legal/privacy" target="_blank" className="text-[#A1FF4A] hover:underline">
+                политикой конфиденциальности
+              </a>
             </span>
           </label>
         </div>
@@ -250,7 +182,9 @@ function EmailLoginForm() {
           className="w-full bg-[#A1FF4A] hover:bg-[#8fe63a] disabled:bg-gray-600 disabled:cursor-not-allowed text-[#101530] font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all"
         >
           {loading ? (
-            <span className="flex items-center gap-2"><span className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#101530] inline-block"></span> Отправка...</span>
+            <span className="flex items-center gap-2">
+              <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#101530] inline-block"></span> Отправка...
+            </span>
           ) : (
             'Отправить код'
           )}
@@ -292,14 +226,20 @@ function EmailLoginForm() {
         className="w-full bg-[#A1FF4A] hover:bg-[#8fe63a] disabled:bg-gray-600 disabled:cursor-not-allowed text-[#101530] font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all"
       >
         {loading ? (
-          <span className="flex items-center gap-2"><span className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#101530] inline-block"></span> Проверка...</span>
+          <span className="flex items-center gap-2">
+            <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#101530] inline-block"></span> Проверка...
+          </span>
         ) : (
           'Войти'
         )}
       </button>
       <div className="flex items-center justify-between text-sm">
         <button
-          onClick={() => { setStep('email'); setCode(''); setError(null); }}
+          onClick={() => {
+            setStep('email');
+            setCode('');
+            setError(null);
+          }}
           className="text-gray-500 hover:text-white transition-colors"
         >
           ← Изменить email
@@ -307,11 +247,7 @@ function EmailLoginForm() {
         {countdown > 0 ? (
           <span className="text-gray-500">Повторить через {countdown}с</span>
         ) : (
-          <button
-            onClick={handleSendCode}
-            disabled={loading}
-            className="text-[#A1FF4A] hover:underline"
-          >
+          <button onClick={handleSendCode} disabled={loading} className="text-[#A1FF4A] hover:underline">
             Отправить снова
           </button>
         )}
@@ -326,14 +262,9 @@ function EmailLoginForm() {
 export default function LoginPage() {
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
-  const [addingAccount, setAddingAccount] = useState(false);
 
   useEffect(() => {
-    const adding = isAddingAccount();
-    setAddingAccount(adding);
-    // Если пользователь идёт сюда для ДОБАВЛЕНИЯ второго аккаунта (мульти-аккаунт),
-    // не редиректим — даём ему войти под другим email.
-    if (isAuthenticated() && !adding) {
+    if (isAuthenticated()) {
       router.push('/');
       return;
     }
@@ -353,22 +284,15 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[#101530] flex flex-col items-center justify-center px-6">
-      {/* Логотип */}
       <div className="mb-8 text-center">
         <h1 className="text-white text-6xl font-bold tracking-wider mb-4">ТРЕНЬКИ</h1>
         <p className="text-gray-400 text-lg">Цифровой мир хоккея</p>
       </div>
 
-      {/* Основной контейнер */}
       <div className="w-full max-w-md bg-[#1a1f3a] rounded-2xl p-8 shadow-2xl">
-        <h2 className="text-white text-2xl font-bold text-center mb-6">
-          {addingAccount ? 'Добавить аккаунт' : 'Вход через Email'}
-        </h2>
-
-        {addingAccount ? <DirectEmailLoginForm /> : <EmailLoginForm />}
+        <h2 className="text-white text-2xl font-bold text-center mb-6">Вход через Email</h2>
+        <EmailLoginForm />
       </div>
-
-
     </div>
   );
 }

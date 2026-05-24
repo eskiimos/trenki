@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { signSession, setSessionCookie } from '@/lib/session';
+import { rateLimit } from '@/lib/coach/rate-limit';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
+
+function getClientIp(request: NextRequest): string {
+  const fwd = request.headers.get('x-forwarded-for');
+  if (fwd) return fwd.split(',')[0]!.trim();
+  return request.headers.get('x-real-ip') || 'unknown';
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +22,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email и код обязательны' }, { status: 400 });
     }
 
-    // Ищем актуальный OTP (не использованный, не истёкший)
+    // 5 неуспешных попыток на пару (email + IP) в окне 15 минут
+    const rlKey = `otp-verify:${email}:${getClientIp(request)}`;
+    const rl = rateLimit(rlKey, 5, 15 * 60 * 1000);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: 'Слишком много попыток, попробуйте позже' },
+        { status: 429 },
+      );
+    }
+
     const otp = await prisma.emailOtp.findFirst({
       where: { email, code, used: false },
       orderBy: { createdAt: 'desc' },
@@ -28,18 +46,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Код истёк. Запросите новый.' }, { status: 400 });
     }
 
-    // Помечаем OTP как использованный
     await prisma.emailOtp.update({ where: { id: otp.id }, data: { used: true } });
 
     // Ищем или создаём пользователя по email.
-    // Если в cookie уже есть telegramId — это никак не влияет: мы не верим
-    // содержимому cookie без проверки OTP, иначе можно подсунуть чужую cookie
-    // и пройти "вход" без знания кода.
     let user = await prisma.user.findUnique({ where: { email } });
     let needsOnboarding = false;
 
     if (!user) {
-      // Новый пользователь — генерируем уникальный ID вместо telegramId
       const generatedId = `email_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       user = await prisma.user.create({
         data: {
@@ -51,14 +64,12 @@ export async function POST(request: NextRequest) {
       });
       needsOnboarding = true;
     } else {
-      // Обновляем emailVerified если нужно
       if (!user.emailVerified) {
         user = await prisma.user.update({
           where: { id: user.id },
           data: { emailVerified: true },
         });
       }
-      // Проверяем нужен ли онбординг
       const profile = await prisma.profile.findUnique({ where: { userId: user.id } });
       needsOnboarding = !profile;
     }
@@ -66,7 +77,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       success: true,
       user: {
-        telegramId: user.telegramId,
+        id: user.id,
         firstName: user.firstName,
         lastName: user.lastName,
         username: user.username,
@@ -74,20 +85,12 @@ export async function POST(request: NextRequest) {
       needsOnboarding,
     });
 
-    // Ставим cookie с сервера с правильными флагами безопасности.
-    // httpOnly пока НЕ включаем, т.к. клиент читает её для logout (lib/auth.ts).
-    // Это будет переведено на httpOnly + /api/auth/logout позже.
-    response.cookies.set('telegramId', user.telegramId, {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 60 * 24 * 30, // 30 дней
-    });
-
+    const token = await signSession({ uid: user.id, role: user.role });
+    setSessionCookie(response, token);
+    logger.info('user login via email OTP', { userId: user.id });
     return response;
   } catch (error) {
-    console.error('Error in verify-code:', error);
+    logger.error('verify-code failed', error);
     return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
   }
 }

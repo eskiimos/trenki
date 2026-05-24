@@ -125,7 +125,6 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    console.log('✅ Workout session created:', workoutSession.id);
 
     return NextResponse.json({
       success: true,
@@ -183,7 +182,6 @@ async function selectModulesForWorkout(
   // Определяем статус тренировки из assessment
   const trainingStatus = getTrainingStatus(assessment);
   
-  console.log('🎯 Selecting videos:', { loadDirection, targetRPE, trainingStatus });
 
   // ШАГ 1: Подбираем РАЗМИНКУ (любое видео с низким RPE)
   const warmup = await prisma.video.findFirst({
@@ -306,7 +304,6 @@ async function selectModulesForWorkout(
     console.log('❌ COOLDOWN (Заминка) не найдена! Требуется: категории GENERAL/TECHNIQUE с RPE макс ≤ 5');
   }
 
-  console.log(`📊 Итого подобрано видео: ${videos.length}/4`);
   if (missingModules.length > 0) {
     console.log(`⚠️ Отсутствуют модули: ${missingModules.join(', ')}`);
   }
@@ -371,7 +368,6 @@ async function selectModulesForWorkoutV2(
   
   // ШАГ 1: Определяем статус тренировки (п.5)
   const trainingStatus = getTrainingStatusEnum(assessment);
-  console.log('🎯 Статус:', trainingStatus, 'RPE:', targetRPE);
 
   // ШАГ 2: СТЕРЖНЕВОЙ МОДУЛЬ - ФИЗ ПОДГОТОВКА (п.2, п.5)
   const fitnessLoadTypes = getFitnessLoadTypesByStatus(trainingStatus);
@@ -391,7 +387,6 @@ async function selectModulesForWorkoutV2(
 
   if (!fitness) {
     missingModules.push(`ФИЗ ПОДГОТОВКА (${trainingStatus})`);
-    console.log('❌ FITNESS не найдена! Статус:', trainingStatus, 'Типы нагрузки:', fitnessLoadTypes);
     return {
       success: false,
       message: `Не найден модуль ФИЗ ПОДГОТОВКА для статуса ${trainingStatus}`,
@@ -401,7 +396,6 @@ async function selectModulesForWorkoutV2(
   }
 
   videos.push(fitness);
-  console.log('✅ FITNESS:', fitness.title, 'LoadType:', fitness.loadType, 'MuscleGroup:', fitness.muscleGroup);
 
   // ШАГ 3: ТЕХНИКА - совместимая с ФИЗ ПОДГОТОВКОЙ (п.8)
   const techniqueLoadTypes = getCompatibleTechniqueTypes(fitness.loadType!);
@@ -427,10 +421,8 @@ async function selectModulesForWorkoutV2(
 
   if (!technique) {
     missingModules.push('ТЕХНИКА');
-    console.log('❌ TECHNIQUE не найдена! Совместимые типы:', techniqueLoadTypes);
   } else {
     videos.push(technique);
-    console.log('✅ TECHNIQUE:', technique.title, 'LoadType:', technique.loadType);
   }
 
   // ШАГ 4: РАЗМИНКА - по статусу + совместимость с ФИЗ (п.9-10)
@@ -457,10 +449,8 @@ async function selectModulesForWorkoutV2(
 
   if (!warmup) {
     missingModules.push('РАЗМИНКА');
-    console.log('❌ WARMUP не найдена! Типы:', warmupTypes, 'Группы:', warmupMuscleGroups);
   } else {
     videos.unshift(warmup); // Разминка идёт первой
-    console.log('✅ WARMUP:', warmup.title, 'LoadType:', warmup.loadType);
   }
 
   // ШАГ 5: ЗАМИНКА - по направлению ФИЗ ПОДГОТОВКИ (п.11)
@@ -485,10 +475,8 @@ async function selectModulesForWorkoutV2(
 
   if (!cooldown) {
     missingModules.push('ЗАМИНКА');
-    console.log('❌ COOLDOWN не найдена! Группы:', cooldownMuscleGroups);
   } else {
     videos.push(cooldown); // Заминка идёт последней
-    console.log('✅ COOLDOWN:', cooldown.title, 'MuscleGroup:', cooldown.muscleGroup);
   }
 
   // Проверяем минимальные требования (хотя бы ФИЗ + еще один модуль)
@@ -501,7 +489,6 @@ async function selectModulesForWorkoutV2(
     };
   }
 
-  console.log(`📊 Итого: ${videos.length}/4 модулей`);
   return { success: true, videos, trainingStatus };
 }
 

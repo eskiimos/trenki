@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getSessionUserId } from '@/lib/auth-server';
 
 export async function GET(request: NextRequest) {
   try {
-    const telegramId = request.nextUrl.searchParams.get('telegramId');
-    if (!telegramId) {
+    const userId = await getSessionUserId(request);
+    if (!userId) {
       return NextResponse.json({ isAdmin: false });
     }
 
     const user = await prisma.user.findUnique({
-      where: { telegramId },
+      where: { id: userId },
       select: { isAdmin: true },
     });
 

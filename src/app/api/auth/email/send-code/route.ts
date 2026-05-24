@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
+import { rateLimit } from '@/lib/coach/rate-limit';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +11,12 @@ function generateOtp(): string {
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function getClientIp(request: NextRequest): string {
+  const fwd = request.headers.get('x-forwarded-for');
+  if (fwd) return fwd.split(',')[0]!.trim();
+  return request.headers.get('x-real-ip') || 'unknown';
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,31 +27,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Некорректный email' }, { status: 400 });
     }
 
+    // Лимит: не более 3 кодов на email за 10 минут И не более 10 кодов с одного IP за 10 минут
+    const emailRl = rateLimit(`otp-send:email:${email}`, 3, 10 * 60 * 1000);
+    if (!emailRl.ok) {
+      return NextResponse.json(
+        { error: 'Слишком частые запросы кода. Попробуйте через несколько минут.' },
+        { status: 429 },
+      );
+    }
+    const ipRl = rateLimit(`otp-send:ip:${getClientIp(request)}`, 10, 10 * 60 * 1000);
+    if (!ipRl.ok) {
+      return NextResponse.json(
+        { error: 'Слишком много запросов. Попробуйте позже.' },
+        { status: 429 },
+      );
+    }
+
     const code = generateOtp();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 минут
 
-    // Удаляем старые коды для этого email
     await prisma.emailOtp.deleteMany({ where: { email } });
-
-    // Создаём новый OTP
     await prisma.emailOtp.create({ data: { email, code, expiresAt } });
 
-    // 🔧 DEV MODE: если нет RESEND_API_KEY или мы не в production —
-    // не пытаемся слать письмо, а просто отдаём код в ответе и пишем в консоль.
-    // Это позволяет логиниться локально без настройки Resend.
+    // DEV: без RESEND_API_KEY — возвращаем код в ответе и пишем в консоль.
     const isDevBypass =
       process.env.NODE_ENV !== 'production' || !process.env.RESEND_API_KEY;
 
     if (isDevBypass) {
-      console.log('\n========================================');
-      console.log('🔧 DEV LOGIN CODE');
-      console.log(`   email: ${email}`);
-      console.log(`   code:  ${code}`);
-      console.log('========================================\n');
+      logger.info('dev OTP issued', { email, code });
       return NextResponse.json({ success: true, devCode: code });
     }
 
-    // Отправляем письмо
+    logger.info('OTP requested', { email });
+
     const result = await sendEmail({
       to: email,
       subject: 'Код входа в Треньки',
@@ -61,13 +77,13 @@ export async function POST(request: NextRequest) {
     });
 
     if (!result.success) {
-      console.error('Email send failed:', result.error);
+      logger.error('Email send failed', result.error);
       return NextResponse.json({ error: 'Не удалось отправить письмо' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error in send-code:', error);
+    logger.error('send-code failed', error);
     return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
   }
 }

@@ -18,7 +18,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('🔄 Update workout:', { sessionId, videoId, action });
 
     // Начать видео
     if (action === 'start' && videoId) {
@@ -43,7 +42,6 @@ export async function POST(request: NextRequest) {
         data: { startedAt: new Date() },
       });
 
-      console.log('✅ Video started:', videoId);
 
       return NextResponse.json({
         success: true,
@@ -53,7 +51,6 @@ export async function POST(request: NextRequest) {
 
     // Завершить видео
     if (action === 'complete' && videoId) {
-      console.log('🎬 Completing video:', { sessionId, videoId });
 
       // Отмечаем видео как завершенное
       const updateResult = await prisma.workoutSessionVideo.updateMany({
@@ -66,7 +63,6 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      console.log('📝 Updated records:', updateResult.count);
 
       // Получаем текущую сессию
       const session = await prisma.workoutSession.findUnique({
@@ -99,7 +95,6 @@ export async function POST(request: NextRequest) {
       const nextIndex = session.currentVideoIndex + 1;
       const allCompleted = session.videos.every((v) => v.completed);
 
-      console.log('✅ Check completion:', { nextIndex, allCompleted, totalVideos: session.totalVideos });
 
       // Если все видео завершены - завершаем тренировку
       if (allCompleted || nextIndex >= session.totalVideos) {
@@ -112,7 +107,6 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        console.log('🎉 Workout completed!');
 
         return NextResponse.json({
           success: true,
@@ -126,7 +120,6 @@ export async function POST(request: NextRequest) {
           data: { currentVideoIndex: nextIndex },
         });
 
-        console.log('✅ Video completed:', videoId, '- Next index:', nextIndex);
 
         return NextResponse.json({
           success: true,

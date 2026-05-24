@@ -64,7 +64,6 @@ export async function PATCH(
     console.error('Error updating review:', error);
     return NextResponse.json({ 
       error: 'Internal server error', 
-      details: error.message 
     }, { status: 500 });
   }
 }
@@ -88,7 +87,6 @@ export async function DELETE(
     console.error('Error deleting review:', error);
     return NextResponse.json({ 
       error: 'Internal server error', 
-      details: error.message 
     }, { status: 500 });
   }
 }

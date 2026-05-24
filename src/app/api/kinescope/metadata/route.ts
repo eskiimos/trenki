@@ -175,7 +175,6 @@ export async function POST(request: NextRequest) {
     console.error('Error fetching Kinescope metadata:', error);
     return NextResponse.json({ 
       error: 'Failed to fetch video metadata',
-      details: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     }, { status: 500 });
   }
