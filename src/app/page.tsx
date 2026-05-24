@@ -51,28 +51,25 @@ const HomePage = () => {
   // Проверяем авторизацию при загрузке страницы
   useEffect(() => {
     const checkAuth = async () => {
-      // 🔓 Пропускаем проверку авторизации на localhost
-      const isLocalhost = typeof window !== 'undefined' && 
+      // На localhost в dev middleware пропускает без cookie — даём UI отрисоваться.
+      const isLocalhost = typeof window !== 'undefined' &&
         (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-      
+
       if (isLocalhost) {
-        console.log('🔓 Localhost detected, skipping auth check');
         setIsCheckingAuth(false);
         return;
       }
-      
-      const telegramId = getTelegramId();
-      
-      if (!telegramId) {
-        console.log('❌ Пользователь не авторизован, редирект на /login');
-        router.push('/login');
-        return;
-      }
-      
-      console.log('✅ Пользователь авторизован:', telegramId);
-      // Если активный аккаунт — тренер, отправляем его в кабинет тренера
+
+      // Источник истины — серверная сессия. localStorage может быть устаревшим:
+      // полагаясь на него мы попадали в loop /login ↔ /.
       try {
-        const res = await fetch('/api/users/me', { cache: 'no-store' });
+        const res = await fetch('/api/users/me', { cache: 'no-store', credentials: 'include' });
+        if (res.status === 401) {
+          // на всякий случай чистим устаревший кеш, чтобы LoginPage не дёргался
+          try { localStorage.removeItem('trenki_auth'); } catch {}
+          router.replace('/login');
+          return;
+        }
         if (res.ok) {
           const data = await res.json();
           if (data?.role === 'COACH') {
@@ -81,7 +78,7 @@ const HomePage = () => {
           }
         }
       } catch {
-        // игнорируем — продолжаем как обычный пользователь
+        // сетевая ошибка — пробуем показать страницу, чтобы не блокировать UI
       }
       setIsCheckingAuth(false);
     };

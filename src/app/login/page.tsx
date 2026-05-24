@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { isAuthenticated, saveAuth } from '@/lib/auth';
+import { saveAuth } from '@/lib/auth';
 
 // ─────────────────────────────────────────────
 // Email-логин: отправка кода и верификация
@@ -264,11 +264,33 @@ export default function LoginPage() {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    if (isAuthenticated()) {
-      router.push('/');
-      return;
-    }
-    setIsChecking(false);
+    let cancelled = false;
+    // Источник истины — серверная подписанная сессия. localStorage кеш может
+    // остаться от старого логина и без неё, а middleware такого юзера всё равно
+    // вернёт на /login → раньше получался бесконечный цикл «Проверка…».
+    (async () => {
+      try {
+        const res = await fetch('/api/users/me', {
+          cache: 'no-store',
+          credentials: 'include',
+        });
+        if (cancelled) return;
+        if (res.ok) {
+          router.replace('/');
+          return;
+        }
+      } catch {
+        // сетевая ошибка — показываем форму, даём пользователю войти заново
+      }
+      // Сессии нет или она невалидна — стираем устаревший localStorage и показываем форму.
+      try {
+        localStorage.removeItem('trenki_auth');
+      } catch {}
+      if (!cancelled) setIsChecking(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   if (isChecking) {
