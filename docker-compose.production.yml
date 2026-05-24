@@ -13,6 +13,15 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
+      # JWT-сессии. >=32 символа. openssl rand -base64 48.
+      - SESSION_SECRET=${SESSION_SECRET}
+      # Админ-панель (логин+пароль) и cron-секрет.
+      - ADMIN_LOGIN=${ADMIN_LOGIN}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - CRON_SECRET=${CRON_SECRET}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      # Legacy / уже не используем, но переменные могут быть в .env — оставим
+      # на случай, если что-то ещё на них смотрит.
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME}
       - BOT_TOKEN=${BOT_TOKEN}
