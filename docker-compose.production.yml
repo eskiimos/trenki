@@ -49,9 +49,13 @@ services:
         max-size: "10m"
         max-file: "3"
     healthcheck:
-      # `/` отдаёт 307 (redirect на /login) и ломает -f. Используем /login —
-      # public-страница, всегда 200, не зависит от auth-cookie.
-      test: ["CMD", "curl", "-fsS", "http://localhost:3000/login"]
+      # В standalone-образе нет curl/wget — пингуем через встроенный Node.
+      # `/login` — public, всегда 200, не зависит от cookie.
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3000/login').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
       interval: 30s
       timeout: 10s
       retries: 3
