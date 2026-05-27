@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAuthUser } from '@/lib/coach/guards';
 
 // Коэффициенты для расчета k_mastery
 const COEFFICIENTS = {
@@ -34,9 +35,12 @@ const COEFFICIENTS = {
  */
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
+    const user = auth.user;
+
     const body = await request.json();
     const {
-      userId,
       rawPower,
       rawSpeed,
       rawEndurance,
@@ -47,26 +51,6 @@ export async function POST(request: NextRequest) {
       matchFrequency,
       gameDifficulty,
     } = body;
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId обязателен' },
-        { status: 400 }
-      );
-    }
-
-    // Находим пользователя
-    const user = await prisma.user.findUnique({
-      where: { telegramId: userId },
-      include: { profile: true },
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Пользователь не найден' },
-        { status: 404 }
-      );
-    }
 
     // Рассчитываем k_mastery (произведение 4 коэффициентов)
     const k1 = COEFFICIENTS.yearsInHockey[yearsInHockey as keyof typeof COEFFICIENTS.yearsInHockey] || 1.53;
@@ -141,7 +125,7 @@ export async function POST(request: NextRequest) {
     });
 
     console.log('✅ Characteristics saved:', {
-      userId,
+      userId: user.id,
       kMastery: kMastery.toFixed(2),
       potential: potential.toFixed(1),
     });

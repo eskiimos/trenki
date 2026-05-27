@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { getTelegramId } from '@/lib/auth';
 
 interface FormData {
   // Самооценка (1-10)
@@ -69,20 +68,12 @@ export default function CharacteristicsOnboardingPage() {
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    
-    try {
-      const userId = getTelegramId();
-      
-      if (!userId) {
-        alert('Ошибка: не удалось определить пользователя');
-        return;
-      }
 
+    try {
       const response = await fetch('/api/profile/characteristics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId,
           ...formData,
           trainingGoals: selectedGoals,
         }),
@@ -91,11 +82,17 @@ export default function CharacteristicsOnboardingPage() {
       const data = await response.json();
 
       if (response.ok) {
-        // Показываем модальное окно успеха
         setShowSuccessModal(true);
-      } else {
-        alert(data.error || 'Ошибка при сохранении данных');
+        return;
       }
+
+      if (response.status === 401) {
+        alert('Сессия истекла. Войдите заново.');
+        router.push('/login');
+        return;
+      }
+
+      alert(data.error || 'Ошибка при сохранении данных');
     } catch (error) {
       console.error('Error submitting characteristics:', error);
       alert('Ошибка при отправке данных');
