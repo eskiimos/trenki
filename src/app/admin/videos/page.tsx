@@ -353,13 +353,13 @@ const AdminVideosPage = () => {
             ...updates,
           }));
           
-          alert(`Данные успешно получены из Kinescope!\n\nОбновлено: ${updatedFields.join(', ')}`);
+          alert(`Метаданные успешно получены!\n\nОбновлено: ${updatedFields.join(', ')}`);
         } else {
-          alert('Все данные уже заполнены или не найдены в Kinescope');
+          alert('Все данные уже заполнены или не найдены');
         }
       } else {
         console.error('Kinescope API error:', data);
-        let errorMessage = 'Ошибка при получении данных из Kinescope';
+        let errorMessage = 'Ошибка при получении метаданных';
         
         if (data.error) {
           errorMessage += `\n\n${data.error}`;
@@ -453,7 +453,7 @@ const AdminVideosPage = () => {
         // метаданные ещё могут не быть готовы сразу после загрузки
       }
 
-      alert(`Видео успешно загружено на Kinescope!\nURL: ${kinescopeUrl}`);
+      alert('Видео успешно загружено');
     } catch (error: any) {
       console.error('Video upload error:', error);
       alert(`Ошибка загрузки: ${error.message}`);
@@ -1136,7 +1136,7 @@ const AdminVideosPage = () => {
                         value={formData.videoUrl}
                         onChange={handleChange}
                         required
-                        placeholder="https://kinescope.io/..."
+                        placeholder="ID или ссылка на видео"
                         className="flex-1 bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                       />
                       {formData.videoUrl && formData.videoUrl.includes('kinescope.io') && (
@@ -1165,7 +1165,7 @@ const AdminVideosPage = () => {
                         htmlFor="videoFileUpload"
                         className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${uploadProgress !== null ? 'bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
                       >
-                        📁 Загрузить видеофайл на Kinescope
+                        📁 Загрузить видеофайл
                       </label>
                       <input
                         id="videoFileUpload"
@@ -1177,7 +1177,7 @@ const AdminVideosPage = () => {
                       />
                       {uploadProgress !== null && (
                         <div className="mt-2">
-                          <div className="text-sm text-gray-400 mb-1">Загрузка на Kinescope: {uploadProgress}%</div>
+                          <div className="text-sm text-gray-400 mb-1">Загрузка: {uploadProgress}%</div>
                           <div className="w-full bg-gray-700 rounded-full h-2">
                             <div
                               className="bg-green-500 h-2 rounded-full transition-all"

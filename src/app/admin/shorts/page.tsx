@@ -274,7 +274,7 @@ export default function AdminShortsPage() {
         // метаданные ещё могут не быть готовы сразу
       }
 
-      alert(`Тренька успешно загружена на Kinescope!\nURL: ${kinescopeUrl}`);
+      alert('Тренька успешно загружена');
     } catch (error: any) {
       console.error('Video upload error:', error);
       alert(`Ошибка загрузки: ${error.message}`);
@@ -368,14 +368,14 @@ export default function AdminShortsPage() {
 
             {/* URL видео */}
             <div>
-              <label className="block text-sm font-medium mb-2">URL видео (Kinescope или прямая ссылка) *</label>
+              <label className="block text-sm font-medium mb-2">URL видео *</label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={videoUrl}
                   onChange={(e) => setVideoUrl(e.target.value)}
                   className="flex-1 px-4 py-2 bg-[#2d3448] border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://kinescope.io/..."
+                  placeholder="ID или ссылка на видео"
                   required
                 />
                 <button
@@ -398,7 +398,7 @@ export default function AdminShortsPage() {
                   htmlFor="shortsVideoFileUpload"
                   className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${uploadProgress !== null ? 'bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
                 >
-                  📁 Загрузить видеофайл на Kinescope
+                  📁 Загрузить видеофайл
                 </label>
                 <input
                   id="shortsVideoFileUpload"
@@ -410,7 +410,7 @@ export default function AdminShortsPage() {
                 />
                 {uploadProgress !== null && (
                   <div className="mt-2">
-                    <div className="text-sm text-gray-400 mb-1">Загрузка на Kinescope: {uploadProgress}%</div>
+                    <div className="text-sm text-gray-400 mb-1">Загрузка: {uploadProgress}%</div>
                     <div className="w-full bg-gray-700 rounded-full h-2">
                       <div
                         className="bg-green-500 h-2 rounded-full transition-all"

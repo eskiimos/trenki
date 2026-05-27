@@ -1,25 +1,29 @@
-import React from 'react';
+import React, { CSSProperties } from 'react';
 
 interface SkeletonProps {
   width?: string;
   height?: string;
   className?: string;
   rounded?: boolean;
+  style?: CSSProperties;
 }
 
-export const Skeleton = ({ 
-  width = 'w-full', 
-  height = 'h-4', 
-  className = '', 
-  rounded = false 
+export const Skeleton = ({
+  width = 'w-full',
+  height = 'h-4',
+  className = '',
+  rounded = false,
+  style,
 }: SkeletonProps) => {
   return (
-    <div 
+    <div
       className={`
         skeleton-loading
         ${width} ${height} ${rounded ? 'rounded-full' : 'rounded'}
         ${className}
       `}
+      style={style}
+      aria-hidden="true"
     />
   );
 };

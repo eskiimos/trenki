@@ -121,7 +121,7 @@ input:focus, button:focus, textarea:focus, select:focus {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Skeleton анимация */
+/* Skeleton анимация — премиальный sweep с лёгким зелёным бликом */
 @keyframes skeleton-loading {
   0% {
     background-position: -200% 0;
@@ -132,9 +132,24 @@ input:focus, button:focus, textarea:focus, select:focus {
 }
 
 .skeleton-loading {
-  background: linear-gradient(90deg, #2d3448 25%, #3d4458 50%, #2d3448 75%);
+  background: linear-gradient(
+    100deg,
+    #0d1228 0%,
+    #181f44 40%,
+    rgba(161, 255, 74, 0.08) 50%,
+    #181f44 60%,
+    #0d1228 100%
+  );
   background-size: 200% 100%;
-  animation: skeleton-loading 1.5s infinite;
+  animation: skeleton-loading 1.8s linear infinite;
+  will-change: background-position;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-loading {
+    animation: none;
+    background: #181f44;
+  }
 }
 
 /* Анимация появления снизу */

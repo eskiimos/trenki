@@ -10,6 +10,8 @@ import { apiCache } from '../lib/cache';
 import { getTelegramId } from '@/lib/auth';
 import BottomNavigation from '@/components/BottomNavigation';
 import WorkoutReminder from '@/components/WorkoutReminder';
+import AssignmentsBanner from '@/components/AssignmentsBanner';
+import { Skeleton } from '@/components/Skeleton';
 
 // Компонент для короткого видео
 interface ShortVideoPlayerProps {
@@ -110,13 +112,13 @@ const HomePage = () => {
         {/* Запланированная тренировка (за 1 час до старта) */}
         <ScheduledWorkoutSection />
 
+        {/* Баннер с тренировками от тренера */}
+        <AssignmentsBanner />
+
         {/* Каталог тренировок */}
         <TrainingsSection />
-        
-        {/* Основное обучающее видео - СКРЫТО */}
-        {/* <HeroVideoSection /> */}
-        
-        {/* Список тренеров */} 
+
+        {/* Список тренеров */}
         <TrainersSection />
         
         {/* Промо-баннер */}
@@ -619,122 +621,14 @@ const Header = () => {
   );
 };
 
-const HeroVideoSection = () => {
-  const [randomVideo, setRandomVideo] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchLatestVideo = async () => {
-      try {
-        const response = await fetch('/api/videos');
-        const data = await response.json();
-        const videos = data.videos || [];
-        
-        if (videos.length > 0) {
-          // Берем первое видео (самое последнее загруженное)
-          setRandomVideo(videos[0]);
-        }
-      } catch (error) {
-        console.error('Error loading random video:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchLatestVideo();
-  }, []);
-
-  if (isLoading) {
-    return (
-      <section className="px-4" style={{ paddingBottom: '15px' }}>
-        <div className="bg-gray-700/30 overflow-hidden animate-pulse" style={{ borderRadius: '4px', width: '100%', height: 'auto', aspectRatio: '16/9', maxHeight: '280px' }}>
-          <div className="absolute inset-0 bg-gradient-to-r from-gray-700/20 via-gray-600/30 to-gray-700/20" />
-        </div>
-      </section>
-    );
-  }
-
-  if (!randomVideo) {
-    return null;
-  }
-
-  // Форматируем длительность видео
-  const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
-  return (
-    <section className="px-4" style={{ paddingBottom: '15px' }}>
-      <h2 className="text-white text-lg font-semibold mb-3">Новая тренировка</h2>
-      <Link href={`/video/${randomVideo.id}`}>
-        <div>
-          {/* Video Thumbnail */}
-          <div className="relative rounded overflow-hidden" style={{ width: '100%', height: 'auto', aspectRatio: '16/9', maxHeight: '280px' }}>
-            {randomVideo.thumbnail && (
-              <Image 
-                src={randomVideo.thumbnail} 
-                alt={randomVideo.title} 
-                fill
-                className="object-cover" 
-              />
-            )}
-            {/* Duration badge */}
-            <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm text-white text-sm font-medium px-2.5 py-1 rounded-lg">
-              {formatDuration(randomVideo.duration)}
-            </div>
-            {/* "Новинка" badge */}
-            <div className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: '#A1FF4A', color: '#060919' }}>
-              Новинка
-            </div>
-          </div>
-          
-          {/* Video Info */}
-          <div className="px-0 py-3">
-            {/* Trainer Avatar + Title на одной строке */}
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-700">
-                {randomVideo.trainer?.avatar ? (
-                  <Image
-                    src={randomVideo.trainer.avatar}
-                    alt={`${randomVideo.trainer.name} ${randomVideo.trainer.lastName}`}
-                    width={40}
-                    height={40}
-                    className="object-cover w-full h-full"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-white font-bold text-sm">
-                    {randomVideo.trainer?.name?.charAt(0)}
-                  </div>
-                )}
-              </div>
-              <h3 className="text-white text-base font-semibold line-clamp-2 leading-tight flex-1">
-                {randomVideo.title.toUpperCase()}
-              </h3>
-            </div>
-            
-            {/* Trainer info */}
-            <div style={{ fontSize: '12px' }} className="text-white/60">
-              <span>
-                {randomVideo.trainer?.name} {randomVideo.trainer?.lastName}
-              </span>
-            </div>
-          </div>
-        </div>
-      </Link>
-    </section>
-  );
-};
-
-// Skeleton для шортсов
 const ShortVideoSkeleton = () => (
   <div className="flex-shrink-0 w-36">
-    <div 
-      className="bg-gray-700/30 rounded overflow-hidden relative aspect-[9/16] animate-pulse" 
-      style={{ borderRadius: '4px' }}
-    >
-      <div className="absolute inset-0 bg-gradient-to-r from-gray-700/20 via-gray-600/30 to-gray-700/20" />
-    </div>
+    <Skeleton
+      width=""
+      height=""
+      className="aspect-9/16"
+      style={{ width: '100%', borderRadius: 4 }}
+    />
   </div>
 );
 
@@ -760,8 +654,8 @@ const TrenkiSection = () => {
   if (isLoading) {
     return (
       <section style={{ paddingTop: '15px', paddingBottom: '15px' }}>
+        <h2 className="px-4 text-white font-semibold mb-3" style={{ fontSize: '12px' }}>КОРОТКИЕ ВИДЕО</h2>
         <div className="flex space-x-4 overflow-x-auto pb-4 px-4">
-          {/* Показываем 3 skeleton loader */}
           <ShortVideoSkeleton />
           <ShortVideoSkeleton />
           <ShortVideoSkeleton />
@@ -874,22 +768,43 @@ const TrainersSection = () => {
       <section style={{ paddingBottom: '15px' }}>
         <div style={{
           width: '100%',
-          paddingLeft: 16,
-          paddingRight: 16,
           paddingTop: 24,
-          paddingBottom: 24,
           background: 'linear-gradient(180deg, #101530 0%, #060919 100%)',
-          borderRadius: 1,
           flexDirection: 'column',
           gap: 16,
-          display: 'flex'
+          display: 'flex',
         }}>
-          <div style={{ color: '#F9F8FE', fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>
-            тренеры
-          </div>
-          <div style={{ display: 'flex', gap: 16 }}>
-            <div className="w-1/2 h-[202px] bg-gray-700/30 rounded-lg animate-pulse" />
-            <div className="w-1/2 h-[202px] bg-gray-700/30 rounded-lg animate-pulse" />
+          <div style={{
+            width: '100%',
+            paddingLeft: 16,
+            paddingRight: 16,
+            color: '#F9F8FE',
+            fontSize: 12,
+            fontFamily: 'Overpass',
+            fontWeight: '700',
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+            lineHeight: '14.4px',
+          }}>тренеры</div>
+          <div style={{
+            display: 'flex',
+            gap: 16,
+            overflowX: 'auto',
+            paddingLeft: 16,
+            paddingRight: 16,
+          }} className="scrollbar-hide">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} style={{ width: 170, flexShrink: 0 }}>
+                <Skeleton width="" height="" style={{ width: 170, height: 170, borderRadius: 8 }} />
+                <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <Skeleton width="" height="" style={{ width: '70%', height: 14, borderRadius: 4 }} />
+                  <Skeleton width="" height="" style={{ width: '55%', height: 14, borderRadius: 4 }} />
+                </div>
+                <div style={{ padding: 8, borderTop: '1px rgba(38, 37, 47, 0.50) solid' }}>
+                  <Skeleton width="" height="" style={{ width: '65%', height: 12, borderRadius: 4 }} />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -1182,18 +1097,19 @@ const VideoCard = ({ video, isNew }: VideoCardProps & { isNew?: boolean }) => {
   );
 };
 
-// Skeleton загрузчик для карточки видео
 const VideoCardSkeleton = () => (
   <div className="flex-shrink-0 w-[calc(100vw-2rem)]">
-    <div className="bg-gray-700/30 overflow-hidden rounded animate-pulse" style={{ borderRadius: '4px', width: '100%', height: 'auto', aspectRatio: '16/9', maxHeight: '280px' }}>
-      <div className="absolute inset-0 bg-gradient-to-r from-gray-700/20 via-gray-600/30 to-gray-700/20" />
-    </div>
+    <Skeleton
+      width=""
+      height=""
+      style={{ width: '100%', aspectRatio: '16/9', maxHeight: 280, borderRadius: 4 }}
+    />
     <div className="px-0 py-3">
       <div className="flex items-center gap-3 mb-2">
-        <div className="w-10 h-10 rounded-full bg-gray-700/30 animate-pulse" />
-        <div className="flex-1 h-4 bg-gray-700/30 animate-pulse rounded" />
+        <Skeleton width="" height="" style={{ width: 40, height: 40, borderRadius: 999 }} />
+        <Skeleton width="" height="" style={{ flex: 1, height: 16, borderRadius: 4 }} />
       </div>
-      <div className="h-3 w-24 bg-gray-700/30 animate-pulse rounded" />
+      <Skeleton width="" height="" style={{ width: 96, height: 12, borderRadius: 4 }} />
     </div>
   </div>
 );
