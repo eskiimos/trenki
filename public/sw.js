@@ -1,7 +1,7 @@
 // Service Worker для PWA
-const CACHE_NAME = 'trenki-v2';
-const RUNTIME_CACHE = 'trenki-runtime-v2';
-const VIDEO_CACHE_NAME = 'trenki-videos-v2';
+const CACHE_NAME = 'trenki-v3';
+const RUNTIME_CACHE = 'trenki-runtime-v3';
+const VIDEO_CACHE_NAME = 'trenki-videos-v3';
 
 // Ресурсы для кэширования при установке
 const STATIC_CACHE_URLS = [
@@ -53,6 +53,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Cache.put поддерживает только GET — любые другие методы пропускаем
+  // без вмешательства, иначе валится TypeError при попытке кешировать POST/PUT/DELETE
+  if (request.method !== 'GET') {
+    return;
+  }
+
   // Пропускаем API запросы к внешним сервисам (кроме видео)
   if (url.hostname.includes('telegram.org') ||
       url.hostname.includes('prisma-data.net')) {
@@ -94,10 +100,10 @@ self.addEventListener('fetch', (event) => {
         // Клонируем ответ для кэша
         const responseToCache = response.clone();
         
-        // Кэшируем успешные ответы
+        // Кэшируем успешные ответы (только GET — отфильтровано выше)
         if (response.status === 200) {
           caches.open(RUNTIME_CACHE).then((cache) => {
-            cache.put(request, responseToCache);
+            cache.put(request, responseToCache).catch(() => {});
           });
         }
         
