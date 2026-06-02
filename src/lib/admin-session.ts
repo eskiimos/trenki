@@ -1,8 +1,9 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { getSessionFromRequest } from '@/lib/session';
+import { getSessionFromRequest, verifySession, SESSION_COOKIE_NAME } from '@/lib/session';
 
 const SESSION_TOKEN_BYTES = 32;
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 7; // 7 дней
@@ -91,6 +92,37 @@ export async function requireAdminAsync(request: NextRequest): Promise<NextRespo
   }
 
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+}
+
+/**
+ * Версия requireAdminAsync для server components (layout/page).
+ * Читает cookies() из next/headers и валидирует admin_token или user.isAdmin.
+ * Возвращает true если у текущего запроса есть права админа.
+ */
+export async function hasAdminAccessRSC(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const adminToken = cookieStore.get(ADMIN_COOKIE_NAME)?.value;
+  if (adminToken && (await validateAdminSessionToken(adminToken))) {
+    return true;
+  }
+
+  const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  if (sessionToken) {
+    const session = await verifySession(sessionToken);
+    if (session?.uid) {
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: session.uid },
+          select: { isAdmin: true },
+        });
+        if (user?.isAdmin) return true;
+      } catch (err) {
+        console.error('hasAdminAccessRSC: prisma error', err);
+      }
+    }
+  }
+
+  return false;
 }
 
 /**

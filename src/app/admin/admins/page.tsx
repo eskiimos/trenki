@@ -17,7 +17,7 @@ interface Admin {
 export default function AdminsPage() {
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newTelegramId, setNewTelegramId] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -38,7 +38,7 @@ export default function AdminsPage() {
   useEffect(() => { fetchAdmins(); }, []);
 
   const addAdmin = async () => {
-    if (!newTelegramId.trim()) return;
+    if (!identifier.trim()) return;
     setAdding(true);
     setError('');
     setSuccess('');
@@ -47,14 +47,14 @@ export default function AdminsPage() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telegramId: newTelegramId.trim() }),
+        body: JSON.stringify({ identifier: identifier.trim() }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || 'Ошибка');
       } else {
         setSuccess('Администратор добавлен');
-        setNewTelegramId('');
+        setIdentifier('');
         fetchAdmins();
       }
     } catch {
@@ -64,7 +64,7 @@ export default function AdminsPage() {
     }
   };
 
-  const removeAdmin = async (telegramId: string) => {
+  const removeAdmin = async (userIdOrEmail: string) => {
     if (!confirm('Снять права администратора?')) return;
     setError('');
     setSuccess('');
@@ -73,7 +73,7 @@ export default function AdminsPage() {
         method: 'DELETE',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telegramId }),
+        body: JSON.stringify({ identifier: userIdOrEmail }),
       });
       if (res.ok) {
         setSuccess('Права сняты');
@@ -103,22 +103,23 @@ export default function AdminsPage() {
           <div className="flex gap-3">
             <input
               type="text"
-              placeholder="Telegram ID (например: 228594178)"
-              value={newTelegramId}
-              onChange={e => setNewTelegramId(e.target.value)}
+              placeholder="Email или User ID"
+              value={identifier}
+              onChange={e => setIdentifier(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addAdmin()}
               className="flex-1 bg-white/10 rounded-full px-4 py-2 text-sm text-white placeholder-gray-500 outline-none focus:ring-1 focus:ring-[#A1FF4A]"
             />
             <button
               onClick={addAdmin}
-              disabled={adding || !newTelegramId.trim()}
+              disabled={adding || !identifier.trim()}
               className="px-5 py-2 rounded-full text-sm font-bold bg-[#A1FF4A] text-[#0A0E1A] disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {adding ? '...' : 'Добавить'}
             </button>
           </div>
           <p className="text-xs text-gray-500 mt-2">
-            Пользователь должен быть уже зарегистрирован в приложении. Telegram ID можно узнать через @userinfobot в Telegram.
+            Пользователь должен быть уже зарегистрирован. Введи email
+            (для email-юзеров) или User ID (cuid из БД).
           </p>
         </div>
 
@@ -145,13 +146,12 @@ export default function AdminsPage() {
                       {admin.firstName} {admin.lastName}
                       {admin.username && <span className="text-gray-400 text-sm ml-1">@{admin.username}</span>}
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      TG: {admin.telegramId}
-                      {admin.email && <> · {admin.email}</>}
+                    <div className="text-xs text-gray-500 mt-0.5 font-mono">
+                      {admin.email ?? admin.id}
                     </div>
                   </div>
                   <button
-                    onClick={() => removeAdmin(admin.telegramId)}
+                    onClick={() => removeAdmin(admin.email ?? admin.id)}
                     className="text-xs text-red-400 hover:text-red-300 border border-red-400/30 rounded-full px-3 py-1 transition-colors ml-4 flex-shrink-0"
                   >
                     Снять права

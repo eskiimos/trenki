@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getSessionFromRequest, SESSION_COOKIE_NAME } from '@/lib/session';
+import { ADMIN_COOKIE_NAME } from '@/lib/admin-session';
 
 // Публичные маршруты, доступные без авторизации
 const publicRoutes = [
@@ -10,6 +11,7 @@ const publicRoutes = [
   '/api/auth/email/send-code',
   '/api/auth/email/verify-code',
   '/api/auth/logout',
+  '/api/health',
 ];
 
 function isPublicRoute(pathname: string): boolean {
@@ -122,6 +124,8 @@ export async function middleware(request: NextRequest) {
   const nonce = generateNonce();
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
+  // Пробрасываем pathname в server components (для admin layout и проч.)
+  requestHeaders.set('x-pathname', pathname);
 
   // Хелпер, который наращивает security headers на любой возвращаемый response.
   const withSecurity = (resp: NextResponse): NextResponse => {
@@ -179,6 +183,21 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isPublicRoute(pathname)) {
+    return passThrough();
+  }
+
+  // Защита /admin/* (кроме самой страницы логина).
+  // Тут проверяем только наличие admin_token cookie ИЛИ обычной сессии
+  // (последняя нужна для юзеров с user.isAdmin=true, которые заходят без
+  // login+password). Реальная валидация токена/прав делается в API/layout —
+  // middleware на edge не может ходить в Prisma.
+  if (pathname.startsWith('/admin') && pathname !== '/admin/login') {
+    const hasAdminCookie = Boolean(request.cookies.get(ADMIN_COOKIE_NAME)?.value);
+    const hasUserSession = Boolean(request.cookies.get(SESSION_COOKIE_NAME)?.value);
+    if (!hasAdminCookie && !hasUserSession) {
+      const loginUrl = new URL('/admin/login', request.url);
+      return withSecurity(NextResponse.redirect(loginUrl));
+    }
     return passThrough();
   }
 

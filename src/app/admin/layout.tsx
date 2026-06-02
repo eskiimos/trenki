@@ -1,90 +1,35 @@
-'use client';
+import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
+import { hasAdminAccessRSC } from '@/lib/admin-session';
 
-import { useEffect, useState, useRef } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import { getTelegramId } from '@/lib/auth';
-
-export default function AdminLayout({
+/**
+ * Server-component layout для /admin/*.
+ * Middleware уже редиректит анонимных пользователей на /admin/login (по
+ * наличию cookie), а здесь — реальная валидация admin_token / user.isAdmin.
+ * Если cookie протух или подделан — серверный redirect на /admin/login.
+ *
+ * Старая 'use client' версия использовала getTelegramId() и проверяла
+ * /api/user/is-admin с telegramId в query — это уже не работает для email-
+ * юзеров и было уязвимо к timing/race conditions.
+ */
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const authCheckRef = useRef<boolean>(false);
-  const lastCheckTimeRef = useRef<number>(0);
+  // pathname приходит из middleware.ts (header 'x-pathname').
+  // /admin/login обходит проверку — иначе была бы петля редиректа.
+  const headerStore = await headers();
+  const pathname = headerStore.get('x-pathname') ?? '';
 
-  useEffect(() => {
-    // Страница логина не требует проверки авторизации
-    if (pathname === '/admin/login') {
-      setIsAuthenticated(true);
-      return;
-    }
-
-    const checkAuth = async () => {
-      try {
-        const now = Date.now();
-        if (authCheckRef.current && now - lastCheckTimeRef.current < 30000) {
-          setIsAuthenticated(true);
-          return;
-        }
-
-        // Сначала проверяем через Telegram ID (для пользователей-администраторов)
-        const telegramId = getTelegramId();
-        if (telegramId) {
-          const res = await fetch(`/api/user/is-admin?telegramId=${telegramId}`);
-          const data = await res.json();
-          if (data.isAdmin) {
-            authCheckRef.current = true;
-            lastCheckTimeRef.current = Date.now();
-            setIsAuthenticated(true);
-            return;
-          }
-        }
-
-        // Запасной вариант: проверка по старому cookie (логин/пароль)
-        const response = await fetch('/api/admin/auth', {
-          method: 'GET',
-          credentials: 'include',
-        });
-
-        if (response.ok) {
-          authCheckRef.current = true;
-          lastCheckTimeRef.current = Date.now();
-          setIsAuthenticated(true);
-        } else {
-          authCheckRef.current = false;
-          setIsAuthenticated(false);
-          router.push('/admin/login');
-        }
-      } catch {
-        setIsAuthenticated(true); // не выбрасываем при ошибке сети
-      }
-    };
-
-    checkAuth();
-  }, [pathname, router]);
-
-  if (isAuthenticated === null) {
-    return (
-      <div className="min-h-screen bg-[#101530] text-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-gray-400 mt-4">Загрузка...</p>
-        </div>
-      </div>
-    );
+  if (pathname.startsWith('/admin/login')) {
+    return <div className="admin-layout">{children}</div>;
   }
 
-  if (isAuthenticated === false) {
-    return null;
+  const isAdmin = await hasAdminAccessRSC();
+  if (!isAdmin) {
+    redirect('/admin/login');
   }
 
-  return (
-    <div className="admin-layout">
-      {children}
-    </div>
-  );
+  return <div className="admin-layout">{children}</div>;
 }
-
