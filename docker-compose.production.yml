@@ -38,6 +38,10 @@ services:
       - NEXT_PUBLIC_KINESCOPE_API_KEY=${NEXT_PUBLIC_KINESCOPE_API_KEY}
       - KINESCOPE_API_KEY=${NEXT_PUBLIC_KINESCOPE_API_KEY}
       - RESEND_API_KEY=${RESEND_API_KEY}
+      # Demo-bypass для одного фиксированного email (без OTP). НЕ задавать
+      # для prod-юзеров — только служебный demo/QA аккаунт.
+      - DEMO_BYPASS_EMAIL=${DEMO_BYPASS_EMAIL}
+      - DEMO_BYPASS_CODE=${DEMO_BYPASS_CODE}
     ports:
       - "3000:3000"
     restart: always

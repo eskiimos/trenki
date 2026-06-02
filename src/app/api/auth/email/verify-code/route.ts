@@ -32,21 +32,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const otp = await prisma.emailOtp.findFirst({
-      where: { email, code, used: false },
-      orderBy: { createdAt: 'desc' },
-    });
+    // Demo-bypass: один заранее заведённый email заходит по фиксированному
+    // коду из env, минуя проверку EmailOtp. Используется для demo/QA, чтобы
+    // не зависеть от живого email-ящика.
+    const demoEmail = process.env.DEMO_BYPASS_EMAIL?.trim().toLowerCase();
+    const demoCode = process.env.DEMO_BYPASS_CODE;
+    const isDemoBypass =
+      !!demoEmail && !!demoCode && email === demoEmail && code === demoCode;
 
-    if (!otp) {
-      return NextResponse.json({ error: 'Неверный код' }, { status: 400 });
+    if (!isDemoBypass) {
+      const otp = await prisma.emailOtp.findFirst({
+        where: { email, code, used: false },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (!otp) {
+        return NextResponse.json({ error: 'Неверный код' }, { status: 400 });
+      }
+
+      if (otp.expiresAt < new Date()) {
+        await prisma.emailOtp.delete({ where: { id: otp.id } });
+        return NextResponse.json({ error: 'Код истёк. Запросите новый.' }, { status: 400 });
+      }
+
+      await prisma.emailOtp.update({ where: { id: otp.id }, data: { used: true } });
+    } else {
+      logger.info('demo bypass verify-code', { email });
     }
-
-    if (otp.expiresAt < new Date()) {
-      await prisma.emailOtp.delete({ where: { id: otp.id } });
-      return NextResponse.json({ error: 'Код истёк. Запросите новый.' }, { status: 400 });
-    }
-
-    await prisma.emailOtp.update({ where: { id: otp.id }, data: { used: true } });
 
     // Ищем или создаём пользователя по email.
     let user = await prisma.user.findUnique({ where: { email } });

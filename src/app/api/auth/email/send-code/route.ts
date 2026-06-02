@@ -27,6 +27,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Некорректный email' }, { status: 400 });
     }
 
+    // Demo-bypass: для одного конкретного email письмо не отправляем,
+    // вход идёт по фиксированному коду DEMO_BYPASS_CODE (см. verify-code).
+    const demoEmail = process.env.DEMO_BYPASS_EMAIL?.trim().toLowerCase();
+    if (demoEmail && email === demoEmail && process.env.DEMO_BYPASS_CODE) {
+      logger.info('demo bypass send-code', { email });
+      return NextResponse.json({ success: true });
+    }
+
     // Лимит: не более 3 кодов на email за 10 минут И не более 10 кодов с одного IP за 10 минут
     const emailRl = rateLimit(`otp-send:email:${email}`, 3, 10 * 60 * 1000);
     if (!emailRl.ok) {
