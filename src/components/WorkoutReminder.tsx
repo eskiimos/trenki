@@ -103,7 +103,7 @@ export default function WorkoutReminder() {
         }}
         className="w-full p-2 rounded-lg inline-flex flex-col justify-center items-start gap-2 overflow-hidden text-left"
         style={{
-          background: 'rgba(68, 92, 255, 0.20)',
+          background: '#060919',
           border: '1px solid rgba(68, 92, 255, 0.35)',
         }}
       >
