@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
   const dueDate = body?.dueDate ? new Date(body.dueDate) : null;
   const notes = body?.notes ? String(body.notes).trim() : null;
   const athleteIds: string[] = Array.isArray(body?.athleteIds) ? body.athleteIds : [];
+  const force = Boolean(body?.force);
 
   if (!teamId || !videoId || !dueDate || Number.isNaN(dueDate.getTime()) || athleteIds.length === 0) {
     return NextResponse.json({ error: 'Не все поля заполнены' }, { status: 400 });
@@ -81,9 +82,13 @@ export async function POST(request: NextRequest) {
   // Проверяем, что все указанные athleteIds — действительно члены команды
   const members = await prisma.teamMember.findMany({
     where: { teamId, status: 'ACTIVE', userId: { in: selfFiltered } },
-    select: { userId: true },
+    select: {
+      userId: true,
+      user: { select: { firstName: true, lastName: true } },
+    },
   });
   const validIds = new Set(members.map((m) => m.userId));
+  const memberById = new Map(members.map((m) => [m.userId, m.user] as const));
   const filtered = selfFiltered.filter((id) => validIds.has(id));
   if (filtered.length === 0) {
     return NextResponse.json({ error: 'Игроки не найдены в команде' }, { status: 400 });
@@ -93,6 +98,45 @@ export async function POST(request: NextRequest) {
   const video = await prisma.video.findUnique({ where: { id: videoId }, select: { id: true } });
   if (!video) {
     return NextResponse.json({ error: 'Видео не найдено' }, { status: 404 });
+  }
+
+  // Конфликт-чек: если у атлета на дату dueDate уже есть план Марка
+  // (ScheduledWorkout), календарь атлета спрячет тренерское назначение.
+  // Возвращаем warnings и ждём подтверждения force=true.
+  if (!force) {
+    const dayStart = new Date(dueDate);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(dueDate);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const conflicts = await prisma.scheduledWorkout.findMany({
+      where: {
+        userId: { in: filtered },
+        date: { gte: dayStart, lte: dayEnd },
+      },
+      select: {
+        id: true,
+        userId: true,
+        video: { select: { id: true, title: true } },
+      },
+    });
+
+    if (conflicts.length > 0) {
+      return NextResponse.json({
+        created: 0,
+        assignments: [],
+        warnings: conflicts.map((c) => {
+          const u = memberById.get(c.userId);
+          const athleteName = `${u?.firstName ?? ''} ${u?.lastName ?? ''}`.trim() || 'Игрок';
+          return {
+            athleteId: c.userId,
+            athleteName,
+            scheduledWorkoutId: c.id,
+            videoTitle: c.video.title,
+          };
+        }),
+      });
+    }
   }
 
   const created = await prisma.$transaction(

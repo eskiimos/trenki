@@ -3,6 +3,15 @@
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
 /**
+ * Email-юзеры получают синтетический telegramId вида "email_<ts>_<rand>",
+ * который НЕ является валидным chat_id для Telegram API. Перед попыткой
+ * отправки нужно проверить, что это реальный числовой ID.
+ */
+export function isValidTelegramId(id?: string | null): boolean {
+  return typeof id === 'string' && /^[1-9]\d{0,19}$/.test(id);
+}
+
+/**
  * Отправить сообщение пользователю в Telegram
  */
 export async function sendTelegramMessage(

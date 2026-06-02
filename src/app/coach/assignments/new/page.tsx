@@ -31,6 +31,7 @@ export default function CoachAssignmentNewPage() {
   const [error, setError] = useState<string | null>(null);
   const [initLoading, setInitLoading] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
+  const [conflicts, setConflicts] = useState<Array<{ athleteId: string; athleteName: string; videoTitle: string }>>([]);
 
   const loadInitial = useCallback(async () => {
     setInitLoading(true);
@@ -97,8 +98,7 @@ export default function CoachAssignmentNewPage() {
   const canSubmit =
     teamId && selectedVideoId && selectedAthletes.size > 0 && dueDate && !submitting;
 
-  const handleSubmit = async () => {
-    if (!canSubmit) return;
+  const submitAssignment = async (force: boolean) => {
     setSubmitting(true);
     setError(null);
     try {
@@ -111,6 +111,7 @@ export default function CoachAssignmentNewPage() {
           dueDate: new Date(dueDate).toISOString(),
           notes: notes.trim() || null,
           athleteIds: Array.from(selectedAthletes),
+          force,
         }),
       });
       if (!res.ok) {
@@ -118,6 +119,15 @@ export default function CoachAssignmentNewPage() {
         setError(d?.error || 'Ошибка');
         return;
       }
+      const data = await res.json();
+
+      // Сервер вернул конфликты — у атлета на эту дату уже план Марка.
+      // Тренер видит модал и решает: всё равно назначить (force=true) или отменить.
+      if (Array.isArray(data.warnings) && data.warnings.length > 0 && !force) {
+        setConflicts(data.warnings);
+        return;
+      }
+
       router.push('/coach/assignments');
     } catch {
       setError('Сетевая ошибка');
@@ -126,8 +136,126 @@ export default function CoachAssignmentNewPage() {
     }
   };
 
+  const handleSubmit = () => {
+    if (!canSubmit) return;
+    submitAssignment(false);
+  };
+
+  const handleConfirmForce = () => {
+    setConflicts([]);
+    submitAssignment(true);
+  };
+
+  const handleCancelConflicts = () => {
+    setConflicts([]);
+  };
+
   return (
     <div className="min-h-screen bg-[#101530] text-white pb-32">
+      {conflicts.length > 0 && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(6, 9, 25, 0.85)',
+            zIndex: 60,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+          onClick={handleCancelConflicts}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#060919',
+              border: '1px solid rgba(161, 255, 74, 0.30)',
+              borderRadius: 18,
+              padding: '20px 22px',
+              maxWidth: 420,
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+            }}
+          >
+            <div
+              className="font-overpass uppercase"
+              style={{ color: '#A1FF4A', fontSize: 11, fontWeight: 900, letterSpacing: 0.5 }}
+            >
+              Конфликт с планом
+            </div>
+            <div className="font-overpass" style={{ color: '#F9F8FE', fontSize: 14, lineHeight: '1.4' }}>
+              У {conflicts.length === 1 ? 'игрока' : 'игроков'} на эту дату уже{' '}
+              {conflicts.length === 1 ? 'есть тренировка' : 'есть тренировки'} в плане. Если назначишь — атлет
+              увидит в календаре только план, твоё задание останется в «От тренера».
+            </div>
+            <div
+              className="font-overpass"
+              style={{
+                color: '#F9F8FE',
+                fontSize: 13,
+                background: 'rgba(161, 255, 74, 0.06)',
+                border: '1px solid rgba(161, 255, 74, 0.20)',
+                borderRadius: 10,
+                padding: '10px 12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+              }}
+            >
+              {conflicts.map((c) => (
+                <div key={`${c.athleteId}-${c.videoTitle}`}>
+                  <span style={{ fontWeight: 800 }}>{c.athleteName}</span>
+                  <span style={{ color: '#AEABBB' }}> · {c.videoTitle}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 mt-2">
+              <button
+                type="button"
+                onClick={handleCancelConflicts}
+                className="font-overpass uppercase flex-1"
+                style={{
+                  background: 'transparent',
+                  color: '#AEABBB',
+                  border: '1px solid #26252F',
+                  borderRadius: 999,
+                  padding: '12px 16px',
+                  fontWeight: 900,
+                  fontSize: 12,
+                  letterSpacing: '0.05em',
+                  cursor: 'pointer',
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmForce}
+                disabled={submitting}
+                className="font-overpass uppercase flex-1"
+                style={{
+                  background: '#A1FF4A',
+                  color: '#101530',
+                  border: 'none',
+                  borderRadius: 999,
+                  padding: '12px 16px',
+                  fontWeight: 900,
+                  fontSize: 12,
+                  letterSpacing: '0.05em',
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  opacity: submitting ? 0.6 : 1,
+                }}
+              >
+                {submitting ? '...' : 'Всё равно назначить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         className="px-5 pb-6 max-w-3xl md:mx-auto md:px-8"
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 24px)' }}
