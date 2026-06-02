@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { getAllOfflineVideos } from '@/lib/offlineVideos';
+import { getAllOfflineVideos, isVideoDownloaded } from '@/lib/offlineVideos';
 
 /**
  * Компонент для обработки офлайн-режима
@@ -39,12 +39,25 @@ export default function OfflineHandler() {
       const videos = await getAllOfflineVideos();
       setHasOfflineVideos(videos.length > 0);
 
-      // Если есть офлайн-видео и мы не на странице офлайн-видео
-      // редиректим туда
-      if (videos.length > 0 && pathname !== '/offline-videos') {
-        console.log('[OfflineHandler] Redirecting to offline videos');
-        router.push('/offline-videos');
+      if (videos.length === 0 || pathname === '/offline-videos') return;
+
+      // Если открыто конкретное /video/[id] и оно уже скачано — не редиректим,
+      // плеер сам возьмёт URL из IndexedDB.
+      const match = pathname?.match(/^\/video\/([^/]+)/);
+      if (match) {
+        try {
+          const downloaded = await isVideoDownloaded(match[1]);
+          if (downloaded) {
+            console.log('[OfflineHandler] Текущее видео скачано, остаёмся на странице');
+            return;
+          }
+        } catch {
+          // если IDB упал — лучше попробуем редиректнуть на список оффлайн-видео
+        }
       }
+
+      console.log('[OfflineHandler] Redirecting to offline videos');
+      router.push('/offline-videos');
     };
 
     window.addEventListener('online', handleOnline);

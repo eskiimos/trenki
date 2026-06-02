@@ -13,11 +13,12 @@ import ScheduleModal from '@/components/ScheduleModal';
 import Toast from '@/components/Toast';
 import { isKinescopeUrl, getKinescopeDirectUrl } from '@/lib/videoQuality';
 import { calculateWorkoutGains, CharacteristicType } from '@/lib/characteristics';
-import { 
-  downloadVideo, 
-  isVideoDownloaded, 
+import {
+  downloadVideo,
+  isVideoDownloaded,
   deleteVideo,
-  type OfflineVideo 
+  getOfflineVideo,
+  type OfflineVideo
 } from '@/lib/offlineVideos';
 
 // Pose-трекер грузим только в браузере: модель MediaPipe из CDN — нет смысла на SSR
@@ -93,6 +94,20 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [isDownloaded, setIsDownloaded] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+
+  // Online/offline для баннера «нет сети, видео не скачано»
+  const [isOffline, setIsOffline] = useState(false);
+  useEffect(() => {
+    setIsOffline(typeof navigator !== 'undefined' && !navigator.onLine);
+    const onOnline = () => setIsOffline(false);
+    const onOffline = () => setIsOffline(true);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
 
   // Pose-трекер (камера + отслеживание суставов)
   const [poseTrackerOpen, setPoseTrackerOpen] = useState(false);
@@ -388,6 +403,25 @@ export default function VideoPage({ params }: VideoPageProps) {
     
     const loadKinescopeUrl = async () => {
       if (videoData?.videoUrl && isKinescopeUrl(videoData.videoUrl)) {
+        // Offline-fallback: если нет сети ИЛИ видео уже скачано — берём прямую
+        // CDN-ссылку из IndexedDB, не дёргаем /api/kinescope/metadata.
+        // Сам видео-blob хранится в Cache API по этому URL, SW отдаст его без сети.
+        const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+        if (!isOnline || (videoId && (await isVideoDownloaded(videoId)))) {
+          try {
+            const offline = videoId ? await getOfflineVideo(videoId) : null;
+            if (offline?.videoUrl && !ignore) {
+              setKinescopeDirectUrl(offline.videoUrl);
+              setIsKinescopeLoading(false);
+              return;
+            }
+          } catch (e) {
+            console.warn('[OFFLINE] Не удалось взять видео из IndexedDB:', e);
+          }
+          // Если оффлайн и нет в IndexedDB — попытка fetch всё равно упадёт,
+          // но пропускать молча тоже плохо: даём дальше упасть в catch ниже.
+        }
+
         // Проверяем кэш сначала (localStorage переживает перезагрузку, в отличие от sessionStorage)
         const cacheKey = `kinescope_url_${videoData.videoUrl}`;
         // Дефолтное качество — 480p для быстрого старта
@@ -1160,6 +1194,19 @@ export default function VideoPage({ params }: VideoPageProps) {
           </h1>
         </div>
       </header>
+
+      {isOffline && !isDownloaded && !isLandscape && (
+        <div
+          className="px-4 py-3 text-center text-sm font-semibold"
+          style={{
+            background: 'rgba(161, 255, 74, 0.10)',
+            borderBottom: '1px solid rgba(161, 255, 74, 0.30)',
+            color: '#A1FF4A',
+          }}
+        >
+          📡 Нет сети — это видео не скачано для офлайн-просмотра
+        </div>
+      )}
 
       {/* Video Player - обёртка с возможностью скрытия */}
       <div 
