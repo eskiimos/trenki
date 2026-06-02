@@ -86,14 +86,12 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         return;
       }
 
-      // Получаем публичный VAPID ключ
-      const response = await fetch('/api/push/subscribe');
-      if (!response.ok) {
-        throw new Error('Не удалось получить VAPID ключ');
+      // VAPID public key — статичная env-переменная, не нужно дёргать сервер
+      const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!publicKey) {
+        throw new Error('NEXT_PUBLIC_VAPID_PUBLIC_KEY не настроен');
       }
-      
-      const { publicKey } = await response.json();
-      
+
       // Регистрируем Service Worker
       const registration = await navigator.serviceWorker.ready;
 

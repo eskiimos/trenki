@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { updateUserActivity } from '@/lib/updateUserActivity';
+import { requireAuthUser } from '@/lib/coach/guards';
 
-// GET - Получить все лайки для short
+// GET - Получить все лайки для short (публичное, без auth)
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await context.params;
-    
+
     const likes = await prisma.shortLike.findMany({
       where: { shortId: id },
       include: {
@@ -42,105 +43,42 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
+    const userId = auth.user.id;
+
     const { id: shortId } = await context.params;
-    const telegramId = request.headers.get('X-Telegram-User-ID');
 
-    if (!telegramId) {
-      return NextResponse.json({ error: 'Telegram ID is required' }, { status: 400 });
-    }
-
-    // Находим или создаём пользователя по telegramId
-    let user = await prisma.user.findUnique({
-      where: { telegramId }
-    });
-
-    if (!user) {
-      // Создаём нового пользователя с профилем
-      user = await prisma.user.create({
-        data: {
-          telegramId,
-          firstName: 'User',
-          profile: {
-            create: {
-              strength: 0,
-              endurance: 0,
-              speed: 0,
-              technique: 0,
-              skating: 0,
-              shooting: 0,
-              passing: 0,
-              checking: 0,
-              overall: 0,
-            }
-          }
-        },
-        include: {
-          profile: true
-        }
-      });
-    }
-
-    // Проверяем, существует ли уже лайк
     const existingLike = await prisma.shortLike.findUnique({
-      where: {
-        userId_shortId: {
-          userId: user.id,
-          shortId
-        }
-      }
+      where: { userId_shortId: { userId, shortId } }
     });
 
     let isLiked: boolean;
     let short;
 
     if (existingLike) {
-      // Убираем лайк
       await prisma.shortLike.delete({
-        where: {
-          userId_shortId: {
-            userId: user.id,
-            shortId
-          }
-        }
+        where: { userId_shortId: { userId, shortId } }
       });
-
-      // Обновляем счётчик
       short = await prisma.short.update({
         where: { id: shortId },
-        data: {
-          likesCount: {
-            decrement: 1
-          }
-        }
+        data: { likesCount: { decrement: 1 } }
       });
-
       isLiked = false;
     } else {
-      // Создаём лайк
       await prisma.shortLike.create({
-        data: {
-          userId: user.id,
-          shortId
-        }
+        data: { userId, shortId }
       });
-
-      // Обновляем счётчик
       short = await prisma.short.update({
         where: { id: shortId },
-        data: {
-          likesCount: {
-            increment: 1
-          }
-        }
+        data: { likesCount: { increment: 1 } }
       });
-
       isLiked = true;
     }
 
-    // Обновляем активность пользователя
-    await updateUserActivity(telegramId);
+    await updateUserActivity(userId);
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       isLiked,
       likesCount: short.likesCount
@@ -151,47 +89,25 @@ export async function POST(
   }
 }
 
-// DELETE - Убрать лайк
+// DELETE - Убрать лайк (теперь дублирует POST-toggle, оставлен для обратной совместимости)
 export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
+    const userId = auth.user.id;
+
     const { id: shortId } = await context.params;
-    const { searchParams } = new URL(request.url);
-    const telegramId = searchParams.get('userId');
 
-    if (!telegramId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
-
-    // Находим пользователя по telegramId
-    const user = await prisma.user.findUnique({
-      where: { telegramId }
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    // Удаляем лайк с внутренним userId
     await prisma.shortLike.delete({
-      where: {
-        userId_shortId: {
-          userId: user.id,
-          shortId
-        }
-      }
-    });
+      where: { userId_shortId: { userId, shortId } }
+    }).catch(() => null);
 
-    // Обновляем счётчик лайков в short
     await prisma.short.update({
       where: { id: shortId },
-      data: {
-        likesCount: {
-          decrement: 1
-        }
-      }
+      data: { likesCount: { decrement: 1 } }
     });
 
     return NextResponse.json({ success: true });

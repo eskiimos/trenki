@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, Send } from 'lucide-react';
-import { getTelegramId } from '@/lib/auth';
 import { ShortsPlayer } from '@/components/ShortsPlayer';
 
 // Swiper
@@ -58,8 +57,6 @@ interface Comment {
 
 export default function ShortPage({ params }: ShortPageProps) {
   const router = useRouter();
-  const userId = getTelegramId();
-  
   const [shortId, setShortId] = useState<string>('');
   const [short, setShort] = useState<ShortData | null>(null);
   const [shorts, setShorts] = useState<ShortData[]>([]);
@@ -82,26 +79,20 @@ export default function ShortPage({ params }: ShortPageProps) {
         const currentId = resolvedParams.id;
         setShortId(currentId);
         
-        // Загружаем все shorts
-        const allUrl = userId ? `/api/shorts?userId=${userId}` : '/api/shorts';
-        const allResponse = await fetch(allUrl);
-        
+        // Сессия передаётся cookie, isLiked заполнит сервер
+        const allResponse = await fetch('/api/shorts');
+
         if (allResponse.ok) {
           const allData = await allResponse.json();
           const allShorts = allData.shorts || [];
           setShorts(allShorts);
-          
-          // Находим текущий short
+
           const idx = allShorts.findIndex((s: ShortData) => s.id === currentId);
           if (idx !== -1) {
             setCurrentIndex(idx);
             setShort(allShorts[idx]);
           } else {
-            // Если не нашли, загружаем отдельно
-            const singleUrl = userId 
-              ? `/api/shorts/${currentId}?userId=${userId}`
-              : `/api/shorts/${currentId}`;
-            const singleResponse = await fetch(singleUrl);
+            const singleResponse = await fetch(`/api/shorts/${currentId}`);
             if (singleResponse.ok) {
               const singleData = await singleResponse.json();
               setShort(singleData.short);
@@ -118,7 +109,7 @@ export default function ShortPage({ params }: ShortPageProps) {
       }
     };
     loadData();
-  }, [params, userId, router]);
+  }, [params, router]);
 
   // Загружаем комментарии
   useEffect(() => {
@@ -143,13 +134,10 @@ export default function ShortPage({ params }: ShortPageProps) {
 
   // Лайк
   const handleLike = async () => {
-    if (!userId || !short) {
-      alert('Пожалуйста, войдите в приложение');
-      return;
-    }
+    if (!short) return;
 
     const wasLiked = short.isLiked;
-    
+
     setShort(prev => prev ? {
       ...prev,
       isLiked: !wasLiked,
@@ -159,11 +147,15 @@ export default function ShortPage({ params }: ShortPageProps) {
     try {
       const response = await fetch(`/api/shorts/${short.id}/likes`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Telegram-User-ID': userId,
-        },
+        headers: { 'Content-Type': 'application/json' },
       });
+
+      if (response.status === 401) {
+        // Откатываем оптимистичное обновление и редиректим на логин
+        setShort(prev => prev ? { ...prev, isLiked: wasLiked, likesCount: short.likesCount } : null);
+        router.push('/login');
+        return;
+      }
 
       if (response.ok) {
         const data = await response.json();
@@ -198,14 +190,19 @@ export default function ShortPage({ params }: ShortPageProps) {
 
   // Добавить комментарий
   const handleAddComment = async () => {
-    if (!newComment.trim() || !short || !userId) return;
+    if (!newComment.trim() || !short) return;
 
     try {
       const response = await fetch(`/api/shorts/${short.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, text: newComment }),
+        body: JSON.stringify({ text: newComment }),
       });
+
+      if (response.status === 401) {
+        router.push('/login');
+        return;
+      }
 
       if (response.ok) {
         const data = await response.json();

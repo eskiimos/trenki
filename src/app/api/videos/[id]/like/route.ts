@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { updateUserActivity } from '@/lib/updateUserActivity';
+import { requireAuthUser } from '@/lib/coach/guards';
 
 // GET - проверить, лайкнул ли пользователь видео
 export async function GET(
@@ -8,33 +9,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
+
     const { id: videoId } = await params;
-    const telegramId = request.headers.get('X-Telegram-User-ID');
 
-    if (!telegramId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Находим пользователя
-    const user = await prisma.user.findUnique({
-      where: { telegramId },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    // Проверяем наличие лайка
     const like = await prisma.videoLike.findUnique({
       where: {
         userId_videoId: {
-          userId: user.id,
+          userId: auth.user.id,
           videoId,
         },
       },
     });
 
-    // Получаем общее количество лайков
     const video = await prisma.video.findUnique({
       where: { id: videoId },
       select: { likesCount: true },
@@ -56,23 +44,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
+    const userId = auth.user.id;
+
     const { id: videoId } = await params;
-    const telegramId = request.headers.get('X-Telegram-User-ID');
 
-    if (!telegramId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Находим пользователя
-    const user = await prisma.user.findUnique({
-      where: { telegramId },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    // Проверяем существование видео
     const video = await prisma.video.findUnique({
       where: { id: videoId },
     });
@@ -81,29 +58,17 @@ export async function POST(
       return NextResponse.json({ error: 'Video not found' }, { status: 404 });
     }
 
-    // Проверяем наличие лайка
     const existingLike = await prisma.videoLike.findUnique({
-      where: {
-        userId_videoId: {
-          userId: user.id,
-          videoId,
-        },
-      },
+      where: { userId_videoId: { userId, videoId } },
     });
 
     let isLiked: boolean;
     let likesCount: number;
 
     if (existingLike) {
-      // Убираем лайк
       await prisma.$transaction([
         prisma.videoLike.delete({
-          where: {
-            userId_videoId: {
-              userId: user.id,
-              videoId,
-            },
-          },
+          where: { userId_videoId: { userId, videoId } },
         }),
         prisma.video.update({
           where: { id: videoId },
@@ -113,13 +78,9 @@ export async function POST(
       isLiked = false;
       likesCount = video.likesCount - 1;
     } else {
-      // Ставим лайк
       await prisma.$transaction([
         prisma.videoLike.create({
-          data: {
-            userId: user.id,
-            videoId,
-          },
+          data: { userId, videoId },
         }),
         prisma.video.update({
           where: { id: videoId },
@@ -130,8 +91,7 @@ export async function POST(
       likesCount = video.likesCount + 1;
     }
 
-    // Обновляем активность пользователя
-    await updateUserActivity(telegramId);
+    await updateUserActivity(userId);
 
     return NextResponse.json({ isLiked, likesCount });
   } catch (error) {

@@ -53,10 +53,7 @@ const ProfileEditPage = () => {
       }
 
       try {
-        const telegramId = user?.id?.toString() || user?.username || 'testuser';
-        console.log('Profile edit page: fetching profile for', telegramId);
-        
-        const response = await fetch(`/api/profile?telegramId=${telegramId}`);
+        const response = await fetch('/api/profile');
         
         if (!response.ok || cancelled) {
           throw new Error('Ошибка загрузки профиля');

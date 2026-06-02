@@ -12,7 +12,6 @@ import CharacteristicsGainModal from '@/components/CharacteristicsGainModal';
 import ScheduleModal from '@/components/ScheduleModal';
 import Toast from '@/components/Toast';
 import { isKinescopeUrl, getKinescopeDirectUrl } from '@/lib/videoQuality';
-import { getTelegramId } from '@/lib/auth';
 import { calculateWorkoutGains, CharacteristicType } from '@/lib/characteristics';
 import { 
   downloadVideo, 
@@ -221,28 +220,13 @@ export default function VideoPage({ params }: VideoPageProps) {
           console.error('Ошибка отметки начала видео:', error);
         }
       } else if (!fromWorkout && videoId) {
-        // Записываем обычный просмотр в историю
+        // Записываем обычный просмотр в историю (userId сервер берёт из сессии)
         try {
-          const telegramId = getTelegramId();
-          if (!telegramId) return;
-
-          const profileResponse = await fetch(`/api/profile?telegramId=${telegramId}`);
-          if (profileResponse.ok) {
-            const profileData = await profileResponse.json();
-            const userId = profileData.user?.id;
-
-            if (userId) {
-              console.log('📹 Recording video watch:', { userId, videoId });
-              await fetch('/api/profile/record-watch', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  userId,
-                  videoId,
-                }),
-              });
-            }
-          }
+          await fetch('/api/profile/record-watch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ videoId }),
+          });
         } catch (error) {
           console.error('Ошибка записи просмотра:', error);
         }
@@ -335,18 +319,9 @@ export default function VideoPage({ params }: VideoPageProps) {
 
   // Начисление баллов при просмотре 80% видео (обычный просмотр, не тренировка)
   const creditGainsForWatching = async () => {
-    const telegramId = getTelegramId();
-    if (!telegramId || !videoId || fromWorkout) {
-      console.log('⚠️ Cannot credit gains - missing params or from workout:', { 
-        telegramId, 
-        videoId, 
-        fromWorkout 
-      });
-      return;
-    }
+    if (!videoId || fromWorkout) return;
 
     try {
-      console.log('💰 Crediting gains for watching 80%:', { telegramId, videoId });
       setIsCompletingModule(true);
       
       const response = await fetch('/api/training/complete-module', {
@@ -594,24 +569,14 @@ export default function VideoPage({ params }: VideoPageProps) {
       if (!videoId || !videoData) return;
 
       try {
-        const telegramId = getTelegramId();
-        if (!telegramId) {
-          // Если нет ID пользователя, показываем количество лайков из videoData
-          setLikesCount(videoData.likesCount || 0);
-          return;
-        }
-
-        const response = await fetch(`/api/videos/${videoId}/like`, {
-          headers: {
-            'X-Telegram-User-ID': telegramId,
-          },
-        });
+        const response = await fetch(`/api/videos/${videoId}/like`);
 
         if (response.ok) {
           const data = await response.json();
           setIsLiked(data.isLiked);
           setLikesCount(data.likesCount);
         } else {
+          // Нет сессии или ошибка — показываем количество из videoData без isLiked
           setLikesCount(videoData.likesCount || 0);
         }
       } catch (error) {
@@ -625,19 +590,15 @@ export default function VideoPage({ params }: VideoPageProps) {
 
   // Функция переключения лайка
   const toggleLike = async () => {
-    const telegramId = getTelegramId();
-    if (!telegramId) {
-      alert('Пожалуйста, войдите в приложение');
-      return;
-    }
-
     try {
       const response = await fetch(`/api/videos/${videoId}/like`, {
         method: 'POST',
-        headers: {
-          'X-Telegram-User-ID': telegramId,
-        },
       });
+
+      if (response.status === 401) {
+        router.push('/login');
+        return;
+      }
 
       if (response.ok) {
         const data = await response.json();
@@ -652,13 +613,7 @@ export default function VideoPage({ params }: VideoPageProps) {
   // Функция завершения одиночного модуля
   const handleCompleteModule = async () => {
     if (isCompletingModule || !videoId) return;
-    
-    const telegramId = getTelegramId();
-    if (!telegramId) {
-      alert('Пожалуйста, войдите в приложение');
-      return;
-    }
-    
+
     try {
       setIsCompletingModule(true);
       

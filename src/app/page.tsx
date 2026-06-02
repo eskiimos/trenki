@@ -307,9 +307,8 @@ const Header = () => {
           
           setUserProfile(profileData);
           
-          // Обновляем authData если данные из базы отличаются
+          // Обновляем authData если данные из базы отличаются — без reload
           if (authData && (authData.firstName !== cachedData.user.firstName || authData.lastName !== cachedData.user.lastName)) {
-            console.log('🔄 Updating authData with correct data from database (from cache)');
             const { saveAuth } = require('@/lib/auth');
             saveAuth({
               telegramId: cachedData.user.telegramId,
@@ -317,10 +316,6 @@ const Header = () => {
               lastName: cachedData.user.lastName,
               username: cachedData.user.username,
             });
-            
-            // Перезагружаем страницу чтобы обновить все компоненты
-            console.log('🔄 Reloading page to apply updated authData...');
-            window.location.reload();
           }
         } else {
           setUserProfile(null);
@@ -376,9 +371,8 @@ const Header = () => {
           setUserProfile(profileData);
           console.log('👤 Final userProfile set:', profileData);
           
-          // Обновляем authData если данные из базы отличаются
+          // Обновляем authData если данные из базы отличаются — без reload
           if (authData && (authData.firstName !== data.user.firstName || authData.lastName !== data.user.lastName)) {
-            console.log('🔄 Updating authData with correct data from database (API response)');
             const { saveAuth } = require('@/lib/auth');
             saveAuth({
               telegramId: data.user.telegramId,
@@ -386,10 +380,6 @@ const Header = () => {
               lastName: data.user.lastName,
               username: data.user.username,
             });
-            
-            // Перезагружаем страницу чтобы обновить все компоненты
-            console.log('🔄 Reloading page to apply updated authData...');
-            window.location.reload();
           }
         } else {
           setUserProfile(null);

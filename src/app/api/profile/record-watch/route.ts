@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAuthUser } from '@/lib/coach/guards';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { userId, videoId } = body;
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
+    const userId = auth.user.id;
 
-    if (!userId || !videoId) {
+    const body = await request.json();
+    const { videoId } = body;
+
+    if (!videoId) {
       return NextResponse.json(
-        { error: 'userId and videoId are required' },
+        { error: 'videoId is required' },
         { status: 400 }
       );
     }

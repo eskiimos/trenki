@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAuthUser } from '@/lib/coach/guards';
 
 type HistoryEntry = {
   gainPower: number;
@@ -11,16 +12,12 @@ type HistoryEntry = {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
+    const userId = auth.user.id;
+
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
     const limit = parseInt(searchParams.get('limit') || '5', 10);
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId обязателен' },
-        { status: 400 }
-      );
-    }
 
     // Получаем последние записи истории с приростом
     const recentHistory = await prisma.characteristicHistory.findMany({

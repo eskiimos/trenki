@@ -1,29 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { updateUserActivity } from '@/lib/updateUserActivity';
+import { requireAuthUser } from '@/lib/coach/guards';
 
-// GET - Получить все комментарии для short
+// GET - Получить все комментарии для short (публичное, без auth)
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await context.params;
-    
+
     const comments = await prisma.shortComment.findMany({
       where: { shortId: id },
       include: {
         user: {
           select: {
             id: true,
-            telegramId: true,
             firstName: true,
             lastName: true,
             username: true,
             profile: {
-              select: {
-                avatarUrl: true
-              }
+              select: { avatarUrl: true }
             }
           }
         }
@@ -31,9 +29,7 @@ export async function GET(
       orderBy: { createdAt: 'desc' }
     });
 
-    const commentsCount = comments.length;
-
-    return NextResponse.json({ comments, commentsCount });
+    return NextResponse.json({ comments, commentsCount: comments.length });
   } catch (error) {
     console.error('Error fetching comments:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -46,31 +42,21 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
+    const userId = auth.user.id;
+
     const { id: shortId } = await context.params;
     const body = await request.json();
-    const { userId: telegramId, text } = body;
-
-    if (!telegramId || !text) {
-      return NextResponse.json({ error: 'userId and text are required' }, { status: 400 });
-    }
+    const text: string = typeof body?.text === 'string' ? body.text : '';
 
     if (text.trim().length === 0) {
       return NextResponse.json({ error: 'Comment cannot be empty' }, { status: 400 });
     }
 
-    // Находим пользователя по telegramId
-    const user = await prisma.user.findUnique({
-      where: { telegramId }
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    // Создаём комментарий с внутренним userId
     const comment = await prisma.shortComment.create({
       data: {
-        userId: user.id,
+        userId,
         shortId,
         text: text.trim()
       },
@@ -82,17 +68,14 @@ export async function POST(
             lastName: true,
             username: true,
             profile: {
-              select: {
-                avatarUrl: true
-              }
+              select: { avatarUrl: true }
             }
           }
         }
       }
     });
 
-    // Обновляем активность пользователя
-    await updateUserActivity(telegramId);
+    await updateUserActivity(userId);
 
     return NextResponse.json({ comment, success: true });
   } catch (error) {

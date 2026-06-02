@@ -58,8 +58,8 @@ export default function CharacteristicsStatsPage() {
 
   const loadData = async () => {
     try {
-      // Загружаем профиль
-      const profileResponse = await fetch(`/api/profile?telegramId=${user?.id}`);
+      // Сервер берёт userId из сессии
+      const profileResponse = await fetch('/api/profile');
       const profileData = await profileResponse.json();
 
       if (profileData.user?.profile) {

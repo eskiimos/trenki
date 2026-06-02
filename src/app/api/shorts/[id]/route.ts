@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminAsync } from '@/lib/admin-session';
+import { getSessionUserId } from '@/lib/auth-server';
 
-// GET - получить short по ID
+// GET - получить short по ID (публичное, isLiked при наличии сессии)
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const sessionUserId = await getSessionUserId(request);
     const { id } = await context.params;
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
-    
+
     const short = await prisma.short.findUnique({
       where: { id },
     });
@@ -20,53 +20,30 @@ export async function GET(
       return NextResponse.json({ error: 'Short not found' }, { status: 404 });
     }
 
-    // Если есть trainerId, загружаем данные тренера
     let trainer = null;
     if (short.trainerId) {
       trainer = await prisma.trainer.findUnique({
         where: { id: short.trainerId },
-        select: {
-          id: true,
-          name: true,
-          lastName: true,
-          avatar: true,
+        select: { id: true, name: true, lastName: true, avatar: true }
+      });
+    }
+
+    let isLiked = false;
+    if (sessionUserId) {
+      const like = await prisma.shortLike.findUnique({
+        where: {
+          userId_shortId: { userId: sessionUserId, shortId: id }
         }
       });
+      isLiked = !!like;
     }
 
-    // Проверяем, лайкнул ли пользователь этот short
-    let isLiked = false;
-    if (userId) {
-      // Находим пользователя по telegramId
-      const user = await prisma.user.findUnique({
-        where: { telegramId: userId }
-      });
-
-      if (user) {
-        const like = await prisma.shortLike.findUnique({
-          where: {
-            userId_shortId: {
-              userId: user.id,
-              shortId: id
-            }
-          }
-        });
-        isLiked = !!like;
-      }
-    }
-
-    // Получаем количество комментариев
     const commentsCount = await prisma.shortComment.count({
       where: { shortId: id }
     });
 
-    return NextResponse.json({ 
-      short: {
-        ...short,
-        trainer,
-        isLiked,
-        commentsCount
-      }
+    return NextResponse.json({
+      short: { ...short, trainer, isLiked, commentsCount }
     });
   } catch (error) {
     console.error('Error fetching short:', error);

@@ -77,13 +77,10 @@ const TrainerVideosPage = () => {
         setVideos(videosData.videos || []);
 
         // Fetch profile
-        const telegramId = getTelegramId();
-        if (telegramId) {
-          const profileResponse = await fetch(`/api/profile?telegramId=${telegramId}`);
-          if (profileResponse.ok) {
-            const profileData = await profileResponse.json();
-            setUserProfile(profileData.user?.profile);
-          }
+        const profileResponse = await fetch('/api/profile');
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          setUserProfile(profileData.user?.profile);
         }
       } catch (error) {
         console.error('Error fetching data:', error);

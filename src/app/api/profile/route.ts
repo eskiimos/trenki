@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    await updateUserActivity(user!.telegramId);
+    await updateUserActivity(user!.id);
 
     return NextResponse.json({ user });
   } catch (error) {

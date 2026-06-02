@@ -1,34 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { LastTrainingTime, LoadDirection } from '@/generated/prisma';
-import { ensureDevUser } from '@/lib/dev-user';
+import { requireAuthUser } from '@/lib/coach/guards';
 
 /**
  * POST /api/training/assessment
- * Создает новую оценку состояния пользователя и определяет параметры тренировки
+ * Создает новую оценку состояния пользователя и определяет параметры тренировки.
+ * Auth: httpOnly session cookie.
  */
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
+    const userId = auth.user.id;
+
     const body = await request.json();
     const {
-      userId,
       lastTrainingTime,
       energyLevel,
       muscleReadiness,
       motivation,
       availableTime,
     } = body;
-
-    // Валидация входных данных
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId обязателен' },
-        { status: 400 }
-      );
-    }
-    
-    // DEV MODE: автоматически создаём пользователя, если его нет
-    await ensureDevUser(userId);
 
     if (!lastTrainingTime || !LastTrainingTime[lastTrainingTime as keyof typeof LastTrainingTime]) {
       return NextResponse.json(
@@ -144,22 +137,16 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET /api/training/assessment?userId=xxx
- * Получает последнюю оценку состояния пользователя
+ * GET /api/training/assessment
+ * Получает последнюю оценку состояния текущего пользователя.
+ * Auth: httpOnly session cookie.
  */
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const userId = searchParams.get('userId');
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
+    const userId = auth.user.id;
 
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId обязателен' },
-        { status: 400 }
-      );
-    }
-
-    // Получаем последнюю оценку
     const assessment = await prisma.userStateAssessment.findFirst({
       where: { userId },
       orderBy: { createdAt: 'desc' },

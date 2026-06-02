@@ -323,33 +323,24 @@ const ProfilePage = () => {
       }
 
       try {
-        const telegramId = user?.id?.toString() || user?.username || 'testuser';
-        console.log('Profile page: fetching profile for', telegramId);
-        
-        // Запрос к API для получения полного профиля пользователя с таймаутом
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
-        
-        const response = await fetch(`/api/profile?telegramId=${telegramId}`, {
-          signal: controller.signal
-        });
-        
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const response = await fetch('/api/profile', { signal: controller.signal });
         clearTimeout(timeoutId);
-        
+
         if (!response.ok || cancelled) {
           throw new Error('Ошибка загрузки профиля');
         }
 
         const data = await response.json();
-        console.log('Profile data received:', data);
-        
+
         if (!cancelled) {
           setUserProfile(data.user);
           setIsLoading(false);
-          
-          // Загружаем последние приросты
+
           if (data.user?.id) {
-            fetchRecentGains(data.user.id);
+            fetchRecentGains();
           }
         }
       } catch (error) {
@@ -360,9 +351,9 @@ const ProfilePage = () => {
       }
     };
 
-    const fetchRecentGains = async (userId: string) => {
+    const fetchRecentGains = async () => {
       try {
-        const response = await fetch(`/api/profile/recent-gains?userId=${userId}&limit=10`);
+        const response = await fetch('/api/profile/recent-gains?limit=10');
         if (response.ok) {
           const data = await response.json();
           setRecentGains(data.totalGains);

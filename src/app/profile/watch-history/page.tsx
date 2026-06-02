@@ -5,7 +5,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import BottomNavigation from '@/components/BottomNavigation';
 import { Skeleton } from '@/components/Skeleton';
-import { getTelegramId } from '@/lib/auth';
 
 // Функция для форматирования длительности видео в YouTube формате (MM:SS или H:MM:SS)
 const formatDuration = (seconds: number): string => {
@@ -57,29 +56,14 @@ const WatchHistoryPage = () => {
     const fetchWatchHistory = async () => {
       try {
         setIsLoading(true);
-        const telegramId = getTelegramId();
-        
-        if (!telegramId) {
+
+        // Сервер берёт userId из сессии
+        const historyResponse = await fetch('/api/profile/watch-history?limit=50');
+
+        if (historyResponse.status === 401) {
           setIsLoading(false);
           return;
         }
-
-        // Первый запрос к /api/profile для получения userId
-        const profileResponse = await fetch(`/api/profile?telegramId=${telegramId}`);
-        if (!profileResponse.ok) {
-          throw new Error('Failed to fetch profile');
-        }
-
-        const profileData = await profileResponse.json();
-        const userId = profileData.user?.id;
-
-        if (!userId) {
-          setIsLoading(false);
-          return;
-        }
-
-        // Второй запрос к /api/profile/watch-history для получения истории
-        const historyResponse = await fetch(`/api/profile/watch-history?userId=${userId}&limit=50`);
         if (!historyResponse.ok) {
           throw new Error('Failed to fetch watch history');
         }

@@ -1,13 +1,14 @@
 import { prisma } from './prisma';
 
 /**
- * Обновляет время последней активности пользователя
- * Вызывать при любом действии пользователя в приложении
+ * Обновляет время последней активности пользователя.
+ * Принимает User.id (внутренний cuid), а не telegramId — раньше у email-юзеров
+ * (telegramId="email_..." ) активность не обновлялась никогда.
  */
-export async function updateUserActivity(telegramId: string): Promise<void> {
+export async function updateUserActivity(userId: string): Promise<void> {
   try {
     await prisma.user.update({
-      where: { telegramId },
+      where: { id: userId },
       data: { lastActivity: new Date() }
     });
   } catch (error) {

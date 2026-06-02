@@ -2,31 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { updateUserActivity } from '@/lib/updateUserActivity';
 import { requireAdminAsync } from '@/lib/admin-session';
+import { getSessionUserId } from '@/lib/auth-server';
 
-// GET - получить все опубликованные shorts
+// GET - получить все опубликованные shorts (публичное, isLiked заполняется только при наличии сессии)
 export async function GET(request: NextRequest) {
   try {
+    const sessionUserId = await getSessionUserId(request);
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
     const trainerId = searchParams.get('trainerId');
     const audience = searchParams.get('audience'); // HOCKEY | ADAPTIVE
-    
-    const whereClause: any = {
-      isPublished: true,
-    };
 
-    // Фильтр по аудитории
+    const whereClause: any = { isPublished: true };
     if (audience === 'ADAPTIVE') {
       whereClause.audience = { in: ['ADAPTIVE', 'ALL'] };
     } else if (audience === 'HOCKEY') {
       whereClause.audience = { in: ['HOCKEY', 'ALL'] };
     }
-
-    // Фильтр по тренеру
     if (trainerId) {
       whereClause.trainerId = trainerId;
     }
-    
+
     const shorts = await prisma.short.findMany({
       where: whereClause,
       orderBy: [
@@ -35,59 +30,36 @@ export async function GET(request: NextRequest) {
       ]
     });
 
-    // Загружаем данные тренеров и статусы лайков
     const shortsWithData = await Promise.all(
       shorts.map(async (short) => {
         let trainer = null;
         if (short.trainerId) {
           trainer = await prisma.trainer.findUnique({
             where: { id: short.trainerId },
-            select: {
-              id: true,
-              name: true,
-              lastName: true,
-              avatar: true,
+            select: { id: true, name: true, lastName: true, avatar: true }
+          });
+        }
+
+        let isLiked = false;
+        if (sessionUserId) {
+          const like = await prisma.shortLike.findUnique({
+            where: {
+              userId_shortId: { userId: sessionUserId, shortId: short.id }
             }
           });
+          isLiked = !!like;
         }
 
-        // Проверяем статус лайка
-        let isLiked = false;
-        if (userId) {
-          const user = await prisma.user.findUnique({
-            where: { telegramId: userId }
-          });
-
-          if (user) {
-            const like = await prisma.shortLike.findUnique({
-              where: {
-                userId_shortId: {
-                  userId: user.id,
-                  shortId: short.id
-                }
-              }
-            });
-            isLiked = !!like;
-          }
-        }
-
-        // Получаем количество комментариев
         const commentsCount = await prisma.shortComment.count({
           where: { shortId: short.id }
         });
 
-        return { 
-          ...short, 
-          trainer,
-          isLiked,
-          commentsCount
-        };
+        return { ...short, trainer, isLiked, commentsCount };
       })
     );
 
-    // Обновляем активность пользователя, если он авторизован
-    if (userId) {
-      await updateUserActivity(userId);
+    if (sessionUserId) {
+      await updateUserActivity(sessionUserId);
     }
 
     return NextResponse.json({ shorts: shortsWithData });

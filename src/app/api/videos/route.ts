@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { updateUserActivity } from '@/lib/updateUserActivity';
 import { requireAdminAsync } from '@/lib/admin-session';
+import { getSessionUserId } from '@/lib/auth-server';
 
 export async function GET(request: NextRequest) {
   try {
+    const sessionUserId = await getSessionUserId(request);
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
     const difficulty = searchParams.get('difficulty');
     const trainerId = searchParams.get('trainerId');
-    const userId = searchParams.get('userId');
     const audience = searchParams.get('audience'); // HOCKEY | ADAPTIVE
 
     const where: any = {
@@ -104,9 +105,8 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Обновляем активность пользователя, если он авторизован
-    if (userId) {
-      await updateUserActivity(userId);
+    if (sessionUserId) {
+      await updateUserActivity(sessionUserId);
     }
 
     return NextResponse.json({ videos: formattedVideos });

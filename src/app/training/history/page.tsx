@@ -82,7 +82,7 @@ export default function TrainingHistoryPage() {
 
   const loadCharacteristics = async () => {
     try {
-      const response = await fetch(`/api/profile?telegramId=${user?.id}`);
+      const response = await fetch('/api/profile');
       const data = await response.json();
 
       if (data.user?.profile) {

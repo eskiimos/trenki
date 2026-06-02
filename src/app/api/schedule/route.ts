@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
       const existingIso = new Set(existing.map(e => e.date.toISOString()));
       const toCreate = uniqueDates
         .filter(d => !existingIso.has(d.toISOString()))
-        .map(d => ({ userId: user.id, videoId, date: d, notificationSent: true }));
+        .map(d => ({ userId: user.id, videoId, date: d, notificationSent: false }));
 
       if (toCreate.length === 0) return [];
 

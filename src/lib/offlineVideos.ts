@@ -3,7 +3,10 @@
 const DB_NAME = 'TrenkiOfflineVideos';
 const DB_VERSION = 1;
 const STORE_NAME = 'videos';
-const VIDEO_CACHE_NAME = 'trenki-videos-v1';
+// ВАЖНО: должно совпадать с VIDEO_CACHE_NAME в public/sw.js, иначе
+// activate-handler сервис-воркера удалит этот кэш при обновлении версии
+// и атлет потеряет скачанные оффлайн-видео.
+const VIDEO_CACHE_NAME = 'trenki-videos-v3';
 
 export interface OfflineVideo {
   id: string;
