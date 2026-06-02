@@ -38,7 +38,7 @@ export default function AssignmentsBanner() {
   const verb = pluralize(pendingCount, 'ждёт', 'ждут', 'ждут');
 
   return (
-    <section className="px-4" style={{ paddingBottom: '15px' }}>
+    <section className="px-4 animate-fadeInDown" style={{ paddingBottom: '15px' }}>
       <Link href="/profile/assignments" style={{ textDecoration: 'none' }}>
         <div
           style={{

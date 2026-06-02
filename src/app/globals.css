@@ -212,6 +212,47 @@ input:focus, button:focus, textarea:focus, select:focus {
   animation: fadeOut 0.3s ease-out forwards;
 }
 
+/* Появление с эффектом «выскочило» — для модалок */
+@keyframes popIn {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.animate-popIn {
+  animation: popIn 0.22s ease-out forwards;
+}
+
+/* Сдвиг сверху вниз с плавной прозрачностью — для баннеров/тостов */
+@keyframes fadeInDown {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.animate-fadeInDown {
+  animation: fadeInDown 0.35s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-slideUp,
+  .animate-slideDown,
+  .animate-fadeIn,
+  .animate-fadeOut,
+  .animate-popIn,
+  .animate-fadeInDown {
+    animation: none;
+  }
+}
+
 /* Heart beat animation for double tap like */
 @keyframes heartBeat {
   0% {

@@ -53,7 +53,7 @@ export default function VideoSlotPicker({ slotLabel, value, options, onChange }:
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full text-left"
+        className="w-full text-left transition-transform duration-100 active:scale-[0.98]"
         style={{
           background: '#101530',
           border: selected ? '1px solid rgba(161, 255, 74, 0.30)' : '1px dashed #26252F',
@@ -122,6 +122,7 @@ export default function VideoSlotPicker({ slotLabel, value, options, onChange }:
 
       {open && (
         <div
+          className="animate-fadeIn"
           style={{
             position: 'fixed',
             inset: 0,
@@ -134,6 +135,7 @@ export default function VideoSlotPicker({ slotLabel, value, options, onChange }:
           onClick={() => setOpen(false)}
         >
           <div
+            className="animate-slideUp"
             onClick={(e) => e.stopPropagation()}
             style={{
               background: '#101530',

@@ -204,6 +204,7 @@ export default function CoachAssignmentNewPage() {
     <div className="min-h-screen bg-[#101530] text-white pb-32">
       {conflicts.length > 0 && (
         <div
+          className="animate-fadeIn"
           style={{
             position: 'fixed',
             inset: 0,
@@ -217,6 +218,7 @@ export default function CoachAssignmentNewPage() {
           onClick={handleCancelConflicts}
         >
           <div
+            className="animate-popIn"
             onClick={(e) => e.stopPropagation()}
             style={{
               background: '#060919',
@@ -649,7 +651,7 @@ export default function CoachAssignmentNewPage() {
         <button
           onClick={handleSubmit}
           disabled={!canSubmit}
-          className="w-full font-overpass uppercase mt-6"
+          className="w-full font-overpass uppercase mt-6 transition-transform duration-100 active:scale-95"
           style={{
             background: canSubmit ? '#A1FF4A' : '#4a4f6a',
             color: canSubmit ? '#101530' : '#AEABBB',

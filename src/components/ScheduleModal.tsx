@@ -405,7 +405,7 @@ export default function ScheduleModal({ isOpen, onClose, videoId }: ScheduleModa
       <div 
         ref={modalRef}
         onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-md bg-[#101530] rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl transform transition-transform duration-300 ease-out ${isClosing ? 'translate-y-full' : 'animate-slide-up'}`}
+        className={`w-full max-w-md bg-[#101530] rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl transform transition-transform duration-300 ease-out ${isClosing ? 'translate-y-full' : 'animate-slideUp'}`}
       >
         
         {/* Header */}

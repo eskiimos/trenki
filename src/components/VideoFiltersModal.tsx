@@ -147,11 +147,11 @@ export default function VideoFiltersModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fadeIn"
       onClick={onClose}
     >
       <div
-        className="bg-[#101530] w-full rounded-t-3xl flex flex-col"
+        className="bg-[#101530] w-full rounded-t-3xl flex flex-col animate-slideUp"
         style={{ height: '88vh', maxHeight: '88vh', marginBottom: '69px' }}
         onClick={(e) => e.stopPropagation()}
       >
