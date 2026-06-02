@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import BottomNavigation from '@/components/BottomNavigation';
-import { getTelegramId } from '@/lib/auth';
 import SwipeableWorkoutItem from '@/components/SwipeableWorkoutItem';
 
 interface ScheduledWorkout {
@@ -29,36 +28,46 @@ interface ScheduledWorkout {
   };
 }
 
+interface CoachAssignment {
+  id: string;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  dueDate: string;
+  coach: { id: string; firstName: string | null; lastName: string | null };
+  video: { id: string; title: string; thumbnail: string | null; duration: number | null };
+}
+
 export default function CalendarPage() {
   const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [scheduledWorkouts, setScheduledWorkouts] = useState<ScheduledWorkout[]>([]);
+  const [coachAssignments, setCoachAssignments] = useState<CoachAssignment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetchScheduledWorkouts();
+    fetchCalendar();
   }, [currentDate.getMonth(), currentDate.getFullYear()]);
 
-  const fetchScheduledWorkouts = async () => {
+  const fetchCalendar = async () => {
     setIsLoading(true);
     try {
       const month = currentDate.getMonth();
       const year = currentDate.getFullYear();
-      const telegramId = getTelegramId();
-      
-      const response = await fetch(`/api/schedule?month=${month}&year=${year}`, {
-        headers: {
-          'x-telegram-id': telegramId || '',
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setScheduledWorkouts(data);
+
+      const [scheduleRes, assignmentsRes] = await Promise.all([
+        fetch(`/api/schedule?month=${month}&year=${year}`),
+        fetch('/api/assignments?role=athlete'),
+      ]);
+
+      if (scheduleRes.ok) {
+        setScheduledWorkouts(await scheduleRes.json());
+      }
+      if (assignmentsRes.ok) {
+        const data = await assignmentsRes.json();
+        setCoachAssignments(data.assignments ?? []);
       }
     } catch (error) {
-      console.error('Error fetching schedule:', error);
+      console.error('Error fetching calendar:', error);
     } finally {
       setIsLoading(false);
     }
@@ -76,15 +85,35 @@ export default function CalendarPage() {
     setSelectedDate(date);
   };
 
-  const getWorkoutsForDate = (date: Date) => {
-    return scheduledWorkouts.filter(workout => {
-      const workoutDate = new Date(workout.date);
-      return (
-        workoutDate.getDate() === date.getDate() &&
-        workoutDate.getMonth() === date.getMonth() &&
-        workoutDate.getFullYear() === date.getFullYear()
-      );
-    });
+  const isSameDay = (a: Date, b: Date) =>
+    a.getDate() === b.getDate() &&
+    a.getMonth() === b.getMonth() &&
+    a.getFullYear() === b.getFullYear();
+
+  const getWorkoutsForDate = (date: Date) =>
+    scheduledWorkouts.filter((w) => isSameDay(new Date(w.date), date));
+
+  // Правило приоритета: если в день есть план Марка (ScheduledWorkout),
+  // тренерское назначение из календаря скрываем. В /profile/assignments оно остаётся.
+  const getAssignmentsForDate = (date: Date) => {
+    if (getWorkoutsForDate(date).length > 0) return [];
+    return coachAssignments.filter(
+      (a) =>
+        a.status !== 'COMPLETED' &&
+        a.status !== 'CANCELLED' &&
+        isSameDay(new Date(a.dueDate), date),
+    );
+  };
+
+  const hasAnyEventOnDay = (year: number, month: number, day: number) => {
+    const checkDate = new Date(year, month, day);
+    if (scheduledWorkouts.some((w) => isSameDay(new Date(w.date), checkDate))) return true;
+    return coachAssignments.some(
+      (a) =>
+        a.status !== 'COMPLETED' &&
+        a.status !== 'CANCELLED' &&
+        isSameDay(new Date(a.dueDate), checkDate),
+    );
   };
 
   const renderCalendar = () => {
@@ -118,11 +147,7 @@ export default function CalendarPage() {
       
       const isToday = isCurrentMonth && today.getDate() === i;
       
-      // Check if there are workouts for this day
-      const hasWorkouts = scheduledWorkouts.some(workout => {
-        const workoutDate = new Date(workout.date);
-        return workoutDate.getDate() === i && workoutDate.getMonth() === month && workoutDate.getFullYear() === year;
-      });
+      const hasWorkouts = hasAnyEventOnDay(year, month, i);
 
       days.push(
         <button
@@ -208,6 +233,14 @@ export default function CalendarPage() {
   };
 
   const selectedWorkouts = getWorkoutsForDate(selectedDate);
+  const selectedAssignments = getAssignmentsForDate(selectedDate);
+  const hasAnythingForSelected = selectedWorkouts.length > 0 || selectedAssignments.length > 0;
+
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds) return '';
+    const min = Math.round(seconds / 60);
+    return `${min} мин`;
+  };
 
   return (
     <div 
@@ -286,17 +319,62 @@ export default function CalendarPage() {
 
         {/* Workouts List */}
         <div className="space-y-4">
-          {selectedWorkouts.length > 0 ? (
-            selectedWorkouts.map((workout) => (
-              <SwipeableWorkoutItem
-                key={workout.id}
-                workout={workout}
-                onDelete={handleDeleteWorkout}
-                categoryMap={categoryMap}
-                levelMap={levelMap}
-              />
-            ))
-          ) : (
+          {selectedAssignments.map((a) => {
+            const coachName = `${a.coach.firstName ?? ''} ${a.coach.lastName ?? ''}`.trim() || 'Тренер';
+            return (
+              <Link
+                key={a.id}
+                href={`/video/${a.video.id}`}
+                className="block rounded-2xl overflow-hidden"
+                style={{
+                  background:
+                    'linear-gradient(135deg, rgba(161, 255, 74, 0.12) 0%, rgba(68, 92, 255, 0.20) 100%)',
+                  border: '1px solid rgba(161, 255, 74, 0.25)',
+                }}
+              >
+                <div className="p-4 flex gap-3 items-center">
+                  <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-[#0d1228] shrink-0">
+                    {a.video.thumbnail && (
+                      <Image src={a.video.thumbnail} alt={a.video.title} fill className="object-cover" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div
+                      style={{
+                        color: '#A1FF4A',
+                        fontSize: 11,
+                        fontFamily: 'Overpass',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.5,
+                        marginBottom: 6,
+                      }}
+                    >
+                      от тренера · {coachName}
+                    </div>
+                    <div className="text-white text-sm font-semibold leading-tight line-clamp-2">
+                      {a.video.title}
+                    </div>
+                    {a.video.duration ? (
+                      <div className="text-[#AEABBB] text-xs mt-1">{formatDuration(a.video.duration)}</div>
+                    ) : null}
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+
+          {selectedWorkouts.map((workout) => (
+            <SwipeableWorkoutItem
+              key={workout.id}
+              workout={workout}
+              onDelete={handleDeleteWorkout}
+              categoryMap={categoryMap}
+              levelMap={levelMap}
+            />
+          ))}
+
+          {!hasAnythingForSelected && (
             <div className="text-[#AEABBB] text-sm text-center py-8">
               Нет запланированных тренировок
             </div>
