@@ -11,8 +11,10 @@ interface Assignment {
   dueDate: string;
   assignedAt: string;
   notes: string | null;
+  videoId: string | null;
+  workoutSessionId: string | null;
   athlete: { id: string; firstName: string; lastName: string };
-  video: { id: string; title: string; thumbnail: string | null; duration: number };
+  video: { id: string; title: string; thumbnail: string | null; duration: number } | null;
   team: { id: string; name: string } | null;
 }
 
@@ -165,7 +167,9 @@ export default function CoachAssignmentsPage() {
                 <StatusBadge status={a.status} />
               </div>
               <div className="font-overpass mt-2" style={{ color: '#AEABBB', fontSize: 13 }}>
-                {a.video.title}
+                {a.workoutSessionId
+                  ? 'Полноценное занятие · 4 модуля'
+                  : (a.video?.title ?? '—')}
               </div>
               {a.notes && (
                 <div

@@ -11,7 +11,9 @@ interface Assignment {
   assignedAt: string;
   completedAt: string | null;
   notes: string | null;
-  video: { id: string; title: string; thumbnail: string | null; duration: number };
+  videoId: string | null;
+  workoutSessionId: string | null;
+  video: { id: string; title: string; thumbnail: string | null; duration: number } | null;
 }
 
 interface AthleteData {
@@ -197,7 +199,11 @@ export default function CoachAthleteDetailPage({ params }: { params: Promise<{ i
           {assignments.map((a) => (
             <div key={a.id} style={{ background: '#060919', border: '1px solid #26252F', borderRadius: 12, padding: '12px 14px' }}>
               <div className="flex items-center justify-between">
-                <div className="font-overpass" style={{ fontWeight: 700, fontSize: 13 }}>{a.video.title}</div>
+                <div className="font-overpass" style={{ fontWeight: 700, fontSize: 13 }}>
+                  {a.workoutSessionId
+                    ? 'Полноценное занятие · 4 модуля'
+                    : (a.video?.title ?? '—')}
+                </div>
                 <StatusBadge status={a.status} />
               </div>
               <div className="font-overpass mt-1" style={{ color: '#AEABBB', fontSize: 11 }}>
