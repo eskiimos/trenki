@@ -1,24 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { WorkoutStatus } from '@/generated/prisma';
+import { requireAuthUser } from '@/lib/coach/guards';
 
 /**
- * GET /api/training/history?userId=xxx&limit=10&offset=0
- * Получает историю тренировок пользователя
+ * GET /api/training/history?limit=10&offset=0
+ * Получает историю тренировок текущего пользователя.
+ * Auth: httpOnly session cookie.
  */
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
+    const userId = auth.user.id;
+
     const searchParams = request.nextUrl.searchParams;
-    const userId = searchParams.get('userId');
     const limit = parseInt(searchParams.get('limit') || '10');
     const offset = parseInt(searchParams.get('offset') || '0');
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId обязателен' },
-        { status: 400 }
-      );
-    }
 
     // Получаем историю тренировок
     const [workouts, total] = await Promise.all([

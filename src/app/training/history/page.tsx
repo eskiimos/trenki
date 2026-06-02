@@ -66,7 +66,7 @@ export default function TrainingHistoryPage() {
 
   const loadHistory = async () => {
     try {
-      const response = await fetch(`/api/training/history?userId=${user?.id}&limit=20`);
+      const response = await fetch('/api/training/history?limit=20');
       const data = await response.json();
 
       if (data.success) {

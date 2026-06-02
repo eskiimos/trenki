@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { WorkoutStatus } from '@/generated/prisma';
+import { requireAuthUser } from '@/lib/coach/guards';
 
 /**
  * POST /api/training/update
- * Обновляет прогресс выполнения тренировки
+ * Обновляет прогресс выполнения тренировки.
+ * Auth: httpOnly session + проверка владения sessionId.
  */
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
+
     const body = await request.json();
     const { sessionId, videoId, action, watchedDuration, actualRPE } = body;
 
@@ -18,10 +23,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Проверяем, что эта сессия принадлежит текущему пользователю
+    const owner = await prisma.workoutSession.findUnique({
+      where: { id: sessionId },
+      select: { userId: true },
+    });
+    if (!owner || owner.userId !== auth.user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     // Начать видео
     if (action === 'start' && videoId) {
-      // Обновляем статус тренировки на IN_PROGRESS (если еще не начата)
       const session = await prisma.workoutSession.findUnique({
         where: { id: sessionId },
       });

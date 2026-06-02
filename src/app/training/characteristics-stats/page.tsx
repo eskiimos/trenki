@@ -110,7 +110,7 @@ export default function CharacteristicsStatsPage() {
         };
 
         // Загружаем статистику тренировок
-        const statsResponse = await fetch(`/api/training/history?userId=${user?.id}&limit=1000`);
+        const statsResponse = await fetch('/api/training/history?limit=1000');
         const statsData = await statsResponse.json();
 
         setData({
