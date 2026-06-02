@@ -50,12 +50,13 @@ services:
         max-file: "3"
     healthcheck:
       # В standalone-образе нет curl/wget — пингуем через встроенный Node.
-      # `/login` — public, всегда 200, не зависит от cookie.
+      # /api/health: 200 если все required env заданы И БД отвечает на SELECT 1,
+      # иначе 503. Раньше тыкали /login (всегда 200) — упавшая БД не палилась.
       test:
         - CMD
         - node
         - -e
-        - "fetch('http://localhost:3000/login').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+        - "fetch('http://localhost:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
       interval: 30s
       timeout: 10s
       retries: 3
