@@ -685,7 +685,7 @@ const TrainingsSection = () => (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2">
             {/* Блок ИИ тренера - на мобилке во всю ширину, на планшете 1 из 3 */}
             <Link href="/training/assessment" style={{textDecoration: 'none'}} className="col-span-2 sm:col-span-1">
-                <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: '#445CFF', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex', cursor: 'pointer'}}>
+                <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex', cursor: 'pointer'}}>
                     <Image
                         src="/icons/icon-cards.svg"
                         alt="ИИ тренер"
