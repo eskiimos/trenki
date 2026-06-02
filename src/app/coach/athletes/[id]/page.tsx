@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useCallback, useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import CoachPoseSessionsSection from '@/components/CoachPoseSessionsSection';
 
@@ -39,19 +39,59 @@ export default function CoachAthleteDetailPage({ params }: { params: Promise<{ i
   const { id } = use(params);
   const [data, setData] = useState<AthleteData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
       const res = await fetch(`/api/athletes/${id}/coach-view`, { cache: 'no-store' });
-      if (res.ok) setData(await res.json());
+      if (res.status === 403 || res.status === 404) {
+        // намеренно: нет доступа / не найден — не считаем сетевой ошибкой,
+        // показываем «не найден» экран ниже (data остаётся null)
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(`Не удалось загрузить игрока (${res.status})`);
+      }
+      setData(await res.json());
+    } catch (e) {
+      console.error('coach/athletes/[id] load failed:', e);
+      setLoadError(e instanceof Error ? e.message : 'Ошибка сети');
+    } finally {
       setLoading(false);
-    })();
+    }
   }, [id]);
 
-  if (loading) {
+  useEffect(() => { load(); }, [load]);
+
+  if (loading && !loadError) {
     return (
       <div className="min-h-screen bg-[#101530] flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#A1FF4A]" />
+      </div>
+    );
+  }
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-[#101530] text-white flex flex-col items-center justify-center px-6 gap-4">
+        <p className="font-overpass text-center" style={{ color: '#F9F8FE', fontSize: 14 }}>{loadError}</p>
+        <div className="flex gap-3">
+          <button
+            onClick={load}
+            className="font-overpass uppercase"
+            style={{ background: '#A1FF4A', color: '#101530', padding: '12px 24px', borderRadius: 999, fontWeight: 900, fontSize: 12, border: 'none', cursor: 'pointer' }}
+          >
+            Повторить
+          </button>
+          <button
+            onClick={() => router.back()}
+            className="font-overpass uppercase"
+            style={{ background: 'transparent', color: '#AEABBB', padding: '12px 24px', borderRadius: 999, fontWeight: 900, fontSize: 12, border: '1px solid #26252F', cursor: 'pointer' }}
+          >
+            Назад
+          </button>
+        </div>
       </div>
     );
   }
@@ -164,6 +204,25 @@ export default function CoachAthleteDetailPage({ params }: { params: Promise<{ i
                 Срок: {new Date(a.dueDate).toLocaleDateString('ru-RU')}
                 {a.completedAt && ` · выполнено ${new Date(a.completedAt).toLocaleDateString('ru-RU')}`}
               </div>
+              {a.notes && (
+                <div
+                  className="font-overpass mt-2"
+                  style={{
+                    color: '#F9F8FE',
+                    fontSize: 11,
+                    background: 'rgba(161, 255, 74, 0.06)',
+                    border: '1px solid rgba(161, 255, 74, 0.20)',
+                    borderRadius: 8,
+                    padding: '6px 10px',
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  <span style={{ color: '#A1FF4A', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, marginRight: 6 }}>
+                    Заметка
+                  </span>
+                  {a.notes}
+                </div>
+              )}
             </div>
           ))}
         </div>

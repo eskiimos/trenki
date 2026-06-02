@@ -10,6 +10,7 @@ interface Assignment {
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
   dueDate: string;
   assignedAt: string;
+  notes: string | null;
   athlete: { id: string; firstName: string; lastName: string };
   video: { id: string; title: string; thumbnail: string | null; duration: number };
   team: { id: string; name: string } | null;
@@ -22,17 +23,26 @@ export default function CoachAssignmentsPage() {
   const toast = useToast();
   const [list, setList] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('active');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch('/api/assignments?role=coach', { cache: 'no-store' });
-    if (res.ok) {
+    setLoadError(null);
+    try {
+      const res = await fetch('/api/assignments?role=coach', { cache: 'no-store' });
+      if (!res.ok) {
+        throw new Error(`Не удалось загрузить задания (${res.status})`);
+      }
       const data = await res.json();
       setList(data.assignments ?? []);
+    } catch (e) {
+      console.error('coach/assignments load failed:', e);
+      setLoadError(e instanceof Error ? e.message : 'Ошибка сети');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -116,14 +126,17 @@ export default function CoachAssignmentsPage() {
         </div>
 
         <div className="mt-5 flex flex-col gap-3">
-          {loading && (
+          {loadError && (
+            <ErrorBanner message={loadError} onRetry={load} />
+          )}
+          {loading && !loadError && (
             <>
               <SkeletonCard />
               <SkeletonCard />
               <SkeletonCard />
             </>
           )}
-          {!loading && filtered.length === 0 && (
+          {!loading && !loadError && filtered.length === 0 && (
             <div
               className="text-center py-10 font-overpass whitespace-pre-line"
               style={{ color: '#AEABBB', fontSize: 14, background: '#060919', borderRadius: 14, border: '1px dashed #26252F' }}
@@ -154,6 +167,25 @@ export default function CoachAssignmentsPage() {
               <div className="font-overpass mt-2" style={{ color: '#AEABBB', fontSize: 13 }}>
                 {a.video.title}
               </div>
+              {a.notes && (
+                <div
+                  className="font-overpass mt-2"
+                  style={{
+                    color: '#F9F8FE',
+                    fontSize: 12,
+                    background: 'rgba(161, 255, 74, 0.06)',
+                    border: '1px solid rgba(161, 255, 74, 0.20)',
+                    borderRadius: 8,
+                    padding: '6px 10px',
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  <span style={{ color: '#A1FF4A', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, marginRight: 6 }}>
+                    Заметка
+                  </span>
+                  {a.notes}
+                </div>
+              )}
               <div className="flex items-center justify-between mt-2">
                 <div className="font-overpass" style={{ color: '#9B99AA', fontSize: 11 }}>
                   Срок: {new Date(a.dueDate).toLocaleDateString('ru-RU')}
@@ -183,6 +215,46 @@ export default function CoachAssignmentsPage() {
       </div>
 
       <BottomNavigationCoach activeTab="assignments" />
+    </div>
+  );
+}
+
+function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div
+      style={{
+        background: 'rgba(255, 74, 74, 0.10)',
+        border: '1px solid rgba(255, 74, 74, 0.30)',
+        borderRadius: 14,
+        padding: '14px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+      }}
+    >
+      <div className="font-overpass" style={{ color: '#F9F8FE', fontSize: 13, fontWeight: 600 }}>
+        {message}
+      </div>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="font-overpass uppercase"
+        style={{
+          background: '#A1FF4A',
+          color: '#101530',
+          border: 'none',
+          borderRadius: 999,
+          padding: '8px 14px',
+          fontSize: 11,
+          fontWeight: 900,
+          letterSpacing: '0.05em',
+          cursor: 'pointer',
+          flexShrink: 0,
+        }}
+      >
+        Повторить
+      </button>
     </div>
   );
 }

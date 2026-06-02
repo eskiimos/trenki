@@ -41,18 +41,22 @@ export default function CoachTeamPage() {
   const [stats, setStats] = useState<TeamStats | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('potential');
   const [regenerating, setRegenerating] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const teamsRes = await fetch('/api/teams', { cache: 'no-store' });
-      if (!teamsRes.ok) return;
+      if (!teamsRes.ok) {
+        throw new Error(`Не удалось загрузить команды (${teamsRes.status})`);
+      }
       const teamsData = await teamsRes.json();
       const first = teamsData.teams?.[0];
-      if (!first) return;
+      if (!first) return; // пустое состояние — это не ошибка
       setTeam(first);
 
       const [statsRes, membersRes] = await Promise.all([
@@ -64,6 +68,9 @@ export default function CoachTeamPage() {
         const data = await membersRes.json();
         setMembers(data.members ?? []);
       }
+    } catch (e) {
+      console.error('coach/team load failed:', e);
+      setLoadError(e instanceof Error ? e.message : 'Ошибка сети');
     } finally {
       setIsLoading(false);
     }
@@ -283,14 +290,17 @@ export default function CoachTeamPage() {
         )}
 
         <div className="mt-3 flex flex-col gap-2">
-          {isLoading && (
+          {loadError && (
+            <ErrorBanner message={loadError} onRetry={load} />
+          )}
+          {isLoading && !loadError && (
             <>
               <SkeletonRow />
               <SkeletonRow />
               <SkeletonRow />
             </>
           )}
-          {!isLoading && members.length === 0 && (
+          {!isLoading && !loadError && members.length === 0 && (
             <div
               className="text-center py-8 font-overpass"
               style={{ color: '#AEABBB', fontSize: 14, background: '#060919', borderRadius: 14, border: '1px dashed #26252F' }}
@@ -333,6 +343,49 @@ function StatCard({ label, value, suffix }: { label: string; value: number | str
       >
         {value}{suffix ?? ''}
       </div>
+    </div>
+  );
+}
+
+function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div
+      style={{
+        background: 'rgba(255, 74, 74, 0.10)',
+        border: '1px solid rgba(255, 74, 74, 0.30)',
+        borderRadius: 14,
+        padding: '14px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+      }}
+    >
+      <div
+        className="font-overpass"
+        style={{ color: '#F9F8FE', fontSize: 13, fontWeight: 600 }}
+      >
+        {message}
+      </div>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="font-overpass uppercase"
+        style={{
+          background: '#A1FF4A',
+          color: '#101530',
+          border: 'none',
+          borderRadius: 999,
+          padding: '8px 14px',
+          fontSize: 11,
+          fontWeight: 900,
+          letterSpacing: '0.05em',
+          cursor: 'pointer',
+          flexShrink: 0,
+        }}
+      >
+        Повторить
+      </button>
     </div>
   );
 }

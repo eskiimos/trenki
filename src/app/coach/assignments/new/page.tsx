@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface Member {
@@ -29,36 +29,49 @@ export default function CoachAssignmentNewPage() {
   const [search, setSearch] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [initLoading, setInitLoading] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
+  const loadInitial = useCallback(async () => {
+    setInitLoading(true);
+    setInitError(null);
+    try {
       const teamsRes = await fetch('/api/teams', { cache: 'no-store' });
-      if (!teamsRes.ok) return;
+      if (!teamsRes.ok) {
+        throw new Error(`Не удалось загрузить команды (${teamsRes.status})`);
+      }
       const teamsData = await teamsRes.json();
       const first = teamsData.teams?.[0];
-      if (!first) return;
+      if (!first) return; // пустое состояние, не ошибка
       setTeamId(first.id);
 
       const [mRes, vRes] = await Promise.all([
         fetch(`/api/teams/${first.id}/members`, { cache: 'no-store' }),
         fetch('/api/videos/all', { cache: 'no-store' }),
       ]);
-      if (mRes.ok) {
-        const d = await mRes.json();
-        setMembers(d.members ?? []);
-      }
-      if (vRes.ok) {
-        const d = await vRes.json();
-        const list: VideoItem[] = (d.videos ?? d ?? []).map((v: { id: string; title: string; thumbnail?: string | null; duration: number }) => ({
-          id: v.id,
-          title: v.title,
-          thumbnail: v.thumbnail ?? null,
-          duration: v.duration,
-        }));
-        setVideos(list);
-      }
-    })();
+      if (!mRes.ok) throw new Error(`Не удалось загрузить игроков (${mRes.status})`);
+      if (!vRes.ok) throw new Error(`Не удалось загрузить видео (${vRes.status})`);
+
+      const mData = await mRes.json();
+      setMembers(mData.members ?? []);
+
+      const vData = await vRes.json();
+      const list: VideoItem[] = (vData.videos ?? vData ?? []).map((v: { id: string; title: string; thumbnail?: string | null; duration: number }) => ({
+        id: v.id,
+        title: v.title,
+        thumbnail: v.thumbnail ?? null,
+        duration: v.duration,
+      }));
+      setVideos(list);
+    } catch (e) {
+      console.error('coach/assignments/new init failed:', e);
+      setInitError(e instanceof Error ? e.message : 'Ошибка сети');
+    } finally {
+      setInitLoading(false);
+    }
   }, []);
+
+  useEffect(() => { loadInitial(); }, [loadInitial]);
 
   // По умолчанию — дата на 3 дня вперёд
   useEffect(() => {
@@ -125,6 +138,54 @@ export default function CoachAssignmentNewPage() {
         <h1 className="font-overpass uppercase" style={{ fontWeight: 900, fontSize: 22 }}>
           Новое задание
         </h1>
+
+        {initError && (
+          <div
+            className="mt-4"
+            style={{
+              background: 'rgba(255, 74, 74, 0.10)',
+              border: '1px solid rgba(255, 74, 74, 0.30)',
+              borderRadius: 14,
+              padding: '14px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+            }}
+          >
+            <div className="font-overpass" style={{ color: '#F9F8FE', fontSize: 13, fontWeight: 600 }}>
+              {initError}
+            </div>
+            <button
+              type="button"
+              onClick={loadInitial}
+              className="font-overpass uppercase"
+              style={{
+                background: '#A1FF4A',
+                color: '#101530',
+                border: 'none',
+                borderRadius: 999,
+                padding: '8px 14px',
+                fontSize: 11,
+                fontWeight: 900,
+                letterSpacing: '0.05em',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              Повторить
+            </button>
+          </div>
+        )}
+
+        {initLoading && !initError && (
+          <div
+            className="mt-4 font-overpass"
+            style={{ color: '#AEABBB', fontSize: 13 }}
+          >
+            Загружаем игроков и тренировки...
+          </div>
+        )}
 
         {/* Игроки */}
         <Section title="Кому">
