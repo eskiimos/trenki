@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNavigationCoach from '@/components/BottomNavigationCoach';
-import { useToast } from '@/lib/coach/use-toast';
 
 type SortKey = 'name' | 'potential' | 'status';
 
@@ -36,15 +35,12 @@ interface Member {
 
 export default function CoachTeamPage() {
   const router = useRouter();
-  const toast = useToast();
   const [team, setTeam] = useState<Team | null>(null);
   const [stats, setStats] = useState<TeamStats | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('potential');
-  const [regenerating, setRegenerating] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -78,49 +74,6 @@ export default function CoachTeamPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleCopyCode = async () => {
-    if (!team) return;
-    try {
-      await navigator.clipboard?.writeText(team.inviteCode);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-      toast.show('Код скопирован', 'success');
-    } catch {
-      toast.show('Не удалось скопировать', 'error');
-    }
-  };
-
-  const handleShare = async () => {
-    if (!team) return;
-    const url = `${location.origin}/join/${team.inviteCode}`;
-    const text = `Присоединяйся к команде «${team.name}» в Треньки! Код: ${team.inviteCode}`;
-    type ShareNav = Navigator & { share?: (d: ShareData) => Promise<void> };
-    const nav = navigator as ShareNav;
-    if (nav.share) {
-      try { await nav.share({ title: 'Команда', text, url }); } catch {}
-    } else {
-      handleCopyCode();
-    }
-  };
-
-  const handleRegenerate = async () => {
-    if (!team) return;
-    if (!confirm('Сгенерировать новый код? Старый перестанет работать.')) return;
-    setRegenerating(true);
-    try {
-      const res = await fetch(`/api/teams/${team.id}/regenerate-code`, { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        setTeam((prev) => prev ? { ...prev, inviteCode: data.team.inviteCode } : prev);
-        toast.show('Новый код создан', 'success');
-      } else {
-        toast.show('Ошибка генерации', 'error');
-      }
-    } finally {
-      setRegenerating(false);
-    }
-  };
-
   const sortedMembers = [...members].sort((a, b) => {
     if (sortKey === 'name') return `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`);
     if (sortKey === 'potential') return b.potential - a.potential;
@@ -146,91 +99,9 @@ export default function CoachTeamPage() {
           </p>
         )}
 
-        {/* Invite-код */}
-        {team && (
-          <div
-            className="mt-5"
-            style={{
-              background: '#060919',
-              border: '1px solid #26252F',
-              borderRadius: 14,
-              padding: '14px 16px',
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <div
-                  className="font-overpass uppercase"
-                  style={{ color: '#9B99AA', fontWeight: 700, fontSize: 10, letterSpacing: '0.5px' }}
-                >
-                  Код приглашения
-                </div>
-                <div
-                  className="font-overpass"
-                  style={{ color: '#A1FF4A', fontWeight: 900, fontSize: 22, letterSpacing: '0.25em', marginTop: 2 }}
-                >
-                  {team.inviteCode}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleShare}
-                className="font-overpass uppercase"
-                style={{
-                  background: '#A1FF4A',
-                  color: '#101530',
-                  borderRadius: 999,
-                  padding: '10px 14px',
-                  fontWeight: 900,
-                  fontSize: 11,
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                Поделиться
-              </button>
-            </div>
-            <div className="flex gap-2 mt-3">
-              <button
-                type="button"
-                onClick={handleCopyCode}
-                className="flex-1 font-overpass uppercase"
-                style={{
-                  background: copied ? '#A1FF4A' : 'transparent',
-                  color: copied ? '#101530' : '#F9F8FE',
-                  border: copied ? 'none' : '1px solid #26252F',
-                  borderRadius: 999,
-                  padding: '8px 12px',
-                  fontWeight: 800,
-                  fontSize: 10,
-                  letterSpacing: '0.05em',
-                  cursor: 'pointer',
-                }}
-              >
-                {copied ? 'Скопировано' : 'Копировать'}
-              </button>
-              <button
-                type="button"
-                onClick={handleRegenerate}
-                disabled={regenerating}
-                className="font-overpass uppercase"
-                style={{
-                  background: 'transparent',
-                  color: '#AEABBB',
-                  border: '1px solid #26252F',
-                  borderRadius: 999,
-                  padding: '8px 12px',
-                  fontWeight: 800,
-                  fontSize: 10,
-                  letterSpacing: '0.05em',
-                  cursor: regenerating ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {regenerating ? '...' : 'Новый код'}
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Блок «Код приглашения» переехал в /coach/profile.
+            Заявки на вступление — здесь. */}
+        {team && <PendingRequestsSection teamId={team.id} />}
 
         {/* Статистика */}
         <div className="mt-5 grid grid-cols-3 gap-3">
@@ -481,5 +352,159 @@ function PlayerRow({ member, onClick }: { member: Member; onClick: () => void })
         )}
       </div>
     </button>
+  );
+}
+
+interface PendingItem {
+  memberId: string;
+  userId: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  avatarUrl: string | null;
+  position: string | null;
+  requestedAt: string;
+}
+
+function PendingRequestsSection({ teamId }: { teamId: string }) {
+  const [items, setItems] = useState<PendingItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/teams/${teamId}/members?status=PENDING`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      setItems(data.pending ?? []);
+    } catch (e) {
+      console.error('pending load failed', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [teamId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleApprove = async (memberId: string) => {
+    setActing(memberId);
+    try {
+      const res = await fetch(`/api/teams/${teamId}/members/${memberId}/approve`, { method: 'POST' });
+      if (res.ok) setItems((prev) => prev.filter((i) => i.memberId !== memberId));
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const handleReject = async (memberId: string) => {
+    if (!confirm('Отклонить заявку?')) return;
+    setActing(memberId);
+    try {
+      const res = await fetch(`/api/teams/${teamId}/members/${memberId}/reject`, { method: 'POST' });
+      if (res.ok) setItems((prev) => prev.filter((i) => i.memberId !== memberId));
+    } finally {
+      setActing(null);
+    }
+  };
+
+  if (loading) return null;
+  if (items.length === 0) return null;
+
+  return (
+    <div
+      className="mt-5"
+      style={{
+        background: '#060919',
+        border: '1px solid rgba(161, 255, 74, 0.30)',
+        borderRadius: 14,
+        padding: '14px 16px',
+      }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div
+          className="font-overpass uppercase"
+          style={{ color: '#A1FF4A', fontWeight: 900, fontSize: 11, letterSpacing: '0.5px' }}
+        >
+          Заявки на вступление · {items.length}
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        {items.map((it) => {
+          const name = `${it.firstName ?? ''} ${it.lastName ?? ''}`.trim() || it.email || 'Игрок';
+          return (
+            <div
+              key={it.memberId}
+              style={{
+                background: '#101530',
+                border: '1px solid #26252F',
+                borderRadius: 12,
+                padding: '10px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+              }}
+            >
+              <div className="flex-1 min-w-0">
+                <div
+                  className="font-overpass truncate"
+                  style={{ color: '#F9F8FE', fontSize: 13, fontWeight: 800 }}
+                >
+                  {name}
+                </div>
+                {it.email && (
+                  <div
+                    className="font-overpass truncate"
+                    style={{ color: '#AEABBB', fontSize: 11, marginTop: 2 }}
+                  >
+                    {it.email}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => handleReject(it.memberId)}
+                disabled={acting === it.memberId}
+                className="font-overpass uppercase transition-transform duration-100 active:scale-95"
+                style={{
+                  background: 'transparent',
+                  color: '#FF6B6B',
+                  border: '1px solid rgba(255, 107, 107, 0.4)',
+                  borderRadius: 999,
+                  padding: '6px 10px',
+                  fontWeight: 800,
+                  fontSize: 10,
+                  letterSpacing: '0.05em',
+                  cursor: acting === it.memberId ? 'not-allowed' : 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                Отклонить
+              </button>
+              <button
+                type="button"
+                onClick={() => handleApprove(it.memberId)}
+                disabled={acting === it.memberId}
+                className="font-overpass uppercase transition-transform duration-100 active:scale-95"
+                style={{
+                  background: '#A1FF4A',
+                  color: '#101530',
+                  border: 'none',
+                  borderRadius: 999,
+                  padding: '6px 12px',
+                  fontWeight: 900,
+                  fontSize: 10,
+                  letterSpacing: '0.05em',
+                  cursor: acting === it.memberId ? 'not-allowed' : 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                {acting === it.memberId ? '...' : 'Принять'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

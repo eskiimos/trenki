@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
 import { isValidInviteCodeFormat } from '@/lib/coach/invite-code';
 import { rateLimit } from '@/lib/coach/rate-limit';
+import { sendUserPush } from '@/lib/coach/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,29 +40,47 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Команда не найдена' }, { status: 404 });
   }
 
-  // Идемпотентно: если уже состоит — просто возвращаем команду
+  // Идемпотентно: повторный join не плодит записи.
+  // - ACTIVE → возвращаем сразу (уже в команде).
+  // - PENDING/INVITED → возвращаем как pending (заявка уже ждёт подтверждения).
+  // - DECLINED → создаём новую заявку (re-apply) — обновляем статус на PENDING.
   const existing = await prisma.teamMember.findUnique({
     where: { teamId_userId: { teamId: team.id, userId: auth.user.id } },
   });
 
   if (existing) {
-    if (existing.status !== 'ACTIVE') {
-      await prisma.teamMember.update({
-        where: { id: existing.id },
-        data: { status: 'ACTIVE' },
-      });
+    if (existing.status === 'ACTIVE') {
+      return NextResponse.json({ team: { id: team.id, name: team.name }, status: 'ACTIVE' });
     }
-    return NextResponse.json({ team: { id: team.id, name: team.name } });
+    if (existing.status === 'PENDING' || existing.status === 'INVITED') {
+      return NextResponse.json({ team: { id: team.id, name: team.name }, status: 'PENDING' });
+    }
+    // DECLINED — повторная заявка
+    await prisma.teamMember.update({
+      where: { id: existing.id },
+      data: { status: 'PENDING', joinedAt: new Date() },
+    });
+  } else {
+    await prisma.teamMember.create({
+      data: {
+        teamId: team.id,
+        userId: auth.user.id,
+        role: 'PLAYER',
+        status: 'PENDING',
+      },
+    });
   }
 
-  await prisma.teamMember.create({
-    data: {
-      teamId: team.id,
-      userId: auth.user.id,
-      role: 'PLAYER',
-      status: 'ACTIVE',
-    },
-  });
+  // Уведомляем тренера о новой заявке — не блокируем ответ.
+  const athleteName =
+    `${auth.user.firstName ?? ''} ${auth.user.lastName ?? ''}`.trim() ||
+    auth.user.email ||
+    'Игрок';
+  sendUserPush(team.createdBy, {
+    title: 'Заявка в команду',
+    body: `${athleteName} хочет вступить в «${team.name}»`,
+    url: '/coach/team',
+  }).catch(() => { });
 
-  return NextResponse.json({ team: { id: team.id, name: team.name } });
+  return NextResponse.json({ team: { id: team.id, name: team.name }, status: 'PENDING' });
 }

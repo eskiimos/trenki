@@ -4,7 +4,7 @@ import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { getTelegramId } from '@/lib/auth';
 
-type JoinState = 'loading' | 'success' | 'error' | 'auth-required';
+type JoinState = 'loading' | 'success' | 'pending' | 'error' | 'auth-required';
 
 export default function JoinTeamPage({ params }: { params: Promise<{ code: string }> }) {
   const router = useRouter();
@@ -36,7 +36,8 @@ export default function JoinTeamPage({ params }: { params: Promise<{ code: strin
         }
         const data = await res.json();
         setTeamName(data.team?.name ?? 'Команда');
-        setState('success');
+        // Сервер вернёт status='ACTIVE' (уже в команде) или 'PENDING' (заявка ждёт тренера).
+        setState(data.status === 'ACTIVE' ? 'success' : 'pending');
       } catch {
         setErrorMsg('Сетевая ошибка');
         setState('error');
@@ -73,6 +74,51 @@ export default function JoinTeamPage({ params }: { params: Promise<{ code: strin
             }}
           >
             Войти
+          </button>
+        </>
+      )}
+
+      {state === 'pending' && (
+        <>
+          <div
+            style={{
+              width: 88,
+              height: 88,
+              borderRadius: '50%',
+              background: 'rgba(161, 255, 74, 0.15)',
+              border: '2px solid rgba(161, 255, 74, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 20,
+            }}
+          >
+            <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="#A1FF4A" strokeWidth="2" />
+              <path d="M12 7v5l3 2" stroke="#A1FF4A" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </div>
+          <h1 className="font-overpass uppercase text-center" style={{ fontWeight: 900, fontSize: 22 }}>
+            Заявка отправлена
+          </h1>
+          <p className="font-overpass mt-2 text-center" style={{ color: '#AEABBB', fontSize: 14, maxWidth: 320 }}>
+            Тренер «{teamName}» подтвердит твоё вступление. После этого тебе придёт уведомление.
+          </p>
+          <button
+            onClick={() => router.push('/')}
+            className="mt-7 font-overpass uppercase"
+            style={{
+              background: '#A1FF4A',
+              color: '#101530',
+              padding: '14px 28px',
+              borderRadius: 999,
+              fontWeight: 900,
+              fontSize: 13,
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            На главную
           </button>
         </>
       )}

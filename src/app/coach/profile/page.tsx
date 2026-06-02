@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import BottomNavigationCoach from '@/components/BottomNavigationCoach';
 import { clearAuth } from '@/lib/auth';
 import AccountSwitcher from '@/components/AccountSwitcher';
+import InviteCodeSection from '@/components/coach/InviteCodeSection';
 
 interface MeData {
   firstName: string;
@@ -50,6 +51,8 @@ export default function CoachProfilePage() {
             </div>
           )}
         </div>
+
+        <InviteCodeSection />
 
         <div className="mt-4 flex flex-col gap-2">
           <LinkButton label="Команда" onClick={() => router.push('/coach/team')} />
