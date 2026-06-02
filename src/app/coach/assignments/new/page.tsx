@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import VideoSlotPicker from '@/components/coach/VideoSlotPicker';
 
 interface Member {
   userId: string;
@@ -492,19 +493,8 @@ export default function CoachAssignmentNewPage() {
               {FULL_SLOTS.map(({ key, module }) => {
                 const candidates = videos.filter((v) => v.moduleType === module);
                 const selectedId = slotVideoIds[key];
-                const selectedVideo = candidates.find((v) => v.id === selectedId);
                 return (
-                  <div
-                    key={key}
-                    style={{
-                      background: '#060919',
-                      border: selectedId
-                        ? '1px solid #A1FF4A'
-                        : '1px solid #26252F',
-                      borderRadius: 12,
-                      padding: '12px 14px',
-                    }}
-                  >
+                  <div key={key} className="flex flex-col gap-2">
                     <div
                       className="font-overpass uppercase"
                       style={{
@@ -512,50 +502,18 @@ export default function CoachAssignmentNewPage() {
                         fontSize: 10,
                         fontWeight: 900,
                         letterSpacing: 0.5,
-                        marginBottom: 6,
                       }}
                     >
                       {MODULE_LABELS[module]}
                     </div>
-                    {candidates.length === 0 ? (
-                      <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 12 }}>
-                        Нет подходящих видео в каталоге
-                      </div>
-                    ) : (
-                      <select
-                        value={selectedId}
-                        onChange={(e) =>
-                          setSlotVideoIds((prev) => ({ ...prev, [key]: e.target.value }))
-                        }
-                        className="w-full font-overpass"
-                        style={{
-                          background: '#101530',
-                          border: '1px solid #26252F',
-                          borderRadius: 8,
-                          padding: '8px 10px',
-                          color: '#F9F8FE',
-                          fontSize: 13,
-                          outline: 'none',
-                        }}
-                      >
-                        <option value="">— пропустить —</option>
-                        {candidates.map((v) => {
-                          const t = v.trainer
-                            ? `${v.trainer.name}${v.trainer.lastName ? ' ' + v.trainer.lastName : ''}`
-                            : '';
-                          return (
-                            <option key={v.id} value={v.id}>
-                              {v.title}{t ? ` · ${t}` : ''} · {Math.round(v.duration / 60)} мин
-                            </option>
-                          );
-                        })}
-                      </select>
-                    )}
-                    {selectedVideo && (
-                      <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 11, marginTop: 6 }}>
-                        Выбрано: {Math.round(selectedVideo.duration / 60)} мин
-                      </div>
-                    )}
+                    <VideoSlotPicker
+                      slotLabel={MODULE_LABELS[module]}
+                      value={selectedId}
+                      options={candidates}
+                      onChange={(videoId) =>
+                        setSlotVideoIds((prev) => ({ ...prev, [key]: videoId }))
+                      }
+                    />
                   </div>
                 );
               })}
