@@ -71,7 +71,8 @@ export async function POST(request: NextRequest) {
   const athleteIds: string[] = Array.isArray(body?.athleteIds) ? body.athleteIds : [];
   const force = Boolean(body?.force);
 
-  // mode === 'full' → 4-модульная тренировка (WorkoutSession + 4 WorkoutSessionVideo).
+  // mode === 'full' → составная тренировка из 2-4 модулей (тренер может
+  // пропустить любую часть, напр. разминка + техника + заминка без физ.).
   // По умолчанию — одиночное видео.
   const mode: 'single' | 'full' = body?.mode === 'full' ? 'full' : 'single';
   const singleVideoId = String(body?.videoId || '').trim();
@@ -79,9 +80,11 @@ export async function POST(request: NextRequest) {
     typeof body?.moduleVideos === 'object' && body.moduleVideos
       ? body.moduleVideos
       : {};
-  const orderedFullVideoIds: string[] = FULL_MODULE_SLOTS.map((slot) =>
-    String(moduleVideos[slot] || '').trim(),
-  );
+  // В каноническом порядке (warmup → fitness → technique → cooldown)
+  // оставляем только реально выбранные модули.
+  const orderedFullVideoIds: string[] = FULL_MODULE_SLOTS
+    .map((slot) => String(moduleVideos[slot] || '').trim())
+    .filter((v) => v.length > 0);
 
   if (!teamId || !dueDate || Number.isNaN(dueDate.getTime()) || athleteIds.length === 0) {
     return NextResponse.json({ error: 'Не все поля заполнены' }, { status: 400 });
@@ -91,9 +94,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Не выбрано видео' }, { status: 400 });
   }
 
-  if (mode === 'full' && orderedFullVideoIds.some((v) => !v)) {
+  if (mode === 'full' && (orderedFullVideoIds.length < 2 || orderedFullVideoIds.length > 4)) {
     return NextResponse.json(
-      { error: 'Полноценное занятие требует все 4 модуля: разминка, физподготовка, техника, заминка' },
+      { error: 'Полноценное занятие требует от 2 до 4 модулей' },
       { status: 400 },
     );
   }

@@ -16,6 +16,7 @@ interface VideoItem {
   thumbnail?: string | null;
   duration: number;
   moduleType?: ModuleType | null;
+  trainer?: { id: string; name: string; lastName?: string | null } | null;
 }
 
 type ModuleType = 'WARMUP' | 'FITNESS' | 'TECHNIQUE' | 'COOLDOWN';
@@ -82,12 +83,20 @@ export default function CoachAssignmentNewPage() {
 
       const vData = await vRes.json();
       const list: VideoItem[] = (vData.videos ?? vData ?? []).map(
-        (v: { id: string; title: string; thumbnail?: string | null; duration: number; moduleType?: ModuleType | null }) => ({
+        (v: {
+          id: string;
+          title: string;
+          thumbnail?: string | null;
+          duration: number;
+          moduleType?: ModuleType | null;
+          trainer?: { id: string; name: string; lastName?: string | null } | null;
+        }) => ({
           id: v.id,
           title: v.title,
           thumbnail: v.thumbnail ?? null,
           duration: v.duration,
           moduleType: v.moduleType ?? null,
+          trainer: v.trainer ?? null,
         }),
       );
       setVideos(list);
@@ -122,11 +131,10 @@ export default function CoachAssignmentNewPage() {
     v.title.toLowerCase().includes(search.toLowerCase())
   );
 
-  const fullModeReady =
-    !!slotVideoIds.warmup &&
-    !!slotVideoIds.fitness &&
-    !!slotVideoIds.technique &&
-    !!slotVideoIds.cooldown;
+  // Полноценное занятие: тренер может выбрать любые 2-4 модуля
+  // (например, разминка + техника + заминка — без физподготовки).
+  const fullSelectedCount = FULL_SLOTS.filter((s) => !!slotVideoIds[s.key]).length;
+  const fullModeReady = fullSelectedCount >= 2 && fullSelectedCount <= 4;
 
   const canSubmit =
     teamId && selectedAthletes.size > 0 && dueDate && !submitting &&
@@ -438,9 +446,12 @@ export default function CoachAssignmentNewPage() {
                   outline: 'none',
                 }}
               />
-              <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
-                {filteredVideos.slice(0, 30).map((v) => {
+              <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
+                {filteredVideos.map((v) => {
                   const sel = selectedVideoId === v.id;
+                  const trainerName = v.trainer
+                    ? `${v.trainer.name}${v.trainer.lastName ? ' ' + v.trainer.lastName : ''}`
+                    : null;
                   return (
                     <button
                       key={v.id}
@@ -456,6 +467,11 @@ export default function CoachAssignmentNewPage() {
                     >
                       <div className="font-overpass truncate" style={{ fontWeight: 700, fontSize: 13 }}>
                         {v.title}
+                        {trainerName && (
+                          <span style={{ color: '#A1FF4A', fontWeight: 700, marginLeft: 6 }}>
+                            · {trainerName}
+                          </span>
+                        )}
                       </div>
                       <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 11, marginTop: 2 }}>
                         {Math.round(v.duration / 60)} мин
@@ -470,7 +486,8 @@ export default function CoachAssignmentNewPage() {
           {mode === 'full' && (
             <div className="flex flex-col gap-3">
               <p className="font-overpass" style={{ color: '#AEABBB', fontSize: 12 }}>
-                Собери занятие из 4 модулей. Видео фильтруются по типу.
+                Собери занятие из 2–4 модулей. Можно пропустить любую часть —
+                например, разминка + техника + заминка без физподготовки.
               </p>
               {FULL_SLOTS.map(({ key, module }) => {
                 const candidates = videos.filter((v) => v.moduleType === module);
@@ -521,12 +538,17 @@ export default function CoachAssignmentNewPage() {
                           outline: 'none',
                         }}
                       >
-                        <option value="">— выбери видео —</option>
-                        {candidates.map((v) => (
-                          <option key={v.id} value={v.id}>
-                            {v.title} · {Math.round(v.duration / 60)} мин
-                          </option>
-                        ))}
+                        <option value="">— пропустить —</option>
+                        {candidates.map((v) => {
+                          const t = v.trainer
+                            ? `${v.trainer.name}${v.trainer.lastName ? ' ' + v.trainer.lastName : ''}`
+                            : '';
+                          return (
+                            <option key={v.id} value={v.id}>
+                              {v.title}{t ? ` · ${t}` : ''} · {Math.round(v.duration / 60)} мин
+                            </option>
+                          );
+                        })}
                       </select>
                     )}
                     {selectedVideo && (
@@ -548,31 +570,34 @@ export default function CoachAssignmentNewPage() {
               { label: '3 дня', days: 3 },
               { label: '1 неделя', days: 7 },
               { label: '2 недели', days: 14 },
-            ]).map((p) => (
-              <button
-                key={p.days}
-                type="button"
-                onClick={() => {
-                  const d = new Date();
-                  d.setDate(d.getDate() + p.days);
-                  setDueDate(d.toISOString().slice(0, 10));
-                }}
-                className="font-overpass uppercase"
-                style={{
-                  background: 'transparent',
-                  color: '#AEABBB',
-                  border: '1px solid #26252F',
-                  borderRadius: 999,
-                  padding: '6px 12px',
-                  fontWeight: 800,
-                  fontSize: 10,
-                  letterSpacing: '0.05em',
-                  cursor: 'pointer',
-                }}
-              >
-                {p.label}
-              </button>
-            ))}
+            ]).map((p) => {
+              // Дата текущего пресета — сегодня + p.days
+              const presetDate = new Date();
+              presetDate.setDate(presetDate.getDate() + p.days);
+              const presetIso = presetDate.toISOString().slice(0, 10);
+              const isActive = dueDate === presetIso;
+              return (
+                <button
+                  key={p.days}
+                  type="button"
+                  onClick={() => setDueDate(presetIso)}
+                  className="font-overpass uppercase"
+                  style={{
+                    background: isActive ? '#A1FF4A' : 'transparent',
+                    color: isActive ? '#101530' : '#AEABBB',
+                    border: isActive ? 'none' : '1px solid #26252F',
+                    borderRadius: 999,
+                    padding: '6px 12px',
+                    fontWeight: 900,
+                    fontSize: 10,
+                    letterSpacing: '0.05em',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
           </div>
           <input
             type="date"
