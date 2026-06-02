@@ -4,11 +4,13 @@ import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { getSessionFromRequest, verifySession, SESSION_COOKIE_NAME } from '@/lib/session';
+import { ADMIN_COOKIE_NAME } from '@/lib/admin-cookie';
 
 const SESSION_TOKEN_BYTES = 32;
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 7; // 7 дней
 
-export const ADMIN_COOKIE_NAME = 'admin_token';
+// Re-export для обратной совместимости (старые импорты из admin-session)
+export { ADMIN_COOKIE_NAME };
 export const ADMIN_SESSION_DURATION_MS = SESSION_DURATION_MS;
 
 function hashToken(token: string): string {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getSessionFromRequest, SESSION_COOKIE_NAME } from '@/lib/session';
-import { ADMIN_COOKIE_NAME } from '@/lib/admin-session';
+import { ADMIN_COOKIE_NAME } from '@/lib/admin-cookie';
 
 // Публичные маршруты, доступные без авторизации
 const publicRoutes = [
