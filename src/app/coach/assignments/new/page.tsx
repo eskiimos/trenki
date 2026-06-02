@@ -15,7 +15,27 @@ interface VideoItem {
   title: string;
   thumbnail?: string | null;
   duration: number;
+  moduleType?: ModuleType | null;
 }
+
+type ModuleType = 'WARMUP' | 'FITNESS' | 'TECHNIQUE' | 'COOLDOWN';
+
+const MODULE_LABELS: Record<ModuleType, string> = {
+  WARMUP: 'Разминка',
+  FITNESS: 'Физподготовка',
+  TECHNIQUE: 'Техника',
+  COOLDOWN: 'Заминка',
+};
+
+const FULL_SLOTS: { key: 'warmup' | 'fitness' | 'technique' | 'cooldown'; module: ModuleType }[] = [
+  { key: 'warmup',    module: 'WARMUP' },
+  { key: 'fitness',   module: 'FITNESS' },
+  { key: 'technique', module: 'TECHNIQUE' },
+  { key: 'cooldown',  module: 'COOLDOWN' },
+];
+
+type Mode = 'single' | 'full';
+type SlotVideoIds = { warmup: string; fitness: string; technique: string; cooldown: string };
 
 export default function CoachAssignmentNewPage() {
   const router = useRouter();
@@ -23,7 +43,11 @@ export default function CoachAssignmentNewPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [selectedAthletes, setSelectedAthletes] = useState<Set<string>>(new Set());
+  const [mode, setMode] = useState<Mode>('single');
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
+  const [slotVideoIds, setSlotVideoIds] = useState<SlotVideoIds>({
+    warmup: '', fitness: '', technique: '', cooldown: '',
+  });
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
   const [search, setSearch] = useState('');
@@ -57,12 +81,15 @@ export default function CoachAssignmentNewPage() {
       setMembers(mData.members ?? []);
 
       const vData = await vRes.json();
-      const list: VideoItem[] = (vData.videos ?? vData ?? []).map((v: { id: string; title: string; thumbnail?: string | null; duration: number }) => ({
-        id: v.id,
-        title: v.title,
-        thumbnail: v.thumbnail ?? null,
-        duration: v.duration,
-      }));
+      const list: VideoItem[] = (vData.videos ?? vData ?? []).map(
+        (v: { id: string; title: string; thumbnail?: string | null; duration: number; moduleType?: ModuleType | null }) => ({
+          id: v.id,
+          title: v.title,
+          thumbnail: v.thumbnail ?? null,
+          duration: v.duration,
+          moduleType: v.moduleType ?? null,
+        }),
+      );
       setVideos(list);
     } catch (e) {
       console.error('coach/assignments/new init failed:', e);
@@ -95,24 +122,37 @@ export default function CoachAssignmentNewPage() {
     v.title.toLowerCase().includes(search.toLowerCase())
   );
 
+  const fullModeReady =
+    !!slotVideoIds.warmup &&
+    !!slotVideoIds.fitness &&
+    !!slotVideoIds.technique &&
+    !!slotVideoIds.cooldown;
+
   const canSubmit =
-    teamId && selectedVideoId && selectedAthletes.size > 0 && dueDate && !submitting;
+    teamId && selectedAthletes.size > 0 && dueDate && !submitting &&
+    (mode === 'single' ? !!selectedVideoId : fullModeReady);
 
   const submitAssignment = async (force: boolean) => {
     setSubmitting(true);
     setError(null);
     try {
+      const payload: Record<string, unknown> = {
+        teamId,
+        dueDate: new Date(dueDate).toISOString(),
+        notes: notes.trim() || null,
+        athleteIds: Array.from(selectedAthletes),
+        force,
+        mode,
+      };
+      if (mode === 'single') {
+        payload.videoId = selectedVideoId;
+      } else {
+        payload.moduleVideos = slotVideoIds;
+      }
       const res = await fetch('/api/assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          teamId,
-          videoId: selectedVideoId,
-          dueDate: new Date(dueDate).toISOString(),
-          notes: notes.trim() || null,
-          athleteIds: Array.from(selectedAthletes),
-          force,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -355,48 +395,150 @@ export default function CoachAssignmentNewPage() {
 
         {/* Видео */}
         <Section title="Тренировка">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск по названию..."
-            className="w-full font-overpass mb-3"
-            style={{
-              background: '#060919',
-              border: '1px solid #26252F',
-              borderRadius: 10,
-              padding: '10px 14px',
-              color: '#F9F8FE',
-              fontSize: 13,
-              outline: 'none',
-            }}
-          />
-          <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
-            {filteredVideos.slice(0, 30).map((v) => {
-              const sel = selectedVideoId === v.id;
-              return (
-                <button
-                  key={v.id}
-                  type="button"
-                  onClick={() => setSelectedVideoId(v.id)}
-                  className="text-left"
-                  style={{
-                    background: '#060919',
-                    border: sel ? '1px solid #A1FF4A' : '1px solid #26252F',
-                    borderRadius: 12,
-                    padding: '10px 12px',
-                  }}
-                >
-                  <div className="font-overpass truncate" style={{ fontWeight: 700, fontSize: 13 }}>
-                    {v.title}
-                  </div>
-                  <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 11, marginTop: 2 }}>
-                    {Math.round(v.duration / 60)} мин
-                  </div>
-                </button>
-              );
-            })}
+          {/* Toggle режима */}
+          <div className="flex gap-2 mb-4">
+            {(['single', 'full'] as Mode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                className="font-overpass uppercase flex-1"
+                style={{
+                  background: mode === m ? '#A1FF4A' : 'transparent',
+                  color: mode === m ? '#101530' : '#AEABBB',
+                  border: mode === m ? 'none' : '1px solid #26252F',
+                  borderRadius: 999,
+                  padding: '10px 12px',
+                  fontWeight: 900,
+                  fontSize: 11,
+                  letterSpacing: '0.05em',
+                  cursor: 'pointer',
+                }}
+              >
+                {m === 'single' ? 'Одно видео' : 'Полноценное занятие'}
+              </button>
+            ))}
           </div>
+
+          {mode === 'single' && (
+            <>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Поиск по названию..."
+                className="w-full font-overpass mb-3"
+                style={{
+                  background: '#060919',
+                  border: '1px solid #26252F',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  color: '#F9F8FE',
+                  fontSize: 13,
+                  outline: 'none',
+                }}
+              />
+              <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
+                {filteredVideos.slice(0, 30).map((v) => {
+                  const sel = selectedVideoId === v.id;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setSelectedVideoId(v.id)}
+                      className="text-left"
+                      style={{
+                        background: '#060919',
+                        border: sel ? '1px solid #A1FF4A' : '1px solid #26252F',
+                        borderRadius: 12,
+                        padding: '10px 12px',
+                      }}
+                    >
+                      <div className="font-overpass truncate" style={{ fontWeight: 700, fontSize: 13 }}>
+                        {v.title}
+                      </div>
+                      <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 11, marginTop: 2 }}>
+                        {Math.round(v.duration / 60)} мин
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {mode === 'full' && (
+            <div className="flex flex-col gap-3">
+              <p className="font-overpass" style={{ color: '#AEABBB', fontSize: 12 }}>
+                Собери занятие из 4 модулей. Видео фильтруются по типу.
+              </p>
+              {FULL_SLOTS.map(({ key, module }) => {
+                const candidates = videos.filter((v) => v.moduleType === module);
+                const selectedId = slotVideoIds[key];
+                const selectedVideo = candidates.find((v) => v.id === selectedId);
+                return (
+                  <div
+                    key={key}
+                    style={{
+                      background: '#060919',
+                      border: selectedId
+                        ? '1px solid #A1FF4A'
+                        : '1px solid #26252F',
+                      borderRadius: 12,
+                      padding: '12px 14px',
+                    }}
+                  >
+                    <div
+                      className="font-overpass uppercase"
+                      style={{
+                        color: '#A1FF4A',
+                        fontSize: 10,
+                        fontWeight: 900,
+                        letterSpacing: 0.5,
+                        marginBottom: 6,
+                      }}
+                    >
+                      {MODULE_LABELS[module]}
+                    </div>
+                    {candidates.length === 0 ? (
+                      <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 12 }}>
+                        Нет подходящих видео в каталоге
+                      </div>
+                    ) : (
+                      <select
+                        value={selectedId}
+                        onChange={(e) =>
+                          setSlotVideoIds((prev) => ({ ...prev, [key]: e.target.value }))
+                        }
+                        className="w-full font-overpass"
+                        style={{
+                          background: '#101530',
+                          border: '1px solid #26252F',
+                          borderRadius: 8,
+                          padding: '8px 10px',
+                          color: '#F9F8FE',
+                          fontSize: 13,
+                          outline: 'none',
+                        }}
+                      >
+                        <option value="">— выбери видео —</option>
+                        {candidates.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.title} · {Math.round(v.duration / 60)} мин
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {selectedVideo && (
+                      <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 11, marginTop: 6 }}>
+                        Выбрано: {Math.round(selectedVideo.duration / 60)} мин
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </Section>
 
         {/* Дата */}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { LoadDirection, WorkoutStatus } from '@/generated/prisma';
 import { requireCoach, requireAuthUser, requireTeamOwnership } from '@/lib/coach/guards';
 import { sendUserPush } from '@/lib/coach/push';
 
@@ -52,20 +53,49 @@ export async function GET(request: NextRequest) {
  * Body: { teamId, videoId, dueDate, notes?, athleteIds: string[] }
  * Создаёт задание (одно или несколько — по одному на каждого игрока).
  */
+/**
+ * Порядок модулей в полноценной 4-модульной тренировке.
+ * Соответствует ModuleType: WARMUP → FITNESS → TECHNIQUE → COOLDOWN.
+ */
+const FULL_MODULE_SLOTS = ['warmup', 'fitness', 'technique', 'cooldown'] as const;
+type FullModuleSlot = (typeof FULL_MODULE_SLOTS)[number];
+
 export async function POST(request: NextRequest) {
   const auth = await requireCoach(request);
   if ('response' in auth) return auth.response;
 
   const body = await request.json().catch(() => ({}));
   const teamId = String(body?.teamId || '').trim();
-  const videoId = String(body?.videoId || '').trim();
   const dueDate = body?.dueDate ? new Date(body.dueDate) : null;
   const notes = body?.notes ? String(body.notes).trim() : null;
   const athleteIds: string[] = Array.isArray(body?.athleteIds) ? body.athleteIds : [];
   const force = Boolean(body?.force);
 
-  if (!teamId || !videoId || !dueDate || Number.isNaN(dueDate.getTime()) || athleteIds.length === 0) {
+  // mode === 'full' → 4-модульная тренировка (WorkoutSession + 4 WorkoutSessionVideo).
+  // По умолчанию — одиночное видео.
+  const mode: 'single' | 'full' = body?.mode === 'full' ? 'full' : 'single';
+  const singleVideoId = String(body?.videoId || '').trim();
+  const moduleVideos: Partial<Record<FullModuleSlot, string>> =
+    typeof body?.moduleVideos === 'object' && body.moduleVideos
+      ? body.moduleVideos
+      : {};
+  const orderedFullVideoIds: string[] = FULL_MODULE_SLOTS.map((slot) =>
+    String(moduleVideos[slot] || '').trim(),
+  );
+
+  if (!teamId || !dueDate || Number.isNaN(dueDate.getTime()) || athleteIds.length === 0) {
     return NextResponse.json({ error: 'Не все поля заполнены' }, { status: 400 });
+  }
+
+  if (mode === 'single' && !singleVideoId) {
+    return NextResponse.json({ error: 'Не выбрано видео' }, { status: 400 });
+  }
+
+  if (mode === 'full' && orderedFullVideoIds.some((v) => !v)) {
+    return NextResponse.json(
+      { error: 'Полноценное занятие требует все 4 модуля: разминка, физподготовка, техника, заминка' },
+      { status: 400 },
+    );
   }
 
   const owns = await requireTeamOwnership(auth.user.id, teamId);
@@ -73,13 +103,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  // Защита: тренер не может назначить задание самому себе
   const selfFiltered = athleteIds.filter((id) => id !== auth.user.id);
   if (selfFiltered.length === 0) {
     return NextResponse.json({ error: 'Нельзя назначить задание самому себе' }, { status: 400 });
   }
 
-  // Проверяем, что все указанные athleteIds — действительно члены команды
   const members = await prisma.teamMember.findMany({
     where: { teamId, status: 'ACTIVE', userId: { in: selfFiltered } },
     select: {
@@ -94,10 +122,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Игроки не найдены в команде' }, { status: 400 });
   }
 
-  // Проверяем существование видео
-  const video = await prisma.video.findUnique({ where: { id: videoId }, select: { id: true } });
-  if (!video) {
-    return NextResponse.json({ error: 'Видео не найдено' }, { status: 404 });
+  // Проверяем существование всех видео (в зависимости от режима)
+  const allVideoIds = mode === 'full' ? orderedFullVideoIds : [singleVideoId];
+  const videos = await prisma.video.findMany({
+    where: { id: { in: allVideoIds } },
+    select: { id: true, duration: true, rpeMin: true, rpeMax: true },
+  });
+  if (videos.length !== allVideoIds.length) {
+    return NextResponse.json({ error: 'Одно или несколько видео не найдено' }, { status: 404 });
   }
 
   // Конфликт-чек: если у атлета на дату dueDate уже есть план Марка
@@ -139,21 +171,87 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const created = await prisma.$transaction(
-    filtered.map((athleteId) =>
-      prisma.trainingAssignment.create({
-        data: {
-          coachId: auth.user.id,
-          athleteId,
-          teamId,
-          videoId,
-          dueDate,
-          notes,
-          status: 'PENDING',
-        },
-      })
-    )
-  );
+  let created: Array<{ id: string }> = [];
+
+  if (mode === 'single') {
+    created = await prisma.$transaction(
+      filtered.map((athleteId) =>
+        prisma.trainingAssignment.create({
+          data: {
+            coachId: auth.user.id,
+            athleteId,
+            teamId,
+            videoId: singleVideoId,
+            dueDate,
+            notes,
+            status: 'PENDING',
+          },
+          select: { id: true },
+        })
+      )
+    );
+  } else {
+    // Полноценное 4-модульное задание: для каждого атлета создаём WorkoutSession
+    // с 4 WorkoutSessionVideo (в фиксированном порядке) + TrainingAssignment,
+    // связанный с этой сессией через workoutSessionId.
+    const videoById = new Map(videos.map((v) => [v.id, v] as const));
+    const totalDurationSec = orderedFullVideoIds.reduce(
+      (sum, vid) => sum + (videoById.get(vid)?.duration ?? 0),
+      0,
+    );
+    const targetDurationMin = Math.max(1, Math.round(totalDurationSec / 60));
+    // Усреднённый RPE по 4 модулям (с границами 1..10).
+    const avgRpe = Math.max(
+      1,
+      Math.min(
+        10,
+        Math.round(
+          orderedFullVideoIds.reduce((sum, vid) => {
+            const v = videoById.get(vid);
+            return sum + ((v?.rpeMin ?? 5) + (v?.rpeMax ?? 7)) / 2;
+          }, 0) / orderedFullVideoIds.length,
+        ),
+      ),
+    );
+
+    created = await prisma.$transaction(async (tx) => {
+      const result: Array<{ id: string }> = [];
+      for (const athleteId of filtered) {
+        const session = await tx.workoutSession.create({
+          data: {
+            userId: athleteId,
+            coachId: auth.user.id,
+            targetDuration: targetDurationMin,
+            targetRPE: avgRpe,
+            loadDirection: LoadDirection.MEDIUM,
+            status: WorkoutStatus.PENDING,
+            totalVideos: orderedFullVideoIds.length,
+            videos: {
+              create: orderedFullVideoIds.map((vid, idx) => ({
+                videoId: vid,
+                order: idx,
+              })),
+            },
+          },
+          select: { id: true },
+        });
+        const assignment = await tx.trainingAssignment.create({
+          data: {
+            coachId: auth.user.id,
+            athleteId,
+            teamId,
+            workoutSessionId: session.id,
+            dueDate,
+            notes,
+            status: 'PENDING',
+          },
+          select: { id: true },
+        });
+        result.push(assignment);
+      }
+      return result;
+    });
+  }
 
   // Push-уведомления игрокам — не блокируем ответ
   const coachName = `${auth.user.firstName ?? ''} ${auth.user.lastName ?? ''}`.trim() || 'Тренер';

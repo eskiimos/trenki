@@ -39,6 +39,7 @@ model User {
   athleteAssignments   TrainingAssignment[]  @relation("AthleteAssignments")
   athletePoseSessions  PoseSession[]         @relation("AthletePoseSessions")
   coachPoseReviews     PoseSession[]         @relation("CoachPoseReviews")
+  coachWorkoutSessions WorkoutSession[]      @relation("CoachWorkoutSessions")
 
   @@map("users")
 }
@@ -381,6 +382,7 @@ model UserStateAssessment {
 model WorkoutSession {
   id                String                @id @default(cuid())
   userId            String
+  coachId           String?               // не null если сессию создал тренер (полноценное 4-модульное задание)
   assessmentId      String?
   targetDuration    Int
   targetRPE         Int
@@ -396,9 +398,12 @@ model WorkoutSession {
   totalVideos       Int                   @default(0)
   videos            WorkoutSessionVideo[]
   characteristicHistory CharacteristicHistory[]
+  coach             User?                 @relation("CoachWorkoutSessions", fields: [coachId], references: [id], onDelete: SetNull)
+  assignment        TrainingAssignment?
 
   @@index([userId, createdAt])
   @@index([userId, status])
+  @@index([coachId])
   @@map("workout_sessions")
 }
 
@@ -749,20 +754,22 @@ model TeamMember {
 }
 
 model TrainingAssignment {
-  id          String            @id @default(cuid())
-  coachId     String
-  athleteId   String
-  teamId      String?
-  videoId     String            // ссылка на существующий каталог (Video)
-  dueDate     DateTime
-  status      AssignmentStatus  @default(PENDING)
-  notes       String?
-  assignedAt  DateTime          @default(now())
-  completedAt DateTime?
-  coach       User    @relation("CoachAssignments",   fields: [coachId],   references: [id], onDelete: Cascade)
-  athlete     User    @relation("AthleteAssignments", fields: [athleteId], references: [id], onDelete: Cascade)
-  team        Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  video       Video   @relation(fields: [videoId], references: [id], onDelete: Restrict)
+  id               String            @id @default(cuid())
+  coachId          String
+  athleteId        String
+  teamId           String?
+  videoId          String?           // одно видео (одиночное назначение)
+  workoutSessionId String?           @unique // полноценная 4-модульная сессия (заполнено либо это, либо videoId)
+  dueDate          DateTime
+  status           AssignmentStatus  @default(PENDING)
+  notes            String?
+  assignedAt       DateTime          @default(now())
+  completedAt      DateTime?
+  coach            User             @relation("CoachAssignments",   fields: [coachId],   references: [id], onDelete: Cascade)
+  athlete          User             @relation("AthleteAssignments", fields: [athleteId], references: [id], onDelete: Cascade)
+  team             Team?            @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  video            Video?           @relation(fields: [videoId], references: [id], onDelete: Restrict)
+  workoutSession   WorkoutSession?  @relation(fields: [workoutSessionId], references: [id], onDelete: SetNull)
 
   @@index([athleteId, status])
   @@index([coachId, dueDate])

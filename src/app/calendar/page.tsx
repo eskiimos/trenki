@@ -32,8 +32,10 @@ interface CoachAssignment {
   id: string;
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   dueDate: string;
+  videoId: string | null;
+  workoutSessionId: string | null;
   coach: { id: string; firstName: string | null; lastName: string | null };
-  video: { id: string; title: string; thumbnail: string | null; duration: number | null };
+  video: { id: string; title: string; thumbnail: string | null; duration: number | null } | null;
 }
 
 export default function CalendarPage() {
@@ -321,10 +323,18 @@ export default function CalendarPage() {
         <div className="space-y-4">
           {selectedAssignments.map((a) => {
             const coachName = `${a.coach.firstName ?? ''} ${a.coach.lastName ?? ''}`.trim() || 'Тренер';
+            const isFull = !!a.workoutSessionId;
+            const href = isFull
+              ? `/training/workout?id=${a.workoutSessionId}`
+              : `/video/${a.video?.id ?? ''}`;
+            const title = isFull
+              ? 'Полноценное занятие · 4 модуля'
+              : (a.video?.title ?? 'Задание от тренера');
+            const durationSec = a.video?.duration ?? null;
             return (
               <Link
                 key={a.id}
-                href={`/video/${a.video.id}`}
+                href={href}
                 className="block rounded-2xl overflow-hidden"
                 style={{
                   background:
@@ -334,7 +344,7 @@ export default function CalendarPage() {
               >
                 <div className="p-4 flex gap-3 items-center">
                   <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-[#0d1228] shrink-0">
-                    {a.video.thumbnail && (
+                    {a.video?.thumbnail && !isFull && (
                       <Image src={a.video.thumbnail} alt={a.video.title} fill className="object-cover" />
                     )}
                   </div>
@@ -353,10 +363,10 @@ export default function CalendarPage() {
                       от тренера · {coachName}
                     </div>
                     <div className="text-white text-sm font-semibold leading-tight line-clamp-2">
-                      {a.video.title}
+                      {title}
                     </div>
-                    {a.video.duration ? (
-                      <div className="text-[#AEABBB] text-xs mt-1">{formatDuration(a.video.duration)}</div>
+                    {!isFull && durationSec ? (
+                      <div className="text-[#AEABBB] text-xs mt-1">{formatDuration(durationSec)}</div>
                     ) : null}
                   </div>
                 </div>

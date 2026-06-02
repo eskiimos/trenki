@@ -213,11 +213,30 @@ export async function POST(request: NextRequest) {
       trainingsToday: trainingsToday + 1,
     });
 
-    // Автозакрытие тренерских заданий по этим видео
-    const completedVideoIds = session.videos.map((v) => v.videoId);
-    markAssignmentsCompletedForVideos(auth.user.id, completedVideoIds).catch((e) => {
-      console.error('auto-complete assignments error:', e);
-    });
+    // Автозакрытие тренерских заданий:
+    //   1. Полноценное 4-модульное задание привязано к этой WorkoutSession
+    //      через TrainingAssignment.workoutSessionId — закрываем по sessionId.
+    //   2. Старые одиночные задания (по videoId) — через
+    //      markAssignmentsCompletedForVideos.
+    (async () => {
+      try {
+        await prisma.trainingAssignment.updateMany({
+          where: {
+            workoutSessionId: sessionId,
+            status: { in: ['PENDING', 'IN_PROGRESS'] },
+          },
+          data: { status: 'COMPLETED', completedAt: new Date() },
+        });
+      } catch (e) {
+        console.error('auto-complete by workoutSessionId failed:', e);
+      }
+      try {
+        const completedVideoIds = session.videos.map((v) => v.videoId);
+        await markAssignmentsCompletedForVideos(auth.user.id, completedVideoIds);
+      } catch (e) {
+        console.error('auto-complete by videoId failed:', e);
+      }
+    })();
 
     return NextResponse.json({
       success: true,

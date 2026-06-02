@@ -10,8 +10,10 @@ interface Assignment {
   assignedAt: string;
   completedAt: string | null;
   notes: string | null;
+  videoId: string | null;
+  workoutSessionId: string | null;
   coach: { id: string; firstName: string; lastName: string };
-  video: { id: string; title: string; thumbnail: string | null; duration: number };
+  video: { id: string; title: string; thumbnail: string | null; duration: number } | null;
   team: { id: string; name: string } | null;
 }
 
@@ -32,13 +34,18 @@ export default function MyAssignmentsPage() {
     })();
   }, []);
 
-  const handleStart = async (assignmentId: string, videoId: string) => {
-    await fetch(`/api/assignments/${assignmentId}/status`, {
+  const handleStart = async (a: Assignment) => {
+    await fetch(`/api/assignments/${a.id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'IN_PROGRESS' }),
     });
-    router.push(`/video/${videoId}`);
+    if (a.workoutSessionId) {
+      // Полноценное 4-модульное задание — открываем сессию в стандартном плеере тренировки
+      router.push(`/training/workout?id=${a.workoutSessionId}`);
+    } else if (a.video) {
+      router.push(`/video/${a.video.id}`);
+    }
   };
 
   const handleComplete = async (assignmentId: string) => {
@@ -115,7 +122,11 @@ export default function MyAssignmentsPage() {
                 </div>
                 <StatusBadge status={a.status} />
               </div>
-              <div className="font-overpass mt-2" style={{ fontWeight: 800, fontSize: 14 }}>{a.video.title}</div>
+              <div className="font-overpass mt-2" style={{ fontWeight: 800, fontSize: 14 }}>
+                {a.workoutSessionId
+                  ? 'Полноценное занятие · 4 модуля'
+                  : (a.video?.title ?? 'Задание')}
+              </div>
               {a.notes && (
                 <div className="font-overpass mt-2" style={{ color: '#AEABBB', fontSize: 12, fontStyle: 'italic' }}>
                   «{a.notes}»
@@ -127,7 +138,7 @@ export default function MyAssignmentsPage() {
               {a.status !== 'COMPLETED' && (
                 <div className="flex gap-2 mt-3">
                   <button
-                    onClick={() => handleStart(a.id, a.video.id)}
+                    onClick={() => handleStart(a)}
                     className="flex-1 font-overpass uppercase"
                     style={{
                       background: '#A1FF4A',
