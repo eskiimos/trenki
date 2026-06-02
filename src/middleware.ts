@@ -8,9 +8,11 @@ const publicRoutes = [
   '/login',
   '/legal',
   '/join',
+  '/admin/login',
   '/api/auth/email/send-code',
   '/api/auth/email/verify-code',
   '/api/auth/logout',
+  '/api/admin/auth',
   '/api/health',
 ];
 
