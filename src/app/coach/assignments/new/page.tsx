@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import VideoSlotPicker from '@/components/coach/VideoSlotPicker';
 
 interface Member {
@@ -463,19 +464,62 @@ export default function CoachAssignmentNewPage() {
                         background: '#060919',
                         border: sel ? '1px solid #A1FF4A' : '1px solid #26252F',
                         borderRadius: 12,
-                        padding: '10px 12px',
+                        padding: 8,
+                        display: 'flex',
+                        gap: 10,
+                        alignItems: 'center',
+                        cursor: 'pointer',
                       }}
                     >
-                      <div className="font-overpass truncate" style={{ fontWeight: 700, fontSize: 13 }}>
-                        {v.title}
-                        {trainerName && (
-                          <span style={{ color: '#A1FF4A', fontWeight: 700, marginLeft: 6 }}>
-                            · {trainerName}
-                          </span>
+                      <div
+                        className="relative rounded-md overflow-hidden bg-[#101530] shrink-0"
+                        style={{ width: 92, height: 52 }}
+                      >
+                        {v.thumbnail && (
+                          <Image
+                            src={v.thumbnail}
+                            alt={v.title}
+                            fill
+                            className="object-cover"
+                            sizes="92px"
+                          />
                         )}
+                        <div
+                          className="absolute"
+                          style={{
+                            right: 4,
+                            bottom: 3,
+                            background: 'rgba(6, 9, 25, 0.85)',
+                            color: '#F9F8FE',
+                            fontSize: 9,
+                            fontWeight: 700,
+                            padding: '1px 4px',
+                            borderRadius: 4,
+                          }}
+                        >
+                          {Math.round(v.duration / 60)} мин
+                        </div>
                       </div>
-                      <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 11, marginTop: 2 }}>
-                        {Math.round(v.duration / 60)} мин
+                      <div className="flex-1 min-w-0">
+                        <div
+                          className="font-overpass"
+                          style={{
+                            color: '#F9F8FE',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            lineHeight: '120%',
+                          }}
+                        >
+                          {v.title}
+                        </div>
+                        {trainerName && (
+                          <div
+                            className="font-overpass"
+                            style={{ color: '#A1FF4A', fontSize: 11, fontWeight: 700, marginTop: 3 }}
+                          >
+                            {trainerName}
+                          </div>
+                        )}
                       </div>
                     </button>
                   );
