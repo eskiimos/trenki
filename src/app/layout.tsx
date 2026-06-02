@@ -5,7 +5,6 @@ import { headers } from "next/headers";
 import "./globals.css";
 import OnboardingWrapper from "@/components/OnboardingWrapper";
 import PWAInit from "@/components/PWAInit";
-import InstallPWAButton from "@/components/InstallPWAButton";
 import OfflineHandler from "@/components/OfflineHandler";
 import AppLoader from "@/components/AppLoader";
 
@@ -95,7 +94,6 @@ export default async function RootLayout({
         <AppLoader />
         <PWAInit />
         <OfflineHandler />
-        <InstallPWAButton />
         <OnboardingWrapper>
           <div className="mobile-container">
             {children}
