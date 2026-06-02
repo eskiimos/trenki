@@ -1,19 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { WorkoutStatus } from '@/generated/prisma';
+import { requireAuthUser } from '@/lib/coach/guards';
 
 /**
  * POST /api/training/cancel
- * Отменяет тренировку (status = SKIPPED)
+ * Отменяет тренировку (status = SKIPPED). Auth: httpOnly session.
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { sessionId, userId } = body;
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
 
-    if (!sessionId || !userId) {
+    const body = await request.json();
+    const { sessionId } = body;
+
+    if (!sessionId) {
       return NextResponse.json(
-        { error: 'sessionId и userId обязательны' },
+        { error: 'sessionId обязателен' },
         { status: 400 }
       );
     }
@@ -30,19 +34,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let requestUser = await prisma.user.findUnique({
-      where: { telegramId: userId },
-      select: { id: true },
-    });
-
-    if (!requestUser) {
-      requestUser = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true },
-      });
-    }
-
-    if (!requestUser || session.userId !== requestUser.id) {
+    if (session.userId !== auth.user.id) {
       return NextResponse.json(
         { error: 'Доступ запрещен' },
         { status: 403 }

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { WorkoutStatus } from '@/generated/prisma';
-import { 
-  calculateWorkoutGains, 
+import {
+  calculateWorkoutGains,
   calculatePotential,
-  CharacteristicType 
+  CharacteristicType
 } from '@/lib/characteristics';
 import { markAssignmentsCompletedForVideos } from '@/lib/coach/auto-complete';
+import { requireAuthUser } from '@/lib/coach/guards';
 
 /**
  * POST /api/training/complete
@@ -14,17 +15,19 @@ import { markAssignmentsCompletedForVideos } from '@/lib/coach/auto-complete';
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { sessionId, userId } = body;
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
 
-    if (!sessionId || !userId) {
+    const body = await request.json();
+    const { sessionId } = body;
+
+    if (!sessionId) {
       return NextResponse.json(
-        { error: 'sessionId и userId обязательны' },
+        { error: 'sessionId обязателен' },
         { status: 400 }
       );
     }
 
-    // Проверяем, что все видео в тренировке завершены
     const session = await prisma.workoutSession.findUnique({
       where: { id: sessionId },
       include: {
@@ -32,11 +35,7 @@ export async function POST(request: NextRequest) {
           include: {
             video: {
               include: {
-                videoTags: {
-                  include: {
-                    tag: true,
-                  },
-                },
+                videoTags: { include: { tag: true } },
               },
             },
           },
@@ -51,20 +50,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Находим пользователя по telegramId или внутреннему id
-    let requestUser = await prisma.user.findUnique({
-      where: { telegramId: userId },
-      select: { id: true },
-    });
-
-    if (!requestUser) {
-      requestUser = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true },
-      });
-    }
-
-    if (!requestUser || session.userId !== requestUser.id) {
+    if (session.userId !== auth.user.id) {
       return NextResponse.json(
         { error: 'Доступ запрещен' },
         { status: 403 }
@@ -229,7 +215,7 @@ export async function POST(request: NextRequest) {
 
     // Автозакрытие тренерских заданий по этим видео
     const completedVideoIds = session.videos.map((v) => v.videoId);
-    markAssignmentsCompletedForVideos(userId, completedVideoIds).catch((e) => {
+    markAssignmentsCompletedForVideos(auth.user.id, completedVideoIds).catch((e) => {
       console.error('auto-complete assignments error:', e);
     });
 

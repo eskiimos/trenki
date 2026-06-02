@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { LoadDirection, VideoDifficulty, LoadType, WorkoutStatus } from '@/generated/prisma/client';
+import { requireAuthUser } from '@/lib/coach/guards';
 
 /**
  * НОВЫЙ АЛГОРИТМ ГЕНЕРАЦИИ ТРЕНИРОВОК v2.0
@@ -13,16 +14,13 @@ import { LoadDirection, VideoDifficulty, LoadType, WorkoutStatus } from '@/gener
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, loadDirection, availableTime } = await request.json();
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
+    const { loadDirection, availableTime } = await request.json();
 
-
-    // Находим пользователя по telegramId
     const user = await prisma.user.findUnique({
-      where: { telegramId: userId },
+      where: { id: auth.user.id },
       include: {
         profile: {
           select: {
@@ -79,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     // Формируем тренировку: РАЗМИНКА → ОСНОВНАЯ ЧАСТЬ → ЗАМИНКА
     const workout = await buildWorkout({
-      userId,
+      userId: user.id,
       weakest,
       strongest,
       middle,

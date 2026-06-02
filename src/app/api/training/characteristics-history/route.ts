@@ -1,22 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAuthUser } from '@/lib/coach/guards';
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
+
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
     const limit = parseInt(searchParams.get('limit') || '10');
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId required' }, { status: 400 });
-    }
-
-    // Получаем пользователя с профилем
     const user = await prisma.user.findUnique({
-      where: { telegramId: userId },
-      include: {
-        profile: true,
-      },
+      where: { id: auth.user.id },
+      include: { profile: true },
     });
 
     if (!user) {

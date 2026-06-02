@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getTelegramId } from '@/lib/auth';
 
 interface WorkoutData {
   id: string;
@@ -30,15 +29,13 @@ export default function WorkoutReminder() {
   useEffect(() => {
     const fetchCurrentWorkout = async () => {
       try {
-        const telegramId = getTelegramId();
-        if (!telegramId) {
+        const response = await fetch('/api/training/current');
+        if (response.status === 401) {
           setIsLoading(false);
           return;
         }
-
-        const response = await fetch(`/api/training/current?userId=${telegramId}`);
         const data = await response.json();
-        
+
         if (data.workout) {
           setWorkout(data.workout);
         }
@@ -62,15 +59,12 @@ export default function WorkoutReminder() {
   const handleCancelWorkout = async () => {
     if (isCancelling || !workout) return;
 
-    const telegramId = getTelegramId();
-    if (!telegramId) return;
-
     try {
       setIsCancelling(true);
       const response = await fetch('/api/training/cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: workout.id, userId: telegramId }),
+        body: JSON.stringify({ sessionId: workout.id }),
       });
 
       if (!response.ok) {

@@ -1,37 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { WorkoutStatus } from '@/generated/prisma';
+import { requireAuthUser } from '@/lib/coach/guards';
 
 /**
- * GET /api/training/current?userId=xxx
- * Получает текущую активную тренировку пользователя
+ * GET /api/training/current[?workoutId=xxx]
+ * Получает активную тренировку текущего пользователя (или конкретную по workoutId).
+ * Auth: httpOnly session cookie.
  */
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const userId = searchParams.get('userId');
-    const workoutId = searchParams.get('workoutId');
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
+    const userId = auth.user.id;
 
-    if (!userId && !workoutId) {
-      return NextResponse.json(
-        { error: 'userId или workoutId обязателен' },
-        { status: 400 }
-      );
-    }
+    const workoutId = request.nextUrl.searchParams.get('workoutId');
 
-    // Ищем активную тренировку (PENDING или IN_PROGRESS)
-    // Если передан workoutId — возвращаем тренировку по id (включая COMPLETED)
     let workout = workoutId
       ? await prisma.workoutSession.findUnique({
           where: { id: workoutId },
           include: {
             videos: {
               include: {
-                video: {
-                  include: {
-                    trainer: true,
-                  },
-                },
+                video: { include: { trainer: true } },
               },
               orderBy: { order: 'asc' },
             },
@@ -39,40 +30,21 @@ export async function GET(request: NextRequest) {
         })
       : null;
 
-    if (!workout && userId) {
-      // Находим пользователя по telegramId или внутреннему id
-      let user = await prisma.user.findUnique({
-        where: { telegramId: userId },
-        select: { id: true },
-      });
+    // Запросили чужую тренировку по workoutId — закрываем
+    if (workoutId && workout && workout.userId !== userId) {
+      return NextResponse.json({ workout: null }, { status: 404 });
+    }
 
-      if (!user) {
-        user = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { id: true },
-        });
-      }
-
-      if (!user) {
-        return NextResponse.json({ workout: null });
-      }
-
-      // Ищем активную тренировку (PENDING или IN_PROGRESS)
+    if (!workout) {
       workout = await prisma.workoutSession.findFirst({
         where: {
-          userId: user.id,
-          status: {
-            in: [WorkoutStatus.PENDING, WorkoutStatus.IN_PROGRESS],
-          },
+          userId,
+          status: { in: [WorkoutStatus.PENDING, WorkoutStatus.IN_PROGRESS] },
         },
         include: {
           videos: {
             include: {
-              video: {
-                include: {
-                  trainer: true,
-                },
-              },
+              video: { include: { trainer: true } },
             },
             orderBy: { order: 'asc' },
           },
@@ -80,11 +52,10 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: 'desc' },
       });
 
-      // \u0415\u0441\u043b\u0438 \u043d\u0430\u0448\u043b\u0430 \u043f\u043e\u0441\u043b\u0435\u0434\u043d\u044e\u044e \u0442\u0440\u0435\u043d\u0438\u0440\u043e\u0432\u043a\u0443 \u2014 \u043e\u0442\u043c\u0435\u043d\u044f\u0435\u043c \u0432\u0441\u0435 \u0431\u043e\u043b\u0435\u0435 \u0441\u0442\u0430\u0440\u044b\u0435 \u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0435 \u0441\u0435\u0441\u0441\u0438\u0438
       if (workout) {
         await prisma.workoutSession.updateMany({
           where: {
-            userId: user.id,
+            userId,
             status: { in: [WorkoutStatus.PENDING, WorkoutStatus.IN_PROGRESS] },
             id: { not: workout.id },
           },
@@ -97,14 +68,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ workout: null });
     }
 
-    // Получаем цель тренировки из профиля пользователя
     const ownerProfile = await prisma.profile.findUnique({
       where: { userId: workout.userId },
       select: { lastGoals: true },
     });
     const trainingGoal = ownerProfile?.lastGoals?.[0] || null;
 
-    // Рассчитываем прогресс
     const totalVideos = workout.totalVideos;
     const completedVideos = workout.videos.filter((v) => v.completed).length;
     const progress = totalVideos > 0 ? (completedVideos / totalVideos) * 100 : 0;
@@ -150,73 +119,54 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Ошибка получения текущей тренировки:', error);
-    return NextResponse.json(
-      { error: 'Ошибка сервера' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Ошибка сервера' }, { status: 500 });
   }
 }
 
 /**
  * PATCH /api/training/current
- * Обновляет статус текущей тренировки (начать/завершить)
- * 
- * DEPRECATED: Используйте /api/training/update вместо этого
+ * Обновляет статус текущей тренировки (начать/завершить).
+ * DEPRECATED: используйте /api/training/update / /complete вместо этого.
+ * Auth: httpOnly session cookie + проверка владения workoutId.
  */
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
+
     const body = await request.json();
     const { workoutId, action, videoId, actualRPE } = body;
 
     if (!workoutId) {
-      return NextResponse.json(
-        { error: 'workoutId обязателен' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'workoutId обязателен' }, { status: 400 });
     }
 
-    // Начать тренировку
+    const owned = await prisma.workoutSession.findUnique({
+      where: { id: workoutId },
+      select: { userId: true },
+    });
+    if (!owned || owned.userId !== auth.user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     if (action === 'start') {
       const workout = await prisma.workoutSession.update({
         where: { id: workoutId },
-        data: { 
-          status: WorkoutStatus.IN_PROGRESS,
-          startedAt: new Date(),
-        },
+        data: { status: WorkoutStatus.IN_PROGRESS, startedAt: new Date() },
       });
-
-      return NextResponse.json({
-        success: true,
-        workout,
-        message: 'Тренировка начата',
-      });
+      return NextResponse.json({ success: true, workout, message: 'Тренировка начата' });
     }
 
-    // Завершить видео
     if (action === 'completeVideo' && videoId) {
       const workoutVideo = await prisma.workoutSessionVideo.updateMany({
-        where: { 
-          sessionId: workoutId,
-          videoId: videoId,
-        },
-        data: {
-          completed: true,
-          completedAt: new Date(),
-          actualRPE: actualRPE || null,
-        },
+        where: { sessionId: workoutId, videoId },
+        data: { completed: true, completedAt: new Date(), actualRPE: actualRPE || null },
       });
-
-      return NextResponse.json({
-        success: true,
-        video: workoutVideo,
-        message: 'Видео завершено',
-      });
+      return NextResponse.json({ success: true, video: workoutVideo, message: 'Видео завершено' });
     }
 
-    // Завершить всю тренировку
     if (action === 'complete') {
       const { actualDuration, actualRPE: workoutActualRPE } = body;
-
       const workout = await prisma.workoutSession.update({
         where: { id: workoutId },
         data: {
@@ -225,15 +175,8 @@ export async function PATCH(request: NextRequest) {
           actualDuration: actualDuration || null,
           actualRPE: workoutActualRPE || null,
         },
-        include: {
-          videos: {
-            include: {
-              video: true,
-            },
-          },
-        },
+        include: { videos: { include: { video: true } } },
       });
-
       return NextResponse.json({
         success: true,
         workout,
@@ -241,29 +184,17 @@ export async function PATCH(request: NextRequest) {
       });
     }
 
-    // Пропустить тренировку
     if (action === 'skip') {
       const workout = await prisma.workoutSession.update({
         where: { id: workoutId },
         data: { status: WorkoutStatus.SKIPPED },
       });
-
-      return NextResponse.json({
-        success: true,
-        workout,
-        message: 'Тренировка пропущена',
-      });
+      return NextResponse.json({ success: true, workout, message: 'Тренировка пропущена' });
     }
 
-    return NextResponse.json(
-      { error: 'Некорректное действие' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'Некорректное действие' }, { status: 400 });
   } catch (error) {
     console.error('Ошибка обновления тренировки:', error);
-    return NextResponse.json(
-      { error: 'Ошибка сервера' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Ошибка сервера' }, { status: 500 });
   }
 }

@@ -353,7 +353,6 @@ export default function VideoPage({ params }: VideoPageProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: telegramId,
           videoId: videoId,
           sessionId: null, // Обычный просмотр, не тренировка
         }),
@@ -667,7 +666,6 @@ export default function VideoPage({ params }: VideoPageProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: telegramId,
           videoId: videoId,
         }),
       });

@@ -131,12 +131,9 @@ export default function WorkoutPage() {
       const urlParams = new URLSearchParams(window.location.search);
       const workoutId = urlParams.get('id');
 
-      let response;
-      if (workoutId) {
-        response = await fetch(`/api/training/current?workoutId=${workoutId}&userId=${user?.id}`);
-      } else {
-        response = await fetch(`/api/training/current?userId=${user?.id}`);
-      }
+      const response = workoutId
+        ? await fetch(`/api/training/current?workoutId=${workoutId}`)
+        : await fetch('/api/training/current');
 
       const data = await response.json();
 
@@ -204,16 +201,7 @@ export default function WorkoutPage() {
 
   // Функция замены модуля на другой подходящий
   const handleReplaceModule = async (moduleIndex: number) => {
-    if (!workout || !user?.id) {
-      console.error('❌ Missing workout or user ID');
-      return;
-    }
-
-    console.log(`🔄 Replacing module ${moduleIndex}:`, {
-      workoutId: workout.id,
-      userId: user.id,
-      moduleTitle: workout.modules[moduleIndex]?.title,
-    });
+    if (!workout) return;
 
     setReplacingModuleIndex(moduleIndex);
     setIsReplacingModule(true);
@@ -225,7 +213,6 @@ export default function WorkoutPage() {
         body: JSON.stringify({
           workoutSessionId: workout.id,
           moduleIndex,
-          userId: user.id,
         }),
       });
 
@@ -264,13 +251,11 @@ export default function WorkoutPage() {
 
   const completeWorkout = async () => {
     try {
-      // Отправляем запрос на завершение тренировки
       const response = await fetch('/api/training/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId: workout?.id,
-          userId: user?.id?.toString(),
         }),
       });
 

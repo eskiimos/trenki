@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { 
-  calculateWorkoutGains, 
+import {
+  calculateWorkoutGains,
   calculatePotential,
-  CharacteristicType 
+  CharacteristicType
 } from '@/lib/characteristics';
 import { markAssignmentsCompletedForVideos } from '@/lib/coach/auto-complete';
+import { requireAuthUser } from '@/lib/coach/guards';
 
 /**
  * POST /api/training/complete-module
@@ -13,30 +14,25 @@ import { markAssignmentsCompletedForVideos } from '@/lib/coach/auto-complete';
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { userId, videoId, sessionId } = body;
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
 
-    if (!userId || !videoId) {
+    const body = await request.json();
+    const { videoId, sessionId } = body;
+
+    if (!videoId) {
       return NextResponse.json(
-        { error: 'userId и videoId обязательны' },
+        { error: 'videoId обязателен' },
         { status: 400 }
       );
     }
 
-    // Находим пользователя с профилем
     const user = await prisma.user.findUnique({
-      where: { telegramId: userId },
+      where: { id: auth.user.id },
       include: { profile: true },
     });
 
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Пользователь не найден' },
-        { status: 404 }
-      );
-    }
-
-    if (!user.profile) {
+    if (!user || !user.profile) {
       return NextResponse.json(
         { error: 'Профиль не найден. Пройдите стартовый опрос.' },
         { status: 404 }
@@ -151,7 +147,7 @@ export async function POST(request: NextRequest) {
     });
 
     console.log('✅ Profile updated:', {
-      userId,
+      userId: user.id,
       newPotential,
       modulesToday: modulesToday + 1,
     });
@@ -199,7 +195,7 @@ export async function POST(request: NextRequest) {
 
     // Автозакрытие тренерских заданий по этому видео
     if (videoId) {
-      markAssignmentsCompletedForVideos(userId, [videoId]).catch((e) => {
+      markAssignmentsCompletedForVideos(user.id, [videoId]).catch((e) => {
         console.error('auto-complete assignments error:', e);
       });
     }

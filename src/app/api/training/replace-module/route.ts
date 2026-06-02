@@ -20,47 +20,27 @@ import {
   selectModuleWithFallback,
   createSearchCriteria,
 } from '@/lib/module-selection-v3';
+import { requireAuthUser } from '@/lib/coach/guards';
 
 /**
  * POST /api/training/replace-module
- * 
+ *
  * Заменяет модуль в тренировке на другой подходящий
- * Body: {
- *   workoutSessionId: string,
- *   moduleIndex: number (0-3),
- *   userId: string (для валидации)
- * }
+ * Body: { workoutSessionId: string, moduleIndex: number (0-3) }
+ * Auth: httpOnly session.
  */
 export async function POST(request: NextRequest) {
   try {
-    const { workoutSessionId, moduleIndex, userId } = await request.json();
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
+    const user = auth.user;
 
-    if (!workoutSessionId || moduleIndex === undefined || !userId) {
+    const { workoutSessionId, moduleIndex } = await request.json();
+
+    if (!workoutSessionId || moduleIndex === undefined) {
       return NextResponse.json(
-        { error: 'workoutSessionId, moduleIndex и userId обязательны' },
+        { error: 'workoutSessionId и moduleIndex обязательны' },
         { status: 400 }
-      );
-    }
-
-
-    // Конвертируем userId в строку (Telegram передаёт ID как число)
-    const userIdStr = String(userId);
-
-    // Получаем пользователя по telegramId или внутреннему id
-    let user = await prisma.user.findUnique({
-      where: { telegramId: userIdStr },
-    });
-
-    if (!user) {
-      user = await prisma.user.findUnique({
-        where: { id: userIdStr },
-      });
-    }
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Пользователь не найден' },
-        { status: 404 }
       );
     }
 

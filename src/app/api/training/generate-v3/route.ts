@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAuthUser } from '@/lib/coach/guards';
 import {
   TrainingGoal,
   EnergyState,
@@ -30,30 +31,28 @@ import {
  * POST /api/training/generate-v3
  * 
  * Body: {
- *   userId: string (telegramId),
  *   goal: TrainingGoal,
  *   energyState: EnergyState,
  * }
+ * Auth: httpOnly session cookie (userId берётся из неё)
  */
 export async function POST(request: NextRequest) {
   try {
-    const { userId, goal, energyState } = await request.json();
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
 
-    // Валидация входных данных
-    if (!userId || !goal || !energyState) {
+    const { goal, energyState } = await request.json();
+
+    if (!goal || !energyState) {
       return NextResponse.json(
-        { error: 'userId, goal и energyState обязательны' },
+        { error: 'goal и energyState обязательны' },
         { status: 400 }
       );
     }
 
-
-    // Получаем пользователя и профиль
     const user = await prisma.user.findUnique({
-      where: { telegramId: userId },
-      include: {
-        profile: true,
-      },
+      where: { id: auth.user.id },
+      include: { profile: true },
     });
 
     if (!user || !user.profile) {

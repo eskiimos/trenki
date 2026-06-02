@@ -24,18 +24,20 @@ export default function SelectGoalPage() {
     setIsGenerating(true);
 
     try {
-      // TODO: Получить telegramId из контекста или localStorage
-      const userId = 'dev_123'; // заглушка
-
       const response = await fetch('/api/training/generate-v3', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId,
           goal: selectedGoal,
           energyState: selectedEnergy,
         }),
       });
+
+      if (response.status === 401) {
+        alert('Сессия истекла. Войдите заново.');
+        router.push('/login');
+        return;
+      }
 
       const data = await response.json();
 
@@ -43,7 +45,6 @@ export default function SelectGoalPage() {
         throw new Error(data.error || 'Ошибка генерации тренировки');
       }
 
-      // Переходим к тренировке
       router.push(`/training/workout?id=${data.workoutId}`);
     } catch (error: any) {
       console.error('Ошибка:', error);

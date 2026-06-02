@@ -51,15 +51,6 @@ export default function TrainingAssessmentPage() {
   }, [webApp, router]);
 
   const handleSubmit = async () => {
-    console.log('🎯 Assessment submit - User:', user);
-    console.log('🔍 User loading state:', userLoading);
-    
-    if (!user?.id) {
-      console.error('❌ No user ID found');
-      alert('Ошибка: пользователь не авторизован. Попробуйте перезагрузить страницу.');
-      return;
-    }
-
     if (!formData.goal) {
       alert('Пожалуйста, выберите цель тренировки');
       return;
@@ -68,43 +59,41 @@ export default function TrainingAssessmentPage() {
     setIsSubmitting(true);
 
     try {
-      const generatePayload = {
-        userId: user.id.toString(),
-        goal: formData.goal,
-        energyState: formData.energyState,
-      };
-      
-      console.log('📤 Generating workout (v3):', generatePayload);
-      
       const generateResponse = await fetch('/api/training/generate-v3', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(generatePayload),
+        body: JSON.stringify({
+          goal: formData.goal,
+          energyState: formData.energyState,
+        }),
       });
 
+      if (generateResponse.status === 401) {
+        alert('Сессия истекла. Войдите заново.');
+        router.push('/login');
+        return;
+      }
+
       const generateData = await generateResponse.json();
-      console.log('📥 Generate response:', generateData);
 
       if (generateData.success) {
-        console.log('✅ Workout generated, redirecting...');
         router.push(`/training/workout?id=${generateData.workoutId}`);
-      } else {
-        console.error('❌ Generate error:', generateData.error);
-        
-        if (generateData.redirectTo) {
-          alert('Пожалуйста, пройди стартовый опрос для определения твоих характеристик');
-          router.push(generateData.redirectTo);
-          return;
-        }
-
-        if (generateData.missingModules && generateData.missingModules.length > 0) {
-          alert(`Не хватает модулей для тренировки: ${generateData.missingModules.join(', ')}`);
-          router.push('/training/workout');
-          return;
-        }
-        
-        alert('Ошибка генерации тренировки: ' + generateData.error);
+        return;
       }
+
+      if (generateData.redirectTo) {
+        alert('Пожалуйста, пройди стартовый опрос для определения твоих характеристик');
+        router.push(generateData.redirectTo);
+        return;
+      }
+
+      if (generateData.missingModules && generateData.missingModules.length > 0) {
+        alert(`Не хватает модулей для тренировки: ${generateData.missingModules.join(', ')}`);
+        router.push('/training/workout');
+        return;
+      }
+
+      alert('Ошибка генерации тренировки: ' + generateData.error);
     } catch (error) {
       console.error('❌ Exception during assessment:', error);
       alert('Произошла ошибка. Попробуйте снова.');
