@@ -582,7 +582,7 @@ function HomePageMock({ focal }: { focal: HomeFocal }) {
 // карточки оказались ближе к центру экрана.
 function SlideHomeCards() {
   return (
-    <div className="animate-fadeIn" style={{ transform: 'translateY(-260px)' }}>
+    <div className="animate-fadeIn" style={{ transform: 'translateY(-360px)' }}>
       <HomePageMock focal="trainings" />
     </div>
   );
@@ -593,7 +593,7 @@ function SlideHomeCards() {
 // Сдвиг меньше: баннер выше карточек, поэтому центрируется при -140.
 function SlideCoachAssignment() {
   return (
-    <div className="animate-fadeIn" style={{ transform: 'translateY(-140px)' }}>
+    <div className="animate-fadeIn" style={{ transform: 'translateY(-240px)' }}>
       <HomePageMock focal="banner" />
     </div>
   );
@@ -995,7 +995,7 @@ function SlideProgress() {
   // Сдвигаем содержимое вверх: header «Профиль» + большая квадратная карточка
   // аватара уезжают за верх, focal-блок PotentialSection поднимается к центру.
   return (
-    <div className="animate-fadeIn" style={{ transform: 'translateY(-340px)' }}>
+    <div className="animate-fadeIn" style={{ transform: 'translateY(-440px)' }}>
       {/* Header страницы «Профиль» — копия profile/page.tsx:455-474 (Dim) */}
       <Dim>
         <div className="flex items-center justify-between px-4 py-4">
