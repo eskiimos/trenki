@@ -986,23 +986,54 @@ const TrainersSection = () => {
                   </Link>
                 ))}
                 {hasMore && (
-                  <Link href="/trainers" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{
-                      width: 32,
-                      height: 202,
-                      background: 'transparent',
-                      borderRadius: 8,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      cursor: 'pointer'
-                    }}>
-                      <div style={{
-                        fontSize: 24,
-                        color: '#445CFF',
-                        fontWeight: 'bold'
-                      }}>→</div>
+                  <Link
+                    href="/trainers"
+                    style={{ flexShrink: 0 }}
+                    className="transition-transform duration-150 active:scale-95"
+                  >
+                    <div
+                      style={{
+                        width: 64,
+                        height: 202,
+                        borderRadius: 12,
+                        background:
+                          'linear-gradient(180deg, rgba(68, 92, 255, 0.10) 0%, rgba(68, 92, 255, 0.22) 100%)',
+                        border: '1px solid rgba(68, 92, 255, 0.45)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: 10,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <svg width="20" height="22" viewBox="0 0 20 22" fill="none">
+                        <path
+                          d="M3 4 L11 11 L3 18"
+                          stroke="#7B91FF"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M9 4 L17 11 L9 18"
+                          stroke="#445CFF"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      <div
+                        className="font-overpass uppercase"
+                        style={{
+                          color: '#7B91FF',
+                          fontSize: 9,
+                          fontWeight: 900,
+                          letterSpacing: '0.15em',
+                        }}
+                      >
+                        Все
+                      </div>
                     </div>
                   </Link>
                 )}
