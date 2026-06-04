@@ -28,10 +28,11 @@ export default function TrainingAssessmentPage() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Состояние формы
+  // Состояние формы. По умолчанию ничего не выбрано — атлет сам
+  // указывает энергию и цель перед генерацией.
   const [formData, setFormData] = useState({
     goal: null as TrainingGoal | null,
-    energyState: 'IN_TONE' as EnergyStateValue,
+    energyState: null as EnergyStateValue | null,
   });
 
   // Логирование состояния пользователя
@@ -51,6 +52,10 @@ export default function TrainingAssessmentPage() {
   }, [webApp, router]);
 
   const handleSubmit = async () => {
+    if (!formData.energyState) {
+      alert('Пожалуйста, выберите своё состояние');
+      return;
+    }
     if (!formData.goal) {
       alert('Пожалуйста, выберите цель тренировки');
       return;
