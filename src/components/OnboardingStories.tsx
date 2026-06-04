@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
+import { ChevronLeft, ChevronRight, Plus, ThumbsUp, Trash2 } from 'lucide-react';
 
 /**
  * Сторис-онбординг в стиле Instagram. Пока доступен только из админ-
@@ -35,6 +36,37 @@ const TAP_LEFT_ZONE = 0.33; // 33% слева = «назад»
 
 const SLIDE_BG =
   'radial-gradient(circle at 50% 0%, rgba(68, 92, 255, 0.18) 0%, rgba(6, 9, 25, 0) 55%), #060919';
+
+// Spotlight-обёртки: focal-блок остаётся «sharp» + лёгкое свечение,
+// остальное блюрится и темнеет — внимание уходит на фокус.
+function Dim({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        filter: 'blur(3px) brightness(0.45)',
+        opacity: 0.7,
+        transition: 'filter 0.4s ease, opacity 0.4s ease',
+        pointerEvents: 'none',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Focus({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        position: 'relative',
+        filter: 'drop-shadow(0 0 24px rgba(161, 255, 74, 0.20))',
+        animation: 'popIn 0.45s ease-out',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
 // ── 1. Welcome ────────────────────────────────────────────────────────
 function SlideWelcome() {
@@ -77,288 +109,1029 @@ function SlideWelcome() {
   );
 }
 
-// ── 2. Главная (3 карточки TrainingsSection) ─────────────────────────
-function SlideHomeCards() {
-  // Pixel-perfect копия src/app/page.tsx:683-728
+// ── Главная (общий mock для слайдов 2 и 3) ───────────────────────────
+// Pixel-perfect mock из src/app/page.tsx: Header → ScheduledWorkoutSection →
+// TrenkiSection → AssignmentsBanner → TrainingsSection → TrainersSection.
+// Один и тот же экран; меняется только focal-блок (TrainingsSection для
+// слайда «карточки», AssignmentsBanner для слайда «баннер»). Остальное —
+// в Dim, чтобы фокус внимания сдвигался естественно, не уводя из контекста.
+type HomeFocal = 'trainings' | 'banner';
+
+function HomePageMock({ focal }: { focal: HomeFocal }) {
+  const Wrap = ({ kind, children }: { kind: HomeFocal; children: React.ReactNode }) =>
+    focal === kind ? <Focus>{children}</Focus> : <Dim>{children}</Dim>;
+
   return (
-    <div className="animate-fadeIn" style={{ paddingTop: 32 }}>
-      <div
-        className="font-overpass uppercase"
-        style={{
-          color: '#9B99AA',
-          fontSize: 10,
-          fontWeight: 800,
-          letterSpacing: '0.5px',
-          paddingLeft: 16,
-          marginBottom: 12,
-        }}
-      >
-        Главная
-      </div>
-      <section className="px-4">
-        <div className="grid grid-cols-2 gap-2">
-          {/* ИИ тренер — col-span-2 на мобиле */}
+    <>
+      {/* Header атлета — копия page.tsx:443-562 */}
+      <Dim>
+        <header
+          style={{
+            width: '100%',
+            paddingBottom: 24,
+            paddingLeft: 16,
+            paddingRight: 16,
+            paddingTop: 16,
+            borderBottom: '1px #101530 solid',
+            flexDirection: 'column',
+            justifyContent: 'flex-start',
+            alignItems: 'flex-start',
+            gap: 12,
+            display: 'flex',
+          }}
+        >
           <div
-            className="col-span-2 animate-slideUp"
             style={{
               width: '100%',
-              height: 100,
-              paddingLeft: 16,
-              paddingRight: 16,
-              paddingTop: 12,
-              paddingBottom: 12,
-              background: 'rgba(68, 92, 255, 0.20)',
-              overflow: 'hidden',
-              borderRadius: 8,
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
+              justifyContent: 'flex-start',
+              alignItems: 'center',
+              gap: 4,
               display: 'flex',
             }}
           >
-            <Image src="/icons/icon-cards.svg" alt="" width={24} height={24} />
             <div
               style={{
-                color: '#F9F8FE',
-                fontSize: 14,
-                fontFamily: 'Overpass',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                lineHeight: '120%',
-                letterSpacing: 0.5,
+                width: 40,
+                paddingTop: 4,
+                paddingBottom: 4,
+                overflow: 'hidden',
+                borderRadius: 2,
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                display: 'flex',
               }}
             >
-              персональный <span style={{ color: '#A1FF4A' }}>ИИ</span> тренер
+              <div
+                style={{
+                  textAlign: 'center',
+                  color: '#F9F8FE',
+                  fontSize: 24,
+                  fontFamily: 'Overpass',
+                  fontWeight: 700,
+                  lineHeight: '24px',
+                }}
+              >
+                10
+              </div>
+              <div
+                style={{
+                  textAlign: 'center',
+                  color: '#F9F8FE',
+                  fontSize: 12,
+                  fontFamily: 'Overpass',
+                  fontWeight: 700,
+                  lineHeight: '12px',
+                  letterSpacing: 0.5,
+                }}
+              >
+                ЦН
+              </div>
+            </div>
+            <div
+              style={{
+                flex: '1 1 0',
+                padding: 4,
+                borderRadius: 2,
+                flexDirection: 'column',
+                justifyContent: 'flex-start',
+                alignItems: 'flex-start',
+                display: 'flex',
+              }}
+            >
+              <div
+                style={{
+                  width: '100%',
+                  paddingTop: 4,
+                  paddingBottom: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    color: '#F9F8FE',
+                    fontSize: 16,
+                    fontFamily: 'Overpass',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    lineHeight: '16px',
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  БАХТИЯР
+                </div>
+              </div>
+              <div
+                style={{
+                  width: '100%',
+                  paddingTop: 4,
+                  paddingBottom: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    color: '#F9F8FE',
+                    fontSize: 16,
+                    fontFamily: 'Overpass',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    lineHeight: '16px',
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  МИНГАЗОВ
+                </div>
+              </div>
+            </div>
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 4,
+                background: '#101530',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Image src="/icons/icon-app.svg" alt="" width={32} height={32} />
             </div>
           </div>
-          {/* Повышение потенциала */}
+        </header>
+      </Dim>
+
+      {/* Шорты (Dim) */}
+      <Dim>
+        <section style={{ paddingTop: 15, paddingBottom: 15 }}>
+          <h2
+            className="px-4 text-white font-semibold mb-3"
+            style={{ fontSize: 12 }}
+          >
+            КОРОТКИЕ ВИДЕО
+          </h2>
+          <div className="flex space-x-4 overflow-hidden pb-4 px-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="flex-shrink-0 w-36"
+                style={{
+                  aspectRatio: '9 / 16',
+                  borderRadius: 4,
+                  background:
+                    i % 2 === 0
+                      ? 'linear-gradient(135deg, #1a2148 0%, #060919 100%)'
+                      : 'linear-gradient(135deg, #101530 0%, #060919 100%)',
+                }}
+              />
+            ))}
+          </div>
+        </section>
+      </Dim>
+
+      {/* ScheduledWorkoutSection mock — копия page.tsx:220-243 (Dim) */}
+      <Dim>
+        <section className="px-4 mb-4">
+          <div className="self-stretch p-4 bg-gradient-to-b from-slate-900 to-slate-950 rounded-lg flex flex-col gap-4 overflow-hidden">
+            <div className="self-stretch flex justify-between items-start">
+              <div className="flex-1 h-9 text-slate-50 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                запланированная тренировка через
+              </div>
+              <div className="w-16 h-8 px-2 py-1 bg-lime-400/20 rounded-lg flex justify-center items-center">
+                <div className="text-lime-400 text-base font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                  04:32
+                </div>
+              </div>
+            </div>
+            <div
+              className="self-stretch h-12 px-6 py-3 rounded-[32px] flex justify-center items-center"
+              style={{ background: '#A1FF4A' }}
+            >
+              <div className="text-slate-950 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
+                начать
+              </div>
+            </div>
+          </div>
+        </section>
+      </Dim>
+
+      {/* AssignmentsBanner mock — копия AssignmentsBanner.tsx */}
+      <Wrap kind="banner">
+        <section className="px-4 animate-fadeInDown" style={{ paddingBottom: 15 }}>
           <div
-            className="animate-slideUp"
             style={{
               width: '100%',
-              height: 100,
-              paddingLeft: 16,
-              paddingRight: 16,
-              paddingTop: 12,
-              paddingBottom: 12,
-              background: 'rgba(68, 92, 255, 0.20)',
-              overflow: 'hidden',
+              padding: 16,
+              background:
+                'linear-gradient(135deg, rgba(161, 255, 74, 0.12) 0%, rgba(68, 92, 255, 0.20) 100%)',
+              border: '1px solid rgba(161, 255, 74, 0.25)',
               borderRadius: 8,
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
               display: 'flex',
-              animationDelay: '0.08s',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 12,
             }}
           >
-            <Image src="/icons/ant-design-thunderbolt-filled_f.svg" alt="" width={16} height={16} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
+              <div
+                style={{
+                  color: '#A1FF4A',
+                  fontSize: 12,
+                  fontFamily: 'Overpass',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                  lineHeight: '120%',
+                }}
+              >
+                от тренера
+              </div>
+              <div
+                style={{
+                  color: '#F9F8FE',
+                  fontSize: 14,
+                  fontFamily: 'Overpass',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                  lineHeight: '120%',
+                }}
+              >
+                <span style={{ color: '#A1FF4A' }}>3</span> тренировки ждут выполнения
+              </div>
+            </div>
             <div
               style={{
-                color: '#F9F8FE',
-                fontSize: 14,
-                fontFamily: 'Overpass',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                lineHeight: '120%',
-                letterSpacing: 0.5,
-                wordWrap: 'break-word',
+                width: 32,
+                height: 32,
+                borderRadius: 999,
+                background: 'rgba(161, 255, 74, 0.15)',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                flexShrink: 0,
               }}
             >
-              повышение потенциала
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M6 4l4 4-4 4"
+                  stroke="#A1FF4A"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </div>
           </div>
-          {/* Треньки, советы профи, разборы */}
+        </section>
+      </Wrap>
+
+      {/* TrainingsSection — 3 карточки */}
+      <Wrap kind="trainings">
+        <section className="px-4" style={{ paddingBottom: 15 }}>
+          <div className="grid grid-cols-2 gap-2">
+            <div
+              className="col-span-2 animate-slideUp"
+              style={{
+                width: '100%',
+                height: 100,
+                paddingLeft: 16,
+                paddingRight: 16,
+                paddingTop: 12,
+                paddingBottom: 12,
+                background: 'rgba(68, 92, 255, 0.20)',
+                overflow: 'hidden',
+                borderRadius: 8,
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                display: 'flex',
+              }}
+            >
+              <Image src="/icons/icon-cards.svg" alt="" width={24} height={24} />
+              <div
+                style={{
+                  color: '#F9F8FE',
+                  fontSize: 14,
+                  fontFamily: 'Overpass',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  lineHeight: '120%',
+                  letterSpacing: 0.5,
+                }}
+              >
+                персональный <span style={{ color: '#A1FF4A' }}>ИИ</span> тренер
+              </div>
+            </div>
+            <div
+              className="animate-slideUp"
+              style={{
+                width: '100%',
+                height: 100,
+                paddingLeft: 16,
+                paddingRight: 16,
+                paddingTop: 12,
+                paddingBottom: 12,
+                background: 'rgba(68, 92, 255, 0.20)',
+                overflow: 'hidden',
+                borderRadius: 8,
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                display: 'flex',
+                animationDelay: '0.08s',
+              }}
+            >
+              <Image src="/icons/ant-design-thunderbolt-filled_f.svg" alt="" width={16} height={16} />
+              <div
+                style={{
+                  color: '#F9F8FE',
+                  fontSize: 14,
+                  fontFamily: 'Overpass',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  lineHeight: '120%',
+                  letterSpacing: 0.5,
+                }}
+              >
+                повышение потенциала
+              </div>
+            </div>
+            <div
+              className="animate-slideUp"
+              style={{
+                width: '100%',
+                height: 100,
+                paddingLeft: 16,
+                paddingRight: 16,
+                paddingTop: 12,
+                paddingBottom: 12,
+                background: 'rgba(68, 92, 255, 0.20)',
+                overflow: 'hidden',
+                borderRadius: 8,
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                display: 'flex',
+                animationDelay: '0.16s',
+              }}
+            >
+              <Image src="/icons/icon-cards-kl.svg" alt="" width={16} height={16} />
+              <div
+                style={{
+                  color: '#F9F8FE',
+                  fontSize: 14,
+                  fontFamily: 'Overpass',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  lineHeight: '120%',
+                  letterSpacing: 0.5,
+                }}
+              >
+                треньки, советы профи, разборы
+              </div>
+            </div>
+          </div>
+        </section>
+      </Wrap>
+
+      {/* TrainersSection mock — копия page.tsx:805-900 (Dim) */}
+      <Dim>
+        <section>
           <div
-            className="animate-slideUp"
             style={{
               width: '100%',
-              height: 100,
-              paddingLeft: 16,
-              paddingRight: 16,
-              paddingTop: 12,
-              paddingBottom: 12,
-              background: 'rgba(68, 92, 255, 0.20)',
-              overflow: 'hidden',
-              borderRadius: 8,
+              paddingTop: 24,
+              paddingBottom: 0,
+              background: 'linear-gradient(180deg, #101530 0%, #060919 100%)',
               flexDirection: 'column',
-              justifyContent: 'space-between',
               alignItems: 'flex-start',
+              gap: 16,
               display: 'flex',
-              animationDelay: '0.16s',
             }}
           >
-            <Image src="/icons/icon-cards-kl.svg" alt="" width={16} height={16} />
             <div
               style={{
-                color: '#F9F8FE',
-                fontSize: 14,
-                fontFamily: 'Overpass',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                lineHeight: '120%',
-                letterSpacing: 0.5,
-                wordWrap: 'break-word',
+                width: '100%',
+                paddingLeft: 16,
+                paddingRight: 16,
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                display: 'flex',
               }}
             >
-              треньки, советы профи, разборы
+              <div
+                style={{
+                  color: '#F9F8FE',
+                  fontSize: 12,
+                  fontFamily: 'Overpass',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  lineHeight: '14.40px',
+                  letterSpacing: 0.5,
+                }}
+              >
+                тренеры
+              </div>
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                gap: 16,
+                overflow: 'hidden',
+                width: '100%',
+                paddingLeft: 16,
+                paddingRight: 16,
+              }}
+            >
+              {[0, 1].map((i) => (
+                <div
+                  key={i}
+                  style={{
+                    width: '170px',
+                    flexShrink: 0,
+                    paddingBottom: 8,
+                    background: '#060919',
+                    overflow: 'hidden',
+                    borderRadius: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '170px',
+                      height: '170px',
+                      background:
+                        'linear-gradient(180deg, rgba(87, 108, 255, 0) 0%, rgba(87, 108, 255, 0.50) 100%), #101530',
+                      borderRadius: 8,
+                    }}
+                  />
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </Dim>
+    </>
+  );
+}
+
+// ── 2. Главная: фокус на TrainingsSection (3 карточки) ───────────────
+// Та же главная, но focal = TrainingsSection. Сдвигаем вверх, чтобы 3
+// карточки оказались ближе к центру экрана.
+function SlideHomeCards() {
+  return (
+    <div className="animate-fadeIn" style={{ transform: 'translateY(-260px)' }}>
+      <HomePageMock focal="trainings" />
     </div>
   );
 }
 
-// ── 3. Назначения от тренера (AssignmentsBanner) ──────────────────────
+// ── 3. Та же главная: фокус смещается на AssignmentsBanner ───────────
+// Атлет видит ровно тот же экран — переключается только внимание.
+// Сдвиг меньше: баннер выше карточек, поэтому центрируется при -140.
 function SlideCoachAssignment() {
-  // Pixel-perfect копия src/components/AssignmentsBanner.tsx
   return (
-    <div className="animate-fadeIn" style={{ paddingTop: 32 }}>
-      <div
-        className="font-overpass uppercase"
-        style={{
-          color: '#9B99AA',
-          fontSize: 10,
-          fontWeight: 800,
-          letterSpacing: '0.5px',
-          paddingLeft: 16,
-          marginBottom: 12,
-        }}
-      >
-        Главная — баннер
-      </div>
-      <section className="px-4">
-        <div
-          className="animate-slideUp"
-          style={{
-            width: '100%',
-            padding: 16,
-            background:
-              'linear-gradient(135deg, rgba(161, 255, 74, 0.12) 0%, rgba(68, 92, 255, 0.20) 100%)',
-            border: '1px solid rgba(161, 255, 74, 0.25)',
-            borderRadius: 8,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 12,
-          }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
-            <div
-              style={{
-                color: '#A1FF4A',
-                fontSize: 12,
-                fontFamily: 'Overpass',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: 0.5,
-                lineHeight: '120%',
-              }}
-            >
-              от тренера
-            </div>
-            <div
-              style={{
-                color: '#F9F8FE',
-                fontSize: 14,
-                fontFamily: 'Overpass',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: 0.5,
-                lineHeight: '120%',
-                wordWrap: 'break-word',
-              }}
-            >
-              <span style={{ color: '#A1FF4A' }}>3</span> тренировки ждут выполнения
-            </div>
-          </div>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 999,
-              background: 'rgba(161, 255, 74, 0.15)',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M6 4l4 4-4 4"
-                stroke="#A1FF4A"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
-        </div>
-      </section>
+    <div className="animate-fadeIn" style={{ transform: 'translateY(-140px)' }}>
+      <HomePageMock focal="banner" />
     </div>
   );
 }
 
 // ── 4. Календарь (виджет + карточка тренировки) ───────────────────────
+// Pixel-perfect mock из src/app/calendar/page.tsx. Структура: header с
+// «КАЛЕНДАРЬ» → виджет (focal) → «Сегодня, 13 июня» + «+ Добавить
+// видео» → CoachAssignment-карточка + SwipeableWorkoutItem-карточка (Dim).
 function SlideCalendar() {
-  // Pixel-perfect mock из src/app/calendar/page.tsx
-  const days = Array.from({ length: 35 }, (_, i) => i - 5); // фейк-сетка
+  const days = Array.from({ length: 35 }, (_, i) => i - 5);
   const todayIdx = 12;
   const eventIdxs = [12, 15, 19, 23];
   return (
-    <div className="animate-fadeIn" style={{ paddingTop: 32 }}>
+    <div
+      className="animate-fadeIn"
+      style={{
+        minHeight: '100%',
+        background: 'linear-gradient(182.77deg, #101530 69.24%, #060919 97.69%)',
+      }}
+    >
+      {/* Header страницы — копия calendar/page.tsx:253-271 */}
+      <header
+        className="flex items-center p-4"
+        style={{ paddingTop: 16 }}
+      >
+        <div className="mr-4 text-white/60">
+          <Image src="/icons/icon-action-back.svg" alt="" width={24} height={24} />
+        </div>
+        <h1
+          className="text-white uppercase"
+          style={{
+            fontFamily: 'Overpass',
+            fontWeight: 700,
+            fontSize: 12,
+            lineHeight: '120%',
+            letterSpacing: '0.5px',
+          }}
+        >
+          КАЛЕНДАРЬ
+        </h1>
+      </header>
+
+      <div className="px-4">
+        {/* Focal — сам виджет календаря */}
+        <Focus>
+          <div className="bg-[#101530] rounded-3xl mb-8 animate-slideUp" style={{ overflow: 'hidden' }}>
+            <div className="bg-[#445CFF]/20 rounded-2xl p-4">
+              {/* Навигация месяцев — реальные ChevronLeft/Right */}
+              <div className="flex items-center justify-between mb-6 text-white">
+                <div className="p-2 rounded-full">
+                  <ChevronLeft size={24} />
+                </div>
+                <span className="text-[14px] font-bold uppercase tracking-widest">
+                  ИЮНЬ, 2026
+                </span>
+                <div className="p-2 rounded-full">
+                  <ChevronRight size={24} />
+                </div>
+              </div>
+              {/* Дни недели — 14px italic */}
+              <div className="grid grid-cols-7 gap-1 mb-4 text-center">
+                {['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'].map((d) => (
+                  <div key={d} className="text-[#AEABBB] text-[14px] font-bold italic">
+                    {d}
+                  </div>
+                ))}
+              </div>
+              {/* Сетка дней */}
+              <div className="grid grid-cols-7 gap-1 place-items-center">
+                {days.map((d, i) => {
+                  const isVisible = d >= 1 && d <= 30;
+                  const isToday = i === todayIdx;
+                  const hasEvent = eventIdxs.includes(i);
+                  return (
+                    <div
+                      key={i}
+                      className="h-10 w-10 flex flex-col items-center justify-center rounded-full relative text-sm font-medium"
+                      style={{
+                        color: isVisible ? '#F9F8FE' : 'transparent',
+                        background: isToday
+                          ? '#445CFF'
+                          : hasEvent && isVisible
+                          ? 'linear-gradient(180deg, rgba(87, 108, 255, 0) 0%, rgba(87, 108, 255, 0.5) 100%)'
+                          : 'transparent',
+                      }}
+                    >
+                      {isVisible ? d : ''}
+                      {hasEvent && !isToday && isVisible && (
+                        <span
+                          className="absolute bottom-1 w-1 h-1 rounded-full"
+                          style={{ background: '#445CFF' }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </Focus>
+
+        {/* «Сегодня, …» + «+ Добавить видео» (Dim) */}
+        <Dim>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-white text-sm font-medium">Сегодня, 13 июня</h2>
+            <div
+              className="flex items-center gap-2 rounded-full px-4 py-2"
+              style={{ background: '#2A3045' }}
+            >
+              <span className="text-[#AEABBB] text-xs font-medium">Добавить видео</span>
+              <div
+                className="w-5 h-5 rounded-full flex items-center justify-center"
+                style={{ background: '#445CFF' }}
+              >
+                <Plus size={12} className="text-white" />
+              </div>
+            </div>
+          </div>
+
+          {/* CoachAssignment карточка — копия calendar/page.tsx:335-373 */}
+          <div
+            className="block rounded-2xl overflow-hidden mb-4"
+            style={{
+              background:
+                'linear-gradient(135deg, rgba(161, 255, 74, 0.12) 0%, rgba(68, 92, 255, 0.20) 100%)',
+              border: '1px solid rgba(161, 255, 74, 0.25)',
+            }}
+          >
+            <div className="p-4 flex gap-3 items-center">
+              <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-[#0d1228] shrink-0">
+                <div className="skeleton-loading" style={{ width: '100%', height: '100%' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div
+                  style={{
+                    color: '#A1FF4A',
+                    fontSize: 11,
+                    fontFamily: 'Overpass',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                    marginBottom: 6,
+                  }}
+                >
+                  от тренера · Никита
+                </div>
+                <div className="text-white text-sm font-semibold leading-tight">
+                  Сила ног, уровень 2
+                </div>
+                <div className="text-[#AEABBB] text-xs mt-1">18 мин</div>
+              </div>
+            </div>
+          </div>
+
+          {/* SwipeableWorkoutItem mock — копия SwipeableWorkoutItem.tsx:101-220 (без swipe-actions) */}
+          <div className="relative overflow-hidden rounded-2xl mb-4">
+            <div className="absolute inset-0 flex justify-end">
+              <div className="w-20 bg-[#35553B] flex flex-col items-center justify-center gap-1">
+                <ThumbsUp size={20} className="text-white" />
+                <span className="text-white text-[10px] font-medium leading-tight text-center">
+                  В<br />избранное
+                </span>
+              </div>
+              <div className="w-20 bg-[#1A2036] flex flex-col items-center justify-center gap-1">
+                <Trash2 size={20} className="text-white" />
+                <span className="text-white text-[10px] font-medium leading-tight">Удалить</span>
+              </div>
+            </div>
+            <div className="relative bg-[#101530]">
+              <div className="flex p-3 gap-4">
+                <div className="relative w-32 h-20 rounded-xl overflow-hidden shrink-0 bg-[#0d1228]">
+                  <div className="skeleton-loading" style={{ width: '100%', height: '100%' }} />
+                  <div className="absolute bottom-1 right-1 bg-black/60 rounded px-1.5 py-0.5">
+                    <span className="text-white text-[10px] font-medium">18:00</span>
+                  </div>
+                </div>
+                <div className="flex-1 flex flex-col justify-between py-1">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-full overflow-hidden bg-gray-700" />
+                      <span className="text-white text-xs font-bold uppercase">
+                        Никита Власов
+                      </span>
+                    </div>
+                    <span className="text-[#A1FF4A] text-xs font-bold">19:30</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <div className="bg-[#2A3045] rounded px-2 py-1">
+                      <span className="text-[#AEABBB] text-[10px] font-medium">Сила</span>
+                    </div>
+                    <div className="bg-[#2A3045] rounded px-2 py-1">
+                      <span className="text-[#AEABBB] text-[10px] font-medium">Без оборудования</span>
+                    </div>
+                    <div className="bg-[#2A3045] rounded px-2 py-1">
+                      <span className="text-[#AEABBB] text-[10px] font-medium">Любитель</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Dim>
+      </div>
+    </div>
+  );
+}
+
+// ── 5. Прогресс / Потенциал ───────────────────────────────────────────
+// Pixel-perfect mock из src/app/profile/page.tsx:
+//   Header «Профиль» + edit (Dim) →
+//   квадратная карточка аватара с overlay + 3 строки (Dim) →
+//   PotentialSection: 2-колонка CharRow + большое кольцо 144px (Focus) →
+//   меню-кнопки в стиле white/10 (Dim).
+function potentialColorStory(p: number): string {
+  if (p <= 0) return '#AEABBB';
+  if (p <= 20) return '#FF8C4A';
+  if (p <= 50) {
+    const t = (p - 20) / 30;
+    const g = Math.round(140 + (201 - 140) * t);
+    return `rgb(255,${g},74)`;
+  }
+  if (p < 70) {
+    const t = (p - 50) / 20;
+    const r = Math.round(255 + (161 - 255) * t);
+    const g = Math.round(201 + (255 - 201) * t);
+    return `rgb(${r},${g},74)`;
+  }
+  return '#A1FF4A';
+}
+
+interface MockCharRowProps {
+  label: string;
+  value: number;
+  gain?: number;
+  insetRight: number;
+}
+
+function MockCharRow({ label, value, gain, insetRight }: MockCharRowProps) {
+  const display = value.toFixed(1);
+  return (
+    <div className="flex items-center" style={{ paddingRight: insetRight }}>
+      <div
+        className="text-white uppercase shrink-0"
+        style={{
+          fontFamily: 'Overpass, sans-serif',
+          fontWeight: 800,
+          fontSize: 12,
+          letterSpacing: '0.5px',
+          lineHeight: '100%',
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          flex: 1,
+          minWidth: 8,
+          height: 1,
+          background:
+            'linear-gradient(90deg, rgba(68,92,255,0) 0%, rgba(68,92,255,0.5) 50%, rgba(68,92,255,0.9) 100%)',
+          marginLeft: 6,
+          marginRight: -1,
+        }}
+      />
+      <div className="relative shrink-0" style={{ width: 56, height: 56, zIndex: 2 }}>
+        <svg viewBox="0 0 56 56" className="absolute inset-0 w-full h-full">
+          <circle cx="28" cy="28" r="26" fill="none" stroke="#445CFF" strokeWidth="1.5" opacity="0.7" />
+          <circle cx="28" cy="28" r="22" fill="rgba(68,92,255,0.06)" />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          {gain != null && gain > 0 && (
+            <span
+              style={{
+                color: '#A1FF4A',
+                fontWeight: 700,
+                fontSize: 9,
+                lineHeight: '100%',
+                marginBottom: 1,
+              }}
+            >
+              +{gain.toFixed(1)}
+            </span>
+          )}
+          <span
+            style={{
+              color: '#445CFF',
+              fontWeight: 900,
+              fontSize: 16,
+              lineHeight: '100%',
+            }}
+          >
+            {display}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MockPotentialSection() {
+  const p = 54;
+  const ringColor = potentialColorStory(p);
+  const RING_SIZE = 144;
+  const RING_RADIUS = 60;
+  const RING_INNER_RADIUS = 52;
+  const RING_OUTER_RADIUS = 68;
+  const DOTS_RADIUS = 72;
+  const RING_CIRC = 2 * Math.PI * RING_RADIUS;
+  const DOT_COUNT = 10;
+  const dots = Array.from({ length: DOT_COUNT }, (_, i) => {
+    const angle = (i / DOT_COUNT) * 2 * Math.PI - Math.PI / 2;
+    return {
+      x: RING_SIZE / 2 + DOTS_RADIUS * Math.cos(angle),
+      y: RING_SIZE / 2 + DOTS_RADIUS * Math.sin(angle),
+      key: i,
+    };
+  });
+
+  const rows: MockCharRowProps[] = [
+    { label: 'выносливость', value: 5.2, gain: 0.4, insetRight: 0 },
+    { label: 'техника', value: 5.8, insetRight: 24 },
+    { label: 'сила', value: 6.1, gain: 0.3, insetRight: 40 },
+    { label: 'скорость', value: 4.7, insetRight: 24 },
+    { label: 'гибкость', value: 4.0, insetRight: 0 },
+  ];
+
+  return (
+    <div
+      className="relative"
+      style={{ backgroundColor: '#060919', borderRadius: 12, padding: '18px 16px' }}
+    >
+      <div className="flex items-stretch gap-2">
+        <div
+          className="flex-1 flex flex-col justify-between"
+          style={{ minHeight: RING_SIZE + 32, gap: 10 }}
+        >
+          {rows.map((r) => (
+            <MockCharRow key={r.label} {...r} />
+          ))}
+        </div>
+        <div
+          className="relative shrink-0 self-center"
+          style={{ width: RING_SIZE, height: RING_SIZE, zIndex: 1 }}
+        >
+          <svg
+            viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
+            className="absolute inset-0 w-full h-full"
+            style={{ transform: 'rotate(-90deg)' }}
+          >
+            <circle cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_OUTER_RADIUS} fill="none" stroke={ringColor} strokeWidth="1" opacity="0.35" />
+            <circle cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_INNER_RADIUS} fill="none" stroke={ringColor} strokeWidth="1" opacity="0.35" />
+            <circle cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS} fill="none" stroke="#1F2540" strokeWidth="6" />
+            <circle
+              cx={RING_SIZE / 2}
+              cy={RING_SIZE / 2}
+              r={RING_RADIUS}
+              fill="none"
+              stroke={ringColor}
+              strokeWidth="6"
+              strokeLinecap="round"
+              strokeDasharray={`${(p / 100) * RING_CIRC} ${RING_CIRC}`}
+            />
+          </svg>
+          <svg
+            viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
+            className="absolute inset-0 w-full h-full pointer-events-none"
+          >
+            {dots.map((d) => (
+              <circle key={d.key} cx={d.x} cy={d.y} r={2} fill={ringColor} opacity={0.55} />
+            ))}
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <div
+              style={{ color: ringColor, fontWeight: 900, fontSize: 32, lineHeight: '100%' }}
+            >
+              {p.toFixed(1)}
+            </div>
+            <div
+              className="uppercase italic mt-1 text-center"
+              style={{
+                color: '#F9F8FE',
+                fontWeight: 800,
+                fontSize: 11,
+                letterSpacing: '0.5px',
+                lineHeight: '110%',
+              }}
+            >
+              общий<br />потенциал
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SlideProgress() {
+  // Сдвигаем содержимое вверх: header «Профиль» + большая квадратная карточка
+  // аватара уезжают за верх, focal-блок PotentialSection поднимается к центру.
+  return (
+    <div className="animate-fadeIn" style={{ transform: 'translateY(-340px)' }}>
+      {/* Header страницы «Профиль» — копия profile/page.tsx:455-474 (Dim) */}
+      <Dim>
+        <div className="flex items-center justify-between px-4 py-4">
+          <div className="flex items-center gap-3">
+            <h1
+              className="text-white uppercase"
+              style={{
+                fontFamily: 'Overpass',
+                fontWeight: 700,
+                fontSize: 12,
+                lineHeight: '120%',
+                letterSpacing: '0.5px',
+              }}
+            >
+              Профиль
+            </h1>
+          </div>
+          <div className="w-6 h-6 flex items-center justify-center">
+            <Image src="/icons/icon-edit.svg" alt="" width={24} height={24} />
+          </div>
+        </div>
+      </Dim>
+
+      <div className="px-4 flex flex-col gap-6">
+        {/* Карточка аватара — копия profile/page.tsx:481-544 (Dim) */}
+        <Dim>
+          <div className="bg-[#060919] rounded-lg overflow-hidden">
+            <div className="w-full relative" style={{ aspectRatio: '1 / 1' }}>
+              {/* Заглушка аватара (без реального файла, чтобы не падал Image) */}
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:
+                    'linear-gradient(135deg, #1a2148 0%, #060919 70%, #101530 100%)',
+                }}
+              />
+              {/* Номер и позиция — левый верхний */}
+              <div
+                className="absolute top-3 left-3 w-16 h-16 rounded-lg flex flex-col items-center justify-center"
+                style={{ background: '#445CFF' }}
+              >
+                <div className="text-white text-2xl font-black leading-none">10</div>
+                <div className="text-white text-xs font-medium uppercase leading-none mt-1">
+                  ЦН
+                </div>
+              </div>
+              {/* Логотип клуба — правый верхний */}
+              <div className="absolute top-3 right-3 w-16 h-16 bg-white rounded-lg flex items-center justify-center overflow-hidden">
+                <Image
+                  src="/icons/icon-app.svg"
+                  alt=""
+                  width={64}
+                  height={64}
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            </div>
+            <div className="h-10 px-4 flex items-center border-b border-[#26252F]">
+              <div className="text-[#445CFF] text-base font-medium uppercase">БАХТИЯР</div>
+            </div>
+            <div className="h-10 px-4 flex items-center border-b border-[#26252F]">
+              <div className="text-[#445CFF] text-base font-medium uppercase">МИНГАЗОВ</div>
+            </div>
+            <div className="h-10 px-4 flex items-center">
+              <div className="text-[#AEABBB] text-sm font-medium uppercase">
+                17 ЛЕТ | 178 СМ | 72 КГ
+              </div>
+            </div>
+          </div>
+        </Dim>
+
+        {/* PotentialSection — focal */}
+        <Focus>
+          <div className="animate-popIn">
+            <MockPotentialSection />
+          </div>
+        </Focus>
+
+        {/* Меню-кнопки — реальный стиль white/10 (Dim) */}
+        <Dim>
+          <div className="bg-[#060919] rounded-lg px-4">
+            {[
+              'Задания от тренера',
+              'Вступить в команду',
+              'Уведомления',
+              'Выйти',
+            ].map((label, i, arr) => (
+              <div
+                key={label}
+                className="flex justify-between items-center py-4"
+                style={{
+                  borderBottom: i < arr.length - 1 ? '1px solid #26252F' : undefined,
+                }}
+              >
+                <span className="text-white text-sm font-medium uppercase tracking-wide">
+                  {label}
+                </span>
+                <Image src="/icons/arrow.svg" alt="" width={20} height={20} className="opacity-50" />
+              </div>
+            ))}
+          </div>
+        </Dim>
+      </div>
+    </div>
+  );
+}
+
+// ── 6. ИИ-тренер: цикл на неделю готов (CTA-слайд) ────────────────────
+// Финальный кадр сторис. Функционал «недельного цикла» появится позже —
+// сейчас просто визуальный teaser: 7 дней (Dim) + карточка с подписью и
+// большая лайм-кнопка (Focus) приглашают начать.
+function SlideAIWeekCycle() {
+  const days = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
+  return (
+    <div className="animate-fadeIn" style={{ paddingTop: 40 }}>
       <div
         className="font-overpass uppercase"
         style={{
-          color: '#9B99AA',
+          color: '#A1FF4A',
           fontSize: 10,
           fontWeight: 800,
           letterSpacing: '0.5px',
           paddingLeft: 16,
-          marginBottom: 8,
+          marginBottom: 12,
         }}
       >
-        Календарь
+        ИИ-тренер
       </div>
-      <h1
-        className="font-overpass uppercase"
-        style={{
-          paddingLeft: 16,
-          fontFamily: 'Overpass',
-          fontWeight: 700,
-          fontSize: 12,
-          letterSpacing: '0.5px',
-          color: '#F9F8FE',
-          marginBottom: 16,
-        }}
-      >
-        КАЛЕНДАРЬ
-      </h1>
 
-      <div className="px-4">
-        {/* Виджет календаря */}
-        <div
-          className="bg-[#101530] rounded-3xl mb-5 animate-slideUp"
-          style={{ overflow: 'hidden' }}
-        >
-          <div
-            className="rounded-2xl p-4"
-            style={{ background: 'rgba(68, 92, 255, 0.20)' }}
-          >
-            {/* Навигация месяцев */}
-            <div className="flex items-center justify-between mb-4 text-white">
-              <span style={{ fontSize: 20, opacity: 0.7 }}>‹</span>
-              <span className="text-[13px] font-bold uppercase tracking-widest">
-                ИЮНЬ, 2026
-              </span>
-              <span style={{ fontSize: 20, opacity: 0.7 }}>›</span>
-            </div>
-            {/* Дни недели */}
-            <div className="grid grid-cols-7 gap-1 mb-2 text-center">
-              {['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'].map((d) => (
+      {/* 7 дней недели — Dim */}
+      <Dim>
+        <section className="px-4 mb-5">
+          <div className="grid grid-cols-7 gap-1.5">
+            {days.map((d, i) => (
+              <div key={d} className="flex flex-col items-center gap-1.5">
                 <div
-                  key={d}
                   style={{
                     color: '#AEABBB',
                     fontSize: 11,
@@ -368,221 +1141,108 @@ function SlideCalendar() {
                 >
                   {d}
                 </div>
-              ))}
-            </div>
-            {/* Сетка дней */}
-            <div className="grid grid-cols-7 gap-1 place-items-center">
-              {days.map((d, i) => {
-                const isVisible = d >= 1 && d <= 30;
-                const isToday = i === todayIdx;
-                const hasEvent = eventIdxs.includes(i);
-                return (
-                  <div
-                    key={i}
-                    style={{
-                      width: 28,
-                      height: 28,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderRadius: 999,
-                      position: 'relative',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: isVisible ? '#F9F8FE' : 'transparent',
-                      background: isToday ? '#445CFF' : 'transparent',
-                    }}
-                  >
-                    {isVisible ? d : ''}
-                    {hasEvent && !isToday && isVisible && (
-                      <span
-                        style={{
-                          position: 'absolute',
-                          bottom: 2,
-                          width: 4,
-                          height: 4,
-                          borderRadius: 999,
-                          background: '#445CFF',
-                        }}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Заголовок выбранной даты */}
-        <div
-          className="font-overpass text-white"
-          style={{ fontSize: 13, fontWeight: 500, marginBottom: 12 }}
-        >
-          Сегодня, 13 июня
-        </div>
-
-        {/* Карточка тренерского задания (зелёный градиент) */}
-        <div
-          className="animate-slideUp"
-          style={{
-            background:
-              'linear-gradient(135deg, rgba(161, 255, 74, 0.12) 0%, rgba(68, 92, 255, 0.20) 100%)',
-            border: '1px solid rgba(161, 255, 74, 0.25)',
-            borderRadius: 16,
-            padding: 12,
-            display: 'flex',
-            gap: 12,
-            alignItems: 'center',
-            animationDelay: '0.12s',
-          }}
-        >
-          <div
-            className="relative shrink-0"
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: 12,
-              background: '#0d1228',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              className="skeleton-loading"
-              style={{ width: '100%', height: '100%' }}
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div
-              style={{
-                color: '#A1FF4A',
-                fontSize: 11,
-                fontFamily: 'Overpass',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: 0.5,
-                marginBottom: 4,
-              }}
-            >
-              от тренера · Никита
-            </div>
-            <div
-              className="font-overpass"
-              style={{
-                color: '#F9F8FE',
-                fontSize: 13,
-                fontWeight: 700,
-                lineHeight: '120%',
-                marginBottom: 4,
-              }}
-            >
-              Сила ног, уровень 2
-            </div>
-            <div
-              className="font-overpass"
-              style={{ color: '#AEABBB', fontSize: 11 }}
-            >
-              18 мин
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── 5. Прогресс / Потенциал ───────────────────────────────────────────
-function SlideProgress() {
-  const ratings = [
-    { label: 'Сила', val: 68 },
-    { label: 'Скорость', val: 54 },
-    { label: 'Выносливость', val: 47 },
-    { label: 'Техника', val: 61 },
-    { label: 'Гибкость', val: 39 },
-  ];
-  return (
-    <div className="animate-fadeIn" style={{ paddingTop: 32 }}>
-      <div
-        className="font-overpass uppercase"
-        style={{
-          color: '#9B99AA',
-          fontSize: 10,
-          fontWeight: 800,
-          letterSpacing: '0.5px',
-          paddingLeft: 16,
-          marginBottom: 12,
-        }}
-      >
-        Профиль
-      </div>
-      <section className="px-4">
-        <div
-          className="animate-popIn"
-          style={{
-            background: '#060919',
-            border: '1px solid #26252F',
-            borderRadius: 14,
-            padding: '16px 18px',
-          }}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div
-              className="font-overpass uppercase"
-              style={{
-                color: '#9B99AA',
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: '0.5px',
-              }}
-            >
-              Потенциал
-            </div>
-            <div className="flex items-baseline gap-2">
-              <div
-                className="font-overpass"
-                style={{ color: '#A1FF4A', fontSize: 28, fontWeight: 900, lineHeight: 1 }}
-              >
-                54
-              </div>
-              <div
-                className="font-overpass"
-                style={{ color: '#A1FF4A', fontSize: 12, fontWeight: 800 }}
-              >
-                +8
-              </div>
-            </div>
-          </div>
-          <div className="flex flex-col gap-3">
-            {ratings.map((r, i) => (
-              <div key={r.label}>
-                <div className="flex justify-between font-overpass" style={{ fontSize: 12 }}>
-                  <span style={{ color: '#AEABBB' }}>{r.label}</span>
-                  <span style={{ color: '#F9F8FE', fontWeight: 800 }}>{r.val}</span>
-                </div>
                 <div
                   style={{
-                    background: '#1a1f3a',
-                    borderRadius: 999,
-                    height: 6,
-                    marginTop: 4,
-                    overflow: 'hidden',
+                    width: '100%',
+                    aspectRatio: '1 / 1.4',
+                    borderRadius: 6,
+                    background:
+                      i === 6
+                        ? 'rgba(174, 171, 187, 0.10)'
+                        : i % 2 === 0
+                        ? 'rgba(68, 92, 255, 0.20)'
+                        : 'rgba(161, 255, 74, 0.15)',
+                    border: '1px solid rgba(255,255,255,0.05)',
                   }}
-                >
-                  <div
-                    style={{
-                      width: `${r.val}%`,
-                      height: '100%',
-                      background: '#A1FF4A',
-                      borderRadius: 999,
-                      transformOrigin: 'left',
-                      animation: `popIn 0.7s ease-out ${i * 0.08}s both`,
-                    }}
-                  />
-                </div>
+                />
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
+      </Dim>
+
+      {/* Focal — карточка с описанием + большая кнопка */}
+      <Focus>
+        <section className="px-4">
+          <div
+            className="animate-popIn"
+            style={{
+              background: '#060919',
+              border: '1px solid rgba(161, 255, 74, 0.25)',
+              borderRadius: 16,
+              padding: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 999,
+                  background: 'rgba(161, 255, 74, 0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <Image
+                  src="/icons/ant-design-thunderbolt-filled_f.svg"
+                  alt=""
+                  width={20}
+                  height={20}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div
+                  className="font-overpass uppercase"
+                  style={{
+                    color: '#A1FF4A',
+                    fontSize: 11,
+                    fontWeight: 800,
+                    letterSpacing: 0.5,
+                    marginBottom: 4,
+                  }}
+                >
+                  цикл на неделю готов
+                </div>
+                <div
+                  className="font-overpass"
+                  style={{
+                    color: '#F9F8FE',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    lineHeight: '130%',
+                  }}
+                >
+                  Подобран под твоё состояние и расписание. Осталось нажать кнопку.
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="w-full"
+              style={{
+                background: '#A1FF4A',
+                color: '#060919',
+                padding: '16px 24px',
+                borderRadius: 32,
+                fontSize: 15,
+                fontWeight: 800,
+                letterSpacing: 0.5,
+                textTransform: 'uppercase',
+                fontFamily: 'Overpass',
+                textAlign: 'center',
+              }}
+            >
+              запустить неделю
+            </div>
+          </div>
+        </section>
+      </Focus>
     </div>
   );
 }
@@ -618,8 +1278,13 @@ const SLIDES: Slide[] = [
   {
     title: 'Растёшь с каждой тренировкой',
     body: 'Сила, скорость, выносливость, техника и гибкость — следи как растёт твой потенциал.',
-    cta: 'Поехали',
     visual: <SlideProgress />,
+  },
+  {
+    title: 'ИИ-тренер уже всё собрал',
+    body: 'Недельный цикл готов — подобран под твоё состояние, прокачку и расписание. Осталось нажать «Поехали».',
+    cta: 'Поехали',
+    visual: <SlideAIWeekCycle />,
   },
 ];
 
