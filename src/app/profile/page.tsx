@@ -9,6 +9,7 @@ import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { ProfileSkeleton } from '../../components/Skeleton';
 import BottomNavigation from '@/components/BottomNavigation';
 import AccountSwitcher from '@/components/AccountSwitcher';
+import OnboardingStories from '@/components/OnboardingStories';
 import { clearAuth, getTelegramId } from '@/lib/auth';
 import { calculateAge } from '@/lib/age-utils';
 
@@ -302,6 +303,7 @@ const ProfilePage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [recentGains, setRecentGains] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [storiesOpen, setStoriesOpen] = useState(false);
   
   // Push-уведомления
   const { 
@@ -771,19 +773,33 @@ const ProfilePage = () => {
               🚪 Выйти
             </button>
           </div>
-          {/* Кнопка панели администратора */}
+          {/* Кнопки только для администраторов */}
           {isAdmin && (
-            <div className="pt-2">
-              <button
-                onClick={() => router.push('/admin')}
-                className="w-full bg-[#A1FF4A]/10 hover:bg-[#A1FF4A]/20 text-[#A1FF4A] font-bold py-3 rounded-lg transition-all duration-300 text-sm"
-              >
-                ⚙️ Панель администратора
-              </button>
-            </div>
+            <>
+              <div className="pt-2">
+                <button
+                  onClick={() => router.push('/admin')}
+                  className="w-full bg-[#A1FF4A]/10 hover:bg-[#A1FF4A]/20 text-[#A1FF4A] font-bold py-3 rounded-lg transition-all duration-300 text-sm"
+                >
+                  ⚙️ Панель администратора
+                </button>
+              </div>
+              <div className="pt-2">
+                <button
+                  onClick={() => setStoriesOpen(true)}
+                  className="w-full bg-[#A1FF4A]/10 hover:bg-[#A1FF4A]/20 text-[#A1FF4A] font-bold py-3 rounded-lg transition-all duration-300 text-sm"
+                >
+                  🎬 Превью онбординг-сторис
+                </button>
+              </div>
+            </>
           )}        </div>
       </div>
-      
+
+      {/* Сторис-онбординг (пока только по кнопке для админов; позже —
+          автозапуск при первом входе после онбординга) */}
+      <OnboardingStories open={storiesOpen} onClose={() => setStoriesOpen(false)} />
+
       {/* Тапбар */}
       <BottomNavigation activeTab="profile" />
     </div>
