@@ -1,16 +1,20 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 
 /**
- * Сторис-онбординг в стиле Instagram. Пока что доступен только из админ-
+ * Сторис-онбординг в стиле Instagram. Пока доступен только из админ-
  * профиля по кнопке (feature-flag). Когда дизайн утвердят — будет
  * автоматически открываться один раз после прохождения онбординга.
  *
+ * Слайды — pixel-perfect mock'и реальных секций приложения, чтобы
+ * атлет сразу узнал что увидит на экране.
+ *
  * Управление:
- *   • тап слева — назад
- *   • тап справа — вперёд
- *   • удержание — пауза прогресса
+ *   • тап в левую треть — назад
+ *   • тап в правую часть — вперёд (на последнем слайде закрывает)
+ *   • удержание >200мс — пауза прогресса
  *   • свайп вниз — закрыть
  *   • ✕ — закрыть
  *   • автопереход через STORY_DURATION_MS
@@ -22,369 +26,619 @@ interface Props {
 }
 
 const STORY_DURATION_MS = 5500;
+const TAP_HOLD_DELAY_MS = 220;
+const TAP_LEFT_ZONE = 0.33; // 33% слева = «назад»
 
-interface Slide {
-  /** Цветовой акцент конкретно для этого слайда (фон heading-капсулы и т.п.) */
-  accent: string;
-  /** Заголовок */
-  title: string;
-  /** Подпись под заголовком */
-  body: string;
-  /** Превью-блок (рендерится в верхней части слайда) */
-  visual: React.ReactNode;
-  /** CTA для последнего слайда (опционально). При клике вызывается onClose. */
-  cta?: string;
-}
+// =====================================================================
+//                             СЛАЙДЫ
+// =====================================================================
 
-function PreviewCard({ children, scale = 1 }: { children: React.ReactNode; scale?: number }) {
-  // Полупрозрачная mock-карточка в стиле приложения. Не интерактивная.
+const SLIDE_BG =
+  'radial-gradient(circle at 50% 0%, rgba(68, 92, 255, 0.18) 0%, rgba(6, 9, 25, 0) 55%), #060919';
+
+// ── 1. Welcome ────────────────────────────────────────────────────────
+function SlideWelcome() {
   return (
     <div
+      className="flex flex-col items-center justify-center"
       style={{
-        background: '#101530',
-        border: '1px solid #26252F',
-        borderRadius: 14,
-        padding: '14px 16px',
-        transform: `scale(${scale})`,
-        transformOrigin: 'top center',
+        height: '100%',
+        background:
+          'radial-gradient(circle at 50% 35%, rgba(161, 255, 74, 0.20) 0%, transparent 55%), #060919',
       }}
     >
-      {children}
+      <div
+        className="font-overpass uppercase animate-popIn"
+        style={{
+          color: '#F9F8FE',
+          fontSize: 56,
+          fontWeight: 900,
+          letterSpacing: '0.05em',
+          lineHeight: '90%',
+          textAlign: 'center',
+        }}
+      >
+        треньки
+      </div>
+      <div
+        className="font-overpass mt-3 animate-fadeIn"
+        style={{
+          color: '#A1FF4A',
+          fontSize: 13,
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.4em',
+          animationDelay: '0.15s',
+        }}
+      >
+        для хоккеиста
+      </div>
     </div>
   );
 }
 
-function SkeletonBar({ width, height = 12 }: { width: string; height?: number }) {
+// ── 2. Главная (3 карточки TrainingsSection) ─────────────────────────
+function SlideHomeCards() {
+  // Pixel-perfect копия src/app/page.tsx:683-728
   return (
-    <div
-      className="skeleton-loading"
-      style={{ width, height, borderRadius: 4, marginBottom: 8 }}
-    />
+    <div className="animate-fadeIn" style={{ paddingTop: 32 }}>
+      <div
+        className="font-overpass uppercase"
+        style={{
+          color: '#9B99AA',
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: '0.5px',
+          paddingLeft: 16,
+          marginBottom: 12,
+        }}
+      >
+        Главная
+      </div>
+      <section className="px-4">
+        <div className="grid grid-cols-2 gap-2">
+          {/* ИИ тренер — col-span-2 на мобиле */}
+          <div
+            className="col-span-2 animate-slideUp"
+            style={{
+              width: '100%',
+              height: 100,
+              paddingLeft: 16,
+              paddingRight: 16,
+              paddingTop: 12,
+              paddingBottom: 12,
+              background: 'rgba(68, 92, 255, 0.20)',
+              overflow: 'hidden',
+              borderRadius: 8,
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              display: 'flex',
+            }}
+          >
+            <Image src="/icons/icon-cards.svg" alt="" width={24} height={24} />
+            <div
+              style={{
+                color: '#F9F8FE',
+                fontSize: 14,
+                fontFamily: 'Overpass',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                lineHeight: '120%',
+                letterSpacing: 0.5,
+              }}
+            >
+              персональный <span style={{ color: '#A1FF4A' }}>ИИ</span> тренер
+            </div>
+          </div>
+          {/* Повышение потенциала */}
+          <div
+            className="animate-slideUp"
+            style={{
+              width: '100%',
+              height: 100,
+              paddingLeft: 16,
+              paddingRight: 16,
+              paddingTop: 12,
+              paddingBottom: 12,
+              background: 'rgba(68, 92, 255, 0.20)',
+              overflow: 'hidden',
+              borderRadius: 8,
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              display: 'flex',
+              animationDelay: '0.08s',
+            }}
+          >
+            <Image src="/icons/ant-design-thunderbolt-filled_f.svg" alt="" width={16} height={16} />
+            <div
+              style={{
+                color: '#F9F8FE',
+                fontSize: 14,
+                fontFamily: 'Overpass',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                lineHeight: '120%',
+                letterSpacing: 0.5,
+                wordWrap: 'break-word',
+              }}
+            >
+              повышение потенциала
+            </div>
+          </div>
+          {/* Треньки, советы профи, разборы */}
+          <div
+            className="animate-slideUp"
+            style={{
+              width: '100%',
+              height: 100,
+              paddingLeft: 16,
+              paddingRight: 16,
+              paddingTop: 12,
+              paddingBottom: 12,
+              background: 'rgba(68, 92, 255, 0.20)',
+              overflow: 'hidden',
+              borderRadius: 8,
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              display: 'flex',
+              animationDelay: '0.16s',
+            }}
+          >
+            <Image src="/icons/icon-cards-kl.svg" alt="" width={16} height={16} />
+            <div
+              style={{
+                color: '#F9F8FE',
+                fontSize: 14,
+                fontFamily: 'Overpass',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                lineHeight: '120%',
+                letterSpacing: 0.5,
+                wordWrap: 'break-word',
+              }}
+            >
+              треньки, советы профи, разборы
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
 
-const SLIDES: Slide[] = [
-  // 1 — приветствие
-  {
-    accent: '#A1FF4A',
-    title: 'Привет в Треньках!',
-    body: 'Цифровая среда для хоккеистов: персональные тренировки, разборы профи и работа с твоим тренером.',
-    visual: (
+// ── 3. Назначения от тренера (AssignmentsBanner) ──────────────────────
+function SlideCoachAssignment() {
+  // Pixel-perfect копия src/components/AssignmentsBanner.tsx
+  return (
+    <div className="animate-fadeIn" style={{ paddingTop: 32 }}>
       <div
-        className="flex flex-col items-center justify-center"
+        className="font-overpass uppercase"
         style={{
-          background: 'radial-gradient(circle at 50% 30%, rgba(161, 255, 74, 0.18) 0%, transparent 60%)',
-          height: '100%',
-          paddingTop: 80,
+          color: '#9B99AA',
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: '0.5px',
+          paddingLeft: 16,
+          marginBottom: 12,
         }}
       >
-        <div
-          className="font-overpass uppercase animate-popIn"
-          style={{
-            color: '#F9F8FE',
-            fontSize: 52,
-            fontWeight: 900,
-            letterSpacing: '0.05em',
-            lineHeight: '90%',
-            textAlign: 'center',
-          }}
-        >
-          треньки
-        </div>
-        <div
-          className="font-overpass mt-3 animate-fadeIn"
-          style={{
-            color: '#A1FF4A',
-            fontSize: 14,
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '0.4em',
-            animationDelay: '0.15s',
-          }}
-        >
-          для хоккеиста
-        </div>
+        Главная — баннер
       </div>
-    ),
-  },
-  // 2 — ИИ-тренер
-  {
-    accent: '#A1FF4A',
-    title: 'Персональный ИИ-тренер',
-    body: 'Скажи, как ты себя чувствуешь и над чем хочешь поработать — мы соберём тренировку под тебя за секунды.',
-    visual: (
-      <div className="flex flex-col gap-3 px-2 pt-4 animate-slideUp">
-        <PreviewCard>
-          <div
-            className="font-overpass uppercase"
-            style={{ color: '#A1FF4A', fontSize: 10, fontWeight: 800, letterSpacing: '0.5px' }}
-          >
-            твоё состояние
-          </div>
-          <div className="flex gap-2 mt-3">
-            <div
-              className="font-overpass uppercase flex-1 text-center"
-              style={{
-                background: 'rgba(161, 255, 74, 0.2)',
-                color: '#AEABBB',
-                padding: '8px 0',
-                borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 800,
-              }}
-            >
-              в тонусе
-            </div>
-            <div
-              className="font-overpass uppercase flex-1 text-center"
-              style={{
-                background: '#A1FF4A',
-                color: '#101530',
-                padding: '8px 0',
-                borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 900,
-              }}
-            >
-              полон сил
-            </div>
-            <div
-              className="font-overpass uppercase flex-1 text-center"
-              style={{
-                background: 'transparent',
-                color: '#AEABBB',
-                border: '1px solid #26252F',
-                padding: '7px 0',
-                borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 800,
-              }}
-            >
-              устал
-            </div>
-          </div>
-        </PreviewCard>
-        <PreviewCard>
-          <div
-            className="font-overpass uppercase"
-            style={{ color: '#A1FF4A', fontSize: 10, fontWeight: 800, letterSpacing: '0.5px' }}
-          >
-            цель
-          </div>
-          <div className="flex flex-wrap gap-2 mt-3">
-            {['Скорость', 'Бросок', 'Выносливость', 'Техника'].map((c, i) => (
-              <div
-                key={c}
-                className="font-overpass uppercase"
-                style={{
-                  background: i === 1 ? '#A1FF4A' : 'transparent',
-                  color: i === 1 ? '#101530' : '#AEABBB',
-                  border: i === 1 ? 'none' : '1px solid #26252F',
-                  padding: '6px 12px',
-                  borderRadius: 999,
-                  fontSize: 11,
-                  fontWeight: 800,
-                }}
-              >
-                {c}
-              </div>
-            ))}
-          </div>
-        </PreviewCard>
-      </div>
-    ),
-  },
-  // 3 — тренировки от тренера
-  {
-    accent: '#A1FF4A',
-    title: 'Тренировки от твоего тренера',
-    body: 'Тренер назначает тебе задание — оно само появится в календаре и напомнит за 30 и 10 минут до старта.',
-    visual: (
-      <div className="px-2 pt-6 animate-slideUp">
+      <section className="px-4">
         <div
+          className="animate-slideUp"
           style={{
-            background: 'linear-gradient(135deg, rgba(161, 255, 74, 0.12) 0%, rgba(68, 92, 255, 0.20) 100%)',
+            width: '100%',
+            padding: 16,
+            background:
+              'linear-gradient(135deg, rgba(161, 255, 74, 0.12) 0%, rgba(68, 92, 255, 0.20) 100%)',
             border: '1px solid rgba(161, 255, 74, 0.25)',
+            borderRadius: 8,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
+            <div
+              style={{
+                color: '#A1FF4A',
+                fontSize: 12,
+                fontFamily: 'Overpass',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+                lineHeight: '120%',
+              }}
+            >
+              от тренера
+            </div>
+            <div
+              style={{
+                color: '#F9F8FE',
+                fontSize: 14,
+                fontFamily: 'Overpass',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+                lineHeight: '120%',
+                wordWrap: 'break-word',
+              }}
+            >
+              <span style={{ color: '#A1FF4A' }}>3</span> тренировки ждут выполнения
+            </div>
+          </div>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 999,
+              background: 'rgba(161, 255, 74, 0.15)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M6 4l4 4-4 4"
+                stroke="#A1FF4A"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// ── 4. Календарь (виджет + карточка тренировки) ───────────────────────
+function SlideCalendar() {
+  // Pixel-perfect mock из src/app/calendar/page.tsx
+  const days = Array.from({ length: 35 }, (_, i) => i - 5); // фейк-сетка
+  const todayIdx = 12;
+  const eventIdxs = [12, 15, 19, 23];
+  return (
+    <div className="animate-fadeIn" style={{ paddingTop: 32 }}>
+      <div
+        className="font-overpass uppercase"
+        style={{
+          color: '#9B99AA',
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: '0.5px',
+          paddingLeft: 16,
+          marginBottom: 8,
+        }}
+      >
+        Календарь
+      </div>
+      <h1
+        className="font-overpass uppercase"
+        style={{
+          paddingLeft: 16,
+          fontFamily: 'Overpass',
+          fontWeight: 700,
+          fontSize: 12,
+          letterSpacing: '0.5px',
+          color: '#F9F8FE',
+          marginBottom: 16,
+        }}
+      >
+        КАЛЕНДАРЬ
+      </h1>
+
+      <div className="px-4">
+        {/* Виджет календаря */}
+        <div
+          className="bg-[#101530] rounded-3xl mb-5 animate-slideUp"
+          style={{ overflow: 'hidden' }}
+        >
+          <div
+            className="rounded-2xl p-4"
+            style={{ background: 'rgba(68, 92, 255, 0.20)' }}
+          >
+            {/* Навигация месяцев */}
+            <div className="flex items-center justify-between mb-4 text-white">
+              <span style={{ fontSize: 20, opacity: 0.7 }}>‹</span>
+              <span className="text-[13px] font-bold uppercase tracking-widest">
+                ИЮНЬ, 2026
+              </span>
+              <span style={{ fontSize: 20, opacity: 0.7 }}>›</span>
+            </div>
+            {/* Дни недели */}
+            <div className="grid grid-cols-7 gap-1 mb-2 text-center">
+              {['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'].map((d) => (
+                <div
+                  key={d}
+                  style={{
+                    color: '#AEABBB',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    fontStyle: 'italic',
+                  }}
+                >
+                  {d}
+                </div>
+              ))}
+            </div>
+            {/* Сетка дней */}
+            <div className="grid grid-cols-7 gap-1 place-items-center">
+              {days.map((d, i) => {
+                const isVisible = d >= 1 && d <= 30;
+                const isToday = i === todayIdx;
+                const hasEvent = eventIdxs.includes(i);
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 999,
+                      position: 'relative',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: isVisible ? '#F9F8FE' : 'transparent',
+                      background: isToday ? '#445CFF' : 'transparent',
+                    }}
+                  >
+                    {isVisible ? d : ''}
+                    {hasEvent && !isToday && isVisible && (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          bottom: 2,
+                          width: 4,
+                          height: 4,
+                          borderRadius: 999,
+                          background: '#445CFF',
+                        }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Заголовок выбранной даты */}
+        <div
+          className="font-overpass text-white"
+          style={{ fontSize: 13, fontWeight: 500, marginBottom: 12 }}
+        >
+          Сегодня, 13 июня
+        </div>
+
+        {/* Карточка тренерского задания (зелёный градиент) */}
+        <div
+          className="animate-slideUp"
+          style={{
+            background:
+              'linear-gradient(135deg, rgba(161, 255, 74, 0.12) 0%, rgba(68, 92, 255, 0.20) 100%)',
+            border: '1px solid rgba(161, 255, 74, 0.25)',
+            borderRadius: 16,
+            padding: 12,
+            display: 'flex',
+            gap: 12,
+            alignItems: 'center',
+            animationDelay: '0.12s',
+          }}
+        >
+          <div
+            className="relative shrink-0"
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 12,
+              background: '#0d1228',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              className="skeleton-loading"
+              style={{ width: '100%', height: '100%' }}
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div
+              style={{
+                color: '#A1FF4A',
+                fontSize: 11,
+                fontFamily: 'Overpass',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+                marginBottom: 4,
+              }}
+            >
+              от тренера · Никита
+            </div>
+            <div
+              className="font-overpass"
+              style={{
+                color: '#F9F8FE',
+                fontSize: 13,
+                fontWeight: 700,
+                lineHeight: '120%',
+                marginBottom: 4,
+              }}
+            >
+              Сила ног, уровень 2
+            </div>
+            <div
+              className="font-overpass"
+              style={{ color: '#AEABBB', fontSize: 11 }}
+            >
+              18 мин
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── 5. Прогресс / Потенциал ───────────────────────────────────────────
+function SlideProgress() {
+  const ratings = [
+    { label: 'Сила', val: 68 },
+    { label: 'Скорость', val: 54 },
+    { label: 'Выносливость', val: 47 },
+    { label: 'Техника', val: 61 },
+    { label: 'Гибкость', val: 39 },
+  ];
+  return (
+    <div className="animate-fadeIn" style={{ paddingTop: 32 }}>
+      <div
+        className="font-overpass uppercase"
+        style={{
+          color: '#9B99AA',
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: '0.5px',
+          paddingLeft: 16,
+          marginBottom: 12,
+        }}
+      >
+        Профиль
+      </div>
+      <section className="px-4">
+        <div
+          className="animate-popIn"
+          style={{
+            background: '#060919',
+            border: '1px solid #26252F',
             borderRadius: 14,
             padding: '16px 18px',
           }}
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <div
-                className="font-overpass uppercase"
-                style={{ color: '#A1FF4A', fontSize: 11, fontWeight: 800, letterSpacing: '0.5px' }}
-              >
-                от тренера
-              </div>
-              <div
-                className="font-overpass mt-2"
-                style={{ color: '#F9F8FE', fontSize: 16, fontWeight: 800 }}
-              >
-                <span style={{ color: '#A1FF4A' }}>3</span> тренировки ждут
-              </div>
-            </div>
+          <div className="flex items-center justify-between mb-4">
             <div
+              className="font-overpass uppercase"
               style={{
-                width: 36,
-                height: 36,
-                borderRadius: 999,
-                background: 'rgba(161, 255, 74, 0.15)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                color: '#9B99AA',
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.5px',
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M6 4l4 4-4 4" stroke="#A1FF4A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              Потенциал
             </div>
-          </div>
-        </div>
-        <PreviewCard>
-          <div className="flex gap-3">
-            <div
-              className="skeleton-loading shrink-0"
-              style={{ width: 76, height: 44, borderRadius: 6 }}
-            />
-            <div className="flex-1">
-              <SkeletonBar width="80%" height={12} />
-              <SkeletonBar width="55%" height={10} />
-            </div>
-          </div>
-        </PreviewCard>
-      </div>
-    ),
-  },
-  // 4 — каталог видео + offline
-  {
-    accent: '#A1FF4A',
-    title: 'Большой каталог видео',
-    body: 'Разминки, ОФП, техника, заминка — всё с лучшими тренерами. Скачивай для оффлайн просмотра на сборах.',
-    visual: (
-      <div className="pt-6 px-2 animate-fadeIn">
-        <div className="flex gap-3 overflow-hidden">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="shrink-0"
-              style={{
-                width: '60%',
-                aspectRatio: '16/9',
-                borderRadius: 10,
-                background:
-                  i === 0
-                    ? 'linear-gradient(135deg, #1a2148 0%, #060919 100%)'
-                    : 'linear-gradient(135deg, #101530 0%, #060919 100%)',
-                position: 'relative',
-                opacity: i === 0 ? 1 : 0.55,
-                transform: `translateX(${-i * 8}px)`,
-              }}
-            >
+            <div className="flex items-baseline gap-2">
               <div
-                className="absolute"
-                style={{
-                  right: 6,
-                  bottom: 6,
-                  background: 'rgba(6, 9, 25, 0.85)',
-                  color: '#F9F8FE',
-                  fontSize: 10,
-                  fontWeight: 800,
-                  padding: '2px 6px',
-                  borderRadius: 4,
-                }}
+                className="font-overpass"
+                style={{ color: '#A1FF4A', fontSize: 28, fontWeight: 900, lineHeight: 1 }}
               >
-                12 мин
+                54
+              </div>
+              <div
+                className="font-overpass"
+                style={{ color: '#A1FF4A', fontSize: 12, fontWeight: 800 }}
+              >
+                +8
               </div>
             </div>
-          ))}
-        </div>
-        <div
-          className="font-overpass mt-5"
-          style={{
-            color: '#A1FF4A',
-            fontSize: 12,
-            fontWeight: 800,
-            textAlign: 'center',
-            background: 'rgba(161, 255, 74, 0.10)',
-            border: '1px solid rgba(161, 255, 74, 0.30)',
-            borderRadius: 999,
-            padding: '8px 12px',
-            display: 'inline-block',
-          }}
-        >
-          ⬇ Скачано · Работает без сети
-        </div>
-      </div>
-    ),
-  },
-  // 5 — прогресс / финал
-  {
-    accent: '#A1FF4A',
-    title: 'Растёшь с каждой тренировкой',
-    body: 'Сила, скорость, техника, выносливость и гибкость — следи как растёт твой потенциал.',
-    cta: 'Поехали',
-    visual: (
-      <div className="pt-6 px-2 animate-popIn">
-        <PreviewCard>
-          <div
-            className="font-overpass uppercase"
-            style={{ color: '#A1FF4A', fontSize: 10, fontWeight: 800, letterSpacing: '0.5px' }}
-          >
-            твой потенциал
           </div>
-          <div
-            className="font-overpass mt-2"
-            style={{ color: '#F9F8FE', fontSize: 32, fontWeight: 900, lineHeight: 1 }}
-          >
-            <span style={{ color: '#A1FF4A' }}>+8</span>
-            <span style={{ color: '#AEABBB', fontSize: 14, marginLeft: 8 }}>за неделю</span>
-          </div>
-          <div className="mt-5 flex flex-col gap-3">
-            {[
-              { label: 'Сила', val: 68 },
-              { label: 'Скорость', val: 54 },
-              { label: 'Выносливость', val: 47 },
-              { label: 'Техника', val: 61 },
-            ].map((r) => (
+          <div className="flex flex-col gap-3">
+            {ratings.map((r, i) => (
               <div key={r.label}>
-                <div className="flex justify-between font-overpass" style={{ fontSize: 11 }}>
+                <div className="flex justify-between font-overpass" style={{ fontSize: 12 }}>
                   <span style={{ color: '#AEABBB' }}>{r.label}</span>
                   <span style={{ color: '#F9F8FE', fontWeight: 800 }}>{r.val}</span>
                 </div>
-                <div style={{ background: '#1a1f3a', borderRadius: 999, height: 5, marginTop: 4 }}>
+                <div
+                  style={{
+                    background: '#1a1f3a',
+                    borderRadius: 999,
+                    height: 6,
+                    marginTop: 4,
+                    overflow: 'hidden',
+                  }}
+                >
                   <div
                     style={{
                       width: `${r.val}%`,
                       height: '100%',
                       background: '#A1FF4A',
                       borderRadius: 999,
-                      transition: 'width 0.8s ease-out',
+                      transformOrigin: 'left',
+                      animation: `popIn 0.7s ease-out ${i * 0.08}s both`,
                     }}
                   />
                 </div>
               </div>
             ))}
           </div>
-        </PreviewCard>
-      </div>
-    ),
+        </div>
+      </section>
+    </div>
+  );
+}
+
+interface Slide {
+  title: string;
+  body: string;
+  visual: React.ReactNode;
+  cta?: string;
+}
+
+const SLIDES: Slide[] = [
+  {
+    title: 'Привет в Треньках!',
+    body: 'Цифровая среда для хоккеиста: персональные тренировки, разборы профи и работа с твоим тренером.',
+    visual: <SlideWelcome />,
+  },
+  {
+    title: 'Подбор под тебя',
+    body: 'На главной — три входа: ИИ-тренер собирает тренировку под твоё состояние, прокачиваешь характеристики, смотришь короткие разборы.',
+    visual: <SlideHomeCards />,
+  },
+  {
+    title: 'Тренировки от твоего тренера',
+    body: 'Тренер назначает задание — оно появится на главной и в календаре, ты получишь уведомление за 30 и 10 минут.',
+    visual: <SlideCoachAssignment />,
+  },
+  {
+    title: 'Календарь тренировок',
+    body: 'Все запланированные тренировки в одном месте — и от тренера, и из твоего плана. Видишь свой ритм недели.',
+    visual: <SlideCalendar />,
+  },
+  {
+    title: 'Растёшь с каждой тренировкой',
+    body: 'Сила, скорость, выносливость, техника и гибкость — следи как растёт твой потенциал.',
+    cta: 'Поехали',
+    visual: <SlideProgress />,
   },
 ];
+
+// =====================================================================
+//                            КОМПОНЕНТ
+// =====================================================================
 
 export default function OnboardingStories({ open, onClose }: Props) {
   const [idx, setIdx] = useState(0);
   const [paused, setPaused] = useState(false);
-  // progress 0..1, обновляется на animationframe пока не paused
   const [progress, setProgress] = useState(0);
   const rafRef = useRef<number | null>(null);
   const lastTickRef = useRef<number>(0);
-  const touchStartYRef = useRef<number | null>(null);
+  // pointer-state для одновременного pause-hold + tap-navigation + swipe-down
+  const pointerRef = useRef<{ startX: number; startY: number; t: number; held: boolean; holdTimer: number | null } | null>(null);
 
   const total = SLIDES.length;
   const current = SLIDES[idx];
 
-  // Сброс прогресса + переход на следующий слайд
   const next = useCallback(() => {
     setProgress(0);
     setIdx((i) => (i + 1 < total ? i + 1 : i));
@@ -401,12 +655,10 @@ export default function OnboardingStories({ open, onClose }: Props) {
     onClose();
   }, [onClose]);
 
-  // На последнем слайде по завершении прогресса — оставляем экран до явного закрытия.
-  // На остальных — auto-advance.
+  // Авто-переход через animation frame
   useEffect(() => {
     if (!open) return;
     if (paused) return;
-
     lastTickRef.current = performance.now();
     const tick = (now: number) => {
       const dt = now - lastTickRef.current;
@@ -430,7 +682,7 @@ export default function OnboardingStories({ open, onClose }: Props) {
     };
   }, [open, paused, idx, total]);
 
-  // Блокируем body scroll
+  // body scroll lock
   useEffect(() => {
     if (!open) return;
     const prevOverflow = document.body.style.overflow;
@@ -440,7 +692,7 @@ export default function OnboardingStories({ open, onClose }: Props) {
     };
   }, [open]);
 
-  // Escape
+  // Esc + клавиши
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -454,30 +706,58 @@ export default function OnboardingStories({ open, onClose }: Props) {
 
   if (!open) return null;
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartYRef.current = e.touches[0].clientY;
-    setPaused(true);
+  // Универсальный pointer-обработчик (работает и на мышке, и на тач):
+  //  • short tap (<TAP_HOLD_DELAY_MS, без вертикального свайпа) → навигация по координате X
+  //  • long press → пауза, до отпускания
+  //  • swipe down >80px → close
+  const handlePointerDown = (e: React.PointerEvent) => {
+    pointerRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      t: performance.now(),
+      held: false,
+      holdTimer: window.setTimeout(() => {
+        if (pointerRef.current) {
+          pointerRef.current.held = true;
+          setPaused(true);
+        }
+      }, TAP_HOLD_DELAY_MS),
+    };
   };
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    setPaused(false);
-    const startY = touchStartYRef.current;
-    touchStartYRef.current = null;
-    if (startY === null) return;
-    const endY = e.changedTouches[0].clientY;
-    if (endY - startY > 80) {
-      // свайп вниз
+
+  const handlePointerUp = (e: React.PointerEvent, viewportWidth: number) => {
+    const p = pointerRef.current;
+    pointerRef.current = null;
+    if (!p) return;
+    if (p.holdTimer !== null) clearTimeout(p.holdTimer);
+    if (p.held) {
+      setPaused(false);
+      return;
+    }
+    const dx = e.clientX - p.startX;
+    const dy = e.clientY - p.startY;
+    // Свайп вниз — закрыть
+    if (dy > 80 && Math.abs(dy) > Math.abs(dx)) {
       close();
+      return;
+    }
+    // Слишком большой свайп по X — игнорируем (не считаем тапом)
+    if (Math.abs(dx) > 30 || Math.abs(dy) > 30) return;
+    // Короткий тап → навигация по координате
+    const relX = e.clientX / Math.max(1, viewportWidth);
+    if (relX < TAP_LEFT_ZONE) {
+      if (idx > 0) prev();
+    } else {
+      if (idx + 1 < total) next();
+      else close();
     }
   };
 
-  const handleLeftTap = () => {
-    if (idx > 0) prev();
-    // На первом слайде тап слева — игнорируем (не закрываем, чтобы не запутать)
-  };
-
-  const handleRightTap = () => {
-    if (idx + 1 < total) next();
-    else close();
+  const handlePointerCancel = () => {
+    const p = pointerRef.current;
+    pointerRef.current = null;
+    if (p?.holdTimer !== null && p?.holdTimer !== undefined) clearTimeout(p.holdTimer);
+    if (p?.held) setPaused(false);
   };
 
   return (
@@ -488,13 +768,15 @@ export default function OnboardingStories({ open, onClose }: Props) {
         position: 'fixed',
         inset: 0,
         zIndex: 1000,
-        background: '#060919',
+        background: SLIDE_BG,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        touchAction: 'none', // отключает default тач-жесты (swipe-back и т.п.)
       }}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
+      onPointerDown={handlePointerDown}
+      onPointerUp={(e) => handlePointerUp(e, window.innerWidth)}
+      onPointerCancel={handlePointerCancel}
     >
       {/* Прогресс-бары */}
       <div
@@ -505,6 +787,7 @@ export default function OnboardingStories({ open, onClose }: Props) {
           paddingRight: 12,
           paddingBottom: 8,
           zIndex: 2,
+          pointerEvents: 'none',
         }}
       >
         {SLIDES.map((_, i) => (
@@ -530,17 +813,24 @@ export default function OnboardingStories({ open, onClose }: Props) {
         ))}
       </div>
 
-      {/* Закрыть */}
+      {/* Закрыть — отдельным pointer-handler чтобы не путать с навигацией */}
       <button
         type="button"
-        onClick={close}
+        onPointerDown={(e) => e.stopPropagation()}
+        onPointerUp={(e) => {
+          e.stopPropagation();
+          // отменяем потенциальную навигацию: очищаем pointer-state
+          if (pointerRef.current?.holdTimer != null) clearTimeout(pointerRef.current.holdTimer);
+          pointerRef.current = null;
+          close();
+        }}
         aria-label="Закрыть"
         style={{
           position: 'absolute',
-          top: 'calc(env(safe-area-inset-top, 0px) + 24px)',
+          top: 'calc(env(safe-area-inset-top, 0px) + 22px)',
           right: 14,
-          width: 32,
-          height: 32,
+          width: 34,
+          height: 34,
           borderRadius: 999,
           background: 'rgba(255, 255, 255, 0.10)',
           color: '#F9F8FE',
@@ -554,43 +844,40 @@ export default function OnboardingStories({ open, onClose }: Props) {
         ✕
       </button>
 
-      {/* Контент текущего слайда (фон + визуал) */}
+      {/* Слайд (визуал + подпись + CTA). key={idx} перезапускает анимации входа */}
       <div
         key={idx}
         style={{
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          background:
-            'radial-gradient(circle at 50% 0%, rgba(68, 92, 255, 0.18) 0%, rgba(6, 9, 25, 0) 60%), #060919',
-          position: 'relative',
+          minHeight: 0,
           overflow: 'hidden',
         }}
-        className="animate-fadeIn"
       >
         <div
           style={{
             flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
             overflow: 'hidden',
-            paddingLeft: 12,
-            paddingRight: 12,
+            minHeight: 0,
           }}
         >
           {current.visual}
         </div>
 
-        {/* Текст + (CTA если есть) */}
+        {/* Текст + CTA */}
         <div
-          className="px-6 pb-10"
-          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 40px)' }}
+          className="px-6"
+          style={{
+            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 36px)',
+            paddingTop: 20,
+          }}
         >
           <div
-            className="font-overpass uppercase"
+            className="font-overpass uppercase animate-fadeInDown"
             style={{
-              color: current.accent,
-              fontSize: 11,
+              color: '#A1FF4A',
+              fontSize: 10,
               fontWeight: 900,
               letterSpacing: '0.4em',
               marginBottom: 8,
@@ -599,20 +886,26 @@ export default function OnboardingStories({ open, onClose }: Props) {
             треньки · {idx + 1}/{total}
           </div>
           <h2
-            className="font-overpass"
+            className="font-overpass animate-fadeInDown"
             style={{
               color: '#F9F8FE',
               fontSize: 24,
               fontWeight: 900,
               lineHeight: 1.15,
               marginBottom: 10,
+              animationDelay: '0.08s',
             }}
           >
             {current.title}
           </h2>
           <p
-            className="font-overpass"
-            style={{ color: '#AEABBB', fontSize: 14, lineHeight: 1.45 }}
+            className="font-overpass animate-fadeInDown"
+            style={{
+              color: '#AEABBB',
+              fontSize: 14,
+              lineHeight: 1.45,
+              animationDelay: '0.16s',
+            }}
           >
             {current.body}
           </p>
@@ -620,7 +913,13 @@ export default function OnboardingStories({ open, onClose }: Props) {
           {current.cta && (
             <button
               type="button"
-              onClick={close}
+              onPointerDown={(e) => e.stopPropagation()}
+              onPointerUp={(e) => {
+                e.stopPropagation();
+                if (pointerRef.current?.holdTimer != null) clearTimeout(pointerRef.current.holdTimer);
+                pointerRef.current = null;
+                close();
+              }}
               className="font-overpass uppercase mt-6 transition-transform duration-100 active:scale-95"
               style={{
                 background: '#A1FF4A',
@@ -640,38 +939,6 @@ export default function OnboardingStories({ open, onClose }: Props) {
           )}
         </div>
       </div>
-
-      {/* Тап-зоны: слева — назад, справа — вперёд. Поверх контента, но прозрачные. */}
-      <button
-        type="button"
-        aria-label="Назад"
-        onClick={handleLeftTap}
-        style={{
-          position: 'absolute',
-          inset: '60px 0 100px 0',
-          left: 0,
-          width: '30%',
-          background: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          zIndex: 2,
-        }}
-      />
-      <button
-        type="button"
-        aria-label="Вперёд"
-        onClick={handleRightTap}
-        style={{
-          position: 'absolute',
-          inset: '60px 0 100px 0',
-          right: 0,
-          width: '30%',
-          background: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          zIndex: 2,
-        }}
-      />
     </div>
   );
 }
