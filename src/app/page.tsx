@@ -1027,9 +1027,9 @@ const VideoCard = ({ video, isNew }: VideoCardProps & { isNew?: boolean }) => {
 
   return (
     <Link href={`/video/${video.id}`}>
-      {/* На мобиле карточка ~88% viewport, чтобы справа выглядывала
+      {/* На мобиле карточка ~80% viewport, чтобы справа выглядывала
           следующая — визуальный hint что список горизонтально скроллится. */}
-      <div className="flex-shrink-0 w-[calc(100vw-3.5rem)] sm:w-[calc(50vw-1rem)] cursor-pointer">
+      <div className="flex-shrink-0 w-[80vw] sm:w-[calc(50vw-1rem)] cursor-pointer">
         {/* Video Thumbnail */}
         <div className="relative rounded overflow-hidden" style={{ width: '100%', height: 'auto', aspectRatio: '16/9', maxHeight: '280px' }}>
           {video.thumbnail && (
@@ -1090,7 +1090,7 @@ const VideoCard = ({ video, isNew }: VideoCardProps & { isNew?: boolean }) => {
 };
 
 const VideoCardSkeleton = () => (
-  <div className="flex-shrink-0 w-[calc(100vw-3.5rem)] sm:w-[calc(50vw-1rem)]">
+  <div className="flex-shrink-0 w-[80vw] sm:w-[calc(50vw-1rem)]">
     <Skeleton
       width=""
       height=""
