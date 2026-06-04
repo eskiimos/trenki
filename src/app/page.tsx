@@ -1023,17 +1023,6 @@ const TrainersSection = () => {
                           strokeLinejoin="round"
                         />
                       </svg>
-                      <div
-                        className="font-overpass uppercase"
-                        style={{
-                          color: '#7B91FF',
-                          fontSize: 9,
-                          fontWeight: 900,
-                          letterSpacing: '0.15em',
-                        }}
-                      >
-                        Все
-                      </div>
                     </div>
                   </Link>
                 )}
