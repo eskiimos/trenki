@@ -15,10 +15,10 @@ export const MODULE_TYPE_LABELS: Record<string, string> = {
 export const LOAD_TYPE_LABELS: Record<string, string> = {
   SPEED: 'Скорость',
   POWER: 'Мощность',
-  MAX_STRENGTH: 'Макс. сила',
+  MAX_STRENGTH: 'Сила',
   STRENGTH_ENDURANCE: 'Силовая выносливость',
   ANAEROBIC_ENDURANCE: 'Анаэробная выносливость',
-  AEROBIC_ENDURANCE: 'Аэробная выносливость',
+  AEROBIC_ENDURANCE: 'Выносливость',
   AGILITY: 'Ловкость',
   MOBILITY: 'Мобильность',
   STATIC_STRETCH: 'Стат. растяжка',
@@ -30,12 +30,29 @@ export const LOAD_TYPE_LABELS: Record<string, string> = {
   RECOVERY: 'Восстановление',
 };
 
+/**
+ * Порядок и whitelist опций «Тип нагрузки» в фильтре /video.
+ * Остальные ключи существуют в БД, но в фильтр не выводятся
+ * (видео с ними фильтр не вычеркнет — просто не даёт чекбокс).
+ * По правке Марка 06.2026.
+ */
+export const LOAD_TYPE_FILTER_ORDER: string[] = [
+  'MAX_STRENGTH',       // Сила
+  'SPEED',              // Скорость
+  'AEROBIC_ENDURANCE',  // Выносливость
+  'TECHNICAL_SKILL',    // Техника
+  'AGILITY',            // Ловкость
+  'MOBILITY',           // Мобильность
+  'STATIC_STRETCH',     // Стат. растяжка
+  'PREHAB',             // Преабилитация
+];
+
 export const MUSCLE_GROUP_LABELS: Record<string, string> = {
   LOWER_BODY: 'Низ тела',
-  UPPER_PULL: 'Верх — тяга',
+  UPPER_PULL: 'Верх тела',
   UPPER_PUSH: 'Верх — жим',
   CORE_STABILITY: 'Кор (стабилизация)',
-  CORE_DYNAMICS: 'Кор (динамика)',
+  CORE_DYNAMICS: 'Кор',
   PREHAB_SHOULDER: 'Плечи (преаб)',
   PREHAB_KNEE: 'Колени (преаб)',
   PREHAB_BACK: 'Спина (преаб)',
@@ -49,6 +66,17 @@ export const MUSCLE_GROUP_LABELS: Record<string, string> = {
   GLUTES: 'Ягодицы',
   CARDIO: 'Кардио',
 };
+
+/**
+ * Порядок и whitelist опций «Группа мышц» в фильтре /video.
+ * По правке Марка 06.2026 — оставлены только 4 базовые группы.
+ */
+export const MUSCLE_GROUP_FILTER_ORDER: string[] = [
+  'FULL_BODY',     // Всё тело
+  'LOWER_BODY',    // Низ тела
+  'UPPER_PULL',    // Верх тела
+  'CORE_DYNAMICS', // Кор
+];
 
 export const DIFFICULTY_LABELS: Record<string, string> = {
   BEGINNER: 'Начинающий',

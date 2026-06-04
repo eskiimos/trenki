@@ -4,7 +4,9 @@ import React from 'react';
 import {
   MODULE_TYPE_LABELS,
   LOAD_TYPE_LABELS,
+  LOAD_TYPE_FILTER_ORDER,
   MUSCLE_GROUP_LABELS,
+  MUSCLE_GROUP_FILTER_ORDER,
   DIFFICULTY_LABELS,
   DURATION_BUCKETS,
   DurationBucketId,
@@ -94,10 +96,20 @@ interface SectionProps {
   selected: string[];
   labels?: Record<string, string>;
   onToggle: (v: string) => void;
+  /**
+   * Если задан — оставляет в секции только перечисленные ключи и
+   * выводит их в этом порядке. Это применяется к нагрузке и группам
+   * мышц (правка Марка 06.2026) — лишние опции скрыты, остальные
+   * упорядочены.
+   */
+  order?: string[];
 }
 
-function Section({ title, values, selected, labels, onToggle }: SectionProps) {
-  if (values.length === 0) return null;
+function Section({ title, values, selected, labels, onToggle, order }: SectionProps) {
+  const ordered = order
+    ? order.filter((k) => values.includes(k))
+    : values;
+  if (ordered.length === 0) return null;
   return (
     <div className="mb-6">
       <h3
@@ -113,7 +125,7 @@ function Section({ title, values, selected, labels, onToggle }: SectionProps) {
         {title}
       </h3>
       <div className="flex flex-wrap gap-2">
-        {values.map((v) => (
+        {ordered.map((v) => (
           <Chip
             key={v}
             label={labels?.[v] ?? v}
@@ -211,6 +223,7 @@ export default function VideoFiltersModal({
             selected={filters.loadTypes}
             labels={LOAD_TYPE_LABELS}
             onToggle={(v) => toggle('loadTypes', v)}
+            order={LOAD_TYPE_FILTER_ORDER}
           />
           <Section
             title="Группа мышц"
@@ -218,6 +231,7 @@ export default function VideoFiltersModal({
             selected={filters.muscleGroups}
             labels={MUSCLE_GROUP_LABELS}
             onToggle={(v) => toggle('muscleGroups', v)}
+            order={MUSCLE_GROUP_FILTER_ORDER}
           />
           <Section
             title="Сложность"
