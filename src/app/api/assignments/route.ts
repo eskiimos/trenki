@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { LoadDirection, WorkoutStatus } from '@/generated/prisma';
 import { requireCoach, requireAuthUser, requireTeamOwnership } from '@/lib/coach/guards';
-import { sendUserPush } from '@/lib/coach/push';
+import { notifyUser } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
@@ -256,17 +256,33 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Push-уведомления игрокам — не блокируем ответ
+  // Уведомления игрокам — Telegram (если есть валидный telegramId) или
+  // web-push fallback. Не блокируем ответ.
   const coachName = `${auth.user.firstName ?? ''} ${auth.user.lastName ?? ''}`.trim() || 'Тренер';
-  Promise.allSettled(
-    filtered.map((athleteId) =>
-      sendUserPush(athleteId, {
-        title: 'Новое задание от тренера',
-        body: `${coachName} назначил тебе тренировку`,
-        url: '/profile/assignments',
-      })
-    )
-  ).catch(() => { });
+  (async () => {
+    try {
+      const athletes = await prisma.user.findMany({
+        where: { id: { in: filtered } },
+        select: { id: true, telegramId: true },
+      });
+      await Promise.allSettled(
+        athletes.map((athlete) =>
+          notifyUser(athlete, {
+            title: 'Новое задание от тренера',
+            body: `${coachName} назначил тебе тренировку`,
+            url: '/profile/assignments',
+            telegramMessage:
+              `🏒 <b>Новое задание от тренера</b>\n\n` +
+              `${coachName} назначил тебе тренировку.\n\n` +
+              `Открой приложение, чтобы посмотреть детали.`,
+            telegramOptions: { parseMode: 'HTML' },
+          }),
+        ),
+      );
+    } catch {
+      // Ошибка отправки уведомлений не должна валить создание заданий
+    }
+  })();
 
   return NextResponse.json({ created: created.length, assignments: created });
 }
