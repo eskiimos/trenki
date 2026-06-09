@@ -51,5 +51,45 @@ export async function GET(request: NextRequest, ctx: RouteContext) {
     },
   });
 
-  return NextResponse.json({ athlete, assignments });
+  // Прирост характеристик за последние 10 событий — для подписей +N.N
+  // в PotentialSection. То же, что показывается атлету в /profile.
+  const recentHistory = await prisma.characteristicHistory.findMany({
+    where: {
+      userId: athleteId,
+      OR: [
+        { gainPower: { not: 0 } },
+        { gainSpeed: { not: 0 } },
+        { gainEndurance: { not: 0 } },
+        { gainTechnique: { not: 0 } },
+        { gainFlexibility: { not: 0 } },
+      ],
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 10,
+    select: {
+      gainPower: true,
+      gainSpeed: true,
+      gainEndurance: true,
+      gainTechnique: true,
+      gainFlexibility: true,
+    },
+  });
+  const recentGains = recentHistory.reduce(
+    (acc, e) => ({
+      gainPower:       acc.gainPower       + e.gainPower,
+      gainSpeed:       acc.gainSpeed       + e.gainSpeed,
+      gainEndurance:   acc.gainEndurance   + e.gainEndurance,
+      gainTechnique:   acc.gainTechnique   + e.gainTechnique,
+      gainFlexibility: acc.gainFlexibility + e.gainFlexibility,
+    }),
+    {
+      gainPower: 0,
+      gainSpeed: 0,
+      gainEndurance: 0,
+      gainTechnique: 0,
+      gainFlexibility: 0,
+    },
+  );
+
+  return NextResponse.json({ athlete, assignments, recentGains });
 }

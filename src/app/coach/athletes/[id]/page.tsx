@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import CoachPoseSessionsSection from '@/components/CoachPoseSessionsSection';
+import PotentialSection from '@/components/PotentialSection';
 
 interface Assignment {
   id: string;
@@ -34,6 +35,13 @@ interface AthleteData {
     } | null;
   };
   assignments: Assignment[];
+  recentGains?: {
+    gainPower: number;
+    gainSpeed: number;
+    gainEndurance: number;
+    gainTechnique: number;
+    gainFlexibility: number;
+  } | null;
 }
 
 export default function CoachAthleteDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -108,16 +116,8 @@ export default function CoachAthleteDetailPage({ params }: { params: Promise<{ i
     );
   }
 
-  const { athlete, assignments } = data;
+  const { athlete, assignments, recentGains } = data;
   const p = athlete.profile;
-
-  const ratings = p ? [
-    { label: 'Сила', value: p.ratingPower },
-    { label: 'Скорость', value: p.ratingSpeed },
-    { label: 'Выносливость', value: p.ratingEndurance },
-    { label: 'Техника', value: p.ratingTechnique },
-    { label: 'Гибкость', value: p.ratingFlexibility },
-  ] : [];
 
   return (
     <div className="min-h-screen bg-[#101530] text-white pb-16">
@@ -159,30 +159,24 @@ export default function CoachAthleteDetailPage({ params }: { params: Promise<{ i
           </div>
         </div>
 
-        {/* Потенциал */}
+        {/* Потенциал — единый компонент с /profile (с десятыми + прирост) */}
         {p && (
-          <div className="mt-5" style={{ background: '#060919', border: '1px solid #26252F', borderRadius: 14, padding: '16px 18px' }}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="font-overpass uppercase" style={{ color: '#9B99AA', fontSize: 11, fontWeight: 700, letterSpacing: '0.5px' }}>
-                Потенциал
-              </div>
-              <div className="font-overpass" style={{ color: '#A1FF4A', fontSize: 22, fontWeight: 900 }}>
-                {Math.round(p.potential)}
-              </div>
-            </div>
-            <div className="flex flex-col gap-2">
-              {ratings.map((r) => (
-                <div key={r.label}>
-                  <div className="flex justify-between font-overpass" style={{ fontSize: 12 }}>
-                    <span style={{ color: '#AEABBB' }}>{r.label}</span>
-                    <span style={{ color: '#F9F8FE', fontWeight: 800 }}>{Math.round(r.value)}</span>
-                  </div>
-                  <div style={{ background: '#1a1f3a', borderRadius: 999, height: 6, marginTop: 4, overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.min(100, r.value)}%`, height: '100%', background: '#A1FF4A' }} />
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="mt-5">
+            <PotentialSection
+              ratingEndurance={p.ratingEndurance}
+              ratingTechnique={p.ratingTechnique}
+              ratingPower={p.ratingPower}
+              ratingSpeed={p.ratingSpeed}
+              ratingFlexibility={p.ratingFlexibility}
+              potential={p.potential}
+              gains={recentGains ? {
+                endurance:   recentGains.gainEndurance,
+                technique:   recentGains.gainTechnique,
+                power:       recentGains.gainPower,
+                speed:       recentGains.gainSpeed,
+                flexibility: recentGains.gainFlexibility,
+              } : undefined}
+            />
           </div>
         )}
 
