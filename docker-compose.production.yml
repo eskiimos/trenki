@@ -42,6 +42,14 @@ services:
       # для prod-юзеров — только служебный demo/QA аккаунт.
       - DEMO_BYPASS_EMAIL=${DEMO_BYPASS_EMAIL}
       - DEMO_BYPASS_CODE=${DEMO_BYPASS_CODE}
+      # Auto-deploy: GitHub webhook → POST /api/webhook/github-deploy
+      # пишет триггер-файл в /tmp/deploy-trigger (см. volumes ниже).
+      # Host-cron подбирает файл и запускает /home/trenki/deploy.sh.
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+    volumes:
+      # Shared dir с хостом для auto-deploy trigger'а. На хосте должна
+      # существовать ./deploy-trigger; host-cron поллит её.
+      - ./deploy-trigger:/tmp/deploy-trigger
     ports:
       - "3000:3000"
     restart: always
