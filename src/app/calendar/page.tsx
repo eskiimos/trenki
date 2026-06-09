@@ -38,12 +38,51 @@ interface CoachAssignment {
   video: { id: string; title: string; thumbnail: string | null; duration: number | null } | null;
 }
 
+type MicrocycleIntent = 'IN_TONE' | 'WARMUP' | 'CHARGED' | 'STRETCH' | 'TIRED';
+
+interface MicrocycleDay {
+  dayOfWeek: number; // 1=Пн..5=Пт
+  intent: MicrocycleIntent;
+  workoutSession: {
+    id: string;
+    status: string;
+    targetDuration: number;
+    totalVideos: number;
+    currentVideoIndex: number;
+  } | null;
+}
+
+interface ActiveMicrocycle {
+  id: string;
+  weekStartDate: string; // ISO date (YYYY-MM-DD)
+  cycleNumber: number;
+  status: string;
+  days: MicrocycleDay[];
+}
+
+const MICROCYCLE_INTENT_LABEL: Record<MicrocycleIntent, string> = {
+  IN_TONE: 'В тонусе',
+  WARMUP: 'Разминка',
+  CHARGED: 'Заряжен',
+  STRETCH: 'Растяжка',
+  TIRED: 'Устал',
+};
+
+const MICROCYCLE_INTENT_EMOJI: Record<MicrocycleIntent, string> = {
+  IN_TONE: '⚡️',
+  WARMUP: '🏃',
+  CHARGED: '🔋',
+  STRETCH: '🧘',
+  TIRED: '😴',
+};
+
 export default function CalendarPage() {
   const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [scheduledWorkouts, setScheduledWorkouts] = useState<ScheduledWorkout[]>([]);
   const [coachAssignments, setCoachAssignments] = useState<CoachAssignment[]>([]);
+  const [microcycle, setMicrocycle] = useState<ActiveMicrocycle | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -56,9 +95,10 @@ export default function CalendarPage() {
       const month = currentDate.getMonth();
       const year = currentDate.getFullYear();
 
-      const [scheduleRes, assignmentsRes] = await Promise.all([
+      const [scheduleRes, assignmentsRes, microcycleRes] = await Promise.all([
         fetch(`/api/schedule?month=${month}&year=${year}`),
         fetch('/api/assignments?role=athlete'),
+        fetch('/api/microcycle/current'),
       ]);
 
       if (scheduleRes.ok) {
@@ -67,6 +107,10 @@ export default function CalendarPage() {
       if (assignmentsRes.ok) {
         const data = await assignmentsRes.json();
         setCoachAssignments(data.assignments ?? []);
+      }
+      if (microcycleRes.ok) {
+        const data = await microcycleRes.json();
+        setMicrocycle(data.microcycle);
       }
     } catch (error) {
       console.error('Error fetching calendar:', error);
@@ -107,9 +151,32 @@ export default function CalendarPage() {
     );
   };
 
+  // Возвращает день микроцикла (если есть), привязанный к конкретной дате.
+  // weekStartDate — это понедельник; dayOfWeek 1..5 = смещение от понедельника.
+  const getMicrocycleDayForDate = (date: Date): MicrocycleDay | null => {
+    if (!microcycle) return null;
+    // weekStartDate приходит как ISO date-only ("YYYY-MM-DD") — парсим в UTC,
+    // чтобы избежать сдвига на сутки в локали с положительным offset.
+    const weekStart = new Date(microcycle.weekStartDate);
+    for (const d of microcycle.days) {
+      const dayDate = new Date(weekStart);
+      dayDate.setUTCDate(weekStart.getUTCDate() + (d.dayOfWeek - 1));
+      // Сравниваем по локальной дате (день/месяц/год), а не по timestamp.
+      if (
+        dayDate.getUTCFullYear() === date.getFullYear() &&
+        dayDate.getUTCMonth() === date.getMonth() &&
+        dayDate.getUTCDate() === date.getDate()
+      ) {
+        return d;
+      }
+    }
+    return null;
+  };
+
   const hasAnyEventOnDay = (year: number, month: number, day: number) => {
     const checkDate = new Date(year, month, day);
     if (scheduledWorkouts.some((w) => isSameDay(new Date(w.date), checkDate))) return true;
+    if (getMicrocycleDayForDate(checkDate)) return true;
     return coachAssignments.some(
       (a) =>
         a.status !== 'COMPLETED' &&
@@ -236,7 +303,11 @@ export default function CalendarPage() {
 
   const selectedWorkouts = getWorkoutsForDate(selectedDate);
   const selectedAssignments = getAssignmentsForDate(selectedDate);
-  const hasAnythingForSelected = selectedWorkouts.length > 0 || selectedAssignments.length > 0;
+  const selectedMicrocycleDay = getMicrocycleDayForDate(selectedDate);
+  const hasAnythingForSelected =
+    selectedWorkouts.length > 0 ||
+    selectedAssignments.length > 0 ||
+    selectedMicrocycleDay !== null;
 
   const formatDuration = (seconds: number | null) => {
     if (!seconds) return '';
@@ -271,6 +342,52 @@ export default function CalendarPage() {
       </header>
 
       <div className="px-4">
+        {/* Баннер микроцикла — если активный есть */}
+        {microcycle && (
+          <div
+            className="mb-4 p-4 rounded-2xl flex items-center gap-3"
+            style={{
+              background:
+                'linear-gradient(135deg, rgba(161, 255, 74, 0.12) 0%, rgba(68, 92, 255, 0.20) 100%)',
+              border: '1px solid rgba(161, 255, 74, 0.25)',
+            }}
+          >
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 999,
+                background: 'rgba(161, 255, 74, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 20,
+                flexShrink: 0,
+              }}
+            >
+              🔋
+            </div>
+            <div className="flex-1 min-w-0">
+              <div
+                style={{
+                  color: '#A1FF4A',
+                  fontSize: 11,
+                  fontFamily: 'Overpass',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                  marginBottom: 2,
+                }}
+              >
+                {microcycle.cycleNumber === 1 ? 'Твой первый микроцикл' : `Микроцикл №${microcycle.cycleNumber}`}
+              </div>
+              <div className="text-white text-sm font-semibold leading-tight">
+                ИИ-тренер собрал тебе неделю · Пн-Пт
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Calendar Widget */}
         <div className="bg-[#101530] rounded-3xl mb-8">
           <div className="bg-[#445CFF]/20 rounded-2xl p-4">
@@ -321,6 +438,86 @@ export default function CalendarPage() {
 
         {/* Workouts List */}
         <div className="space-y-4">
+          {/* Карточка дня микроцикла — отрисуется первой, если день есть */}
+          {selectedMicrocycleDay && (() => {
+            const d = selectedMicrocycleDay;
+            const ws = d.workoutSession;
+            // Если AI не нашёл модулей — день пустой, показываем заглушку.
+            if (!ws) {
+              return (
+                <div
+                  className="block rounded-2xl overflow-hidden"
+                  style={{
+                    background: 'rgba(174, 171, 187, 0.08)',
+                    border: '1px dashed rgba(174, 171, 187, 0.3)',
+                  }}
+                >
+                  <div className="p-4">
+                    <div
+                      style={{
+                        color: '#AEABBB',
+                        fontSize: 11,
+                        fontFamily: 'Overpass',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.5,
+                        marginBottom: 6,
+                      }}
+                    >
+                      {MICROCYCLE_INTENT_EMOJI[d.intent]} {MICROCYCLE_INTENT_LABEL[d.intent]} · ИИ-тренер
+                    </div>
+                    <div className="text-[#AEABBB] text-sm">
+                      Для этого дня не хватило подходящих модулей в каталоге.
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            return (
+              <Link
+                href={`/training/workout?id=${ws.id}`}
+                className="block rounded-2xl overflow-hidden"
+                style={{
+                  background:
+                    'linear-gradient(135deg, rgba(68, 92, 255, 0.20) 0%, rgba(161, 255, 74, 0.12) 100%)',
+                  border: '1px solid rgba(68, 92, 255, 0.35)',
+                }}
+              >
+                <div className="p-4 flex gap-3 items-center">
+                  <div
+                    className="relative w-20 h-20 rounded-lg shrink-0 flex items-center justify-center"
+                    style={{ background: 'rgba(68, 92, 255, 0.25)', fontSize: 36 }}
+                  >
+                    {MICROCYCLE_INTENT_EMOJI[d.intent]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div
+                      style={{
+                        color: '#A1FF4A',
+                        fontSize: 11,
+                        fontFamily: 'Overpass',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.5,
+                        marginBottom: 6,
+                      }}
+                    >
+                      ИИ-тренер · {MICROCYCLE_INTENT_LABEL[d.intent]}
+                    </div>
+                    <div className="text-white text-sm font-semibold leading-tight">
+                      Тренировка · {ws.totalVideos} модул{ws.totalVideos === 1 ? 'ь' : ws.totalVideos < 5 ? 'я' : 'ей'}
+                    </div>
+                    <div className="text-[#AEABBB] text-xs mt-1">
+                      ~{ws.targetDuration} мин
+                      {ws.status === 'IN_PROGRESS' && ` · в процессе (${ws.currentVideoIndex}/${ws.totalVideos})`}
+                      {ws.status === 'COMPLETED' && ' · завершено'}
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            );
+          })()}
+
           {selectedAssignments.map((a) => {
             const coachName = `${a.coach.firstName ?? ''} ${a.coach.lastName ?? ''}`.trim() || 'Тренер';
             const isFull = !!a.workoutSessionId;

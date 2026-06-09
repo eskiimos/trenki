@@ -744,6 +744,42 @@ const ProfilePage = () => {
             )}
           </div>
 
+          {/* Авто-генерация микроциклов */}
+          {userProfile?.profile && (
+            <div className="pt-2">
+              <button
+                onClick={async () => {
+                  const next = !userProfile.profile.autoGenerateMicrocycle;
+                  // Оптимистично обновляем UI; если API упадёт — откатим.
+                  setUserProfile((prev: any) =>
+                    prev
+                      ? { ...prev, profile: { ...prev.profile, autoGenerateMicrocycle: next } }
+                      : prev,
+                  );
+                  try {
+                    const res = await fetch('/api/profile/microcycle-preferences', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ autoGenerate: next }),
+                    });
+                    if (!res.ok) throw new Error();
+                  } catch {
+                    setUserProfile((prev: any) =>
+                      prev
+                        ? { ...prev, profile: { ...prev.profile, autoGenerateMicrocycle: !next } }
+                        : prev,
+                    );
+                  }
+                }}
+                className="w-full bg-white/10 hover:bg-white/15 text-white/70 font-medium py-3 rounded-lg transition-all duration-300 text-sm"
+              >
+                {userProfile.profile.autoGenerateMicrocycle
+                  ? '🔁 Авто-генерация микроцикла: ВКЛ'
+                  : '🔁 Авто-генерация микроцикла: ВЫКЛ'}
+              </button>
+            </div>
+          )}
+
           {/* Кнопка push-уведомлений */}
           {isSupported && (
             <div className="pt-2">
@@ -797,8 +833,20 @@ const ProfilePage = () => {
       </div>
 
       {/* Сторис-онбординг (пока только по кнопке для админов; позже —
-          автозапуск при первом входе после онбординга) */}
-      <OnboardingStories open={storiesOpen} onClose={() => setStoriesOpen(false)} />
+          автозапуск при первом входе после онбординга).
+          onComplete: «Поехали» → генерим микроцикл → редирект в /calendar. */}
+      <OnboardingStories
+        open={storiesOpen}
+        onClose={() => setStoriesOpen(false)}
+        onComplete={async () => {
+          const res = await fetch('/api/microcycle/generate', { method: 'POST' });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data?.error || 'Ошибка генерации микроцикла');
+          }
+          router.push('/calendar');
+        }}
+      />
 
       {/* Тапбар */}
       <BottomNavigation activeTab="profile" />

@@ -9,95 +9,99 @@ datasource db {
 }
 
 model User {
-  id            String            @id @default(cuid())
-  telegramId    String            @unique
-  firstName     String?
-  lastName      String?
-  username      String?
-  email         String?           @unique
-  emailVerified Boolean           @default(false)
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  lastActivity  DateTime          @default(now())
-  inviteCode    String?           // Код, с которым зарегистрировался пользователь
-  ageConsentAt  DateTime?         // Дата и время подтверждения возраста (18+ или законный представитель)
-  isAdmin       Boolean           @default(false) // Доступ к админ-панели
-  role          UserRole          @default(ATHLETE) // Роль: спортсмен или тренер
-  favorites            FavoriteVideo[]
-  profile              Profile?
-  coachProfile         CoachProfile?
-  shortComments        ShortComment[]
-  shortLikes           ShortLike[]
-  sessions             TrainingSession[]
-  videoLikes           VideoLike[]
+  id                    String                  @id @default(cuid())
+  telegramId            String                  @unique
+  firstName             String?
+  lastName              String?
+  username              String?
+  email                 String?                 @unique
+  emailVerified         Boolean                 @default(false)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  lastActivity          DateTime                @default(now())
+  inviteCode            String? // Код, с которым зарегистрировался пользователь
+  ageConsentAt          DateTime? // Дата и время подтверждения возраста (18+ или законный представитель)
+  isAdmin               Boolean                 @default(false) // Доступ к админ-панели
+  role                  UserRole                @default(ATHLETE) // Роль: спортсмен или тренер
+  favorites             FavoriteVideo[]
+  profile               Profile?
+  coachProfile          CoachProfile?
+  shortComments         ShortComment[]
+  shortLikes            ShortLike[]
+  sessions              TrainingSession[]
+  videoLikes            VideoLike[]
   characteristicHistory CharacteristicHistory[]
-  scheduledWorkouts    ScheduledWorkout[]
-  trainerReviews       TrainerReview[]
-  coachTeams           Team[]                @relation("CoachTeams")
-  teamMemberships      TeamMember[]
-  coachAssignments     TrainingAssignment[]  @relation("CoachAssignments")
-  athleteAssignments   TrainingAssignment[]  @relation("AthleteAssignments")
-  athletePoseSessions  PoseSession[]         @relation("AthletePoseSessions")
-  coachPoseReviews     PoseSession[]         @relation("CoachPoseReviews")
-  coachWorkoutSessions WorkoutSession[]      @relation("CoachWorkoutSessions")
+  scheduledWorkouts     ScheduledWorkout[]
+  trainerReviews        TrainerReview[]
+  coachTeams            Team[]                  @relation("CoachTeams")
+  teamMemberships       TeamMember[]
+  coachAssignments      TrainingAssignment[]    @relation("CoachAssignments")
+  athleteAssignments    TrainingAssignment[]    @relation("AthleteAssignments")
+  athletePoseSessions   PoseSession[]           @relation("AthletePoseSessions")
+  coachPoseReviews      PoseSession[]           @relation("CoachPoseReviews")
+  coachWorkoutSessions  WorkoutSession[]        @relation("CoachWorkoutSessions")
+  microcycles           Microcycle[]
 
   @@map("users")
 }
 
 model Profile {
-  id            String          @id @default(cuid())
-  userId        String          @unique
-  position      HockeyPosition?
-  gender        Gender?
-  number        Int?
-  birthDate     DateTime?       // Дата рождения (возраст вычисляется автоматически)
-  height        Int?
-  weight        Int?
-  avatarUrl     String?
-  clubLogoUrl   String?
-  
+  id          String          @id @default(cuid())
+  userId      String          @unique
+  position    HockeyPosition?
+  gender      Gender?
+  number      Int?
+  birthDate   DateTime? // Дата рождения (возраст вычисляется автоматически)
+  height      Int?
+  weight      Int?
+  avatarUrl   String?
+  clubLogoUrl String?
+
   // Новая система характеристик (потенциал)
-  ratingPower       Float           @default(0)  // сила
-  ratingSpeed       Float           @default(0)  // скорость
-  ratingEndurance   Float           @default(0)  // выносливость
-  ratingTechnique   Float           @default(0)  // техника
-  ratingFlexibility Float           @default(0)  // гибкость
-  potential         Float           @default(0)  // средний показатель (потенциал)
-  
+  ratingPower       Float @default(0) // сила
+  ratingSpeed       Float @default(0) // скорость
+  ratingEndurance   Float @default(0) // выносливость
+  ratingTechnique   Float @default(0) // техника
+  ratingFlexibility Float @default(0) // гибкость
+  potential         Float @default(0) // средний показатель (потенциал)
+
   // Данные стартового опроса
-  rawPower          Int?            // самооценка силы (1-10)
-  rawSpeed          Int?            // самооценка скорости (1-10)
-  rawEndurance      Int?            // самооценка выносливости (1-10)
-  rawTechnique      Int?            // самооценка техники (1-10)
-  rawFlexibility    Int?            // самооценка гибкости (1-10)
-  kMastery          Float?          // коэффициент мастерства (5.5-9.4)
-  
+  rawPower       Int? // самооценка силы (1-10)
+  rawSpeed       Int? // самооценка скорости (1-10)
+  rawEndurance   Int? // самооценка выносливости (1-10)
+  rawTechnique   Int? // самооценка техники (1-10)
+  rawFlexibility Int? // самооценка гибкости (1-10)
+  kMastery       Float? // коэффициент мастерства (5.5-9.4)
+
   // Алгоритм 2.0 - новые поля
-  ageGroup          AgeGroup?       // Возрастная группа
-  lastGoals         String[]        @default([]) // Последние 3 выбранные цели для отслеживания разнообразия
-  
+  ageGroup  AgeGroup? // Возрастная группа
+  lastGoals String[]  @default([]) // Последние 3 выбранные цели для отслеживания разнообразия
+
   // Ограничения и прогресс
-  trainingsToday    Int             @default(0)  // тренировок сегодня
-  modulesToday      Int             @default(0)  // модулей сегодня
-  lastTrainingDate  DateTime?       // дата последней тренировки
-  fatigue           Float           @default(0)  // усталость (0-100)
-  
+  trainingsToday   Int       @default(0) // тренировок сегодня
+  modulesToday     Int       @default(0) // модулей сегодня
+  lastTrainingDate DateTime? // дата последней тренировки
+  fatigue          Float     @default(0) // усталость (0-100)
+
+  // Микроцикл (Sprint 5)
+  autoGenerateMicrocycle Boolean @default(true) // авто-генерация еженедельного цикла
+
   // Старые характеристики (deprecated, оставляем для совместимости)
-  strength      Int             @default(0)
-  endurance     Int             @default(0)
-  speed         Int             @default(0)
-  technique     Int             @default(0)
-  skating       Int             @default(0)
-  shooting      Int             @default(0)
-  passing       Int             @default(0)
-  checking      Int             @default(0)
-  overall       Int             @default(0)
-  
-  dailyProgress Int             @default(0)
-  maxDailyGoal  Int             @default(10)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strength  Int @default(0)
+  endurance Int @default(0)
+  speed     Int @default(0)
+  technique Int @default(0)
+  skating   Int @default(0)
+  shooting  Int @default(0)
+  passing   Int @default(0)
+  checking  Int @default(0)
+  overall   Int @default(0)
+
+  dailyProgress Int      @default(0)
+  maxDailyGoal  Int      @default(10)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("profiles")
 }
@@ -136,51 +140,51 @@ model TrainerReview {
 }
 
 model Video {
-  id              String                @id @default(cuid())
-  title           String
-  description     String?
-  duration        Int
-  videoUrl        String
-  thumbnail       String?
-  category        VideoCategory
-  difficulty      VideoDifficulty
-  trainerId       String
-  tags            String[]
-  equipment       String[]
-  level           String?
-  isPublished     Boolean               @default(false)
-  viewsCount      Int                   @default(0)
-  likesCount      Int                   @default(0)
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
-  rpeMax          Int?
-  rpeMin          Int?
-  
+  id          String          @id @default(cuid())
+  title       String
+  description String?
+  duration    Int
+  videoUrl    String
+  thumbnail   String?
+  category    VideoCategory
+  difficulty  VideoDifficulty
+  trainerId   String
+  tags        String[]
+  equipment   String[]
+  level       String?
+  isPublished Boolean         @default(false)
+  viewsCount  Int             @default(0)
+  likesCount  Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  rpeMax      Int?
+  rpeMin      Int?
+
   // Старые поля (String - не трогаем, чтобы не сломать данные)
-  muscleGroupOld  String?           @map("группаМышц")
-  complexityOld   String?           @map("сложность")
-  moduleTypeOld   String?           @map("типМодуля")
-  loadTypeOld     String?           @map("типНагрузки")
-  
+  muscleGroupOld String? @map("группаМышц")
+  complexityOld  String? @map("сложность")
+  moduleTypeOld  String? @map("типМодуля")
+  loadTypeOld    String? @map("типНагрузки")
+
   // Новые поля для алгоритма «Треньки» (опциональные, enum типы)
-  loadType        LoadType?             // тип нагрузки
-  muscleGroup     MuscleGroup?          // направление нагрузки  
-  complexity      Complexity?           // сложность
-  moduleType      ModuleType?           // тип модуля (разминка/ОФП/техника/заминка)
-  trainingGoals   TrainingGoal[]        // для каких целей подходит модуль (массив)
-  ageGroups       AgeGroup[]            // целевые возрастные группы (массив)
-  audience        Audience              @default(HOCKEY) // для какого субдомена
-  
-  favorites       FavoriteVideo[]
-  trainingModules TrainingModule[]
-  sessions        TrainingSession[]
-  likes           VideoLike[]
-  videoTags       VideoTag[]
-  trainer         Trainer               @relation(fields: [trainerId], references: [id])
-  workoutSessions WorkoutSessionVideo[]
-  scheduledWorkouts ScheduledWorkout[]
+  loadType      LoadType? // тип нагрузки
+  muscleGroup   MuscleGroup? // направление нагрузки  
+  complexity    Complexity? // сложность
+  moduleType    ModuleType? // тип модуля (разминка/ОФП/техника/заминка)
+  trainingGoals TrainingGoal[] // для каких целей подходит модуль (массив)
+  ageGroups     AgeGroup[] // целевые возрастные группы (массив)
+  audience      Audience       @default(HOCKEY) // для какого субдомена
+
+  favorites           FavoriteVideo[]
+  trainingModules     TrainingModule[]
+  sessions            TrainingSession[]
+  likes               VideoLike[]
+  videoTags           VideoTag[]
+  trainer             Trainer               @relation(fields: [trainerId], references: [id])
+  workoutSessions     WorkoutSessionVideo[]
+  scheduledWorkouts   ScheduledWorkout[]
   trainingAssignments TrainingAssignment[]
-  poseSessions    PoseSession[]
+  poseSessions        PoseSession[]
 
   @@map("videos")
 }
@@ -380,26 +384,27 @@ model UserStateAssessment {
 }
 
 model WorkoutSession {
-  id                String                @id @default(cuid())
-  userId            String
-  coachId           String?               // не null если сессию создал тренер (полноценное 4-модульное задание)
-  assessmentId      String?
-  targetDuration    Int
-  targetRPE         Int
-  loadDirection     LoadDirection
-  status            WorkoutStatus         @default(PENDING)
-  completedAt       DateTime?
-  actualDuration    Int?
-  actualRPE         Int?
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
-  currentVideoIndex Int                   @default(0)
-  startedAt         DateTime?
-  totalVideos       Int                   @default(0)
-  videos            WorkoutSessionVideo[]
+  id                    String                  @id @default(cuid())
+  userId                String
+  coachId               String? // не null если сессию создал тренер (полноценное 4-модульное задание)
+  assessmentId          String?
+  targetDuration        Int
+  targetRPE             Int
+  loadDirection         LoadDirection
+  status                WorkoutStatus           @default(PENDING)
+  completedAt           DateTime?
+  actualDuration        Int?
+  actualRPE             Int?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  currentVideoIndex     Int                     @default(0)
+  startedAt             DateTime?
+  totalVideos           Int                     @default(0)
+  videos                WorkoutSessionVideo[]
   characteristicHistory CharacteristicHistory[]
-  coach             User?                 @relation("CoachWorkoutSessions", fields: [coachId], references: [id], onDelete: SetNull)
-  assignment        TrainingAssignment?
+  coach                 User?                   @relation("CoachWorkoutSessions", fields: [coachId], references: [id], onDelete: SetNull)
+  assignment            TrainingAssignment?
+  microcycleDay         MicrocycleDay?
 
   @@index([userId, createdAt])
   @@index([userId, status])
@@ -438,10 +443,10 @@ model UserModuleHistory {
 }
 
 model CharacteristicHistory {
-  id                String          @id @default(cuid())
-  userId            String
-  sessionId         String?         // ID тренировки (если из тренировки)
-  
+  id        String  @id @default(cuid())
+  userId    String
+  sessionId String? // ID тренировки (если из тренировки)
+
   // Снимок характеристик после события
   ratingPower       Float
   ratingSpeed       Float
@@ -449,20 +454,20 @@ model CharacteristicHistory {
   ratingTechnique   Float
   ratingFlexibility Float
   potential         Float
-  
+
   // Прирост за это событие
-  gainPower         Float           @default(0)
-  gainSpeed         Float           @default(0)
-  gainEndurance     Float           @default(0)
-  gainTechnique     Float           @default(0)
-  gainFlexibility   Float           @default(0)
-  
+  gainPower       Float @default(0)
+  gainSpeed       Float @default(0)
+  gainEndurance   Float @default(0)
+  gainTechnique   Float @default(0)
+  gainFlexibility Float @default(0)
+
   // Метаданные
-  eventType         String          // "WORKOUT" или "MODULE"
-  createdAt         DateTime        @default(now())
-  
-  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  session           WorkoutSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  eventType String // "WORKOUT" или "MODULE"
+  createdAt DateTime @default(now())
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session WorkoutSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
   @@map("characteristic_history")
@@ -554,20 +559,20 @@ enum TrainingStatus {
 
 // Новые цели тренировок (Алгоритм 2.0)
 enum TrainingGoal {
-  POWERFUL_SHOT          // 🎯 Мощный бросок
-  OUTRUN_OPPONENT        // 🦵🏻 Убегаем от соперника
-  STRENGTH_STABILITY     // 💪🏻 Силовая борьба и устойчивость
-  SOFT_HANDS             // 🏒 Мягкие ручки
-  FULL_GAME_ENDURANCE    // 🫁 Выносливость на всю игру
-  AGILITY                // ⚡️ Маневренность
-  SPORT_LONGEVITY        // 🏥 Спортивное долголетие
+  POWERFUL_SHOT // 🎯 Мощный бросок
+  OUTRUN_OPPONENT // 🦵🏻 Убегаем от соперника
+  STRENGTH_STABILITY // 💪🏻 Силовая борьба и устойчивость
+  SOFT_HANDS // 🏒 Мягкие ручки
+  FULL_GAME_ENDURANCE // 🫁 Выносливость на всю игру
+  AGILITY // ⚡️ Маневренность
+  SPORT_LONGEVITY // 🏥 Спортивное долголетие
 }
 
 // Состояние энергии перед тренировкой
 enum EnergyState {
-  FULLY_CHARGED          // 🔋 заряжен на все 100%
-  IN_TONE                // ⚡️ в тонусе, но не супер
-  TIRED                  // 😴 устал/восстанавливаюсь
+  FULLY_CHARGED // 🔋 заряжен на все 100%
+  IN_TONE // ⚡️ в тонусе, но не супер
+  TIRED // 😴 устал/восстанавливаюсь
 }
 
 enum TagType {
@@ -631,37 +636,37 @@ enum WorkoutStatus {
 }
 
 enum AgeGroup {
-  CHILD           // Дети (7-10 лет)
-  TEEN            // Подростки (11-17 лет)
-  YOUNG_ADULT     // Молодые взрослые (18-34)
-  ADULT           // Взрослые (35+)
+  CHILD // Дети (7-10 лет)
+  TEEN // Подростки (11-17 лет)
+  YOUNG_ADULT // Молодые взрослые (18-34)
+  ADULT // Взрослые (35+)
 }
 
 // Уровень сложности на основе потенциала
 enum ComplexityLevel {
-  BEGINNER        // Начинающий (потенциал 0-29)
-  AMATEUR         // Любитель (потенциал 30-50)
-  ADVANCED        // Продвинутый (потенциал 51-76)
-  PRO             // Профи (потенциал 77-100)
+  BEGINNER // Начинающий (потенциал 0-29)
+  AMATEUR // Любитель (потенциал 30-50)
+  ADVANCED // Продвинутый (потенциал 51-76)
+  PRO // Профи (потенциал 77-100)
 }
 
 model ScheduledWorkout {
-  id                      String   @id @default(cuid())
-  userId                  String
-  videoId                 String
-  date                    DateTime
-  completed               Boolean  @default(false)
-  
-  // Уведомления
-  notificationSent        Boolean  @default(false)   // Отправлено уведомление о создании
-  notification30MinSent   Boolean  @default(false)   // Отправлено уведомление за 30 мин
-  notification10MinSent   Boolean  @default(false)   // Отправлено уведомление за 10 мин
-  
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  id        String   @id @default(cuid())
+  userId    String
+  videoId   String
+  date      DateTime
+  completed Boolean  @default(false)
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  // Уведомления
+  notificationSent      Boolean @default(false) // Отправлено уведомление о создании
+  notification30MinSent Boolean @default(false) // Отправлено уведомление за 30 мин
+  notification10MinSent Boolean @default(false) // Отправлено уведомление за 10 мин
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
 
   @@index([userId, date])
   @@index([date, notification30MinSent])
@@ -678,7 +683,7 @@ model InviteCode {
   isActive    Boolean   @default(true) // Активен ли код
   createdAt   DateTime  @default(now())
   expiresAt   DateTime? // Дата истечения (опционально)
-  description String?   // Описание (например, "Бета-тестирование 25 человек")
+  description String? // Описание (например, "Бета-тестирование 25 человек")
 
   @@map("invite_codes")
 }
@@ -713,7 +718,7 @@ enum AssignmentStatus {
 model CoachProfile {
   userId          String   @id
   clubName        String?
-  position        String?  // главный тренер, ассистент и т.п.
+  position        String? // главный тренер, ассистент и т.п.
   experienceYears Int?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -723,17 +728,17 @@ model CoachProfile {
 }
 
 model Team {
-  id          String   @id @default(cuid())
+  id          String               @id @default(cuid())
   name        String
   clubName    String?
   logoUrl     String?
-  inviteCode  String   @unique
-  createdBy   String   // userId тренера-владельца
-  coach       User     @relation("CoachTeams", fields: [createdBy], references: [id], onDelete: Cascade)
+  inviteCode  String               @unique
+  createdBy   String // userId тренера-владельца
+  coach       User                 @relation("CoachTeams", fields: [createdBy], references: [id], onDelete: Cascade)
   members     TeamMember[]
   assignments TrainingAssignment[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
 
   @@index([createdBy])
   @@map("teams")
@@ -746,8 +751,8 @@ model TeamMember {
   role     TeamMemberRole   @default(PLAYER)
   status   TeamMemberStatus @default(ACTIVE)
   joinedAt DateTime         @default(now())
-  team     Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team     Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([teamId, userId])
   @@index([userId])
@@ -756,18 +761,18 @@ model TeamMember {
 }
 
 model TrainingAssignment {
-  id               String            @id @default(cuid())
+  id               String           @id @default(cuid())
   coachId          String
   athleteId        String
   teamId           String?
-  videoId          String?           // одно видео (одиночное назначение)
-  workoutSessionId String?           @unique // полноценная 4-модульная сессия (заполнено либо это, либо videoId)
+  videoId          String? // одно видео (одиночное назначение)
+  workoutSessionId String?          @unique // полноценная 4-модульная сессия (заполнено либо это, либо videoId)
   dueDate          DateTime
-  status           AssignmentStatus  @default(PENDING)
+  status           AssignmentStatus @default(PENDING)
   notes            String?
-  assignedAt       DateTime          @default(now())
+  assignedAt       DateTime         @default(now())
   completedAt      DateTime?
-  coach            User             @relation("CoachAssignments",   fields: [coachId],   references: [id], onDelete: Cascade)
+  coach            User             @relation("CoachAssignments", fields: [coachId], references: [id], onDelete: Cascade)
   athlete          User             @relation("AthleteAssignments", fields: [athleteId], references: [id], onDelete: Cascade)
   team             Team?            @relation(fields: [teamId], references: [id], onDelete: SetNull)
   video            Video?           @relation(fields: [videoId], references: [id], onDelete: Restrict)
@@ -779,31 +784,96 @@ model TrainingAssignment {
 }
 
 model PoseSession {
-  id              String   @id @default(cuid())
-  athleteId       String
-  videoId         String
-  durationSec     Int      @default(0)
-  framesCount     Int      @default(0)
-  avgConfidence   Float?
-  fps             Int?     // Частота сэмплирования скелета (кадров в секунду)
+  id             String    @id @default(cuid())
+  athleteId      String
+  videoId        String
+  durationSec    Int       @default(0)
+  framesCount    Int       @default(0)
+  avgConfidence  Float?
+  fps            Int? // Частота сэмплирования скелета (кадров в секунду)
   /// DEPRECATED. Раньше хранили массив до 9000 кадров прямо в Postgres JSONB.
   /// Новые сессии пишут в Cloudinary (см. framesUrl). Старые читаем из этой колонки,
   /// пока не пройдёт бэкфилл.
-  frames          Json?
+  frames         Json?
   /// Cloudinary public_id raw-ассета с gzip-JSON. signed URL генерируется на каждый GET.
-  framesUrl       String?
+  framesUrl      String?
   /// Формат payload (`json-gzip` пока единственный поддерживаемый).
-  framesEncoding  String?
-  coachId         String?
-  coachRating     Int?
-  coachComment    String?
-  reviewedAt      DateTime?
-  createdAt       DateTime @default(now())
-  athlete         User     @relation("AthletePoseSessions", fields: [athleteId], references: [id], onDelete: Cascade)
-  coach           User?    @relation("CoachPoseReviews",   fields: [coachId],   references: [id], onDelete: SetNull)
-  video           Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  framesEncoding String?
+  coachId        String?
+  coachRating    Int?
+  coachComment   String?
+  reviewedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  athlete        User      @relation("AthletePoseSessions", fields: [athleteId], references: [id], onDelete: Cascade)
+  coach          User?     @relation("CoachPoseReviews", fields: [coachId], references: [id], onDelete: SetNull)
+  video          Video     @relation(fields: [videoId], references: [id], onDelete: Cascade)
 
   @@index([athleteId, createdAt])
   @@index([videoId])
   @@map("pose_sessions")
+}
+
+// ======================================================================
+//                            МИКРОЦИКЛ
+// ======================================================================
+// Микроцикл — 5 тренировок (Пн-Пт) на одну неделю, сгенерированных AI под
+// характеристики атлета. Один Microcycle = неделя + 5 MicrocycleDay; каждая
+// ссылается на свой WorkoutSession через nullable workoutSessionId.
+
+// Намерение тренировки на день — задаёт ощущение от занятия. Реальный
+// mapping intent → (TrainingGoal, EnergyState) — в src/lib/microcycle/intents.ts.
+enum MicrocycleIntent {
+  IN_TONE // ⚡️ в тонусе (понедельник)
+  WARMUP // 🏃 разминка/зарядка (вторник)
+  CHARGED // 🔋 заряжен (среда — пиковая)
+  STRETCH // 🧘 растяжка (четверг)
+  TIRED // 😴 устал (пятница — лёгкая)
+}
+
+enum MicrocycleStatus {
+  ACTIVE // цикл активен (неделя ещё не закончилась)
+  COMPLETED // неделя закончилась, ждём фидбэка
+  ARCHIVED // фидбэк дан, цикл закрыт
+}
+
+// Заполняется атлетом после цикла (Sprint 3). Влияет на параметры
+// следующего цикла (Sprint 4).
+enum MicrocycleFeedback {
+  EASY // было легко → усложняем следующий
+  NORMAL // нормально → повторяем
+  HARD // тяжело → упрощаем
+}
+
+model Microcycle {
+  id               String              @id @default(cuid())
+  userId           String
+  weekStartDate    DateTime            @db.Date // понедельник недели цикла
+  cycleNumber      Int // 1, 2, 3... у конкретного юзера
+  status           MicrocycleStatus    @default(ACTIVE)
+  feedback         MicrocycleFeedback? // Sprint 3
+  adjustmentFactor Float? // коэф. адаптации применённый при генерации (Sprint 4)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  user User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  days MicrocycleDay[]
+
+  @@unique([userId, weekStartDate])
+  @@index([userId, cycleNumber(sort: Desc)])
+  @@map("microcycles")
+}
+
+model MicrocycleDay {
+  id               String           @id @default(cuid())
+  microcycleId     String
+  dayOfWeek        Int // 1=Пн, 2=Вт, ..., 5=Пт (CHECK 1..5 в SQL)
+  intent           MicrocycleIntent
+  workoutSessionId String?          @unique // nullable: если AI не нашёл модулей
+  createdAt        DateTime         @default(now())
+
+  microcycle     Microcycle      @relation(fields: [microcycleId], references: [id], onDelete: Cascade)
+  workoutSession WorkoutSession? @relation(fields: [workoutSessionId], references: [id], onDelete: SetNull)
+
+  @@unique([microcycleId, dayOfWeek])
+  @@map("microcycle_days")
 }

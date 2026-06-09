@@ -24,6 +24,16 @@ import { ChevronLeft, ChevronRight, Plus, ThumbsUp, Trash2 } from 'lucide-react'
 interface Props {
   open: boolean;
   onClose: () => void;
+  /**
+   * Опционально: что делать по клику на CTA (последний слайд, кнопка
+   * «Поехали»). Если передано — управление полностью передаётся туда
+   * (например, генерация микроцикла + редирект). Если не передано —
+   * fallback на onClose (режим admin-превью).
+   *
+   * Если onComplete возвращает Promise — пока он pending, в сторис
+   * показывается лоадер.
+   */
+  onComplete?: () => void | Promise<void>;
 }
 
 const STORY_DURATION_MS = 5500;
@@ -1292,10 +1302,13 @@ const SLIDES: Slide[] = [
 //                            КОМПОНЕНТ
 // =====================================================================
 
-export default function OnboardingStories({ open, onClose }: Props) {
+export default function OnboardingStories({ open, onClose, onComplete }: Props) {
   const [idx, setIdx] = useState(0);
   const [paused, setPaused] = useState(false);
   const [progress, setProgress] = useState(0);
+  // Лоадер пока выполняется onComplete (например, идёт генерация микроцикла).
+  const [completing, setCompleting] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
   const rafRef = useRef<number | null>(null);
   const lastTickRef = useRef<number>(0);
   // pointer-state для одновременного pause-hold + tap-navigation + swipe-down
@@ -1576,31 +1589,62 @@ export default function OnboardingStories({ open, onClose }: Props) {
           </p>
 
           {current.cta && (
-            <button
-              type="button"
-              onPointerDown={(e) => e.stopPropagation()}
-              onPointerUp={(e) => {
-                e.stopPropagation();
-                if (pointerRef.current?.holdTimer != null) clearTimeout(pointerRef.current.holdTimer);
-                pointerRef.current = null;
-                close();
-              }}
-              className="font-overpass uppercase mt-6 transition-transform duration-100 active:scale-95"
-              style={{
-                background: '#A1FF4A',
-                color: '#101530',
-                border: 'none',
-                borderRadius: 999,
-                padding: '14px 28px',
-                fontWeight: 900,
-                fontSize: 13,
-                letterSpacing: '0.05em',
-                cursor: 'pointer',
-                width: '100%',
-              }}
-            >
-              {current.cta}
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={completing}
+                onPointerDown={(e) => e.stopPropagation()}
+                onPointerUp={async (e) => {
+                  e.stopPropagation();
+                  if (pointerRef.current?.holdTimer != null) clearTimeout(pointerRef.current.holdTimer);
+                  pointerRef.current = null;
+
+                  if (!onComplete) {
+                    close();
+                    return;
+                  }
+
+                  // Передан handler (реальная генерация микроцикла + редирект).
+                  // Пока он работает — показываем лоадер, прогресс ставим на паузу.
+                  setCompleteError(null);
+                  setCompleting(true);
+                  setPaused(true);
+                  try {
+                    await onComplete();
+                    // Закрывать здесь не нужно — onComplete сам редиректит
+                    // (страница размонтируется).
+                  } catch (err: any) {
+                    setCompleteError(err?.message || 'Не удалось подготовить твою неделю. Попробуй ещё раз.');
+                    setCompleting(false);
+                    setPaused(false);
+                  }
+                }}
+                className="font-overpass uppercase mt-6 transition-transform duration-100 active:scale-95"
+                style={{
+                  background: '#A1FF4A',
+                  color: '#101530',
+                  border: 'none',
+                  borderRadius: 999,
+                  padding: '14px 28px',
+                  fontWeight: 900,
+                  fontSize: 13,
+                  letterSpacing: '0.05em',
+                  cursor: completing ? 'wait' : 'pointer',
+                  width: '100%',
+                  opacity: completing ? 0.65 : 1,
+                }}
+              >
+                {completing ? 'Готовим твою неделю…' : current.cta}
+              </button>
+              {completeError && (
+                <div
+                  className="font-overpass mt-3 text-center"
+                  style={{ color: '#FF8C4A', fontSize: 12 }}
+                >
+                  {completeError}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

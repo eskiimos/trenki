@@ -11,6 +11,7 @@ import { getTelegramId } from '@/lib/auth';
 import BottomNavigation from '@/components/BottomNavigation';
 import WorkoutReminder from '@/components/WorkoutReminder';
 import AssignmentsBanner from '@/components/AssignmentsBanner';
+import MicrocycleFeedbackModal from '@/components/MicrocycleFeedbackModal';
 import { Skeleton } from '@/components/Skeleton';
 
 // Компонент для короткого видео
@@ -46,9 +47,36 @@ const ShortVideoPlayer = ({ shortId, poster, title, trainer }: ShortVideoPlayerP
 const HomePage = () => {
   const router = useRouter();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  
+  // Микроцикл, ждущий фидбэк (если есть). Загружается параллельно с auth.
+  const [pendingFeedbackCycle, setPendingFeedbackCycle] = useState<
+    { id: string; cycleNumber: number } | null
+  >(null);
+  const [feedbackModalDismissed, setFeedbackModalDismissed] = useState(false);
+
   // Инициализируем Telegram WebApp
   useTelegram();
+
+  // Проверка наличия активного цикла, ждущего фидбэк
+  useEffect(() => {
+    if (isCheckingAuth) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/microcycle/current', { cache: 'no-store' });
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (data?.microcycle?.awaitingFeedback) {
+          setPendingFeedbackCycle({
+            id: data.microcycle.id,
+            cycleNumber: data.microcycle.cycleNumber,
+          });
+        }
+      } catch {
+        // тихо игнорируем — модалка не критична
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isCheckingAuth]);
   
   // Проверяем авторизацию при загрузке страницы
   useEffect(() => {
@@ -127,6 +155,16 @@ const HomePage = () => {
       
       {/* Нижнее меню */}
       <BottomNavigation activeTab="home" />
+
+      {/* Опрос после микроцикла */}
+      {pendingFeedbackCycle && !feedbackModalDismissed && (
+        <MicrocycleFeedbackModal
+          open
+          microcycleId={pendingFeedbackCycle.id}
+          cycleNumber={pendingFeedbackCycle.cycleNumber}
+          onClose={() => setFeedbackModalDismissed(true)}
+        />
+      )}
     </div>
   );
 };
