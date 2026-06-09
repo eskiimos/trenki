@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight, Plus, ThumbsUp, Trash2 } from 'lucide-react';
+import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay';
 
 /**
  * Сторис-онбординг в стиле Instagram. Пока доступен только из админ-
@@ -1439,6 +1440,9 @@ export default function OnboardingStories({ open, onClose, onComplete }: Props) 
   };
 
   return (
+    <>
+    {/* Полноэкранный лоадер генерации микроцикла — поверх сторис. */}
+    <MicrocyclePreparingOverlay open={completing} />
     <div
       role="dialog"
       aria-modal="true"
@@ -1649,5 +1653,6 @@ export default function OnboardingStories({ open, onClose, onComplete }: Props) 
         </div>
       </div>
     </div>
+    </>
   );
 }

@@ -6,6 +6,7 @@ import {
   feedbackToFactor,
 } from '@/lib/microcycle/intents';
 import {
+  getMicrocycleStartDate,
   getMicrocycleWeekStart,
   getMicrocycleDayDate,
 } from '@/lib/microcycle/week-start';
@@ -48,66 +49,70 @@ describe('microcycle/week-start', () => {
   const utc = (y: number, m: number, d: number) =>
     new Date(Date.UTC(y, m - 1, d, 12, 0, 0, 0)); // полдень — чтобы не было сюрпризов
 
-  it('returns today if today is Monday', () => {
-    // 2026-06-08 (Mon)
-    const monday = utc(2026, 6, 8);
-    expect(getMicrocycleWeekStart(monday).toISOString().slice(0, 10))
-      .toBe('2026-06-08');
-  });
-
-  it('rounds Tuesday to next Monday', () => {
-    // 2026-06-09 (Tue) → 2026-06-15 (Mon next)
-    expect(getMicrocycleWeekStart(utc(2026, 6, 9)).toISOString().slice(0, 10))
-      .toBe('2026-06-15');
-  });
-
-  it('rounds Wednesday to next Monday', () => {
-    // 2026-06-10 (Wed) → 2026-06-15
-    expect(getMicrocycleWeekStart(utc(2026, 6, 10)).toISOString().slice(0, 10))
-      .toBe('2026-06-15');
-  });
-
-  it('rounds Saturday to next Monday', () => {
-    // 2026-06-13 (Sat) → 2026-06-15
-    expect(getMicrocycleWeekStart(utc(2026, 6, 13)).toISOString().slice(0, 10))
-      .toBe('2026-06-15');
-  });
-
-  it('rounds Sunday to next Monday (tomorrow)', () => {
-    // 2026-06-14 (Sun) → 2026-06-15
-    expect(getMicrocycleWeekStart(utc(2026, 6, 14)).toISOString().slice(0, 10))
-      .toBe('2026-06-15');
-  });
-
-  it('handles month boundary', () => {
-    // 2026-06-30 (Tue) → 2026-07-06 (Mon)
-    expect(getMicrocycleWeekStart(utc(2026, 6, 30)).toISOString().slice(0, 10))
-      .toBe('2026-07-06');
-  });
-
-  it('handles year boundary', () => {
-    // 2026-12-31 (Thu) → 2027-01-04 (Mon)
-    expect(getMicrocycleWeekStart(utc(2026, 12, 31)).toISOString().slice(0, 10))
-      .toBe('2027-01-04');
-  });
-
-  describe('getMicrocycleDayDate', () => {
-    const monday = utc(2026, 6, 8); // 2026-06-08 (Mon)
-
-    it('returns Monday for dayOfWeek=1', () => {
-      expect(getMicrocycleDayDate(monday, 1).toISOString().slice(0, 10))
+  describe('getMicrocycleStartDate (today)', () => {
+    it('returns today (Mon)', () => {
+      expect(getMicrocycleStartDate(utc(2026, 6, 8)).toISOString().slice(0, 10))
         .toBe('2026-06-08');
     });
 
-    it('returns Friday for dayOfWeek=5', () => {
-      expect(getMicrocycleDayDate(monday, 5).toISOString().slice(0, 10))
-        .toBe('2026-06-12');
+    it('returns today (Wed)', () => {
+      expect(getMicrocycleStartDate(utc(2026, 6, 10)).toISOString().slice(0, 10))
+        .toBe('2026-06-10');
+    });
+
+    it('returns today (Sat)', () => {
+      expect(getMicrocycleStartDate(utc(2026, 6, 13)).toISOString().slice(0, 10))
+        .toBe('2026-06-13');
+    });
+
+    it('normalizes to 00:00:00 UTC', () => {
+      const result = getMicrocycleStartDate(utc(2026, 6, 10));
+      expect(result.getUTCHours()).toBe(0);
+      expect(result.getUTCMinutes()).toBe(0);
+      expect(result.getUTCSeconds()).toBe(0);
+    });
+  });
+
+  describe('getMicrocycleWeekStart (cron, ближайший Пн)', () => {
+    it('returns today if today is Monday', () => {
+      expect(getMicrocycleWeekStart(utc(2026, 6, 8)).toISOString().slice(0, 10))
+        .toBe('2026-06-08');
+    });
+
+    it('rounds Tuesday to next Monday', () => {
+      expect(getMicrocycleWeekStart(utc(2026, 6, 9)).toISOString().slice(0, 10))
+        .toBe('2026-06-15');
+    });
+
+    it('rounds Sunday to next Monday (tomorrow)', () => {
+      expect(getMicrocycleWeekStart(utc(2026, 6, 14)).toISOString().slice(0, 10))
+        .toBe('2026-06-15');
+    });
+
+    it('handles year boundary', () => {
+      // 2026-12-31 (Thu) → 2027-01-04 (Mon)
+      expect(getMicrocycleWeekStart(utc(2026, 12, 31)).toISOString().slice(0, 10))
+        .toBe('2027-01-04');
+    });
+  });
+
+  describe('getMicrocycleDayDate', () => {
+    const start = utc(2026, 6, 10); // среда — стартуем с неё
+
+    it('returns startDate for dayOfWeek=1', () => {
+      expect(getMicrocycleDayDate(start, 1).toISOString().slice(0, 10))
+        .toBe('2026-06-10');
+    });
+
+    it('returns startDate + 4 days for dayOfWeek=5', () => {
+      expect(getMicrocycleDayDate(start, 5).toISOString().slice(0, 10))
+        .toBe('2026-06-14');
     });
 
     it('throws for invalid dayOfWeek', () => {
-      expect(() => getMicrocycleDayDate(monday, 0)).toThrow();
-      expect(() => getMicrocycleDayDate(monday, 6)).toThrow();
-      expect(() => getMicrocycleDayDate(monday, 7)).toThrow();
+      expect(() => getMicrocycleDayDate(start, 0)).toThrow();
+      expect(() => getMicrocycleDayDate(start, 6)).toThrow();
+      expect(() => getMicrocycleDayDate(start, 7)).toThrow();
     });
   });
 });

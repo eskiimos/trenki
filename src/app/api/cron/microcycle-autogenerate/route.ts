@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendUserPush } from '@/lib/coach/push';
 import { generateMicrocycleForUser } from '@/lib/microcycle/generate';
+import { getMicrocycleWeekStart } from '@/lib/microcycle/week-start';
 import { UserRole } from '@/generated/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -45,6 +46,9 @@ export async function GET(request: NextRequest) {
   });
 
   const startedAt = Date.now();
+  // Cron всегда стартует цикл с ближайшего понедельника — логика
+  // «новая неделя». Ручной generate (через endpoint) использует today.
+  const startDate = getMicrocycleWeekStart(new Date());
   let created = 0;
   let existing = 0;
   let noProfile = 0;
@@ -52,7 +56,7 @@ export async function GET(request: NextRequest) {
 
   for (const u of eligible) {
     try {
-      const result = await generateMicrocycleForUser(u.id);
+      const result = await generateMicrocycleForUser(u.id, { startDate });
       if (result.status === 'CREATED') {
         created++;
         // Push (web-only, Telegram отключён). Не блокируем цикл.

@@ -1,47 +1,49 @@
-// Определяет дату-понедельник для микроцикла.
+// Стартовая дата микроцикла.
 //
-// Правило: если сегодня понедельник — берём сегодня, иначе ближайший
-// будущий понедельник. То есть атлет, который жмёт «Поехали» в субботу,
-// получит цикл, стартующий с послезавтра.
+// Две стратегии:
+//   - `getMicrocycleStartDate(now)` — СЕГОДНЯ (00:00 UTC). Для ручной
+//     генерации после онбординга: атлет жмёт «Поехали» в среду → его
+//     цикл идёт Ср/Чт/Пт/Сб/Вс, без ожидания понедельника.
+//   - `getMicrocycleWeekStart(now)` — ближайший Пн (сегодня если уже Пн,
+//     иначе следующий). Для cron'а авто-генерации, который запускается
+//     в воскресенье и логически создаёт «следующую неделю Пн-Пт».
 //
-// Все даты в UTC — чтобы не зависеть от таймзоны сервера; в БД хранится
-// DATE (без времени), фронт показывает в локали юзера.
+// Все даты UTC. В БД хранится DATE (без времени), фронт показывает в локали.
 
-/**
- * @param now — текущий момент. Параметр, а не Date.now(), чтобы было тестируемо.
- * @returns Date представляющий 00:00:00.000 UTC понедельника недели цикла.
- */
+/** Сегодняшняя дата как 00:00:00 UTC. */
+export function getMicrocycleStartDate(now: Date): Date {
+  return new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+    0, 0, 0, 0,
+  ));
+}
+
+/** Ближайший понедельник (сегодня если Пн, иначе следующий). */
 export function getMicrocycleWeekStart(now: Date): Date {
-  // Day: 0=Sun, 1=Mon, …, 6=Sat
-  const day = now.getUTCDay();
-
-  // Сколько дней добавить, чтобы попасть на ближайший Пн (вкл. сегодня).
-  // Пн (1) → 0, Вт (2) → 6, Ср (3) → 5, …, Сб (6) → 2, Вс (0) → 1
+  const day = now.getUTCDay(); // 0=Sun, 1=Mon, …, 6=Sat
   const daysUntilMonday = day === 1 ? 0 : (8 - day) % 7;
-
-  const monday = new Date(Date.UTC(
+  return new Date(Date.UTC(
     now.getUTCFullYear(),
     now.getUTCMonth(),
     now.getUTCDate() + daysUntilMonday,
     0, 0, 0, 0,
   ));
-
-  return monday;
 }
 
 /**
- * Возвращает дату конкретного дня недели в микроцикле.
- * @param weekStart — понедельник (из getMicrocycleWeekStart).
- * @param dayOfWeek — 1=Пн, 2=Вт, ..., 5=Пт.
+ * Возвращает дату конкретного дня микроцикла (1..5).
+ * @param startDate — дата дня 1 (из getMicrocycleStartDate или WeekStart).
  */
-export function getMicrocycleDayDate(weekStart: Date, dayOfWeek: number): Date {
+export function getMicrocycleDayDate(startDate: Date, dayOfWeek: number): Date {
   if (dayOfWeek < 1 || dayOfWeek > 5) {
     throw new Error(`dayOfWeek must be 1..5, got ${dayOfWeek}`);
   }
   return new Date(Date.UTC(
-    weekStart.getUTCFullYear(),
-    weekStart.getUTCMonth(),
-    weekStart.getUTCDate() + (dayOfWeek - 1),
+    startDate.getUTCFullYear(),
+    startDate.getUTCMonth(),
+    startDate.getUTCDate() + (dayOfWeek - 1),
     0, 0, 0, 0,
   ));
 }

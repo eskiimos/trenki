@@ -32,7 +32,7 @@ import {
   applyAdjustment,
   feedbackToFactor,
 } from '@/lib/microcycle/intents';
-import { getMicrocycleWeekStart } from '@/lib/microcycle/week-start';
+import { getMicrocycleStartDate } from '@/lib/microcycle/week-start';
 
 export type GenerateStatus = 'CREATED' | 'EXISTING' | 'NO_PROFILE';
 
@@ -55,6 +55,12 @@ export interface GenerateResult {
 interface Options {
   /** Подменяемое «сейчас» — для cron'а можно явно передать (тестируемость) */
   now?: Date;
+  /**
+   * Явная стартовая дата (00:00 UTC). Если не передана — берётся «сегодня»
+   * (getMicrocycleStartDate). Cron передаёт сюда понедельник (getMicrocycleWeekStart),
+   * чтобы автоциклы шли по неделям; ручной запуск использует today.
+   */
+  startDate?: Date;
 }
 
 export async function generateMicrocycleForUser(
@@ -72,7 +78,7 @@ export async function generateMicrocycleForUser(
   }
 
   const profile = user.profile;
-  const weekStartDate = getMicrocycleWeekStart(now);
+  const weekStartDate = opts.startDate ?? getMicrocycleStartDate(now);
 
   // ── Идемпотентность ────────────────────────────────────────────────
   const existing = await prisma.microcycle.findUnique({
