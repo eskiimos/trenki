@@ -57,12 +57,13 @@ export default function TrainingHistoryPage() {
     }
   }, [webApp, router]);
 
+  // Сервер берёт userId из httpOnly cookie (requireAuthUser). Раньше гейт
+  // `if (user?.id)` зависел от localStorage; на Android/Samsung Fold в PWA
+  // localStorage мог быть пустым → load* не вызывались → бесконечная загрузка.
   useEffect(() => {
-    if (user?.id) {
-      loadHistory();
-      loadCharacteristics();
-    }
-  }, [user]);
+    loadHistory();
+    loadCharacteristics();
+  }, []);
 
   const loadHistory = async () => {
     try {

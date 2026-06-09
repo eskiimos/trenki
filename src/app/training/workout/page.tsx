@@ -101,27 +101,30 @@ export default function WorkoutPage() {
     }
   }, [webApp, router]);
 
+  // Загружаем тренировку сразу при монтировании — auth идёт через httpOnly
+  // cookie на сервере (requireAuthUser). Раньше гейт `if (user?.id)` зависел
+  // от localStorage; на Samsung Fold в PWA-стандалоне localStorage мог быть
+  // пустым → user никогда не выставлялся → loadWorkout не вызывался →
+  // бесконечная загрузка. На iOS Safari проблема не воспроизводилась.
   useEffect(() => {
-    if (user?.id) {
-      loadWorkout();
-    }
-  }, [user]);
+    loadWorkout();
+  }, []);
 
   // Перезагружаем данные при возврате на страницу (например, после просмотра видео)
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && user?.id) {
+      if (document.visibilityState === 'visible') {
         console.log('🔄 Page became visible, reloading workout data...');
         loadWorkout();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [user]);
+  }, []);
 
   const allCompleted = !!workout && workout.modules.length > 0 && workout.modules.every(m => m.completed);
 

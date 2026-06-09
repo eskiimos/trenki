@@ -50,11 +50,13 @@ export default function CharacteristicsStatsPage() {
     }
   }, [webApp, router]);
 
+  // Сервер берёт userId из httpOnly cookie (requireAuthUser). Раньше гейт
+  // `if (user?.id)` зависел от localStorage; на Android/Samsung Fold в PWA
+  // localStorage мог быть пустым → loadData не вызывался → бесконечная
+  // загрузка.
   useEffect(() => {
-    if (user?.id) {
-      loadData();
-    }
-  }, [user]);
+    loadData();
+  }, []);
 
   const loadData = async () => {
     try {
