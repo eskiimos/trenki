@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import BottomNavigation from '@/components/BottomNavigation';
 import SwipeableWorkoutItem from '@/components/SwipeableWorkoutItem';
+import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay';
 
 interface ScheduledWorkout {
   id: string;
@@ -84,10 +85,32 @@ export default function CalendarPage() {
   const [coachAssignments, setCoachAssignments] = useState<CoachAssignment[]>([]);
   const [microcycle, setMicrocycle] = useState<ActiveMicrocycle | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [generatingCycle, setGeneratingCycle] = useState(false);
+  const [cycleError, setCycleError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCalendar();
   }, [currentDate.getMonth(), currentDate.getFullYear()]);
+
+  // Ручная генерация микроцикла (кнопка «Собрать неделю»). Идемпотентна —
+  // если на эту неделю цикл уже есть, бэкенд вернёт существующий.
+  const handleGenerateMicrocycle = async () => {
+    if (generatingCycle) return;
+    setCycleError(null);
+    setGeneratingCycle(true);
+    try {
+      const res = await fetch('/api/microcycle/generate', { method: 'POST' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || 'Не удалось собрать неделю');
+      }
+      await fetchCalendar();
+    } catch (err: any) {
+      setCycleError(err?.message || 'Ошибка');
+    } finally {
+      setGeneratingCycle(false);
+    }
+  };
 
   const fetchCalendar = async () => {
     setIsLoading(true);
@@ -342,9 +365,69 @@ export default function CalendarPage() {
       </header>
 
       <div className="px-4">
+        {/* Кнопка ручной сборки недели (микроцикл). Видна всегда, чтобы быть
+            точкой входа и якорем тура (data-tour). Идемпотентна. */}
+        <button
+          type="button"
+          data-tour="microcycle-button"
+          onClick={handleGenerateMicrocycle}
+          disabled={generatingCycle}
+          className="w-full mb-4 rounded-2xl flex items-center gap-3 p-4 transition-transform active:scale-[0.98]"
+          style={{
+            background:
+              'linear-gradient(135deg, rgba(161, 255, 74, 0.18) 0%, rgba(68, 92, 255, 0.22) 100%)',
+            border: '1px solid rgba(161, 255, 74, 0.35)',
+            cursor: generatingCycle ? 'wait' : 'pointer',
+            opacity: generatingCycle ? 0.7 : 1,
+          }}
+        >
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 999,
+              background: 'rgba(161, 255, 74, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 20,
+              flexShrink: 0,
+            }}
+          >
+            ⚡️
+          </div>
+          <div className="flex-1 min-w-0 text-left">
+            <div
+              style={{
+                color: '#A1FF4A',
+                fontSize: 11,
+                fontFamily: 'Overpass',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+                marginBottom: 2,
+              }}
+            >
+              ИИ-тренер
+            </div>
+            <div className="text-white text-sm font-semibold leading-tight">
+              {generatingCycle
+                ? 'Собираю неделю…'
+                : microcycle
+                ? 'Пересобрать неделю'
+                : 'Собрать неделю — 5 тренировок'}
+            </div>
+          </div>
+          <ChevronRight size={20} className="text-[#A1FF4A] shrink-0" />
+        </button>
+        {cycleError && (
+          <div className="text-[#FF8C4A] text-xs text-center mb-3 font-medium">{cycleError}</div>
+        )}
+
         {/* Баннер микроцикла — если активный есть */}
         {microcycle && (
           <div
+            data-tour="microcycle-banner"
             className="mb-4 p-4 rounded-2xl flex items-center gap-3"
             style={{
               background:
@@ -590,6 +673,9 @@ export default function CalendarPage() {
       </div>
 
       <BottomNavigation activeTab="calendar" />
+
+      {/* Анимация сборки недели */}
+      <MicrocyclePreparingOverlay open={generatingCycle} />
     </div>
   );
 }

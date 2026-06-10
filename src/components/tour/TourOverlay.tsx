@@ -98,6 +98,24 @@ export default function TourOverlay({ step, rect, index, total, onNext, onSkip }
               animation: isTap ? 'tourPulse 1.6s ease-in-out infinite' : undefined,
             }}
           />
+          {/* На 'next'-шагах гасим клики по подсвеченному, чтобы пользователь
+              не запустил реальное действие случайно (напр. сабмит генерации).
+              Продвижение — только кнопкой «Далее». На 'tap'-шагах этого слоя
+              нет — там «дырка» открыта для реального клика. */}
+          {!isTap && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: 'fixed',
+                top: rect.top - PAD,
+                left: rect.left - PAD,
+                width: rect.width + PAD * 2,
+                height: rect.height + PAD * 2,
+                pointerEvents: 'auto',
+                background: 'transparent',
+              }}
+            />
+          )}
         </>
       ) : (
         <div style={{ position: 'fixed', inset: 0, background: DIM, pointerEvents: 'auto' }} />

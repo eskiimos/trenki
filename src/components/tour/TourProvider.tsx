@@ -125,7 +125,10 @@ export default function TourProvider({ children }: { children: React.ReactNode }
     }
 
     (async () => {
-      const el = await waitForElement(`[data-tour="${step.anchor}"]`, 8000);
+      // 16с таймаута: на шаге микроцикла баннер появляется только после
+      // генерации (5 тренировок последовательно) + refetch — это может занять
+      // 10-15с. На остальных шагах элемент находится мгновенно.
+      const el = await waitForElement(`[data-tour="${step.anchor}"]`, 16000);
       if (cancelled) return;
       if (el) {
         elRef.current = el;
