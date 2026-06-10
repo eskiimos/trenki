@@ -9,8 +9,8 @@ import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { ProfileSkeleton } from '../../components/Skeleton';
 import BottomNavigation from '@/components/BottomNavigation';
 import AccountSwitcher from '@/components/AccountSwitcher';
-import OnboardingStories from '@/components/OnboardingStories';
 import PotentialSection from '@/components/PotentialSection';
+import { useTour } from '@/components/tour/TourProvider';
 import { clearAuth, getTelegramId } from '@/lib/auth';
 import { calculateAge } from '@/lib/age-utils';
 
@@ -21,8 +21,8 @@ const ProfilePage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [recentGains, setRecentGains] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [storiesOpen, setStoriesOpen] = useState(false);
-  
+  const { startTour } = useTour();
+
   // Push-уведомления
   const { 
     isSupported, 
@@ -262,7 +262,7 @@ const ProfilePage = () => {
         </div>
 
         {/* Секция потенциала — pure CSS/SVG, повторяет дизайн из Figma */}
-        <div className="mb-6 md:mb-0">
+        <div className="mb-6 md:mb-0" data-tour="potential-ring">
           <PotentialSection
             ratingEndurance={userProfile?.profile?.ratingEndurance}
             ratingTechnique={userProfile?.profile?.ratingTechnique}
@@ -540,31 +540,19 @@ const ProfilePage = () => {
               </div>
               <div className="pt-2">
                 <button
-                  onClick={() => setStoriesOpen(true)}
+                  onClick={() => {
+                    router.push('/');
+                    // даём главной смонтироваться, затем стартуем тур
+                    setTimeout(() => startTour(), 400);
+                  }}
                   className="w-full bg-[#A1FF4A]/10 hover:bg-[#A1FF4A]/20 text-[#A1FF4A] font-bold py-3 rounded-lg transition-all duration-300 text-sm"
                 >
-                  🎬 Превью онбординг-сторис
+                  🧭 Тур по приложению
                 </button>
               </div>
             </>
           )}        </div>
       </div>
-
-      {/* Сторис-онбординг (пока только по кнопке для админов; позже —
-          автозапуск при первом входе после онбординга).
-          onComplete: «Поехали» → генерим микроцикл → редирект в /calendar. */}
-      <OnboardingStories
-        open={storiesOpen}
-        onClose={() => setStoriesOpen(false)}
-        onComplete={async () => {
-          const res = await fetch('/api/microcycle/generate', { method: 'POST' });
-          if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
-            throw new Error(data?.error || 'Ошибка генерации микроцикла');
-          }
-          router.push('/calendar');
-        }}
-      />
 
       {/* Тапбар */}
       <BottomNavigation activeTab="profile" />

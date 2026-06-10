@@ -577,7 +577,7 @@ export default function WorkoutPage() {
       )}
 
       {/* Модули тренировки */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-2 gap-4 mb-6" data-tour="workout-modules">
         {workout.modules.map((module, index) => {
           const moduleType = getModuleType(module);
           const info = moduleTypeInfo[moduleType as keyof typeof moduleTypeInfo];
