@@ -30,7 +30,7 @@ interface Props {
 const DIM = 'rgba(6, 9, 25, 0.82)';
 const PAD = 8;
 
-export default function TourOverlay({ step, rect, index, total, onNext, onSkip }: Props) {
+export default function TourOverlay({ step, rect, index, total, onNext }: Props) {
   const isLast = !!step.isLast;
   const isTap = step.advanceOn === 'tap';
 
@@ -56,7 +56,7 @@ export default function TourOverlay({ step, rect, index, total, onNext, onSkip }
       {rect ? (
         <>
           {/* top */}
-          <div style={dimStyle(0, 0, '100vw', Math.max(0, rect.top - PAD))} onClick={onSkipGuard(isTap, onSkip)} />
+          <div style={dimStyle(0, 0, '100vw', Math.max(0, rect.top - PAD))} onClick={(e) => e.stopPropagation()} />
           {/* bottom */}
           <div
             style={dimStyle(
@@ -65,12 +65,12 @@ export default function TourOverlay({ step, rect, index, total, onNext, onSkip }
               '100vw',
               `calc(100vh - ${rect.top + rect.height + PAD}px)`,
             )}
-            onClick={onSkipGuard(isTap, onSkip)}
+            onClick={(e) => e.stopPropagation()}
           />
           {/* left */}
           <div
             style={dimStyle(rect.top - PAD, 0, Math.max(0, rect.left - PAD), rect.height + PAD * 2)}
-            onClick={onSkipGuard(isTap, onSkip)}
+            onClick={(e) => e.stopPropagation()}
           />
           {/* right */}
           <div
@@ -80,7 +80,7 @@ export default function TourOverlay({ step, rect, index, total, onNext, onSkip }
               `calc(100vw - ${rect.left + rect.width + PAD}px)`,
               rect.height + PAD * 2,
             )}
-            onClick={onSkipGuard(isTap, onSkip)}
+            onClick={(e) => e.stopPropagation()}
           />
           {/* Свечение-рамка вокруг цели */}
           <div
@@ -157,11 +157,34 @@ export default function TourOverlay({ step, rect, index, total, onNext, onSkip }
           ))}
         </div>
 
-        <div
-          className="font-overpass uppercase"
-          style={{ color: '#A1FF4A', fontSize: 15, fontWeight: 900, letterSpacing: '0.3px', marginBottom: 6, lineHeight: '120%' }}
-        >
-          {step.title}
+        {/* Заголовок с аватаром ИИ-помощника */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 999,
+              overflow: 'hidden',
+              flexShrink: 0,
+              background: '#0C1126',
+              border: '2px solid rgba(161,255,74,0.5)',
+              boxShadow: '0 0 16px rgba(161,255,74,0.25)',
+            }}
+          >
+            <img
+              src="/avatars/Ai_robot.jpeg"
+              alt="ИИ-помощник"
+              width={44}
+              height={44}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          </div>
+          <div
+            className="font-overpass uppercase"
+            style={{ color: '#A1FF4A', fontSize: 15, fontWeight: 900, letterSpacing: '0.3px', lineHeight: '120%' }}
+          >
+            {step.title}
+          </div>
         </div>
         <div
           className="font-overpass"
@@ -170,17 +193,11 @@ export default function TourOverlay({ step, rect, index, total, onNext, onSkip }
           {step.body}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <button
-            type="button"
-            onClick={onSkip}
-            className="font-overpass"
-            style={{ color: '#AEABBB', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
-          >
-            Пропустить
-          </button>
-
-          {isTap ? (
+        {/* Подсказка на тап показывается только когда есть что нажать (rect).
+            Иначе (фолбэк без элемента) — кнопка «Далее», чтобы тур не застрял
+            (кнопки «Пропустить» больше нет). */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
+          {isTap && rect ? (
             <div
               className="font-overpass uppercase"
               style={{ color: '#A1FF4A', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
@@ -241,14 +258,5 @@ function dimStyle(
     height,
     background: DIM,
     pointerEvents: 'auto',
-  };
-}
-
-// На шагах с реальным тапом клик по затемнённой области не должен ничего
-// ломать — даём «пропустить»? Нет: просто гасим, чтобы не сбить пользователя.
-// На 'next'-шагах клик мимо тоже ничего не делает (ждём кнопку).
-function onSkipGuard(_isTap: boolean, _onSkip: () => void) {
-  return (e: React.MouseEvent) => {
-    e.stopPropagation();
   };
 }
