@@ -21,7 +21,7 @@ const STEPS = [
   { emoji: '😴', label: 'Устал' },
 ];
 
-const STEP_INTERVAL_MS = 2400; // ~12с на 5 шагов
+const STEP_INTERVAL_MS = 900; // ~4.5с на 5 карточек — успевает проиграться в минимальном окне показа
 
 interface Props {
   open: boolean;

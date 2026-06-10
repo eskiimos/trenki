@@ -93,11 +93,15 @@ export default function CalendarPage() {
   }, [currentDate.getMonth(), currentDate.getFullYear()]);
 
   // Ручная генерация микроцикла (кнопка «Собрать неделю»). Идемпотентна —
-  // если на эту неделю цикл уже есть, бэкенд вернёт существующий.
+  // если на эту неделю цикл уже есть, бэкенд вернёт существующий (мгновенно).
+  // Поэтому держим экран сборки минимум ~5с, чтобы анимация успела проиграться
+  // и создавалось ощущение, что ИИ реально собирает неделю.
+  const MIN_OVERLAY_MS = 5000;
   const handleGenerateMicrocycle = async () => {
     if (generatingCycle) return;
     setCycleError(null);
     setGeneratingCycle(true);
+    const startedAt = Date.now();
     try {
       const res = await fetch('/api/microcycle/generate', { method: 'POST' });
       if (!res.ok) {
@@ -105,6 +109,10 @@ export default function CalendarPage() {
         throw new Error(data?.error || 'Не удалось собрать неделю');
       }
       await fetchCalendar();
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < MIN_OVERLAY_MS) {
+        await new Promise((r) => setTimeout(r, MIN_OVERLAY_MS - elapsed));
+      }
     } catch (err: any) {
       setCycleError(err?.message || 'Ошибка');
     } finally {
