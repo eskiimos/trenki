@@ -34,10 +34,17 @@ export default function TourOverlay({ step, rect, index, total, onNext, onSkip }
   const isLast = !!step.isLast;
   const isTap = step.advanceOn === 'tap';
 
-  // Позиция тултипа: если цель в нижней половине экрана — показываем над ней,
-  // иначе под ней. Без цели — по центру.
+  // Тултип — bottom-sheet: по умолчанию закреплён внизу экрана. Если же
+  // подсвеченный элемент сам в нижней части (напр. кнопка «Вперёд») и
+  // нижний тултип его перекрыл бы — поднимаем тултип наверх. Без цели —
+  // по центру. Так подсказка не налезает на фокус ни на одном экране.
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-  const tooltipBelow = rect ? rect.top + rect.height < vh * 0.55 : true;
+  const targetNearBottom = rect ? rect.top + rect.height > vh * 0.62 : false;
+  const tooltipPos: React.CSSProperties = !rect
+    ? { top: '50%', transform: 'translateY(-50%)' }
+    : targetNearBottom
+    ? { top: 'calc(env(safe-area-inset-top, 0px) + 16px)' }
+    : { bottom: 'calc(env(safe-area-inset-bottom, 0px) + 24px)' };
 
   return (
     // pointer-events:none на контейнере — иначе прозрачный слой на весь экран
@@ -98,21 +105,18 @@ export default function TourOverlay({ step, rect, index, total, onNext, onSkip }
 
       {/* Тултип */}
       <div
+        className="tour-tooltip"
         style={{
           position: 'fixed',
           left: 16,
           right: 16,
-          ...(rect
-            ? tooltipBelow
-              ? { top: Math.min(rect.top + rect.height + PAD + 14, vh - 220) }
-              : { top: Math.max(rect.top - PAD - 14 - 200, 16) }
-            : { top: '50%', transform: 'translateY(-50%)' }),
+          ...tooltipPos,
           zIndex: 9999,
-          background: '#101530',
-          border: '1px solid rgba(161,255,74,0.25)',
-          borderRadius: 16,
-          padding: 18,
-          boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
+          background: 'linear-gradient(180deg, #131A3A 0%, #0C1126 100%)',
+          border: '1px solid rgba(161,255,74,0.30)',
+          borderRadius: 20,
+          padding: 20,
+          boxShadow: '0 12px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.03) inset',
           maxWidth: 460,
           marginLeft: 'auto',
           marginRight: 'auto',
@@ -137,13 +141,13 @@ export default function TourOverlay({ step, rect, index, total, onNext, onSkip }
 
         <div
           className="font-overpass uppercase"
-          style={{ color: '#A1FF4A', fontSize: 11, fontWeight: 800, letterSpacing: '0.5px', marginBottom: 6 }}
+          style={{ color: '#A1FF4A', fontSize: 15, fontWeight: 900, letterSpacing: '0.3px', marginBottom: 6, lineHeight: '120%' }}
         >
           {step.title}
         </div>
         <div
           className="font-overpass"
-          style={{ color: '#F9F8FE', fontSize: 14, fontWeight: 500, lineHeight: 1.45, marginBottom: 14 }}
+          style={{ color: '#D7D5E0', fontSize: 14, fontWeight: 500, lineHeight: 1.5, marginBottom: 16 }}
         >
           {step.body}
         </div>
@@ -192,6 +196,13 @@ export default function TourOverlay({ step, rect, index, total, onNext, onSkip }
         @keyframes tourPulse {
           0%, 100% { box-shadow: 0 0 0 2px rgba(161,255,74,0.25), 0 0 22px rgba(161,255,74,0.30); }
           50% { box-shadow: 0 0 0 3px rgba(161,255,74,0.45), 0 0 34px rgba(161,255,74,0.55); }
+        }
+        @keyframes tourTooltipIn {
+          from { opacity: 0; transform: translateY(8px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .tour-tooltip {
+          animation: tourTooltipIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
         }
       `}</style>
     </div>
