@@ -40,7 +40,11 @@ export default function TourOverlay({ step, rect, index, total, onNext, onSkip }
   const tooltipBelow = rect ? rect.top + rect.height < vh * 0.55 : true;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9998 }}>
+    // pointer-events:none на контейнере — иначе прозрачный слой на весь экран
+    // перехватывал бы клик по «дырке» спотлайта, и реальный элемент нельзя
+    // было бы нажать. Блокирующие части (затемнение, тултип) включают
+    // pointer-events обратно.
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9998, pointerEvents: 'none' }}>
       {/* Затемнение */}
       {rect ? (
         <>
@@ -89,7 +93,7 @@ export default function TourOverlay({ step, rect, index, total, onNext, onSkip }
           />
         </>
       ) : (
-        <div style={{ position: 'fixed', inset: 0, background: DIM }} />
+        <div style={{ position: 'fixed', inset: 0, background: DIM, pointerEvents: 'auto' }} />
       )}
 
       {/* Тултип */}
@@ -112,6 +116,7 @@ export default function TourOverlay({ step, rect, index, total, onNext, onSkip }
           maxWidth: 460,
           marginLeft: 'auto',
           marginRight: 'auto',
+          pointerEvents: 'auto',
         }}
       >
         {/* Прогресс */}
