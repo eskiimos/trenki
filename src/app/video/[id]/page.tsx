@@ -759,10 +759,20 @@ export default function VideoPage({ params }: VideoPageProps) {
   };
 
   const [showControls, setShowControls] = useState(true);
+  const [isBuffering, setIsBuffering] = useState(false); // спиннер при буферизации видео (#4)
+  const [autoplayHint, setAutoplayHint] = useState(false); // тост-пояснение при переключении автоплея (#5)
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const showControlsRef = useRef(true); // зеркало showControls для тап-логики без stale-стейта (#1)
+  const autoplayHintTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownHintRef = useRef(false); // Флаг для показа подсказки только один раз
   const pendingSeekRef = useRef<number | null>(null); // Позиция для восстановления после смены качества
+
+  // Держим ref в синхроне с showControls — нужно для решения show/hide внутри
+  // отложенного single-tap обработчика (замыкание видит свежее значение).
+  useEffect(() => {
+    showControlsRef.current = showControls;
+  }, [showControls]);
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -932,6 +942,7 @@ export default function VideoPage({ params }: VideoPageProps) {
 
   const handleVideoEnded = async () => {
     setIsPlaying(false);
+    setIsBuffering(false);
     
     // Завершаем видео в тренировке, если ещё не завершено
     if (fromWorkout && sessionId && !videoCompletedRef.current) {
@@ -1021,6 +1032,15 @@ export default function VideoPage({ params }: VideoPageProps) {
       }
       if (countdownTimerRef.current) {
         clearInterval(countdownTimerRef.current);
+      }
+      if (autoplayHintTimerRef.current) {
+        clearTimeout(autoplayHintTimerRef.current);
+      }
+      if (doubleTapTimerRef.current) {
+        clearTimeout(doubleTapTimerRef.current);
+      }
+      if (seekFlashTimerRef.current) {
+        clearTimeout(seekFlashTimerRef.current);
       }
     };
   }, []);
@@ -1220,7 +1240,6 @@ export default function VideoPage({ params }: VideoPageProps) {
             ref={playerContainerRef}
             className={`${isLandscape ? 'w-full h-full' : 'aspect-video'} relative overflow-hidden`}
             onMouseMove={handleVideoInteraction}
-            onTouchStart={handleVideoInteraction}
             onClick={(e) => e.stopPropagation()}
           >
           {isLoading || isKinescopeLoading ? (
@@ -1258,13 +1277,17 @@ export default function VideoPage({ params }: VideoPageProps) {
                 x-webkit-airplay="allow"
                 controlsList="nodownload"
                 preload="auto"
-                onClick={togglePlay}
                 onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
+                onPause={() => { setIsPlaying(false); setIsBuffering(false); }}
+                onError={() => setIsBuffering(false)}
+                onSeeked={() => setIsBuffering(false)}
                 onTimeUpdate={(e) => {
                   const video = e.currentTarget;
                   setCurrentTime(video.currentTime);
-                  
+
+                  // Видео реально двигается — значит не застряло на буферизации
+                  if (isBuffering) setIsBuffering(false);
+
                   // Обновляем буферизацию
                   if (video.buffered.length > 0) {
                     const bufferedEnd = video.buffered.end(video.buffered.length - 1);
@@ -1315,10 +1338,16 @@ export default function VideoPage({ params }: VideoPageProps) {
                   }
                 }}
                 onWaiting={() => {
-                  console.log('Video is buffering...');
+                  setIsBuffering(true);
+                }}
+                onPlaying={() => {
+                  setIsBuffering(false);
+                }}
+                onStalled={() => {
+                  setIsBuffering(true);
                 }}
                 onCanPlayThrough={() => {
-                  console.log('Video can play through without buffering');
+                  setIsBuffering(false);
                 }}
                 onEnded={handleVideoEnded}
               />
@@ -1345,31 +1374,34 @@ export default function VideoPage({ params }: VideoPageProps) {
                 </div>
               )}
               
-              {/* Play/Pause Overlay with Skip Buttons */}
+              {/* Спиннер буферизации — когда видео подгружается во время
+                  воспроизведения (#4). pointer-events:none, чтобы не мешать тапам. */}
+              {isBuffering && isPlaying && !showFullscreenHint && !isLoading && !isKinescopeLoading && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
+                  <div className="w-12 h-12 border-[3px] border-white/30 border-t-white rounded-full animate-spin" />
+                </div>
+              )}
+
+              {/* Play/Pause Overlay with Skip Buttons.
+                  Единый onClick обрабатывает и одиночный тап (показать/скрыть
+                  контролы), и двойной (перемотка) — без onTouchEnd, чтобы на
+                  мобилке тач+click не дёргались дважды (#1). touchAction:
+                  manipulation убирает 300ms-задержку click на iOS. */}
               {!showFullscreenHint && (
                 <div
+                  style={{ touchAction: 'manipulation' }}
                   className={`absolute inset-0 bg-gradient-to-b from-transparent to-black/50 flex items-center justify-center transition-opacity duration-300 ${
                     showControls ? 'opacity-100' : 'opacity-0'
                   }`}
-                  onClick={() => {
-                    if (showControls) {
-                      if (hideControlsTimeoutRef.current) clearTimeout(hideControlsTimeoutRef.current);
-                      setShowControls(false);
-                    } else {
-                      showControlsTemporarily();
-                    }
-                  }}
-                  onTouchEnd={(e) => {
-                    const touch = e.changedTouches[0];
+                  onClick={(e) => {
                     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-                    const x = touch.clientX - rect.left;
+                    const x = e.clientX - rect.left;
                     const isLeft = x < rect.width / 2;
 
                     if (doubleTapTimerRef.current) {
-                      // Двойной тап — перемотка
+                      // Второй тап в окне 250мс → перемотка
                       clearTimeout(doubleTapTimerRef.current);
                       doubleTapTimerRef.current = null;
-                      e.preventDefault();
 
                       if (isLeft) {
                         skipBackward();
@@ -1377,18 +1409,22 @@ export default function VideoPage({ params }: VideoPageProps) {
                         skipForward();
                       }
 
-                      // Флэш анимации
                       setSeekFlash(isLeft ? 'left' : 'right');
                       if (seekFlashTimerRef.current) clearTimeout(seekFlashTimerRef.current);
                       seekFlashTimerRef.current = setTimeout(() => setSeekFlash(null), 600);
 
-                      // Показываем интерфейс на время
                       showControlsTemporarily();
                     } else {
-                      // Первый тап — ждём второго
+                      // Первый тап — ждём, не двойной ли. Если нет — show/hide контролов.
                       doubleTapTimerRef.current = setTimeout(() => {
                         doubleTapTimerRef.current = null;
-                      }, 280);
+                        if (showControlsRef.current) {
+                          if (hideControlsTimeoutRef.current) clearTimeout(hideControlsTimeoutRef.current);
+                          setShowControls(false);
+                        } else {
+                          showControlsTemporarily();
+                        }
+                      }, 250);
                     }
                   }}
                 >
@@ -1414,48 +1450,49 @@ export default function VideoPage({ params }: VideoPageProps) {
                       </div>
                     </div>
                   )}
-                  <div className="flex items-center gap-6">
+                  <div className={`flex items-center gap-6 ${showControls ? '' : 'pointer-events-none'}`}>
                     {/* Skip Backward 10s */}
                     <button
-                      onClick={skipBackward}
-                      className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
+                      onClick={(e) => { e.stopPropagation(); skipBackward(); }}
+                      className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
                       title="Назад на 10 секунд"
                     >
                       <Image
                         src="/icons/video/player/carbon_rewind-10-l.svg"
                         alt="Назад на 10 секунд"
-                        width={18}
-                        height={18}
+                        width={20}
+                        height={20}
                       />
                     </button>
-                    
-                    {/* Play/Pause Button */}
+
+                    {/* Play/Pause Button — крупный хитбокс 64px, чтобы легко попасть (#2) */}
                     <button
-                      onClick={togglePlay}
-                      className="w-11 h-11 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
+                      onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+                      className="w-16 h-16 bg-white/25 backdrop-blur-sm rounded-full flex items-center justify-center opacity-90 hover:opacity-100 transition-opacity"
+                      title={isPlaying ? 'Пауза' : 'Воспроизвести'}
                     >
                       <Image
-                        src={isPlaying 
+                        src={isPlaying
                           ? '/icons/video/player/pause.svg'
                           : '/icons/video/player/Play.svg'
                         }
                         alt={isPlaying ? 'Пауза' : 'Воспроизвести'}
-                        width={22}
-                        height={22}
+                        width={30}
+                        height={30}
                       />
                     </button>
-                    
+
                     {/* Skip Forward 10s */}
                     <button
-                      onClick={skipForward}
-                      className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
+                      onClick={(e) => { e.stopPropagation(); skipForward(); }}
+                      className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
                       title="Вперед на 10 секунд"
                     >
                       <Image
                         src="/icons/video/player/carbon_rewind-10-r.svg"
                         alt="Вперед на 10 секунд"
-                        width={18}
-                        height={18}
+                        width={20}
+                        height={20}
                       />
                     </button>
                   </div>
@@ -1465,7 +1502,7 @@ export default function VideoPage({ params }: VideoPageProps) {
               {/* Video Controls - для всех видео */}
               {!showFullscreenHint && (
             <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pt-8 ${isLandscape ? 'pb-6 px-5' : 'pb-2 px-3'} transition-opacity duration-300 ${
-            showControls ? 'opacity-100' : 'opacity-0'
+            showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}>
             {/* Scrubber: цветная полоса + прозрачный input range поверх с круглым thumb.
                 Полоса отрисовывается div'ами (buffered + current), input ловит drag/touch. */}
@@ -1487,6 +1524,15 @@ export default function VideoPage({ params }: VideoPageProps) {
                 <div
                   className="absolute left-0 top-0 h-full bg-blue-500 rounded-full"
                   style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+                />
+                {/* Кружок — на том же проценте, что и полоса (#3) */}
+                <div
+                  className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white border-2 border-blue-500 shadow pointer-events-none"
+                  style={{
+                    left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%`,
+                    width: isLandscape ? 16 : 14,
+                    height: isLandscape ? 16 : 14,
+                  }}
                 />
               </div>
               {/* Реальный input: drag, клавиатура, accessibility */}
@@ -1515,7 +1561,7 @@ export default function VideoPage({ params }: VideoPageProps) {
                 {/* Play/Pause Button */}
                 <button 
                   onClick={togglePlay}
-                  className="transition-opacity hover:opacity-80"
+                  className="transition-opacity hover:opacity-80 p-2"
                   title={isPlaying ? 'Пауза' : 'Воспроизвести'}
                 >
                   <Image
@@ -1532,7 +1578,7 @@ export default function VideoPage({ params }: VideoPageProps) {
                 {/* Volume Control */}
                 <button 
                   onClick={toggleMute} 
-                  className="transition-opacity hover:opacity-80"
+                  className="transition-opacity hover:opacity-80 p-2"
                   title={isMuted ? 'Включить звук' : 'Выключить звук'}
                 >
                   <Image
@@ -1554,10 +1600,18 @@ export default function VideoPage({ params }: VideoPageProps) {
               
               <div className={`flex items-center space-x-2 ${isLandscape ? 'space-x-3' : ''}`}>
                 {/* Autoplay Toggle */}
-                <button 
-                  onClick={() => setAutoplayEnabled(!autoplayEnabled)}
-                  className="transition-opacity hover:opacity-80"
-                  title={autoplayEnabled ? 'Автоплей включен' : 'Автоплей выключен'}
+                <button
+                  onClick={() => {
+                    const next = !autoplayEnabled;
+                    setAutoplayEnabled(next);
+                    // Поясняющий тост — чтобы было понятно, что делает кнопка (#5)
+                    setAutoplayHint(true);
+                    if (autoplayHintTimerRef.current) clearTimeout(autoplayHintTimerRef.current);
+                    autoplayHintTimerRef.current = setTimeout(() => setAutoplayHint(false), 2400);
+                    showControlsTemporarily();
+                  }}
+                  className="transition-opacity hover:opacity-80 p-2"
+                  title="Автоплей: автоматически запускать следующее видео"
                 >
                   <Image
                     src={autoplayEnabled 
@@ -1624,7 +1678,7 @@ export default function VideoPage({ params }: VideoPageProps) {
                 {/* Fullscreen Button */}
                 <button 
                   onClick={toggleFullscreen}
-                  className="transition-opacity hover:opacity-80"
+                  className="transition-opacity hover:opacity-80 p-2"
                   title={isFullscreen ? 'Выход из полноэкранного режима' : 'Полноэкранный режим'}
                 >
                   <Image
@@ -1642,6 +1696,17 @@ export default function VideoPage({ params }: VideoPageProps) {
           </div>
           )}
             </>
+          )}
+
+          {/* Тост-пояснение автоплея (#5) */}
+          {autoplayHint && !showFullscreenHint && (
+            <div className="absolute left-1/2 -translate-x-1/2 bottom-20 z-50 pointer-events-none">
+              <div className="bg-black/85 backdrop-blur-sm text-white text-xs font-medium px-4 py-2 rounded-full whitespace-nowrap border border-white/15">
+                {autoplayEnabled
+                  ? '▶ Автоплей включён — следующее видео запустится само'
+                  : '⏸ Автоплей выключен'}
+              </div>
+            </div>
           )}
 
           {/* Next Video Preview with Countdown - Overlay */}
