@@ -764,6 +764,7 @@ export default function VideoPage({ params }: VideoPageProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const showControlsRef = useRef(true); // зеркало showControls для тап-логики без stale-стейта (#1)
+  const isBufferingRef = useRef(false); // зеркало isBuffering — чтобы onTimeUpdate не читал stale-стейт
   const autoplayHintTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownHintRef = useRef(false); // Флаг для показа подсказки только один раз
   const pendingSeekRef = useRef<number | null>(null); // Позиция для восстановления после смены качества
@@ -773,6 +774,9 @@ export default function VideoPage({ params }: VideoPageProps) {
   useEffect(() => {
     showControlsRef.current = showControls;
   }, [showControls]);
+  useEffect(() => {
+    isBufferingRef.current = isBuffering;
+  }, [isBuffering]);
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -1012,17 +1016,25 @@ export default function VideoPage({ params }: VideoPageProps) {
     }
   }, []);
 
-  // Скрываем элементы управления при запуске видео
+  // Один раз при старте показываем контролы и прячем через 3с.
   useEffect(() => {
-    if (isPlaying) {
-      showControlsTemporarily();
-    } else {
+    showControlsTemporarily();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ВАЖНО (Android): НЕ пере-показываем контролы на каждый flip isPlaying.
+  // На слабой сети буферизация дёргает play/pause → раньше эффект каждый раз
+  // звал showControlsTemporarily/setShowControls → контролы «мигали».
+  // Теперь: только на реальной ПАУЗЕ пиним контролы видимыми; при игре
+  // ничего не делаем (показ — по тапу/кнопке).
+  useEffect(() => {
+    if (!isPlaying) {
       setShowControls(true);
       if (hideControlsTimeoutRef.current) {
         clearTimeout(hideControlsTimeoutRef.current);
       }
     }
-  }, [isPlaying, showControlsTemporarily]);
+  }, [isPlaying]);
 
   // Очистка таймеров при размонтировании
   useEffect(() => {
@@ -1236,10 +1248,14 @@ export default function VideoPage({ params }: VideoPageProps) {
         <div 
           className={`${isLandscape ? 'w-full h-full bg-black flex items-center justify-center' : 'bg-black'}`}
         >
-          <div 
+          <div
             ref={playerContainerRef}
             className={`${isLandscape ? 'w-full h-full' : 'aspect-video'} relative overflow-hidden`}
-            onMouseMove={handleVideoInteraction}
+            // ВАЖНО (Android): авто-показ контролов только для реальной мыши.
+            // На тач-устройствах тап генерит синтетический mousemove → раньше
+            // он показывал контролы, а tap-toggle через 250мс их прятал →
+            // контролы «мигали» на каждое касание. Гейтим по pointerType.
+            onPointerMove={(e) => { if (e.pointerType === 'mouse') handleVideoInteraction(); }}
             onClick={(e) => e.stopPropagation()}
           >
           {isLoading || isKinescopeLoading ? (
@@ -1285,8 +1301,9 @@ export default function VideoPage({ params }: VideoPageProps) {
                   const video = e.currentTarget;
                   setCurrentTime(video.currentTime);
 
-                  // Видео реально двигается — значит не застряло на буферизации
-                  if (isBuffering) setIsBuffering(false);
+                  // Видео реально двигается — значит не застряло на буферизации.
+                  // Читаем через ref, чтобы не дёргать setState на stale-значении.
+                  if (isBufferingRef.current) setIsBuffering(false);
 
                   // Обновляем буферизацию
                   if (video.buffered.length > 0) {
@@ -1318,8 +1335,11 @@ export default function VideoPage({ params }: VideoPageProps) {
                     return;
                   }
 
-                  // Пытаемся начать воспроизведение когда видео готово
-                  if (!isPlaying) {
+                  // Пытаемся начать воспроизведение когда видео готово.
+                  // Проверяем живой video.paused, а НЕ React-стейт isPlaying
+                  // (на Android canplay после ребуфера срабатывает часто, а
+                  // stale isPlaying приводил к лишним play() и дёрганью статуса).
+                  if (video.paused) {
                     video.play().then(() => {
                       setIsPlaying(true);
                     }).catch(err => {
