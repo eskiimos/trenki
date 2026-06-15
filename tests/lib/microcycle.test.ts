@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  INTENT_PARAMS,
-  MICROCYCLE_DAYS_ORDER,
-  applyAdjustment,
-  feedbackToFactor,
-} from '@/lib/microcycle/intents';
+import { planWeek, parsePrevDay, type DayState } from '@/lib/microcycle/week-plan';
 import {
   getMicrocycleStartDate,
   getMicrocycleWeekStart,
@@ -18,29 +13,132 @@ import {
   MicrocycleStatus,
 } from '@/generated/prisma';
 
-describe('microcycle/intents', () => {
-  it('has all 5 intents in canonical order Пн → Пт', () => {
-    expect(MICROCYCLE_DAYS_ORDER).toEqual([
-      MicrocycleIntent.IN_TONE,
-      MicrocycleIntent.WARMUP,
-      MicrocycleIntent.CHARGED,
-      MicrocycleIntent.STRETCH,
-      MicrocycleIntent.TIRED,
-    ]);
+// Хелпер: состояния дней по dayOfWeek для компактных проверок.
+const statesByDay = (week: { dayOfWeek: number; kind: string; energyState: EnergyState }[]) =>
+  Object.fromEntries(week.map((d) => [d.dayOfWeek, `${d.kind}:${d.energyState}`]));
+
+describe('microcycle/week-plan — стартовая неделя', () => {
+  const base = planWeek(null, null, 1);
+
+  it('5 дней Пн-Пт', () => {
+    expect(base.map((d) => d.dayOfWeek)).toEqual([1, 2, 3, 4, 5]);
   });
 
-  it('maps each intent to a unique consecutive dayOfWeek 1..5', () => {
-    const days = MICROCYCLE_DAYS_ORDER.map((i) => INTENT_PARAMS[i].dayOfWeek);
-    expect(days).toEqual([1, 2, 3, 4, 5]);
+  it('Пн полный «в тонусе», Ср полный «заряжен» (пик), Пт полный «устал» (пониженный)', () => {
+    const s = statesByDay(base);
+    expect(s[1]).toBe(`FULL:${EnergyState.IN_TONE}`);
+    expect(s[3]).toBe(`FULL:${EnergyState.FULLY_CHARGED}`);
+    expect(s[5]).toBe(`FULL:${EnergyState.TIRED}`);
   });
 
-  it('defines goal+energyState for every intent', () => {
-    for (const intent of MICROCYCLE_DAYS_ORDER) {
-      const p = INTENT_PARAMS[intent];
-      expect(p.goal).toBeTruthy();
-      expect(p.energyState).toBeTruthy();
-      expect(p.label).toBeTruthy();
+  it('Вт — только разминка, Чт — разминка+растяжка (лёгкие дни)', () => {
+    const s = statesByDay(base);
+    expect(s[2]).toMatch(/^WARMUP:/);
+    expect(s[4]).toMatch(/^WARMUP_STRETCH:/);
+  });
+
+  it('у каждого дня есть цель и производный intent', () => {
+    for (const d of base) {
+      expect(d.goal).toBeTruthy();
+      expect(d.intent).toBeTruthy();
+      expect(d.label).toBeTruthy();
     }
+  });
+
+  it('полные дни недели получают разные цели (без повторов внутри недели)', () => {
+    const fullGoals = base.filter((d) => d.kind === 'FULL').map((d) => d.goal);
+    expect(new Set(fullGoals).size).toBe(fullGoals.length);
+  });
+});
+
+describe('microcycle/week-plan — адаптация ИЗИ (усложнение)', () => {
+  const prev = (): DayState[] =>
+    planWeek(null, null, 1).map((d) => ({ dayOfWeek: d.dayOfWeek, kind: d.kind, energyState: d.energyState }));
+
+  it('поднимает самый низкий полный день (Пт Устал→В тонусе) первым', () => {
+    const next = planWeek(prev(), MicrocycleFeedback.EASY, 2);
+    const s = statesByDay(next);
+    expect(s[5]).toBe(`FULL:${EnergyState.IN_TONE}`); // Пт поднят
+    expect(s[1]).toBe(`FULL:${EnergyState.IN_TONE}`); // Пн без изменений
+    expect(s[3]).toBe(`FULL:${EnergyState.FULLY_CHARGED}`); // Ср без изменений
+  });
+
+  it('при равенстве низших — поднимает более ранний день (Пн раньше Пт)', () => {
+    // после первого ИЗИ: Пн=В тонусе, Пт=В тонусе, Ср=Заряжен → следующий ИЗИ поднимет Пн
+    const c2 = planWeek(prev(), MicrocycleFeedback.EASY, 2).map((d) => ({ dayOfWeek: d.dayOfWeek, kind: d.kind, energyState: d.energyState }));
+    const c3 = planWeek(c2, MicrocycleFeedback.EASY, 3);
+    const s = statesByDay(c3);
+    expect(s[1]).toBe(`FULL:${EnergyState.FULLY_CHARGED}`); // Пн поднят
+    expect(s[5]).toBe(`FULL:${EnergyState.IN_TONE}`); // Пт остался
+  });
+
+  it('когда все полные дни на пике — добавляет полный день (Вт из лёгкого)', () => {
+    // прогоняем ИЗИ много раз пока Пн/Ср/Пт все не станут Заряжен
+    let week = prev();
+    for (let i = 0; i < 6; i++) {
+      week = planWeek(week, MicrocycleFeedback.EASY, i + 2).map((d) => ({ dayOfWeek: d.dayOfWeek, kind: d.kind, energyState: d.energyState }));
+    }
+    // теперь ещё один ИЗИ должен апгрейдить лёгкий день (Вт) в полный
+    const next = planWeek(week, MicrocycleFeedback.EASY, 99);
+    const tue = next.find((d) => d.dayOfWeek === 2)!;
+    expect(tue.kind).toBe('FULL');
+  });
+});
+
+describe('microcycle/week-plan — адаптация ТЯЖКО (упрощение)', () => {
+  const prev = (): DayState[] =>
+    planWeek(null, null, 1).map((d) => ({ dayOfWeek: d.dayOfWeek, kind: d.kind, energyState: d.energyState }));
+
+  it('снижает самый высокий полный день (Ср Заряжен→В тонусе) первым', () => {
+    const next = planWeek(prev(), MicrocycleFeedback.HARD, 2);
+    const s = statesByDay(next);
+    expect(s[3]).toBe(`FULL:${EnergyState.IN_TONE}`); // Ср снижен
+    expect(s[1]).toBe(`FULL:${EnergyState.IN_TONE}`); // Пн без изменений
+    expect(s[5]).toBe(`FULL:${EnergyState.TIRED}`); // Пт без изменений
+  });
+
+  it('все полные дни на минимуме — структуру не ломает', () => {
+    const allTired: DayState[] = [
+      { dayOfWeek: 1, kind: 'FULL', energyState: EnergyState.TIRED },
+      { dayOfWeek: 2, kind: 'WARMUP', energyState: EnergyState.TIRED },
+      { dayOfWeek: 3, kind: 'FULL', energyState: EnergyState.TIRED },
+      { dayOfWeek: 4, kind: 'WARMUP_STRETCH', energyState: EnergyState.IN_TONE },
+      { dayOfWeek: 5, kind: 'FULL', energyState: EnergyState.TIRED },
+    ];
+    const next = planWeek(allTired, MicrocycleFeedback.HARD, 2);
+    const s = statesByDay(next);
+    expect(s[1]).toBe(`FULL:${EnergyState.TIRED}`);
+    expect(s[3]).toBe(`FULL:${EnergyState.TIRED}`);
+    expect(s[5]).toBe(`FULL:${EnergyState.TIRED}`);
+  });
+});
+
+describe('microcycle/week-plan — НОРМ + ротация целей', () => {
+  it('НОРМ сохраняет состояния, но меняет цели от цикла к циклу', () => {
+    const c1 = planWeek(null, null, 1);
+    const prev = c1.map((d) => ({ dayOfWeek: d.dayOfWeek, kind: d.kind, energyState: d.energyState }));
+    const c2 = planWeek(prev, MicrocycleFeedback.NORMAL, 2);
+    // состояния те же
+    expect(statesByDay(c2)).toEqual(statesByDay(c1));
+    // но цель Пн отличается (ротация по cycleNumber)
+    expect(c2.find((d) => d.dayOfWeek === 1)!.goal).not.toBe(c1.find((d) => d.dayOfWeek === 1)!.goal);
+  });
+
+  it('наборы целей соседних недель не пересекаются (без повторов подряд)', () => {
+    const c1Goals = new Set(planWeek(null, null, 1).filter((d) => d.kind === 'FULL').map((d) => d.goal));
+    const prev = planWeek(null, null, 1).map((d) => ({ dayOfWeek: d.dayOfWeek, kind: d.kind, energyState: d.energyState }));
+    const c2Goals = planWeek(prev, MicrocycleFeedback.NORMAL, 2).filter((d) => d.kind === 'FULL').map((d) => d.goal);
+    for (const g of c2Goals) expect(c1Goals.has(g)).toBe(false);
+  });
+});
+
+describe('microcycle/week-plan — parsePrevDay', () => {
+  it('восстанавливает тип+состояние из intent', () => {
+    expect(parsePrevDay(1, MicrocycleIntent.IN_TONE)).toMatchObject({ kind: 'FULL', energyState: EnergyState.IN_TONE });
+    expect(parsePrevDay(3, MicrocycleIntent.CHARGED)).toMatchObject({ kind: 'FULL', energyState: EnergyState.FULLY_CHARGED });
+    expect(parsePrevDay(5, MicrocycleIntent.TIRED)).toMatchObject({ kind: 'FULL', energyState: EnergyState.TIRED });
+    expect(parsePrevDay(2, MicrocycleIntent.WARMUP)).toMatchObject({ kind: 'WARMUP' });
+    expect(parsePrevDay(4, MicrocycleIntent.STRETCH)).toMatchObject({ kind: 'WARMUP_STRETCH' });
   });
 });
 
@@ -114,49 +212,6 @@ describe('microcycle/week-start', () => {
       expect(() => getMicrocycleDayDate(start, 6)).toThrow();
       expect(() => getMicrocycleDayDate(start, 7)).toThrow();
     });
-  });
-});
-
-describe('microcycle/feedbackToFactor', () => {
-  it('EASY → +1, NORMAL → 0, HARD → -1, null → 0', () => {
-    expect(feedbackToFactor(MicrocycleFeedback.EASY)).toBe(1);
-    expect(feedbackToFactor(MicrocycleFeedback.NORMAL)).toBe(0);
-    expect(feedbackToFactor(MicrocycleFeedback.HARD)).toBe(-1);
-    expect(feedbackToFactor(null)).toBe(0);
-  });
-});
-
-describe('microcycle/applyAdjustment', () => {
-  const base = INTENT_PARAMS[MicrocycleIntent.IN_TONE]; // energyState = IN_TONE
-
-  it('returns same params when factor is 0 or null', () => {
-    expect(applyAdjustment(base, 0)).toEqual(base);
-    expect(applyAdjustment(base, null)).toEqual(base);
-  });
-
-  it('shifts energyState up when EASY (+1)', () => {
-    expect(applyAdjustment(base, 1).energyState).toBe(EnergyState.FULLY_CHARGED);
-  });
-
-  it('shifts energyState down when HARD (-1)', () => {
-    expect(applyAdjustment(base, -1).energyState).toBe(EnergyState.TIRED);
-  });
-
-  it('caps at FULLY_CHARGED when already maxed', () => {
-    const charged = INTENT_PARAMS[MicrocycleIntent.CHARGED]; // FULLY_CHARGED
-    expect(applyAdjustment(charged, 1).energyState).toBe(EnergyState.FULLY_CHARGED);
-  });
-
-  it('caps at TIRED when already minned', () => {
-    const tired = INTENT_PARAMS[MicrocycleIntent.TIRED]; // TIRED
-    expect(applyAdjustment(tired, -1).energyState).toBe(EnergyState.TIRED);
-  });
-
-  it('preserves goal and dayOfWeek', () => {
-    const result = applyAdjustment(base, 1);
-    expect(result.goal).toBe(base.goal);
-    expect(result.dayOfWeek).toBe(base.dayOfWeek);
-    expect(result.label).toBe(base.label);
   });
 });
 

@@ -2,19 +2,19 @@
 // и эндпоинтом POST /api/microcycle/generate (по запросу атлета), и cron'ом
 // /api/cron/microcycle-autogenerate (массово в воскресенье вечером).
 //
-// Логика:
-//   1. Найти/создать профиль; без него — NO_PROFILE.
-//   2. Если уже есть микроцикл на эту weekStartDate — вернуть EXISTING.
-//   3. Иначе: 5 раз buildWorkout с разными (goal, energyState) из intent-mapping,
-//      применить adjustmentFactor из последнего фидбэка, сохранить транзакцией.
+// Неделя строится по методичке тренеров через planWeek (week-plan.ts):
+// 3 полноценных дня (Пн/Ср/Пт) + Вт «только разминка» + Чт «разминка+растяжка»,
+// с адаптацией состояний от фидбэка прошлого цикла и ротацией целей.
 
 import { prisma } from '@/lib/prisma';
 import {
   AgeGroup,
   TrainingGoal,
   EnergyState,
+  MicrocycleIntent,
   WorkoutStatus,
   MicrocycleStatus,
+  MicrocycleFeedback,
 } from '@/generated/prisma';
 import {
   GOAL_TO_MUSCLE_GROUPS,
@@ -24,21 +24,17 @@ import {
   applyAgeModifiers,
   getComplexityLevel,
   getAllowedComplexityLevels,
+  type WorkoutStructure,
 } from '@/lib/training-algorithm-v3';
 import { buildWorkout } from '@/lib/training/build-workout';
-import {
-  INTENT_PARAMS,
-  MICROCYCLE_DAYS_ORDER,
-  applyAdjustment,
-  feedbackToFactor,
-} from '@/lib/microcycle/intents';
+import { planWeek, parsePrevDay, type DayKind } from '@/lib/microcycle/week-plan';
 import { getMicrocycleStartDate } from '@/lib/microcycle/week-start';
 
 export type GenerateStatus = 'CREATED' | 'EXISTING' | 'NO_PROFILE';
 
 export interface GeneratedDay {
   dayOfWeek: number;
-  intent: typeof MICROCYCLE_DAYS_ORDER[number];
+  intent: MicrocycleIntent;
   workoutSessionId: string | null;
   moduleCount: number;
   missingModules: string[];
@@ -55,12 +51,36 @@ export interface GenerateResult {
 interface Options {
   /** Подменяемое «сейчас» — для cron'а можно явно передать (тестируемость) */
   now?: Date;
-  /**
-   * Явная стартовая дата (00:00 UTC). Если не передана — берётся «сегодня»
-   * (getMicrocycleStartDate). Cron передаёт сюда понедельник (getMicrocycleWeekStart),
-   * чтобы автоциклы шли по неделям; ручной запуск использует today.
-   */
+  /** Явная стартовая дата (00:00 UTC). По умолчанию — сегодня. Cron шлёт Пн. */
   startDate?: Date;
+}
+
+// Структура тренировки по типу дня. Полный — стандартная v3-структура;
+// лёгкие дни урезаны (только разминка / разминка+заминка-растяжка).
+function structureForKind(
+  kind: DayKind,
+  energyState: EnergyState,
+  potential: number,
+): WorkoutStructure {
+  if (kind === 'WARMUP') {
+    return {
+      moduleCount: 1,
+      includeWarmup: true,
+      includeFitness: false,
+      includeTechnique: false,
+      includeCooldown: false,
+    };
+  }
+  if (kind === 'WARMUP_STRETCH') {
+    return {
+      moduleCount: 2,
+      includeWarmup: true,
+      includeFitness: false,
+      includeTechnique: false,
+      includeCooldown: true, // заминка = статическая растяжка/мобилити
+    };
+  }
+  return getWorkoutStructure(energyState, potential);
 }
 
 export async function generateMicrocycleForUser(
@@ -101,23 +121,34 @@ export async function generateMicrocycleForUser(
     };
   }
 
-  // ── Адаптация на основе фидбэка прошлого цикла ─────────────────────
+  // ── Прошлый цикл → состояния дней + фидбэк для адаптации ────────────
   const lastCycle = await prisma.microcycle.findFirst({
     where: { userId },
     orderBy: { cycleNumber: 'desc' },
-    select: { cycleNumber: true, feedback: true },
+    select: {
+      cycleNumber: true,
+      feedback: true,
+      days: { select: { dayOfWeek: true, intent: true } },
+    },
   });
   const cycleNumber = (lastCycle?.cycleNumber ?? 0) + 1;
-  const adjustmentFactor = lastCycle?.feedback
-    ? feedbackToFactor(lastCycle.feedback)
-    : null;
+  const prevDays =
+    lastCycle && lastCycle.days.length > 0
+      ? lastCycle.days.map((d) => parsePrevDay(d.dayOfWeek, d.intent))
+      : null;
+  const feedback: MicrocycleFeedback | null = lastCycle?.feedback ?? null;
 
-  // ── Генерация 5 тренировок (последовательно) ───────────────────────
+  // План недели по методичке (структура + цели).
+  const plan = planWeek(prevDays, feedback, cycleNumber);
+
+  // adjustmentFactor — для аналитики (как именно адаптировали).
+  const adjustmentFactor =
+    feedback === MicrocycleFeedback.EASY ? 1 : feedback === MicrocycleFeedback.HARD ? -1 : 0;
+
+  // ── Генерация тренировок по дням (последовательно) ─────────────────
   type PlannedDay = {
     dayOfWeek: number;
-    intent: typeof MICROCYCLE_DAYS_ORDER[number];
-    goal: TrainingGoal;
-    energyState: EnergyState;
+    intent: MicrocycleIntent;
     workoutSessionId: string | null;
     missingModules: string[];
     totalDuration: number;
@@ -127,32 +158,31 @@ export async function generateMicrocycleForUser(
   };
   const planned: PlannedDay[] = [];
 
-  for (const intent of MICROCYCLE_DAYS_ORDER) {
-    const baseParams = INTENT_PARAMS[intent];
-    const { goal, energyState } = applyAdjustment(baseParams, adjustmentFactor);
+  for (const day of plan) {
+    const { goal, energyState, kind, intent } = day;
 
     const complexityLevel = getComplexityLevel(profile.potential);
     const allowedComplexityLevels = getAllowedComplexityLevels(complexityLevel, energyState);
-    const structure = getWorkoutStructure(energyState, profile.potential);
+    const structure = structureForKind(kind, energyState, profile.potential);
     const rpeRange = getRPERange(
       energyState,
       profile.potential,
       profile.ageGroup as AgeGroup | undefined,
     );
-    const muscleGroups = GOAL_TO_MUSCLE_GROUPS[goal];
-    const loadTypes = GOAL_TO_LOAD_TYPES[goal];
-    loadTypes.fitness = applyAgeModifiers(
-      loadTypes.fitness,
-      profile.ageGroup as AgeGroup | undefined,
-    );
-    loadTypes.technique = applyAgeModifiers(
-      loadTypes.technique,
-      profile.ageGroup as AgeGroup | undefined,
-    );
+    const muscleGroups = GOAL_TO_MUSCLE_GROUPS[goal as TrainingGoal];
+    // Клонируем — applyAgeModifiers возвращает новый массив, и без клона мы бы
+    // мутировали общую константу GOAL_TO_LOAD_TYPES (порча между днями/юзерами,
+    // особенно в cron'е, который гонит всех юзеров в одном процессе).
+    const baseLoad = GOAL_TO_LOAD_TYPES[goal as TrainingGoal];
+    const loadTypes = {
+      ...baseLoad,
+      fitness: applyAgeModifiers(baseLoad.fitness, profile.ageGroup as AgeGroup | undefined),
+      technique: applyAgeModifiers(baseLoad.technique, profile.ageGroup as AgeGroup | undefined),
+    };
 
     const workout = await buildWorkout({
       userId,
-      goal,
+      goal: goal as TrainingGoal,
       energyState,
       structure,
       muscleGroups,
@@ -163,10 +193,8 @@ export async function generateMicrocycleForUser(
     });
 
     planned.push({
-      dayOfWeek: baseParams.dayOfWeek,
+      dayOfWeek: day.dayOfWeek,
       intent,
-      goal,
-      energyState,
       workoutSessionId: null,
       missingModules: workout.missingModules,
       totalDuration: workout.totalDuration,
@@ -177,7 +205,9 @@ export async function generateMicrocycleForUser(
   }
 
   // ── Сохраняем в одной транзакции ───────────────────────────────────
-  const cycleId = await prisma.$transaction(async (tx) => {
+  let cycleId: string;
+  try {
+    cycleId = await prisma.$transaction(async (tx) => {
     const cycle = await tx.microcycle.create({
       data: {
         userId,
@@ -225,7 +255,34 @@ export async function generateMicrocycleForUser(
     }
 
     return cycle.id;
-  }, { timeout: 30_000 });
+    }, { timeout: 30_000 });
+  } catch (e: any) {
+    // Гонка: цикл на эту неделю создан параллельно (cron + ручной запрос) →
+    // unique violation по (userId, weekStartDate). Возвращаем существующий
+    // вместо 500.
+    if (e?.code === 'P2002') {
+      const raced = await prisma.microcycle.findUnique({
+        where: { userId_weekStartDate: { userId, weekStartDate } },
+        include: { days: { orderBy: { dayOfWeek: 'asc' } } },
+      });
+      if (raced) {
+        return {
+          status: 'EXISTING',
+          microcycleId: raced.id,
+          weekStartDate: raced.weekStartDate,
+          cycleNumber: raced.cycleNumber,
+          days: raced.days.map((d) => ({
+            dayOfWeek: d.dayOfWeek,
+            intent: d.intent,
+            workoutSessionId: d.workoutSessionId,
+            moduleCount: 0,
+            missingModules: [],
+          })),
+        };
+      }
+    }
+    throw e;
+  }
 
   return {
     status: 'CREATED',

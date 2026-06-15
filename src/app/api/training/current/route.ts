@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { WorkoutStatus } from '@/generated/prisma';
+import { WorkoutStatus, MicrocycleStatus } from '@/generated/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
 
 /**
@@ -53,11 +53,26 @@ export async function GET(request: NextRequest) {
       });
 
       if (workout) {
+        // Сессии, входящие в активный микроцикл, НЕ помечаем SKIPPED — иначе
+        // открытие /training/workout без ?id (через «продолжить» / нижнее меню)
+        // «пропустит» 4 из 5 дней недели. Микроцикл намеренно держит несколько
+        // PENDING-сессий одновременно.
+        const microcycleDays = await prisma.microcycleDay.findMany({
+          where: {
+            workoutSessionId: { not: null },
+            microcycle: { userId, status: { not: MicrocycleStatus.ARCHIVED } },
+          },
+          select: { workoutSessionId: true },
+        });
+        const protectedIds = microcycleDays
+          .map((d) => d.workoutSessionId)
+          .filter((id): id is string => id !== null);
+
         await prisma.workoutSession.updateMany({
           where: {
             userId,
             status: { in: [WorkoutStatus.PENDING, WorkoutStatus.IN_PROGRESS] },
-            id: { not: workout.id },
+            id: { not: workout.id, notIn: protectedIds },
           },
           data: { status: WorkoutStatus.SKIPPED },
         });
