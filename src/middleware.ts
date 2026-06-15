@@ -6,6 +6,7 @@ import { ADMIN_COOKIE_NAME } from '@/lib/admin-cookie';
 // Публичные маршруты, доступные без авторизации
 const publicRoutes = [
   '/login',
+  '/landing',
   '/legal',
   '/join',
   '/admin/login',
