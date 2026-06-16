@@ -146,7 +146,7 @@ export default function TrainingAssessmentPage() {
           color: '#F9F8FE',
           flex: 1
         }}>
-          ПЕРСОНАЛЬНАЯ ТРЕНИРОВКА
+          БЫСТРАЯ ТРЕНИРОВКА
         </h1>
         {/* Кнопка "i" — показывается когда блок скрыт */}
         {!showInfoBlock && (
@@ -225,7 +225,7 @@ export default function TrainingAssessmentPage() {
             gap: '16px'
           }}>
             <div>
-              твой <span style={{color: '#A1FF4A'}}>ии-тренер</span> составит идеальный комплекс для продуктивной тренировки.
+              составим идеальный комплекс для твоей <span style={{color: '#A1FF4A'}}>быстрой тренировки</span>.
             </div>
             <div>
               настрой фильтры и вперед!

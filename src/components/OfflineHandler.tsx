@@ -13,6 +13,7 @@ export default function OfflineHandler() {
   const pathname = usePathname();
   const [isOnline, setIsOnline] = useState(true);
   const [hasOfflineVideos, setHasOfflineVideos] = useState(false);
+  const [dismissed, setDismissed] = useState(false); // плашку закрыли вручную
 
   useEffect(() => {
     // Проверяем начальное состояние
@@ -34,6 +35,7 @@ export default function OfflineHandler() {
     const handleOffline = async () => {
       console.log('[OfflineHandler] Connection lost');
       setIsOnline(false);
+      setDismissed(false); // новый обрыв сети — показываем плашку снова
 
       // Проверяем, есть ли скачанные видео
       const videos = await getAllOfflineVideos();
@@ -70,9 +72,17 @@ export default function OfflineHandler() {
   }, [router, pathname]);
 
   // Показываем уведомление если офлайн и нет скачанных видео
-  if (!isOnline && !hasOfflineVideos && pathname !== '/offline-videos') {
+  if (!isOnline && !hasOfflineVideos && !dismissed && pathname !== '/offline-videos') {
     return (
       <div className="fixed top-0 left-0 right-0 z-50 bg-red-500 text-white px-4 py-3 text-center">
+        <button
+          type="button"
+          onClick={() => setDismissed(true)}
+          aria-label="Закрыть"
+          className="absolute top-1/2 right-3 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-white text-lg font-bold leading-none"
+        >
+          ✕
+        </button>
         <p className="text-sm font-semibold">
           📡 Нет подключения к интернету
         </p>

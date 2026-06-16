@@ -130,7 +130,7 @@ export default function WorkoutReminder() {
             {isStarted ? 'продолжить' : 'начать'}
           </span>
           <span className="text-lime-400 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
-            {' '}тренировку с персональным тренером
+            {' '}{isStarted ? 'прерванную тренировку' : 'тренировку'}
           </span>
         </div>
       </div>

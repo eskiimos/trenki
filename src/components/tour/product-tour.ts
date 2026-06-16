@@ -32,8 +32,8 @@ export const PRODUCT_TOUR: TourStep[] = [
     route: '/',
     anchor: 'ai-trainer-card',
     advanceOn: 'tap',
-    title: 'Персональный ИИ-тренер',
-    body: 'Нажми на карточку — покажу, как ИИ подбирает тренировку под тебя.',
+    title: 'Быстрая тренировка',
+    body: 'Нажми на карточку — соберём быструю тренировку под тебя.',
   },
   {
     id: 'assess-goal',

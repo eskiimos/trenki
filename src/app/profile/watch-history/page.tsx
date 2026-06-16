@@ -157,7 +157,7 @@ const WatchHistoryPage = () => {
               textTransform: 'uppercase'
             }}
           >
-            История просмотров
+            История тренировок
           </h1>
         </div>
       </header>

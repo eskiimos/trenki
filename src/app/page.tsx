@@ -726,12 +726,12 @@ const TrainingsSection = () => (
                 <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex', cursor: 'pointer'}}>
                     <Image
                         src="/icons/icon-cards.svg"
-                        alt="ИИ тренер"
+                        alt="Быстрая тренировка"
                         width={24}
                         height={24}
                     />
                     <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50}}>
-                        персональный <span style={{color: '#A1FF4A'}}>ИИ</span> тренер
+                        <span style={{color: '#A1FF4A'}}>быстрая</span> тренировка
                     </div>
                 </div>
             </Link>
