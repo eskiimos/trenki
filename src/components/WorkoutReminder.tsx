@@ -19,14 +19,32 @@ interface WorkoutData {
   }>;
 }
 
+// O-2: «скрыть на сегодня». Раньше плашка не имела понятия «закрыто» — после
+// закрытия и обновления она появлялась снова (в цикле несколько PENDING-дней,
+// /api/training/current всегда отдаёт один). Теперь ✕ прячет напоминание на
+// текущий день (localStorage), а назавтра оно показывается снова.
+const DISMISS_KEY = 'workoutReminderDismissedDate';
+const todayKey = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+};
+
 export default function WorkoutReminder() {
   const router = useRouter();
   const [workout, setWorkout] = useState<WorkoutData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isCancelling, setIsCancelling] = useState(false);
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   useEffect(() => {
+    // Уже скрыли сегодня — ничего не показываем (и не дёргаем API).
+    try {
+      if (localStorage.getItem(DISMISS_KEY) === todayKey()) {
+        setIsLoading(false);
+        return;
+      }
+    } catch {
+      // localStorage недоступен — просто покажем напоминание как обычно.
+    }
+
     const fetchCurrentWorkout = async () => {
       try {
         const response = await fetch('/api/training/current');
@@ -51,42 +69,15 @@ export default function WorkoutReminder() {
 
   if (isLoading || !workout) return null;
 
-  const completedVideos = workout.modules.filter((v) => v.completed).length;
-  const totalVideos = workout.totalVideos;
-  const progress = Math.round((completedVideos / totalVideos) * 100);
   const isStarted = workout.status === 'IN_PROGRESS';
 
-  const handleCancelWorkout = async () => {
-    if (isCancelling || !workout) return;
-
+  const dismissForToday = () => {
     try {
-      setIsCancelling(true);
-      const response = await fetch('/api/training/cancel', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: workout.id }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error || 'Не удалось отменить тренировку');
-      }
-
-      setWorkout(null);
-      setShowCancelConfirm(false);
-    } catch (error) {
-      console.error('Ошибка отмены тренировки:', error);
-      const tg = window.Telegram?.WebApp;
-      const message = error instanceof Error ? error.message : 'Ошибка отмены тренировки';
-
-      if (tg?.showAlert) {
-        tg.showAlert(message);
-      } else {
-        alert(message);
-      }
-    } finally {
-      setIsCancelling(false);
+      localStorage.setItem(DISMISS_KEY, todayKey());
+    } catch {
+      // не критично — просто скроем на эту сессию страницы
     }
+    setWorkout(null);
   };
 
   return (
@@ -117,10 +108,10 @@ export default function WorkoutReminder() {
             type="button"
             onClick={(event) => {
               event.stopPropagation();
-              setShowCancelConfirm(true);
+              dismissForToday();
             }}
             className="w-8 h-8 -m-1 inline-flex items-center justify-center text-[#A1FF4A] text-lg font-bold leading-none"
-            aria-label="Закрыть напоминание"
+            aria-label="Скрыть напоминание на сегодня"
           >
             ✕
           </button>
@@ -134,39 +125,6 @@ export default function WorkoutReminder() {
           </span>
         </div>
       </div>
-      {showCancelConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setShowCancelConfirm(false)}
-            role="button"
-            tabIndex={-1}
-            aria-label="Закрыть подтверждение"
-          />
-          <div className="relative w-full max-w-sm rounded-xl bg-[#0B0F2A] p-4 text-left shadow-lg">
-            <div className="text-white text-base font-semibold">Вы уверены?</div>
-            <div className="mt-2 text-white/80 text-sm">
-              Тренировка будет отменена.
-            </div>
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setShowCancelConfirm(false)}
-                className="flex-1 rounded-lg border border-white/20 px-3 py-2 text-sm font-semibold text-white"
-              >
-                Нет
-              </button>
-              <button
-                type="button"
-                onClick={handleCancelWorkout}
-                className="flex-1 rounded-lg bg-[#A1FF4A] px-3 py-2 text-sm font-semibold text-[#0B0F2A]"
-              >
-                Да, отменить
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
