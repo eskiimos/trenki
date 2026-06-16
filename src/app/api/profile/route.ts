@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { updateUserActivity } from '@/lib/updateUserActivity';
 import { getSessionUserId } from '@/lib/auth-server';
+import {
+  isValidName,
+  isValidGameNumber,
+  NAME_MAX_FIRST,
+  NAME_MAX_LAST,
+} from '@/lib/profile-validation';
 
 export async function GET(request: NextRequest) {
   try {
@@ -63,9 +69,41 @@ export async function POST(request: NextRequest) {
 
     const { firstName, lastName, username, profile, email } = body;
 
+    // Валидация имени/фамилии: только буквы и дефис, ограничение длины.
+    // Защита от обхода клиентской маски — не доверяем телу запроса.
+    // Не-строковые значения тоже отбиваем чистым 400 (иначе Prisma даст 500).
+    if (firstName !== undefined && firstName !== null &&
+        (typeof firstName !== 'string' || (firstName.length > 0 && !isValidName(firstName, NAME_MAX_FIRST)))) {
+      return NextResponse.json(
+        { error: 'Имя: разрешены только буквы и дефис, до 10 символов' },
+        { status: 400 },
+      );
+    }
+    if (lastName !== undefined && lastName !== null &&
+        (typeof lastName !== 'string' || (lastName.length > 0 && !isValidName(lastName, NAME_MAX_LAST)))) {
+      return NextResponse.json(
+        { error: 'Фамилия: разрешены только буквы и дефис, до 15 символов' },
+        { status: 400 },
+      );
+    }
+
     let normalizedProfile = null;
     if (profile) {
       const { calculateAgeData, isValidBirthDate } = await import('@/lib/age-utils');
+
+      // Игровой номер: пусто или 1..99. Не используем truthiness — иначе
+      // числовой 0 тихо стал бы null вместо явного отказа.
+      const rawNumber = profile.number;
+      const parsedNumber =
+        rawNumber === null || rawNumber === undefined || rawNumber === ''
+          ? null
+          : parseInt(String(rawNumber), 10);
+      if (!isValidGameNumber(parsedNumber)) {
+        return NextResponse.json(
+          { error: 'Игровой номер должен быть от 1 до 99' },
+          { status: 400 },
+        );
+      }
 
       let ageGroup = profile.ageGroup || null;
       if (profile.birthDate) {
@@ -79,7 +117,7 @@ export async function POST(request: NextRequest) {
       normalizedProfile = {
         ...profile,
         position: profile.position ? profile.position : null,
-        number: profile.number ? parseInt(profile.number) : null,
+        number: parsedNumber,
         birthDate: profile.birthDate ? new Date(profile.birthDate) : null,
         ageGroup,
         height: profile.height ? parseInt(profile.height) : null,

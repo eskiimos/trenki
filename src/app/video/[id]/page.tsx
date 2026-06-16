@@ -90,6 +90,17 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [autoplayEnabled, setAutoplayEnabled] = useState(false);
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // LK-3. Режим просмотра: тренировочный (без перемотки, идёт в потенциал) /
+  // тестовый (с перемоткой, БЕЗ начисления потенциала, дневной лимит не тратит,
+  // но просмотр пишется в историю). Переключается пользователем в плеере.
+  // В тренировке (fromWorkout) — всегда тренировочный, перемотка запрещена.
+  const [watchMode, setWatchMode] = useState<'training' | 'test'>('training');
+  const canSeek = !fromWorkout && watchMode === 'test';
+  const canSeekRef = useRef(false); // зеркало canSeek для хоткеев без stale-стейта
+  // % просмотра для зачёта. Раньше было 99% + зависимость от onEnded → на Android
+  // (ребуфер/уход в фон в конце ролика) видео часто «не считалось».
+  const WATCH_CREDIT_PERCENT = 90;
+
   // Состояние для скачивания видео
   const [isDownloaded, setIsDownloaded] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -283,28 +294,38 @@ export default function VideoPage({ params }: VideoPageProps) {
         }
       }
 
-      // В тренировке завершение происходит только при 100% (onEnded event)
-      // Прогресс только отслеживаем, но не завершаем видео
-    } 
-    // Для обычного просмотра - проверяем 99% для начисления баллов
-    else if (!fromWorkout && videoId) {
-      if (!gainsCreditedRef.current && progressPercent >= 99) {
-        console.log('💰 Video reached 99%, crediting gains...', { currentTime, duration, progressPercent });
-        gainsCreditedRef.current = true;
-        await creditGainsForWatching();
+      // Завершаем видео по достижении порога ИЛИ по onEnded (что раньше).
+      // Раньше зависели ТОЛЬКО от onEnded — а он на Android часто не приходит
+      // (ребуфер/уход в фон в конце ролика) → видео не засчитывалось.
+      if (!videoCompletedRef.current && progressPercent >= WATCH_CREDIT_PERCENT) {
+        videoCompletedRef.current = true; // оптимистично — против дублей на соседних тиках
+        const ok = await completeVideoInWorkout();
+        // При сбое (сеть/не-ok) снимаем флаг: даём onEnded и следующим тикам повторить.
+        if (!ok) videoCompletedRef.current = false;
       }
     }
-  }, [fromWorkout, sessionId, videoId]);
+    // Для обычного просмотра — порог для начисления потенциала. Потенциал
+    // начисляем ТОЛЬКО в тренировочном режиме. В тестовом — без прибавки
+    // (просмотр уже записан в историю на старте, record-watch). Флаг латчим
+    // только когда реально пытались начислить, иначе test→training терял бы зачёт.
+    else if (!fromWorkout && videoId) {
+      if (!gainsCreditedRef.current && watchMode === 'training' && progressPercent >= WATCH_CREDIT_PERCENT) {
+        gainsCreditedRef.current = true; // оптимистично — против дублей
+        const ok = await creditGainsForWatching();
+        if (!ok) gainsCreditedRef.current = false; // при сбое — повтор на следующем тике
+      }
+    }
+  }, [fromWorkout, sessionId, videoId, watchMode]);
 
-  // Завершение видео в тренировке
-  const completeVideoInWorkout = async () => {
+  // Завершение видео в тренировке. Возвращает true только при успехе —
+  // вызывающий код по false снимает videoCompletedRef и повторяет (onEnded/тик).
+  const completeVideoInWorkout = async (): Promise<boolean> => {
     if (!fromWorkout || !sessionId || !videoId) {
       console.log('⚠️ Cannot complete video - missing params:', { fromWorkout, sessionId, videoId });
-      return;
+      return false;
     }
-    
+
     try {
-      console.log('✅ Completing video in workout:', { sessionId, videoId });
       const response = await fetch('/api/training/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -316,29 +337,31 @@ export default function VideoPage({ params }: VideoPageProps) {
       });
 
       const data = await response.json();
-      console.log('📊 Video completed response:', data);
 
       if (response.ok) {
         // Возвращаем на страницу тренировки
-        console.log('🔄 Redirecting to workout page...');
         setTimeout(() => {
           router.push(`/training/workout?id=${sessionId}`);
         }, 1000); // Небольшая задержка для плавности
-      } else {
-        console.error('❌ Failed to complete video:', data);
+        return true;
       }
+      console.error('❌ Failed to complete video:', data);
+      return false;
     } catch (error) {
       console.error('Ошибка завершения видео:', error);
+      return false;
     }
   };
 
-  // Начисление баллов при просмотре 80% видео (обычный просмотр, не тренировка)
-  const creditGainsForWatching = async () => {
-    if (!videoId || fromWorkout) return;
+  // Начисление потенциала при просмотре видео (обычный просмотр, не тренировка).
+  // Возвращает true, если зачёт можно считать завершённым (успех ИЛИ дневной
+  // лимит — повторять бессмысленно). false → сетевой/иной сбой, нужен повтор.
+  const creditGainsForWatching = async (): Promise<boolean> => {
+    if (!videoId || fromWorkout) return false;
 
     try {
       setIsCompletingModule(true);
-      
+
       const response = await fetch('/api/training/complete-module', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -349,38 +372,35 @@ export default function VideoPage({ params }: VideoPageProps) {
       });
 
       const data = await response.json();
-      console.log('📊 Gains credited response:', data);
 
       if (response.ok && data.success) {
         // Показываем модалку с приростом характеристик
         setCharacteristicsGains(data.gains);
         setNewCharacteristics(data.newCharacteristics);
         setShowGainsModal(true);
-        
+
         // Обновляем локальный профиль
         setUserProfile((prev: any) => ({
           ...prev,
           ...data.newCharacteristics,
         }));
-
-        // setToast({
-        //   message: '🎉 Вы заработали очки! Прогресс обновлен',
-        //   type: 'success',
-        // });
+        return true;
       } else if (data.limitReached) {
         setToast({
           message: data.error || 'Достигнут дневной лимит',
           type: 'warning',
         });
-      } else {
-        console.error('❌ Failed to credit gains:', data);
+        return true; // лимит — терминальное состояние на сегодня, не повторяем
       }
+      console.error('❌ Failed to credit gains:', data);
+      return false;
     } catch (error) {
       console.error('Ошибка начисления очков:', error);
       setToast({
         message: 'Ошибка начисления очков',
         type: 'error',
       });
+      return false;
     } finally {
       setIsCompletingModule(false);
     }
@@ -397,6 +417,7 @@ export default function VideoPage({ params }: VideoPageProps) {
     setShowNextVideoPreview(false);
     videoCompletedRef.current = false;
     gainsCreditedRef.current = false;
+    setWatchMode('training'); // каждое новое видео стартует в тренировочном режиме
     if (countdownTimerRef.current) {
       clearInterval(countdownTimerRef.current);
     }
@@ -777,6 +798,9 @@ export default function VideoPage({ params }: VideoPageProps) {
   useEffect(() => {
     isBufferingRef.current = isBuffering;
   }, [isBuffering]);
+  useEffect(() => {
+    canSeekRef.current = canSeek;
+  }, [canSeek]);
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -809,6 +833,7 @@ export default function VideoPage({ params }: VideoPageProps) {
 
   // Перемотка на 10 секунд назад
   const skipBackward = () => {
+    if (!canSeekRef.current) return; // тренировочный режим — перемотка запрещена
     if (videoRef.current) {
       videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
     }
@@ -817,39 +842,17 @@ export default function VideoPage({ params }: VideoPageProps) {
 
   // Перемотка на 10 секунд вперед
   const skipForward = () => {
+    if (!canSeekRef.current) return; // тренировочный режим — перемотка запрещена
     if (videoRef.current) {
       videoRef.current.currentTime = Math.min(videoRef.current.duration, videoRef.current.currentTime + 10);
     }
     showControlsTemporarily();
   };
 
-  // Обработка горячих клавиш для перемотки
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      // Игнорируем, если пользователь печатает в input/textarea
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-
-      switch(e.key) {
-        case 'ArrowLeft':
-          e.preventDefault();
-          skipBackward();
-          break;
-        case 'ArrowRight':
-          e.preventDefault();
-          skipForward();
-          break;
-        case ' ':
-          e.preventDefault();
-          togglePlay();
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, []);
+  // NB: единый обработчик горячих клавиш — handleKeyDown ниже (стрелки/J/L/
+  // пробел/цифры). Раньше был второй дублирующий listener (handleKeyPress),
+  // из-за чего одна стрелка перематывала на 15с, а пробел двойным togglePlay
+  // не срабатывал. Удалён в пользу handleKeyDown.
 
   // Проверка поддержки Fullscreen API
   const checkFullscreenSupport = () => {
@@ -951,7 +954,8 @@ export default function VideoPage({ params }: VideoPageProps) {
     // Завершаем видео в тренировке, если ещё не завершено
     if (fromWorkout && sessionId && !videoCompletedRef.current) {
       videoCompletedRef.current = true;
-      await completeVideoInWorkout();
+      const ok = await completeVideoInWorkout();
+      if (!ok) videoCompletedRef.current = false; // сбой — позволяем повторить
       return; // Не запускаем autoplay, возвращаемся к тренировке
     }
     
@@ -1061,6 +1065,23 @@ export default function VideoPage({ params }: VideoPageProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!videoRef.current) return;
+
+      // Не перехватываем клавиши, когда пользователь печатает в поле ввода.
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target instanceof HTMLElement && e.target.isContentEditable)
+      ) {
+        return;
+      }
+
+      // Тренировочный режим: перемотка запрещена — глушим все seek-клавиши.
+      const seekKeys = ['arrowleft', 'arrowright', 'j', 'l', '0', 'home', 'end',
+        '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+      if (!canSeekRef.current && seekKeys.includes(e.key.toLowerCase())) {
+        e.preventDefault();
+        return;
+      }
 
       switch(e.key.toLowerCase()) {
         case ' ':
@@ -1419,19 +1440,21 @@ export default function VideoPage({ params }: VideoPageProps) {
                     const isLeft = x < rect.width / 2;
 
                     if (doubleTapTimerRef.current) {
-                      // Второй тап в окне 250мс → перемотка
+                      // Второй тап в окне 250мс → перемотка (только если разрешена)
                       clearTimeout(doubleTapTimerRef.current);
                       doubleTapTimerRef.current = null;
 
-                      if (isLeft) {
-                        skipBackward();
-                      } else {
-                        skipForward();
-                      }
+                      if (canSeek) {
+                        if (isLeft) {
+                          skipBackward();
+                        } else {
+                          skipForward();
+                        }
 
-                      setSeekFlash(isLeft ? 'left' : 'right');
-                      if (seekFlashTimerRef.current) clearTimeout(seekFlashTimerRef.current);
-                      seekFlashTimerRef.current = setTimeout(() => setSeekFlash(null), 600);
+                        setSeekFlash(isLeft ? 'left' : 'right');
+                        if (seekFlashTimerRef.current) clearTimeout(seekFlashTimerRef.current);
+                        seekFlashTimerRef.current = setTimeout(() => setSeekFlash(null), 600);
+                      }
 
                       showControlsTemporarily();
                     } else {
@@ -1471,7 +1494,8 @@ export default function VideoPage({ params }: VideoPageProps) {
                     </div>
                   )}
                   <div className={`flex items-center gap-6 ${showControls ? '' : 'pointer-events-none'}`}>
-                    {/* Skip Backward 10s */}
+                    {/* Skip Backward 10s — только в тестовом режиме (перемотка) */}
+                    {canSeek && (
                     <button
                       onClick={(e) => { e.stopPropagation(); skipBackward(); }}
                       className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
@@ -1484,6 +1508,7 @@ export default function VideoPage({ params }: VideoPageProps) {
                         height={20}
                       />
                     </button>
+                    )}
 
                     {/* Play/Pause Button — крупный хитбокс 64px, чтобы легко попасть (#2) */}
                     <button
@@ -1502,7 +1527,8 @@ export default function VideoPage({ params }: VideoPageProps) {
                       />
                     </button>
 
-                    {/* Skip Forward 10s */}
+                    {/* Skip Forward 10s — только в тестовом режиме (перемотка) */}
+                    {canSeek && (
                     <button
                       onClick={(e) => { e.stopPropagation(); skipForward(); }}
                       className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
@@ -1515,6 +1541,7 @@ export default function VideoPage({ params }: VideoPageProps) {
                         height={20}
                       />
                     </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -1563,7 +1590,9 @@ export default function VideoPage({ params }: VideoPageProps) {
                 step={0.1}
                 value={currentTime}
                 aria-label="Перемотка видео"
+                disabled={!canSeek}
                 onChange={(e) => {
+                  if (!canSeek) return; // тренировочный режим — перемотка запрещена
                   const t = Number(e.target.value);
                   setCurrentTime(t);
                   if (videoRef.current) {
@@ -1571,7 +1600,7 @@ export default function VideoPage({ params }: VideoPageProps) {
                   }
                   showControlsTemporarily();
                 }}
-                className="video-scrubber relative w-full"
+                className={`video-scrubber relative w-full ${canSeek ? '' : 'pointer-events-none opacity-70'}`}
               />
             </div>
             
@@ -1619,6 +1648,27 @@ export default function VideoPage({ params }: VideoPageProps) {
               </div>
               
               <div className={`flex items-center space-x-2 ${isLandscape ? 'space-x-3' : ''}`}>
+                {/* LK-3. Переключатель режима просмотра. В тренировке скрыт —
+                    там всегда тренировочный (без перемотки, идёт в прогресс). */}
+                {!fromWorkout && (
+                  <button
+                    onClick={() => {
+                      setWatchMode(prev => (prev === 'training' ? 'test' : 'training'));
+                      showControlsTemporarily();
+                    }}
+                    className={`px-2 py-0.5 rounded border text-xs font-semibold transition-all ${
+                      watchMode === 'test'
+                        ? 'border-[#A1FF4A] text-[#A1FF4A] bg-white/10'
+                        : 'border-white/40 text-white hover:border-white/70 hover:bg-white/10'
+                    }`}
+                    title={watchMode === 'training'
+                      ? 'Тренировочный режим: без перемотки, идёт в прогресс. Нажмите для тестового.'
+                      : 'Тестовый режим: с перемоткой, без начисления прогресса. Нажмите для тренировочного.'}
+                  >
+                    {watchMode === 'training' ? 'Тренировка' : 'Тест'}
+                  </button>
+                )}
+
                 {/* Autoplay Toggle */}
                 <button
                   onClick={() => {

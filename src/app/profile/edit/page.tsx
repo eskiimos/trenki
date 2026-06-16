@@ -9,6 +9,12 @@ import { ProfileEditSkeleton } from '../../../components/Skeleton';
 import BottomNavigation from '@/components/BottomNavigation';
 import { apiCache } from '@/lib/cache';
 import ImageCropper from '@/components/ImageCropper';
+import {
+  sanitizeName,
+  sanitizeNumberInput,
+  NAME_MAX_FIRST,
+  NAME_MAX_LAST,
+} from '@/lib/profile-validation';
 
 const ProfileEditPage = () => {
   const { user } = useTelegram();
@@ -64,12 +70,14 @@ const ProfileEditPage = () => {
         if (!cancelled) {
           setUserProfile(data.user);
           
-          // Заполняем форму данными
+          // Заполняем форму данными.
+          // Имя/фамилию/номер чистим маской уже на загрузке — иначе legacy-значения
+          // (например, с пробелами из Telegram) заблокировали бы сохранение профиля.
           setFormData({
-            firstName: data.user?.firstName || user.first_name || '',
-            lastName: data.user?.lastName || user.last_name || '',
+            firstName: sanitizeName(data.user?.firstName || user.first_name || '', NAME_MAX_FIRST),
+            lastName: sanitizeName(data.user?.lastName || user.last_name || '', NAME_MAX_LAST),
             position: data.user?.profile?.position || '',
-            number: data.user?.profile?.number?.toString() || '',
+            number: sanitizeNumberInput(data.user?.profile?.number?.toString() || ''),
             birthDate: data.user?.profile?.birthDate ? new Date(data.user.profile.birthDate).toISOString().split('T')[0] : '',
             gender: data.user?.profile?.gender || '',
             height: data.user?.profile?.height?.toString() || '',
@@ -300,7 +308,7 @@ const ProfileEditPage = () => {
         email: emailStep === 'verified' ? currentEmail : undefined,
         profile: {
           position: formData.position || null,
-          number: formData.number ? parseInt(formData.number) : null,
+          number: formData.number ? parseInt(formData.number, 10) : null,
           birthDate: formData.birthDate ? new Date(formData.birthDate).toISOString() : null,
           gender: formData.gender || null,
           height: formData.height ? parseInt(formData.height) : null,
@@ -362,10 +370,12 @@ const ProfileEditPage = () => {
         errorMessage = 'Проблема с подключением. Проверьте интернет соединение.';
       } else if (err?.message?.includes('Сервер вернул невалидный ответ')) {
         errorMessage = 'Сервер недоступен. Попробуйте позже.';
-      } else if (err?.message?.includes('Ошибка сервера:')) {
+      } else if (err?.message) {
+        // Текст ошибки от сервера (валидация имени/номера 400, занятый email 409
+        // и т.п.) показываем как есть, чтобы пользователь понял, что исправить.
         errorMessage = err.message;
       }
-      
+
       alert(errorMessage);
     } finally {
       setIsSaving(false);
@@ -462,7 +472,8 @@ const ProfileEditPage = () => {
           <input
             type="text"
             value={formData.firstName}
-            onChange={(e) => handleInputChange('firstName', e.target.value)}
+            onChange={(e) => handleInputChange('firstName', sanitizeName(e.target.value, NAME_MAX_FIRST))}
+            maxLength={NAME_MAX_FIRST}
             placeholder="ИМЯ"
             className="w-full text-white placeholder-gray-400 px-4 border focus:outline-none transition-colors"
             style={{
@@ -481,7 +492,8 @@ const ProfileEditPage = () => {
           <input
             type="text"
             value={formData.lastName}
-            onChange={(e) => handleInputChange('lastName', e.target.value)}
+            onChange={(e) => handleInputChange('lastName', sanitizeName(e.target.value, NAME_MAX_LAST))}
+            maxLength={NAME_MAX_LAST}
             placeholder="ФАМИЛИЯ"
             className="w-full text-white placeholder-gray-400 px-4 border focus:outline-none transition-colors"
             style={{
@@ -810,11 +822,12 @@ const ProfileEditPage = () => {
         <div>
           <label className="text-white text-sm mb-2 block uppercase">ИГРОВОЙ НОМЕР</label>
           <input
-            type="number"
-            min="1"
-            max="99"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={formData.number}
-            onChange={(e) => handleInputChange('number', e.target.value)}
+            onChange={(e) => handleInputChange('number', sanitizeNumberInput(e.target.value))}
+            maxLength={2}
             placeholder="00"
             className="w-full text-white placeholder-gray-400 px-4 border focus:outline-none transition-colors"
             style={{
