@@ -58,6 +58,45 @@ interface VideoData {
   muscleGroup?: string | null;
 }
 
+// O-3: сохранение тайм-кода просмотра в localStorage, чтобы при обновлении/
+// выходе/возврате видео продолжалось примерно с места остановки.
+const POS_PREFIX = 'video_pos_';
+const posKey = (id: string) => POS_PREFIX + id;
+
+function saveVideoPosition(id: string, t: number, d: number, creditPercent: number) {
+  try {
+    if (!id || !d || isNaN(d) || isNaN(t)) return;
+    // Не храним: вступление (t<5) ИЛИ позицию за порогом зачёта — иначе
+    // возобновление с >=порога давало бы мгновенный/повторный зачёт потенциала.
+    if (t < 5 || t >= d * (creditPercent / 100)) {
+      localStorage.removeItem(posKey(id));
+      return;
+    }
+    localStorage.setItem(posKey(id), JSON.stringify({ t }));
+  } catch {
+    // localStorage недоступен — просто не сохраняем позицию
+  }
+}
+
+function loadVideoPosition(id: string): number | null {
+  try {
+    const raw = id ? localStorage.getItem(posKey(id)) : null;
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    return typeof v?.t === 'number' && isFinite(v.t) ? v.t : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearVideoPosition(id: string) {
+  try {
+    if (id) localStorage.removeItem(posKey(id));
+  } catch {
+    // no-op
+  }
+}
+
 export default function VideoPage({ params }: VideoPageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -414,6 +453,8 @@ export default function VideoPage({ params }: VideoPageProps) {
     setShowNextVideoPreview(false);
     videoCompletedRef.current = false;
     gainsCreditedRef.current = false;
+    resumeAppliedRef.current = false; // O-3: для нового видео заново применим resume
+    lastPosSaveRef.current = 0;
     setWatchMode('training'); // каждое новое видео стартует в тренировочном режиме
 
     const loadKinescopeUrl = async () => {
@@ -781,6 +822,8 @@ export default function VideoPage({ params }: VideoPageProps) {
   const isBufferingRef = useRef(false); // зеркало isBuffering — чтобы onTimeUpdate не читал stale-стейт
   const hasShownHintRef = useRef(false); // Флаг для показа подсказки только один раз
   const pendingSeekRef = useRef<number | null>(null); // Позиция для восстановления после смены качества
+  const resumeAppliedRef = useRef(false); // O-3: позицию из localStorage применяем один раз на видео
+  const lastPosSaveRef = useRef(0); // O-3: троттлинг сохранения позиции
 
   // Держим ref в синхроне с showControls — нужно для решения show/hide внутри
   // отложенного single-tap обработчика (замыкание видит свежее значение).
@@ -942,7 +985,8 @@ export default function VideoPage({ params }: VideoPageProps) {
   const handleVideoEnded = async () => {
     setIsPlaying(false);
     setIsBuffering(false);
-    
+    clearVideoPosition(videoId); // O-3: досмотрено — не возобновляем с конца
+
     // Завершаем видео в тренировке, если ещё не завершено
     if (fromWorkout && sessionId && !videoCompletedRef.current) {
       videoCompletedRef.current = true;
@@ -1282,6 +1326,18 @@ export default function VideoPage({ params }: VideoPageProps) {
                   const video = e.currentTarget;
                   setCurrentTime(video.currentTime);
 
+                  // O-3: периодически сохраняем позицию (не чаще раза в 5с, без
+                  // setState). Только для свободного просмотра и ТОЛЬКО после того,
+                  // как resume применён (resumeAppliedRef) — иначе ранний тик при
+                  // t<5 успел бы стереть сохранённую позицию до её восстановления.
+                  if (!fromWorkout && video.duration && resumeAppliedRef.current) {
+                    const nowTs = Date.now();
+                    if (nowTs - lastPosSaveRef.current > 5000) {
+                      lastPosSaveRef.current = nowTs;
+                      saveVideoPosition(videoId, video.currentTime, video.duration, WATCH_CREDIT_PERCENT);
+                    }
+                  }
+
                   // Видео реально двигается — значит не застряло на буферизации.
                   // Читаем через ref, чтобы не дёргать setState на stale-значении.
                   if (isBufferingRef.current) setIsBuffering(false);
@@ -1308,12 +1364,30 @@ export default function VideoPage({ params }: VideoPageProps) {
                 onCanPlay={(e) => {
                   const video = e.currentTarget;
 
-                  // Восстанавливаем позицию после смены качества
+                  // Восстанавливаем позицию после смены качества. Это имеет
+                  // приоритет над resume из localStorage — отмечаем resume как
+                  // применённый, чтобы он не перебил позицию смены качества.
                   if (pendingSeekRef.current !== null) {
                     video.currentTime = pendingSeekRef.current;
                     pendingSeekRef.current = null;
+                    resumeAppliedRef.current = true;
                     video.play().catch(() => {});
                     return;
+                  }
+
+                  // O-3: один раз на видео восстанавливаем сохранённую позицию
+                  // (до автостарта). Флаг ставим ТОЛЬКО когда duration уже известна —
+                  // иначе ранний canPlay с duration=0/NaN (Android) «съел» бы
+                  // единственный resume; повторные canPlay (ребуфер) отсекаются им же.
+                  // Сохранённая позиция всегда НИЖЕ порога зачёта (saveVideoPosition
+                  // не пишет >=порога), поэтому мгновенного/повторного зачёта от
+                  // resume нет — зачёт начисляет обычный тик при достижении 90%.
+                  if (!resumeAppliedRef.current && !fromWorkout && video.duration && !isNaN(video.duration)) {
+                    resumeAppliedRef.current = true;
+                    const saved = loadVideoPosition(videoId);
+                    if (saved !== null && saved >= 5 && saved < video.duration - 1) {
+                      video.currentTime = saved;
+                    }
                   }
 
                   // Пытаемся начать воспроизведение когда видео готово.
