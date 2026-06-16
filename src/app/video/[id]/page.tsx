@@ -82,13 +82,10 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [isKinescopeLoading, setIsKinescopeLoading] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   
-  // Для автоплея следующего видео
+  // Для рекомендации следующего видео в конце просмотра (без автоплея)
   const [allVideos, setAllVideos] = useState<VideoData[]>([]);
   const [nextVideo, setNextVideo] = useState<VideoData | null>(null);
   const [showNextVideoPreview, setShowNextVideoPreview] = useState(false);
-  const [countdown, setCountdown] = useState(5);
-  const [autoplayEnabled, setAutoplayEnabled] = useState(false);
-  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // LK-3. Режим просмотра: тренировочный (без перемотки, идёт в потенциал) /
   // тестовый (с перемоткой, БЕЗ начисления потенциала, дневной лимит не тратит,
@@ -418,10 +415,7 @@ export default function VideoPage({ params }: VideoPageProps) {
     videoCompletedRef.current = false;
     gainsCreditedRef.current = false;
     setWatchMode('training'); // каждое новое видео стартует в тренировочном режиме
-    if (countdownTimerRef.current) {
-      clearInterval(countdownTimerRef.current);
-    }
-    
+
     const loadKinescopeUrl = async () => {
       if (videoData?.videoUrl && isKinescopeUrl(videoData.videoUrl)) {
         // Offline-fallback: если нет сети ИЛИ видео уже скачано — берём прямую
@@ -781,12 +775,10 @@ export default function VideoPage({ params }: VideoPageProps) {
 
   const [showControls, setShowControls] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false); // спиннер при буферизации видео (#4)
-  const [autoplayHint, setAutoplayHint] = useState(false); // тост-пояснение при переключении автоплея (#5)
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const showControlsRef = useRef(true); // зеркало showControls для тап-логики без stale-стейта (#1)
   const isBufferingRef = useRef(false); // зеркало isBuffering — чтобы onTimeUpdate не читал stale-стейт
-  const autoplayHintTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownHintRef = useRef(false); // Флаг для показа подсказки только один раз
   const pendingSeekRef = useRef<number | null>(null); // Позиция для восстановления после смены качества
 
@@ -959,39 +951,15 @@ export default function VideoPage({ params }: VideoPageProps) {
       return; // Не запускаем autoplay, возвращаемся к тренировке
     }
     
-    if (autoplayEnabled && nextVideo) {
-      // Показываем превью и запускаем обратный отсчёт
-      startCountdown();
+    // Автоплея нет: в конце просто показываем рекомендацию следующего видео
+    // (обложка + название, без воспроизведения). Переход — по тапу.
+    if (nextVideo) {
+      setShowNextVideoPreview(true);
     }
   };
 
-  const startCountdown = () => {
-    setShowNextVideoPreview(true);
-    setCountdown(5);
-    
-    countdownTimerRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          // Переходим к следующему видео
-          if (countdownTimerRef.current) {
-            clearInterval(countdownTimerRef.current);
-          }
-          if (nextVideo) {
-            router.push(`/video/${nextVideo.id}`);
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  const cancelAutoplay = () => {
-    if (countdownTimerRef.current) {
-      clearInterval(countdownTimerRef.current);
-    }
+  const closeRecommendation = () => {
     setShowNextVideoPreview(false);
-    setAutoplayEnabled(false);
   };
 
   // Функция для смены качества видео
@@ -1045,12 +1013,6 @@ export default function VideoPage({ params }: VideoPageProps) {
     return () => {
       if (hideControlsTimeoutRef.current) {
         clearTimeout(hideControlsTimeoutRef.current);
-      }
-      if (countdownTimerRef.current) {
-        clearInterval(countdownTimerRef.current);
-      }
-      if (autoplayHintTimerRef.current) {
-        clearTimeout(autoplayHintTimerRef.current);
       }
       if (doubleTapTimerRef.current) {
         clearTimeout(doubleTapTimerRef.current);
@@ -1221,8 +1183,6 @@ export default function VideoPage({ params }: VideoPageProps) {
             onClick={() => {
               if (fromWorkout) {
                 router.push('/training/workout');
-              } else if (autoplayEnabled) {
-                router.push('/video');
               } else {
                 router.back();
               }
@@ -1669,31 +1629,6 @@ export default function VideoPage({ params }: VideoPageProps) {
                   </button>
                 )}
 
-                {/* Autoplay Toggle */}
-                <button
-                  onClick={() => {
-                    const next = !autoplayEnabled;
-                    setAutoplayEnabled(next);
-                    // Поясняющий тост — чтобы было понятно, что делает кнопка (#5)
-                    setAutoplayHint(true);
-                    if (autoplayHintTimerRef.current) clearTimeout(autoplayHintTimerRef.current);
-                    autoplayHintTimerRef.current = setTimeout(() => setAutoplayHint(false), 2400);
-                    showControlsTemporarily();
-                  }}
-                  className="transition-opacity hover:opacity-80 p-2"
-                  title="Автоплей: автоматически запускать следующее видео"
-                >
-                  <Image
-                    src={autoplayEnabled 
-                      ? '/icons/video/player/material-symbols_autoplay active.svg'
-                      : '/icons/video/player/material-symbols_autoplay def.svg'
-                    }
-                    alt="Автоплей"
-                    width={isLandscape ? 24 : 18}
-                    height={isLandscape ? 24 : 18}
-                  />
-                </button>
-
                 {/* Quality Selector — только если доступно несколько качеств */}
                 {Object.keys(availableQualities).length > 1 && (
                   <div className="relative" onClick={(e) => e.stopPropagation()}>
@@ -1768,28 +1703,18 @@ export default function VideoPage({ params }: VideoPageProps) {
             </>
           )}
 
-          {/* Тост-пояснение автоплея (#5) */}
-          {autoplayHint && !showFullscreenHint && (
-            <div className="absolute left-1/2 -translate-x-1/2 bottom-20 z-50 pointer-events-none">
-              <div className="bg-black/85 backdrop-blur-sm text-white text-xs font-medium px-4 py-2 rounded-full whitespace-nowrap border border-white/15">
-                {autoplayEnabled
-                  ? '▶ Автоплей включён — следующее видео запустится само'
-                  : '⏸ Автоплей выключен'}
-              </div>
-            </div>
-          )}
-
-          {/* Next Video Preview with Countdown - Overlay */}
+          {/* Рекомендация следующего видео — Overlay (без автоплея) */}
           {showNextVideoPreview && nextVideo && (
             <div className="absolute inset-0 bg-[#0A0E1A] p-4 md:p-8 z-50">
-              {/* Header - "ДАЛЕЕ" слева, крестик справа */}
+              {/* Header — «РЕКОМЕНДУЕМ» слева, крестик справа */}
               <div className="flex items-center justify-between mb-6 md:mb-8">
-                <h2 className="text-white text-xl md:text-4xl font-bold tracking-wider">ДАЛЕЕ</h2>
-                
+                <h2 className="text-white text-xl md:text-4xl font-bold tracking-wider">РЕКОМЕНДУЕМ</h2>
+
                 {/* Close Button */}
                 <button
-                  onClick={cancelAutoplay}
+                  onClick={closeRecommendation}
                   className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center text-white hover:text-gray-300 transition-colors"
+                  aria-label="Закрыть"
                 >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="md:w-7 md:h-7">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -1797,10 +1722,15 @@ export default function VideoPage({ params }: VideoPageProps) {
                   </svg>
                 </button>
               </div>
-              
-              {/* Content: Превью (240px) + Название справа на мобилке */}
-              <div className="flex flex-row md:flex-row items-start gap-4 md:gap-8">
-                {/* Thumbnail with Countdown - 240px на мобилке */}
+
+              {/* Кликабельная карточка: обложка + название. Видео НЕ играет —
+                  переход на страницу видео только по тапу. */}
+              <button
+                type="button"
+                onClick={() => router.push(`/video/${nextVideo.id}`)}
+                className="flex flex-row items-start gap-4 md:gap-8 text-left w-full"
+              >
+                {/* Thumbnail с иконкой play */}
                 <div className="relative w-60 md:w-[400px] flex-shrink-0">
                   <div className="w-full aspect-video rounded-lg md:rounded-2xl overflow-hidden bg-white/5 backdrop-blur-sm border border-white/10">
                     {nextVideo.thumbnail && (
@@ -1811,74 +1741,32 @@ export default function VideoPage({ params }: VideoPageProps) {
                         className="object-cover opacity-80"
                       />
                     )}
-                    {/* Countdown Circle - в центре превью */}
+                    {/* Play icon по центру */}
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="relative w-16 h-16 md:w-24 md:h-24">
-                        <svg className="w-full h-full transform -rotate-90">
-                          <circle
-                            cx="32"
-                            cy="32"
-                            r="28"
-                            stroke="rgba(255,255,255,0.15)"
-                            strokeWidth="2.5"
-                            fill="none"
-                            className="md:hidden"
-                          />
-                          <circle
-                            cx="32"
-                            cy="32"
-                            r="28"
-                            stroke="white"
-                            strokeWidth="2.5"
-                            fill="none"
-                            strokeDasharray={`${2 * Math.PI * 28}`}
-                            strokeDashoffset={`${2 * Math.PI * 28 * (1 - countdown / 5)}`}
-                            className="transition-all duration-1000 ease-linear md:hidden"
-                          />
-                          <circle
-                            cx="48"
-                            cy="48"
-                            r="42"
-                            stroke="rgba(255,255,255,0.15)"
-                            strokeWidth="3"
-                            fill="none"
-                            className="hidden md:block"
-                          />
-                          <circle
-                            cx="48"
-                            cy="48"
-                            r="42"
-                            stroke="white"
-                            strokeWidth="3"
-                            fill="none"
-                            strokeDasharray={`${2 * Math.PI * 42}`}
-                            strokeDashoffset={`${2 * Math.PI * 42 * (1 - countdown / 5)}`}
-                            className="hidden md:block transition-all duration-1000 ease-linear"
-                          />
+                      <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center border border-white/20">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="white" className="md:w-8 md:h-8 ml-0.5">
+                          <path d="M8 5v14l11-7z" />
                         </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-white text-2xl md:text-4xl font-bold">{countdown}</span>
-                        </div>
                       </div>
                     </div>
-                    {/* Timer Badge */}
+                    {/* Duration Badge */}
                     <div className="absolute bottom-2 right-2 md:bottom-3 md:right-3 bg-black/70 backdrop-blur-sm rounded px-2 py-1 md:px-2.5 md:py-1">
                       <span className="text-white text-[10px] md:text-xs font-medium">
-                        {nextVideo.duration && !isNaN(nextVideo.duration) && nextVideo.duration > 0 
-                          ? `${Math.floor(nextVideo.duration / 60)}:${String(Math.floor(nextVideo.duration % 60)).padStart(2, '0')}` 
+                        {nextVideo.duration && !isNaN(nextVideo.duration) && nextVideo.duration > 0
+                          ? `${Math.floor(nextVideo.duration / 60)}:${String(Math.floor(nextVideo.duration % 60)).padStart(2, '0')}`
                           : '0:00'}
                       </span>
                     </div>
                   </div>
                 </div>
-                
-                {/* Video Title - справа от превью */}
+
+                {/* Название + инфо справа */}
                 <div className="flex-1 flex flex-col justify-start">
                   <h3 className="text-white text-sm md:text-xl font-semibold leading-snug mb-3 md:mb-6">
                     {nextVideo.title}
                   </h3>
-                  
-                  {/* Info - только на десктопе */}
+
+                  {/* Info — только на десктопе */}
                   <div className="hidden md:flex flex-col gap-5 text-white/60 uppercase tracking-wider text-xs font-medium">
                     <div className="flex flex-col gap-1">
                       <div className="text-[9px] text-white/40">ВИД</div>
@@ -1894,7 +1782,7 @@ export default function VideoPage({ params }: VideoPageProps) {
                     </div>
                   </div>
                 </div>
-              </div>
+              </button>
             </div>
           )}
         </div>
