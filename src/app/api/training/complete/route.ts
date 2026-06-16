@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
     const session = await prisma.workoutSession.findUnique({
       where: { id: sessionId },
       include: {
+        microcycleDay: true, // непустой → это тренировка из недельного цикла
         videos: {
           include: {
             video: {
@@ -55,6 +56,13 @@ export async function POST(request: NextRequest) {
         { error: 'Доступ запрещен' },
         { status: 403 }
       );
+    }
+
+    // Идемпотентность: уже завершённую сессию повторно НЕ начисляем. Важно
+    // особенно для цикловых — у них больше нет дневного лимита-бэкстопа, и
+    // двойной вызов (ретрай/дабл-тап) иначе начислил бы прибавку дважды.
+    if (session.status === WorkoutStatus.COMPLETED) {
+      return NextResponse.json({ success: true, alreadyCompleted: true });
     }
 
     const allCompleted = session.videos.every(v => v.completed);
@@ -140,20 +148,30 @@ export async function POST(request: NextRequest) {
       : null;
     
     let trainingsToday = user.profile.trainingsToday;
-    
+
     // Сбрасываем счетчик если новый день
     if (!lastTrainingDate || lastTrainingDate < today) {
       trainingsToday = 0;
     }
 
-    // Проверяем лимит (2 тренировки в день)
-    if (trainingsToday >= 2) {
+    // Тренировки из недельного цикла НЕ подпадают под дневной лимит (2/день) —
+    // это запланированная программа, а не ad-hoc быстрые тренировки. Иначе при
+    // «догоне» пропущенных дней цикла пользователь упирался в лимит и вместо
+    // дашборда с прибавкой видел «достигнут дневной лимит» (баг C-6).
+    const isCycleTraining = session.microcycleDay != null;
+
+    // Проверяем лимит (2 тренировки в день) — только для быстрых тренировок.
+    if (!isCycleTraining && trainingsToday >= 2) {
       return NextResponse.json({
         success: false,
         error: 'Достигнут дневной лимит тренировок (2). Отдохни и возвращайся завтра! 💪',
         limitReached: true,
       });
     }
+
+    // Новое значение счётчика: цикловые тренировки его НЕ увеличивают
+    // (не расходуют дневной бюджет быстрых тренировок).
+    const newTrainingsToday = isCycleTraining ? trainingsToday : trainingsToday + 1;
 
     // Обновляем профиль
     await prisma.profile.update({
@@ -165,7 +183,7 @@ export async function POST(request: NextRequest) {
         ratingTechnique: parseFloat(newCharacteristics.ratingTechnique.toFixed(1)),
         ratingFlexibility: parseFloat(newCharacteristics.ratingFlexibility.toFixed(1)),
         potential: newPotential,
-        trainingsToday: trainingsToday + 1,
+        trainingsToday: newTrainingsToday,
         lastTrainingDate: new Date(),
       },
     });
@@ -210,7 +228,8 @@ export async function POST(request: NextRequest) {
       sessionId: updatedSession.id,
       status: updatedSession.status,
       newPotential,
-      trainingsToday: trainingsToday + 1,
+      isCycleTraining,
+      trainingsToday: newTrainingsToday,
     });
 
     // Автозакрытие тренерских заданий:
@@ -251,7 +270,7 @@ export async function POST(request: NextRequest) {
         ratingFlexibility: newCharacteristics.ratingFlexibility,
         potential: newPotential,
       },
-      trainingsToday: trainingsToday + 1,
+      trainingsToday: newTrainingsToday,
     });
 
   } catch (error) {
