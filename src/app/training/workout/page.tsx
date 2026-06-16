@@ -46,6 +46,7 @@ interface Workout {
   modules: WorkoutModule[];
   equipment?: string[];
   trainingGoal?: string | null;
+  dayLabel?: string | null;
 }
 
 const GOAL_LABELS: Record<string, string> = {
@@ -550,6 +551,29 @@ export default function WorkoutPage() {
           }}>
             <span style={{color: '#A1FF4A'}}>ии-тренер</span> рекомендует пройти все модули по очереди, а потом хорошенько отдохнуть
           </div>
+        </div>
+      )}
+
+      {/* Название дня цикла (нагрузка/характер дня) — для цикловых тренировок */}
+      {workout.dayLabel && (
+        <div className="mb-2" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{
+            fontFamily: 'Overpass',
+            fontWeight: 400,
+            fontSize: '12px',
+            lineHeight: '120%',
+            letterSpacing: '0.5px',
+            color: '#9B99AA',
+          }}>ДЕНЬ ЦИКЛА:</span>
+          <span style={{
+            fontFamily: 'Overpass',
+            fontWeight: 700,
+            fontSize: '12px',
+            lineHeight: '120%',
+            letterSpacing: '0.5px',
+            textTransform: 'uppercase',
+            color: '#A1FF4A',
+          }}>{workout.dayLabel}</span>
         </div>
       )}
 

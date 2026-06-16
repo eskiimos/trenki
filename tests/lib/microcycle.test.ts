@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planWeek, parsePrevDay, type DayState } from '@/lib/microcycle/week-plan';
+import { planWeek, parsePrevDay, goalsFromStoredDays, type DayState } from '@/lib/microcycle/week-plan';
 import {
   getMicrocycleStartDate,
   getMicrocycleWeekStart,
@@ -16,6 +16,31 @@ import {
 // Хелпер: состояния дней по dayOfWeek для компактных проверок.
 const statesByDay = (week: { dayOfWeek: number; kind: string; energyState: EnergyState }[]) =>
   Object.fromEntries(week.map((d) => [d.dayOfWeek, `${d.kind}:${d.energyState}`]));
+
+describe('microcycle/week-plan — goalsFromStoredDays (восстановление цели дня из intent)', () => {
+  for (const cycleNumber of [1, 2, 3]) {
+    it(`совпадает с planWeek (цель + подпись) для цикла ${cycleNumber}`, () => {
+      const plan = planWeek(null, null, cycleNumber);
+      const stored = plan.map((d) => ({ dayOfWeek: d.dayOfWeek, intent: d.intent }));
+      const restored = goalsFromStoredDays(stored, cycleNumber);
+      expect(restored.map((d) => [d.dayOfWeek, d.goal, d.label])).toEqual(
+        plan.map((d) => [d.dayOfWeek, d.goal, d.label]),
+      );
+    });
+  }
+
+  it('восстанавливает цель и для адаптированной (ИЗИ) недели', () => {
+    const prev = planWeek(null, null, 1).map((d) => ({
+      dayOfWeek: d.dayOfWeek,
+      kind: d.kind,
+      energyState: d.energyState,
+    }));
+    const plan2 = planWeek(prev, MicrocycleFeedback.EASY, 2);
+    const stored = plan2.map((d) => ({ dayOfWeek: d.dayOfWeek, intent: d.intent }));
+    const restored = goalsFromStoredDays(stored, 2);
+    expect(restored.map((d) => d.goal)).toEqual(plan2.map((d) => d.goal));
+  });
+});
 
 describe('microcycle/week-plan — стартовая неделя', () => {
   const base = planWeek(null, null, 1);

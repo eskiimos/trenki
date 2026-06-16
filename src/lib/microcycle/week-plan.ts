@@ -211,3 +211,18 @@ export function planWeek(
   const adapted = adaptWeek(prev, feedback);
   return assignGoals(adapted, cycleNumber);
 }
+
+/**
+ * Восстанавливает план дней (с целями и подписями) из сохранённых intent и
+ * номера цикла — та же ротация целей, что при генерации. assignGoals чист и
+ * зависит только от структуры недели + cycleNumber, а структура (FULL/лёгкий)
+ * однозначно выводится из intent через parsePrevDay. Позволяет показать цель
+ * дня цикла без отдельного хранения её в БД (миграция не нужна).
+ */
+export function goalsFromStoredDays(
+  days: { dayOfWeek: number; intent: MicrocycleIntent }[],
+  cycleNumber: number,
+): DayPlan[] {
+  const states = days.map((d) => parsePrevDay(d.dayOfWeek, d.intent));
+  return assignGoals(states, cycleNumber);
+}

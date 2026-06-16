@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { WorkoutStatus, MicrocycleStatus } from '@/generated/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
+import { goalsFromStoredDays } from '@/lib/microcycle/week-plan';
 
 /**
  * GET /api/training/current[?workoutId=xxx]
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
               },
               orderBy: { order: 'asc' },
             },
+            microcycleDay: { include: { microcycle: { include: { days: true } } } },
           },
         })
       : null;
@@ -48,6 +50,7 @@ export async function GET(request: NextRequest) {
             },
             orderBy: { order: 'asc' },
           },
+          microcycleDay: { include: { microcycle: { include: { days: true } } } },
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -87,7 +90,25 @@ export async function GET(request: NextRequest) {
       where: { userId: workout.userId },
       select: { lastGoals: true },
     });
-    const trainingGoal = ownerProfile?.lastGoals?.[0] || null;
+    let trainingGoal: string | null = ownerProfile?.lastGoals?.[0] || null;
+    let dayLabel: string | null = null;
+
+    // Для тренировки из недельного цикла берём ЦЕЛЬ и подпись именно этого дня
+    // (а не последнюю быструю цель из lastGoals). Цель восстанавливаем из
+    // сохранённых intent + cycleNumber той же ротацией, что при генерации —
+    // без отдельного хранения цели (миграция не нужна).
+    const mday = workout.microcycleDay;
+    if (mday?.microcycle) {
+      const plans = goalsFromStoredDays(
+        mday.microcycle.days.map((d) => ({ dayOfWeek: d.dayOfWeek, intent: d.intent })),
+        mday.microcycle.cycleNumber,
+      );
+      const plan = plans.find((p) => p.dayOfWeek === mday.dayOfWeek);
+      if (plan) {
+        trainingGoal = plan.goal;
+        dayLabel = plan.label;
+      }
+    }
 
     const totalVideos = workout.totalVideos;
     const completedVideos = workout.videos.filter((v) => v.completed).length;
@@ -107,6 +128,7 @@ export async function GET(request: NextRequest) {
         startedAt: workout.startedAt,
         createdAt: workout.createdAt,
         trainingGoal,
+        dayLabel,
         modules: workout.videos.map((wsVideo) => ({
           id: wsVideo.video.id,
           sessionVideoId: wsVideo.id,
