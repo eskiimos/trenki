@@ -204,7 +204,10 @@ export default function WorkoutPage() {
   };
 
   // Функция замены модуля на другой подходящий
-  const handleReplaceModule = async (moduleIndex: number) => {
+  const handleReplaceModule = async (
+    moduleIndex: number,
+    stretchDirection?: 'FULL' | 'UPPER' | 'LOWER',
+  ) => {
     if (!workout) return;
 
     setReplacingModuleIndex(moduleIndex);
@@ -217,6 +220,7 @@ export default function WorkoutPage() {
         body: JSON.stringify({
           workoutSessionId: workout.id,
           moduleIndex,
+          stretchDirection, // C-8: направление растяжки (только для заминки)
         }),
       });
 
@@ -853,6 +857,56 @@ export default function WorkoutPage() {
                   </button>
                 );
               })()}
+
+              {/* C-8: выбор направления растяжки для заминки (дня растяжки).
+                  Подменяет стретч-видео через replace-module. «Рандом» —
+                  это просто уже подобранное видео (по умолчанию). */}
+              {module.moduleType === 'COOLDOWN' && !isCompleted && !isLocked && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    position: 'absolute',
+                    left: '8px',
+                    right: '8px',
+                    bottom: '8px',
+                    zIndex: 3,
+                    display: 'flex',
+                    gap: '4px',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {([
+                    { dir: 'FULL', label: 'Всё тело' },
+                    { dir: 'UPPER', label: 'Верх' },
+                    { dir: 'LOWER', label: 'Низ' },
+                  ] as const).map(({ dir, label }) => (
+                    <button
+                      key={dir}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleReplaceModule(index, dir);
+                      }}
+                      disabled={replacingModuleIndex === index && isReplacingModule}
+                      style={{
+                        flex: 1,
+                        padding: '6px 2px',
+                        borderRadius: '8px',
+                        backgroundColor: 'rgba(161, 255, 74, 0.18)',
+                        border: '1px solid rgba(161, 255, 74, 0.4)',
+                        color: '#A1FF4A',
+                        fontFamily: 'Overpass',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap',
+                        cursor: replacingModuleIndex === index && isReplacingModule ? 'wait' : 'pointer',
+                      }}
+                      title={`Растяжка: ${label}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}

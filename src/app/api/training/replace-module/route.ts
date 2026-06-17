@@ -22,11 +22,27 @@ import {
 } from '@/lib/module-selection-v3';
 import { requireAuthUser } from '@/lib/coach/guards';
 
+// C-8: направление растяжки → группы мышц для подбора заминки (cooldown).
+// null → направление не задано, подбираем по цели (прежнее поведение/рандом).
+function stretchMuscleGroups(direction: unknown): MuscleGroup[] | null {
+  switch (direction) {
+    case 'FULL':
+      return [MuscleGroup.FULL_BODY];
+    case 'UPPER':
+      return [MuscleGroup.UPPER_PUSH, MuscleGroup.UPPER_PULL, MuscleGroup.PREHAB_SHOULDER];
+    case 'LOWER':
+      return [MuscleGroup.LOWER_BODY, MuscleGroup.PREHAB_KNEE, MuscleGroup.PREHAB_BACK];
+    default:
+      return null;
+  }
+}
+
 /**
  * POST /api/training/replace-module
  *
  * Заменяет модуль в тренировке на другой подходящий
- * Body: { workoutSessionId: string, moduleIndex: number (0-3) }
+ * Body: { workoutSessionId: string, moduleIndex: number (0-3),
+ *         stretchDirection?: 'FULL' | 'UPPER' | 'LOWER' } (C-8, только для заминки)
  * Auth: httpOnly session.
  */
 export async function POST(request: NextRequest) {
@@ -35,7 +51,7 @@ export async function POST(request: NextRequest) {
     if ('response' in auth) return auth.response;
     const user = auth.user;
 
-    const { workoutSessionId, moduleIndex } = await request.json();
+    const { workoutSessionId, moduleIndex, stretchDirection } = await request.json();
 
     if (!workoutSessionId || moduleIndex === undefined) {
       return NextResponse.json(
@@ -151,10 +167,12 @@ export async function POST(request: NextRequest) {
         newModule = result.video;
       }
     } else if (currentModuleType === ModuleType.COOLDOWN) {
-      // Заминка
-      const muscleGroups = trainingGoal
-        ? GOAL_TO_MUSCLE_GROUPS[trainingGoal as TrainingGoal]?.cooldown || [MuscleGroup.FULL_BODY]
-        : [MuscleGroup.FULL_BODY];
+      // Заминка / растяжка. C-8: если задано направление — фильтруем по группам
+      // тела (верх/низ/всё тело); иначе — по цели (прежнее поведение/рандом).
+      const muscleGroups = stretchMuscleGroups(stretchDirection)
+        ?? (trainingGoal
+          ? GOAL_TO_MUSCLE_GROUPS[trainingGoal as TrainingGoal]?.cooldown || [MuscleGroup.FULL_BODY]
+          : [MuscleGroup.FULL_BODY]);
 
       const criteria = createSearchCriteria(
         ModuleType.COOLDOWN,
