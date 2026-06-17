@@ -1,12 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTelegram } from '@/hooks/useTelegram';
 import { TrainingGoal } from '@/generated/prisma';
 import { GOAL_LABELS, ENERGY_STATE_LABELS } from '@/lib/training-algorithm-v3';
+import { pickCycleDayToOffer, todayCycleDayIndex } from '@/lib/microcycle/offer';
 
 const trainingGoals = Object.values(TrainingGoal) as TrainingGoal[];
+
+// C-4: подписи дней цикла по intent (для предложения цикловой тренировки).
+const INTENT_LABELS: Record<string, string> = {
+  IN_TONE: 'В тонусе',
+  WARMUP: 'Разминка',
+  CHARGED: 'Заряжен',
+  STRETCH: 'Растяжка',
+  TIRED: 'Устал',
+};
 
 const GOAL_ICONS: Record<string, string> = {
   POWERFUL_SHOT:       'A_powerful_throw.svg',
@@ -34,6 +44,50 @@ export default function TrainingAssessmentPage() {
     goal: null as TrainingGoal | null,
     energyState: null as EnergyStateValue | null,
   });
+
+  // C-4: предложение сделать тренировку из активного цикла вместо быстрой.
+  const [cycleOffer, setCycleOffer] = useState<{ sessionId: string; label: string } | null>(null);
+  // Если отказался от цикла — день закроем, только когда быстрая реально создана
+  // (в handleSubmit), а не на сам отказ, иначе уход без тренировки закрыл бы день.
+  const declinedCycleSessionRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/microcycle/current');
+        if (!res.ok) return;
+        const data = await res.json();
+        const mc = data.microcycle;
+        if (cancelled || !mc || mc.effectiveStatus !== 'ACTIVE') return;
+        const todayIdx = todayCycleDayIndex(mc.weekStartDate, new Date());
+        const day = pickCycleDayToOffer(mc.days || [], todayIdx);
+        if (!cancelled && day && day.workoutSession) {
+          setCycleOffer({
+            sessionId: day.workoutSession.id,
+            label: INTENT_LABELS[day.intent] || 'тренировка',
+          });
+        }
+      } catch {
+        // нет сети/цикла — просто не предлагаем
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const acceptCycleOffer = () => {
+    if (!cycleOffer) return;
+    router.push(`/training/workout?id=${cycleOffer.sessionId}`);
+  };
+
+  const declineCycleOffer = () => {
+    if (!cycleOffer) return;
+    // Запоминаем день — закроем его в handleSubmit, когда быстрая создастся.
+    declinedCycleSessionRef.current = cycleOffer.sessionId;
+    setCycleOffer(null);
+  };
 
   // Логирование состояния пользователя
   useEffect(() => {
@@ -82,6 +136,20 @@ export default function TrainingAssessmentPage() {
       const generateData = await generateResponse.json();
 
       if (generateData.success) {
+        // C-4: спортсмен отказался от цикла в пользу быстрой — теперь, когда
+        // быстрая реально создана, закрываем предложенный день цикла.
+        if (declinedCycleSessionRef.current) {
+          try {
+            await fetch('/api/microcycle/close-day', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sessionId: declinedCycleSessionRef.current }),
+            });
+          } catch {
+            // не критично — просто не закрыли день цикла
+          }
+          declinedCycleSessionRef.current = null;
+        }
         router.push(`/training/workout?id=${generateData.workoutId}`);
         return;
       }
@@ -131,6 +199,36 @@ export default function TrainingAssessmentPage() {
 
   return (
     <div className="min-h-screen bg-[#101530] text-white p-4" style={{ paddingBottom: '100px' }}>
+      {/* C-4: предложение сделать тренировку из активного цикла вместо быстрой */}
+      {cycleOffer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/60" />
+          <div className="relative w-full max-w-sm rounded-xl bg-[#0B0F2A] p-5 text-left shadow-lg border border-[rgba(68,92,255,0.35)]">
+            <div className="text-white text-base font-semibold">У тебя активен цикл</div>
+            <div className="mt-2 text-white/80 text-sm">
+              По плану цикла есть невыполненная тренировка —{' '}
+              <span className="text-[#A1FF4A] font-semibold">{cycleOffer.label}</span>. Сделать её вместо быстрой?
+            </div>
+            <div className="mt-4 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={acceptCycleOffer}
+                className="w-full rounded-lg bg-[#A1FF4A] px-3 py-2.5 text-sm font-semibold text-[#0B0F2A]"
+              >
+                Да, из цикла
+              </button>
+              <button
+                type="button"
+                onClick={declineCycleOffer}
+                className="w-full rounded-lg border border-white/20 px-3 py-2.5 text-sm font-semibold text-white"
+              >
+                Нет, быструю
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Заголовок с кнопкой назад */}
       <div className="mb-6 flex items-center gap-3">
         <button onClick={() => router.back()} className="flex-shrink-0">
