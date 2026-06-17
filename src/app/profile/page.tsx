@@ -296,107 +296,89 @@ const ProfilePage = () => {
           </div>
         )}
 
-        {/* Дневной прогресс - временно скрыто */}
-        {false && userProfile?.profile?.potential !== undefined && userProfile?.profile?.potential > 0 && (
-          <div className="bg-[#2d3448] rounded-lg p-4 mb-6">
-            <div className="text-white text-sm font-medium font-overpass mb-3">
-              📅 Сегодня
-            </div>
-            
-            <div className="space-y-3">
-              {/* Модули */}
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-[#AEABBB] text-xs font-overpass">Модули</span>
-                  <span className="text-white text-xs font-bold font-overpass">
-                    {userProfile?.profile?.modulesToday || 0}/4
+        {/* ─── Навигация ─── */}
+        <div className="mb-6">
+          <h2 className="text-white/50 text-xs font-medium font-overpass uppercase tracking-wide mb-2 px-1">
+            Навигация
+          </h2>
+          <div className="bg-[#060919] rounded-lg px-4">
+            <Link href="/profile/watch-history">
+              <div className="flex justify-between items-center py-4 cursor-pointer hover:opacity-80 transition-opacity">
+                <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">История тренировок</span>
+                <Image src="/icons/arrow.svg" alt="" width={20} height={20} className="opacity-50" />
+              </div>
+            </Link>
+            <div className="h-[1px] bg-[#26252F]" />
+            <button
+              type="button"
+              onClick={() => router.push('/profile/assignments')}
+              className="w-full flex justify-between items-center py-4 cursor-pointer hover:opacity-80 transition-opacity text-left"
+            >
+              <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">Задания от тренера</span>
+              <Image src="/icons/arrow.svg" alt="" width={20} height={20} className="opacity-50" />
+            </button>
+          </div>
+        </div>
+
+        {/* ─── Настройки ─── */}
+        {(userProfile?.profile || isSupported) && (
+          <div className="mb-6">
+            <h2 className="text-white/50 text-xs font-medium font-overpass uppercase tracking-wide mb-2 px-1">
+              Настройки
+            </h2>
+            <div className="bg-[#060919] rounded-lg px-4">
+              {userProfile?.profile && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const next = !userProfile.profile.autoGenerateMicrocycle;
+                    // Оптимистично обновляем UI; если API упадёт — откатим.
+                    setUserProfile((prev: any) =>
+                      prev ? { ...prev, profile: { ...prev.profile, autoGenerateMicrocycle: next } } : prev,
+                    );
+                    try {
+                      const res = await fetch('/api/profile/microcycle-preferences', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ autoGenerate: next }),
+                      });
+                      if (!res.ok) throw new Error();
+                    } catch {
+                      setUserProfile((prev: any) =>
+                        prev ? { ...prev, profile: { ...prev.profile, autoGenerateMicrocycle: !next } } : prev,
+                      );
+                    }
+                  }}
+                  className="w-full flex justify-between items-center py-4 text-left"
+                >
+                  <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">Авто-генерация цикла</span>
+                  <span className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${userProfile.profile.autoGenerateMicrocycle ? 'bg-[#A1FF4A]' : 'bg-white/20'}`}>
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${userProfile.profile.autoGenerateMicrocycle ? 'translate-x-5' : 'translate-x-0.5'}`} />
                   </span>
-                </div>
-                <div className="h-2 bg-[#1a1f35] rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-[#445CFF] to-[#7B61FF] rounded-full transition-all duration-300"
-                    style={{ 
-                      width: `${Math.min(100, ((userProfile?.profile?.modulesToday || 0) / 4) * 100)}%` 
-                    }}
-                  />
-                </div>
-              </div>
-              
-              {/* Тренировки */}
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-[#AEABBB] text-xs font-overpass">Тренировки</span>
-                  <span className="text-white text-xs font-bold font-overpass">
-                    {userProfile?.profile?.trainingsToday || 0}/2
-                  </span>
-                </div>
-                <div className="h-2 bg-[#1a1f35] rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-[#A1FF4A] to-[#7DFF8C] rounded-full transition-all duration-300"
-                    style={{ 
-                      width: `${Math.min(100, ((userProfile?.profile?.trainingsToday || 0) / 2) * 100)}%` 
-                    }}
-                  />
-                </div>
-              </div>
+                </button>
+              )}
+              {userProfile?.profile && isSupported && <div className="h-[1px] bg-[#26252F]" />}
+              {isSupported && (
+                <>
+                  <button
+                    type="button"
+                    onClick={isSubscribed ? unsubscribe : subscribe}
+                    disabled={pushLoading}
+                    className="w-full flex justify-between items-center py-4 text-left disabled:opacity-50"
+                  >
+                    <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">
+                      {pushLoading ? 'Загрузка…' : 'Push-уведомления'}
+                    </span>
+                    <span className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${isSubscribed ? 'bg-[#A1FF4A]' : 'bg-white/20'}`}>
+                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${isSubscribed ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                    </span>
+                  </button>
+                  {pushError && <p className="text-red-500 text-xs pb-2 text-center">{pushError}</p>}
+                </>
+              )}
             </div>
-            
-            {/* Предупреждение о лимите */}
-            {((userProfile?.profile?.modulesToday || 0) >= 4 || (userProfile?.profile?.trainingsToday || 0) >= 2) && (
-              <div className="mt-3 p-2 bg-[#FF6B6B]/10 border border-[#FF6B6B]/30 rounded text-[#FF6B6B] text-[10px] font-overpass text-center">
-                ⚠️ Дневной лимит достигнут. Приходи завтра!
-              </div>
-            )}
           </div>
         )}
-
-        {/* Меню разделы */}
-        <div className="bg-[#060919] rounded-lg px-4 mb-6">
-          {/* ВРЕМЕННО СКРЫТО 
-          <Link href="/training/history">
-            <div className="flex justify-between items-center py-4 cursor-pointer hover:opacity-80 transition-opacity">
-              <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИЗБРАННЫЕ ТРЕНЕРЫ</span>
-              <Image 
-                src="/icons/arrow.svg" 
-                alt="Стрелка" 
-                width={20} 
-                height={20}
-                className="opacity-50"
-              />
-            </div>
-          </Link>
-          
-          <div className="h-[1px] bg-[#26252F]"></div>
-          
-          <Link href="/favorites">
-            <div className="flex justify-between items-center py-4 cursor-pointer hover:opacity-80 transition-opacity">
-              <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИЗБРАННЫЕ ТРЕНИРОВКИ</span>
-              <Image 
-                src="/icons/arrow.svg" 
-                alt="Стрелка" 
-                width={20} 
-                height={20}
-                className="opacity-50"
-              />
-            </div>
-          </Link>
-          
-          <div className="h-[1px] bg-[#26252F]"></div>
-          */}
-          
-          <Link href="/profile/watch-history">
-            <div className="flex justify-between items-center py-4 cursor-pointer hover:opacity-80 transition-opacity">
-              <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">ИСТОРИЯ ТРЕНИРОВОК</span>
-              <Image 
-                src="/icons/arrow.svg" 
-                alt="Стрелка" 
-                width={20} 
-                height={20}
-                className="opacity-50"
-              />
-            </div>
-          </Link>
-        </div>
         
         {/* FAQ секция */}
         <div className="mb-6">
@@ -423,25 +405,17 @@ const ProfilePage = () => {
           </div>
         </div>
 
-        {/* Служебные кнопки */}
-        <div className="space-y-2">
-          {/* Переключатель аккаунтов: видим для админа всегда (включая «+ Добавить»),
-              для обычного пользователя — только если уже есть >=2 аккаунтов */}
-          <div className="pt-2">
+        {/* ─── Аккаунт ─── */}
+        <div className="mb-6">
+          <h2 className="text-white/50 text-xs font-medium font-overpass uppercase tracking-wide mb-2 px-1">
+            Аккаунт
+          </h2>
+          <div className="space-y-2">
+            {/* Переключатель аккаунтов: для админа всегда (включая «+ Добавить»),
+                для обычного — только если уже есть >=2 аккаунтов */}
             <AccountSwitcher hideWhenSingle={!(isAdmin || userProfile?.role === 'COACH')} />
-          </div>
-          {/* Задания от тренера */}
-          <div className="pt-2">
-            <button
-              onClick={() => router.push('/profile/assignments')}
-              className="w-full bg-white/10 hover:bg-white/15 text-white font-medium py-3 rounded-lg transition-all duration-300 text-sm"
-            >
-              📋 Задания от тренера
-            </button>
-          </div>
 
-          {/* Вступить в команду по коду / Покинуть команду */}
-          <div className="pt-2">
+            {/* Вступить в команду по коду / Покинуть команду */}
             {athleteTeam ? (
               <button
                 onClick={handleLeaveTeam}
@@ -460,98 +434,38 @@ const ProfilePage = () => {
                 👥 Вступить в команду
               </button>
             )}
-          </div>
 
-          {/* Авто-генерация микроциклов */}
-          {userProfile?.profile && (
-            <div className="pt-2">
-              <button
-                onClick={async () => {
-                  const next = !userProfile.profile.autoGenerateMicrocycle;
-                  // Оптимистично обновляем UI; если API упадёт — откатим.
-                  setUserProfile((prev: any) =>
-                    prev
-                      ? { ...prev, profile: { ...prev.profile, autoGenerateMicrocycle: next } }
-                      : prev,
-                  );
-                  try {
-                    const res = await fetch('/api/profile/microcycle-preferences', {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ autoGenerate: next }),
-                    });
-                    if (!res.ok) throw new Error();
-                  } catch {
-                    setUserProfile((prev: any) =>
-                      prev
-                        ? { ...prev, profile: { ...prev.profile, autoGenerateMicrocycle: !next } }
-                        : prev,
-                    );
-                  }
-                }}
-                className="w-full bg-white/10 hover:bg-white/15 text-white/70 font-medium py-3 rounded-lg transition-all duration-300 text-sm"
-              >
-                {userProfile.profile.autoGenerateMicrocycle
-                  ? '🔁 Авто-генерация микроцикла: ВКЛ'
-                  : '🔁 Авто-генерация микроцикла: ВЫКЛ'}
-              </button>
-            </div>
-          )}
-
-          {/* Кнопка push-уведомлений */}
-          {isSupported && (
-            <div className="pt-2">
-              <button 
-                onClick={isSubscribed ? unsubscribe : subscribe}
-                disabled={pushLoading}
-                className={`w-full ${
-                  isSubscribed 
-                    ? 'bg-white/10 hover:bg-white/15' 
-                    : 'bg-white/10 hover:bg-white/15'
-                } text-white/70 font-medium py-3 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm`}
-              >
-                {pushLoading ? '⏳ Загрузка...' : isSubscribed ? '🔕 Отключить уведомления' : '🔔 Включить уведомления'}
-              </button>
-              {pushError && (
-                <p className="text-red-500 text-xs mt-1 text-center">{pushError}</p>
-              )}
-            </div>
-          )}
-          
-          {/* Кнопка выхода */}
-          <div className="pt-2">
-            <button 
+            {/* Выход */}
+            <button
               onClick={handleLogout}
               className="w-full bg-white/10 hover:bg-white/15 text-white/70 font-medium py-3 rounded-lg transition-all duration-300 text-sm"
             >
               🚪 Выйти
             </button>
           </div>
-          {/* Кнопки только для администраторов */}
-          {isAdmin && (
-            <>
-              <div className="pt-2">
-                <button
-                  onClick={() => router.push('/admin')}
-                  className="w-full bg-[#A1FF4A]/10 hover:bg-[#A1FF4A]/20 text-[#A1FF4A] font-bold py-3 rounded-lg transition-all duration-300 text-sm"
-                >
-                  ⚙️ Панель администратора
-                </button>
-              </div>
-              <div className="pt-2">
-                <button
-                  onClick={() => {
-                    router.push('/');
-                    // даём главной смонтироваться, затем стартуем тур
-                    setTimeout(() => startTour(), 400);
-                  }}
-                  className="w-full bg-[#A1FF4A]/10 hover:bg-[#A1FF4A]/20 text-[#A1FF4A] font-bold py-3 rounded-lg transition-all duration-300 text-sm"
-                >
-                  🧭 Тур по приложению
-                </button>
-              </div>
-            </>
-          )}        </div>
+        </div>
+
+        {/* ─── Админ ─── */}
+        {isAdmin && (
+          <div className="mb-6 space-y-2">
+            <button
+              onClick={() => router.push('/admin')}
+              className="w-full bg-[#A1FF4A]/10 hover:bg-[#A1FF4A]/20 text-[#A1FF4A] font-bold py-3 rounded-lg transition-all duration-300 text-sm"
+            >
+              ⚙️ Панель администратора
+            </button>
+            <button
+              onClick={() => {
+                router.push('/');
+                // даём главной смонтироваться, затем стартуем тур
+                setTimeout(() => startTour(), 400);
+              }}
+              className="w-full bg-[#A1FF4A]/10 hover:bg-[#A1FF4A]/20 text-[#A1FF4A] font-bold py-3 rounded-lg transition-all duration-300 text-sm"
+            >
+              🧭 Тур по приложению
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Тапбар */}
