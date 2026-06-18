@@ -1,6 +1,20 @@
-version: '3.8'
-
 services:
+  # Одноразовый сервис: применяет ожидающие миграции БД ПЕРЕД стартом app.
+  # Берём стейдж deps — там есть prisma CLI + schema + migrations. Идемпотентно
+  # (no-op, если применять нечего). app ждёт его успешного завершения ниже.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: deps
+    container_name: trenki-migrate
+    command: npx prisma migrate deploy
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    restart: "no"
+    networks:
+      - trenki-network
+
   app:
     build:
       context: .
@@ -10,6 +24,10 @@ services:
         - NEXT_PUBLIC_VAPID_PUBLIC_KEY=${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
         - NEXT_PUBLIC_BOT_USERNAME=${NEXT_PUBLIC_BOT_USERNAME}
     container_name: trenki-app
+    # app стартует только после успешного применения миграций.
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     environment:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
