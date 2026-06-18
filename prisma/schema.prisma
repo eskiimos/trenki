@@ -23,6 +23,11 @@ model User {
   ageConsentAt          DateTime? // Дата и время подтверждения возраста (18+ или законный представитель)
   isAdmin               Boolean                 @default(false) // Доступ к админ-панели
   role                  UserRole                @default(ATHLETE) // Роль: спортсмен или тренер
+  // Тариф доступа (фундамент под платежи). Пока выдаётся вручную из админки;
+  // когда подключим T-Bank — биллинг будет выставлять premiumUntil. См. hasPremium().
+  accessTier            AccessTier              @default(FREE)
+  premiumUntil          DateTime? // null + tier=PREMIUM = бессрочно; иначе — срок действия
+  premiumNote           String? // Кто/за что выдал (ручная выдача, аудит)
   favorites             FavoriteVideo[]
   profile               Profile?
   coachProfile          CoachProfile?
@@ -695,6 +700,13 @@ model InviteCode {
 enum UserRole {
   ATHLETE
   COACH
+}
+
+// Тариф доступа пользователя (под монетизацию). Минимальный набор — расширяемо
+// (можно добавить PRO/TEAM и т.п.). Эффективный доступ считает hasPremium().
+enum AccessTier {
+  FREE
+  PREMIUM
 }
 
 enum TeamMemberRole {

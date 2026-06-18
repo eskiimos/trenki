@@ -38,6 +38,8 @@ interface User {
   createdAt: string;
   updatedAt: string;
   lastActivity: string;
+  accessTier?: 'FREE' | 'PREMIUM';
+  premiumUntil?: string | null;
   profile: UserProfile | null;
   stats: UserStats;
   pushNotifications: {
@@ -186,6 +188,46 @@ export default function AdminUsersPage() {
       }
     } catch (e) {
       console.error('attach email failed', e);
+      alert('Сетевая ошибка');
+    }
+  };
+
+  // Выдать / снять премиум-доступ (фундамент под платежи; пока ручной рычаг).
+  const handleSetAccess = async (user: User) => {
+    const isPremium = user.accessTier === 'PREMIUM';
+    let until: string | null = null;
+    let note: string | null = null;
+    if (isPremium) {
+      if (!window.confirm(`Снять PREMIUM у ${user.firstName || user.telegramId}?`)) return;
+    } else {
+      const untilInput = window.prompt('PREMIUM до (ГГГГ-ММ-ДД). Пусто = бессрочно:', '');
+      if (untilInput == null) return; // отмена
+      until = untilInput.trim() || null;
+      const noteInput = window.prompt('Пометка — за что выдан (необязательно):', '');
+      note = noteInput?.trim() || null;
+    }
+    const tier = isPremium ? 'FREE' : 'PREMIUM';
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/access`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier, until, note }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert(data?.error || 'Не удалось изменить доступ');
+        return;
+      }
+      const patch = {
+        accessTier: data.user.accessTier as 'FREE' | 'PREMIUM',
+        premiumUntil: (data.user.premiumUntil ?? null) as string | null,
+      };
+      setUsers(prev => prev.map(u => (u.id === user.id ? { ...u, ...patch } : u)));
+      if (selectedUser?.id === user.id) {
+        setSelectedUser({ ...selectedUser, ...patch });
+      }
+    } catch (e) {
+      console.error('set access failed', e);
       alert('Сетевая ошибка');
     }
   };
@@ -443,6 +485,11 @@ export default function AdminUsersPage() {
                         Online
                       </span>
                     )}
+                    {user.accessTier === 'PREMIUM' && (
+                      <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-1 rounded-full">
+                        ⭐ PREMIUM
+                      </span>
+                    )}
                   </div>
                   
                   <div className="text-sm text-gray-400 space-y-1">
@@ -533,6 +580,17 @@ export default function AdminUsersPage() {
                     {selectedUser.email && !selectedUser.email.endsWith('@t.me')
                       ? 'Сменить email'
                       : 'Привязать email'}
+                  </button>
+                  <button
+                    onClick={() => handleSetAccess(selectedUser)}
+                    className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
+                      selectedUser.accessTier === 'PREMIUM'
+                        ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'
+                        : 'bg-[#A1FF4A]/20 text-[#A1FF4A] hover:bg-[#A1FF4A]/30'
+                    }`}
+                    title="Ручная выдача/снятие премиум-доступа"
+                  >
+                    {selectedUser.accessTier === 'PREMIUM' ? 'Снять PREMIUM' : 'Выдать PREMIUM'}
                   </button>
                   <button
                     onClick={() => handleDeleteUser(selectedUser)}

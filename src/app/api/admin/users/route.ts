@@ -58,7 +58,12 @@ export async function GET(request: NextRequest) {
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
           lastActivity: user.lastActivity || user.updatedAt,
-          
+
+          // Тариф доступа (под платежи)
+          accessTier: user.accessTier,
+          premiumUntil: user.premiumUntil,
+          premiumNote: user.premiumNote,
+
           // Профиль
           profile: user.profile ? {
             position: user.profile.position,
