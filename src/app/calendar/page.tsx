@@ -433,15 +433,17 @@ export default function CalendarPage() {
           <div className="text-[#FF8C4A] text-xs text-center mb-3 font-medium">{cycleError}</div>
         )}
 
-        {/* Баннер микроцикла — если активный есть */}
-        {microcycle && (
+        {/* Баннер микроцикла — если активный есть. Прячем, пока крутится
+            экран сборки (generatingCycle): иначе в туре баннер (его якорь
+            data-tour) появляется в DOM под оверлеем подготовки, и спотлайт
+            подсвечивает пустую область. Показываем только когда оверлей ушёл. */}
+        {microcycle && !generatingCycle && (
           <div
             data-tour="microcycle-banner"
             className="mb-4 p-4 rounded-2xl flex items-center gap-3"
             style={{
-              background:
-                'linear-gradient(135deg, rgba(161, 255, 74, 0.12) 0%, rgba(68, 92, 255, 0.20) 100%)',
-              border: '1px solid rgba(161, 255, 74, 0.25)',
+              background: 'var(--grad-accent)',
+              border: '1px solid var(--border-lime)',
             }}
           >
             <div
