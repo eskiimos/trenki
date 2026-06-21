@@ -7,6 +7,8 @@ import {
   isValidGameNumber,
   NAME_MAX_FIRST,
   NAME_MAX_LAST,
+  clampHeight,
+  clampWeight,
 } from '@/lib/profile-validation';
 
 export async function GET(request: NextRequest) {
@@ -120,8 +122,8 @@ export async function POST(request: NextRequest) {
         number: parsedNumber,
         birthDate: profile.birthDate ? new Date(profile.birthDate) : null,
         ageGroup,
-        height: profile.height ? parseInt(profile.height) : null,
-        weight: profile.weight ? parseInt(profile.weight) : null,
+        height: profile.height ? clampHeight(parseInt(profile.height)) : null,
+        weight: profile.weight ? clampWeight(parseInt(profile.weight)) : null,
         avatarUrl: profile.avatarUrl ? profile.avatarUrl : null,
         clubLogoUrl: profile.clubLogoUrl ? profile.clubLogoUrl : null,
       };

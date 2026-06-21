@@ -348,7 +348,8 @@ export default function TrainerPage() {
         </div>
       </div>
 
-      {/* ТРЕНЬКИ (Шортсы) */}
+      {/* ТРЕНЬКИ (Шортсы) — секцию показываем только если шортсы есть */}
+      {shorts.length > 0 && (
       <div className="mb-4 bg-[#060919] py-4">
         <div className="px-4 mb-4 flex items-center justify-between">
           <h3 className="text-white text-sm font-bold uppercase">
@@ -356,28 +357,27 @@ export default function TrainerPage() {
           </h3>
           <div className="flex items-center gap-2">
             <span className="text-[#f9f9f9] text-sm">({shorts.length})</span>
-            <Image 
-              src="/icons/arrow.svg" 
-              alt="Показать все" 
-              width={16} 
+            <Image
+              src="/icons/arrow.svg"
+              alt="Показать все"
+              width={16}
               height={16}
             />
           </div>
         </div>
-        
+
         {/* Горизонтальный скролл шортсов */}
         <div className="overflow-x-auto scrollbar-hide">
           <div className="flex gap-4 px-4" style={{ width: 'max-content' }}>
-            {shorts.length > 0 ? (
-              shorts.map((short) => (
-                <Link 
-                  key={short.id} 
+            {shorts.map((short) => (
+                <Link
+                  key={short.id}
                   href={`/shorts/${short.id}`}
                   className="flex-shrink-0"
                 >
                   <div className="w-[120px] h-[213px] bg-gray-800 rounded-lg overflow-hidden relative">
                     {short.thumbnail ? (
-                      <Image 
+                      <Image
                         src={short.thumbnail}
                         alt={short.title}
                         fill
@@ -388,13 +388,11 @@ export default function TrainerPage() {
                     )}
                   </div>
                 </Link>
-              ))
-            ) : (
-              <div className="text-white/50 text-sm">Нет треньков</div>
-            )}
+              ))}
           </div>
         </div>
       </div>
+      )}
 
       {/* ТРЕНИРОВКИ (Длинные видео) */}
       <div className="mb-8 bg-[#060919] py-4">

@@ -6,6 +6,14 @@ import {
   isValidGameNumber,
   NAME_MAX_FIRST,
   NAME_MAX_LAST,
+  isValidHeight,
+  isValidWeight,
+  clampHeight,
+  clampWeight,
+  HEIGHT_MIN,
+  HEIGHT_MAX,
+  WEIGHT_MIN,
+  WEIGHT_MAX,
 } from '@/lib/profile-validation';
 
 describe('sanitizeName', () => {
@@ -83,5 +91,38 @@ describe('isValidGameNumber', () => {
     expect(isValidGameNumber(100)).toBe(false);
     expect(isValidGameNumber(12.5)).toBe(false);
     expect(isValidGameNumber(NaN)).toBe(false);
+  });
+});
+
+describe('рост/вес', () => {
+  it('валидны null и значения в границах', () => {
+    expect(isValidHeight(null)).toBe(true);
+    expect(isValidHeight(HEIGHT_MIN)).toBe(true);
+    expect(isValidHeight(180)).toBe(true);
+    expect(isValidHeight(HEIGHT_MAX)).toBe(true);
+    expect(isValidWeight(WEIGHT_MIN)).toBe(true);
+    expect(isValidWeight(75)).toBe(true);
+    expect(isValidWeight(WEIGHT_MAX)).toBe(true);
+  });
+
+  it('отклоняет выход за границы, дробные и NaN', () => {
+    expect(isValidHeight(HEIGHT_MIN - 1)).toBe(false);
+    expect(isValidHeight(HEIGHT_MAX + 1)).toBe(false);
+    expect(isValidHeight(180.5)).toBe(false);
+    expect(isValidHeight(NaN)).toBe(false);
+    expect(isValidWeight(WEIGHT_MIN - 1)).toBe(false);
+    expect(isValidWeight(WEIGHT_MAX + 1)).toBe(false);
+  });
+
+  it('clamp приводит к границам и округляет, мусор → null', () => {
+    expect(clampHeight(5000)).toBe(HEIGHT_MAX);
+    expect(clampHeight(10)).toBe(HEIGHT_MIN);
+    expect(clampHeight(180.4)).toBe(180);
+    expect(clampHeight(NaN)).toBe(null);
+    expect(clampHeight(null)).toBe(null);
+    expect(clampWeight(9999)).toBe(WEIGHT_MAX);
+    expect(clampWeight(1)).toBe(WEIGHT_MIN);
+    expect(clampWeight(75.6)).toBe(76);
+    expect(clampWeight(NaN)).toBe(null);
   });
 });

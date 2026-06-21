@@ -35,3 +35,34 @@ export function isValidGameNumber(n: number | null | undefined): boolean {
   if (n === null || n === undefined) return true;
   return Number.isInteger(n) && n >= 1 && n <= 99;
 }
+
+// Антропометрия. Границы — как в HTML-инпутах ЛК; сервер их повторяет, чтобы
+// нельзя было обойти маску (нельзя доверять телу запроса, см. CLAUDE.md).
+export const HEIGHT_MIN = 100; // см
+export const HEIGHT_MAX = 230;
+export const WEIGHT_MIN = 30; // кг
+export const WEIGHT_MAX = 150;
+
+/** Рост валиден, если null или целое в пределах [HEIGHT_MIN, HEIGHT_MAX]. */
+export function isValidHeight(n: number | null | undefined): boolean {
+  if (n === null || n === undefined) return true;
+  return Number.isInteger(n) && n >= HEIGHT_MIN && n <= HEIGHT_MAX;
+}
+
+/** Вес валиден, если null или целое в пределах [WEIGHT_MIN, WEIGHT_MAX]. */
+export function isValidWeight(n: number | null | undefined): boolean {
+  if (n === null || n === undefined) return true;
+  return Number.isInteger(n) && n >= WEIGHT_MIN && n <= WEIGHT_MAX;
+}
+
+/** Приводит рост к допустимому диапазону; null/NaN → null. */
+export function clampHeight(n: number | null | undefined): number | null {
+  if (n === null || n === undefined || Number.isNaN(n)) return null;
+  return Math.min(HEIGHT_MAX, Math.max(HEIGHT_MIN, Math.round(n)));
+}
+
+/** Приводит вес к допустимому диапазону; null/NaN → null. */
+export function clampWeight(n: number | null | undefined): number | null {
+  if (n === null || n === undefined || Number.isNaN(n)) return null;
+  return Math.min(WEIGHT_MAX, Math.max(WEIGHT_MIN, Math.round(n)));
+}

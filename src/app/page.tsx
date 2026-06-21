@@ -758,11 +758,31 @@ const TrainingsSection = () => {
     const router = useRouter();
     const [generatingCycle, setGeneratingCycle] = useState(false);
     const [cycleError, setCycleError] = useState<string | null>(null);
+    const [hasActiveCycle, setHasActiveCycle] = useState(false);
 
-    // Кнопка «Собрать микроцикл» на главной (правка владельца). Идемпотентно;
-    // тот же endpoint, что в календаре. Держим экран сборки минимум ~5с.
-    const handleGenerateMicrocycle = async () => {
+    // Узнаём, есть ли уже собранный активный цикл. Если есть — кнопка НЕ
+    // пересобирает неделю при каждом тапе (правка владельца), а ведёт в
+    // календарь к готовому плану.
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch('/api/microcycle/current');
+                if (!res.ok) return;
+                const data = await res.json();
+                if (!cancelled && data?.microcycle?.effectiveStatus === 'ACTIVE') {
+                    setHasActiveCycle(true);
+                }
+            } catch {}
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
+    // Клик: цикл уже собран → открываем календарь (без пересборки). Иначе
+    // собираем неделю (экран сборки ~5с) и ведём в календарь. Идемпотентно.
+    const handleMicrocycleClick = async () => {
         if (generatingCycle) return;
+        if (hasActiveCycle) { router.push('/calendar'); return; }
         setCycleError(null);
         setGeneratingCycle(true);
         const startedAt = Date.now();
@@ -787,7 +807,7 @@ const TrainingsSection = () => {
         <button
             type="button"
             data-tour="microcycle-card"
-            onClick={handleGenerateMicrocycle}
+            onClick={handleMicrocycleClick}
             disabled={generatingCycle}
             className="w-full mb-2 transition-transform active:scale-[0.99]"
             style={{
@@ -801,7 +821,7 @@ const TrainingsSection = () => {
             <div className="text-left flex-1 min-w-0">
                 <div style={{ color: '#A1FF4A', fontSize: 11, fontFamily: 'Overpass', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>ИИ-тренер</div>
                 <div style={{ color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                    {generatingCycle ? 'Собираю неделю…' : 'Собрать микроцикл на неделю'}
+                    {generatingCycle ? 'Собираю неделю…' : hasActiveCycle ? 'Открыть мою неделю' : 'Собрать микроцикл на неделю'}
                 </div>
             </div>
         </button>
@@ -1046,9 +1066,8 @@ const TrainersSection = () => {
                             textTransform: 'uppercase', 
                             lineHeight: '14px', 
                             letterSpacing: 0.50,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
+                            whiteSpace: 'normal',
+                            overflowWrap: 'break-word'
                         }}>{trainer.name}</div>
                         <div style={{
                             alignSelf: 'stretch', 
@@ -1059,9 +1078,8 @@ const TrainersSection = () => {
                             textTransform: 'uppercase', 
                             lineHeight: '14px', 
                             letterSpacing: 0.50,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
+                            whiteSpace: 'normal',
+                            overflowWrap: 'break-word'
                         }}>{trainer.lastName}</div>
                     </div>
                     <div style={{

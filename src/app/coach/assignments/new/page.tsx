@@ -391,7 +391,20 @@ export default function CoachAssignmentNewPage() {
                     color: allSelected ? '#A1FF4A' : '#F9F8FE',
                   }}
                 >
-                  <span>👥 Вся команда</span>
+                  <span className="flex items-center gap-2">
+                    <span
+                      style={{
+                        width: 18, height: 18, borderRadius: 5, flexShrink: 0,
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        background: allSelected ? '#A1FF4A' : 'transparent',
+                        border: `2px solid ${allSelected ? '#A1FF4A' : '#445CFF'}`,
+                        color: '#101530', fontSize: 12, fontWeight: 900, lineHeight: 1,
+                      }}
+                    >
+                      {allSelected ? '✓' : ''}
+                    </span>
+                    👥 Вся команда
+                  </span>
                   <span style={{ fontSize: 11, color: '#AEABBB' }}>{allSelected ? 'снять' : `все ${members.length}`}</span>
                 </button>
               );
