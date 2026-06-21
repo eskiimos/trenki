@@ -164,6 +164,9 @@ model Video {
   updatedAt   DateTime        @updatedAt
   rpeMax      Int?
   rpeMin      Int?
+  // Когда по видео отправлен push атлетам («доступно новое видео»). null —
+  // ещё не уведомляли; защищает от повторной рассылки при редактировании.
+  athletesNotifiedAt DateTime?
 
   // Старые поля (String - не трогаем, чтобы не сломать данные)
   muscleGroupOld String? @map("группаМышц")

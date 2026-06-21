@@ -40,6 +40,15 @@ const FULL_SLOTS: { key: 'warmup' | 'fitness' | 'technique' | 'cooldown'; module
 type Mode = 'single' | 'full';
 type SlotVideoIds = { warmup: string; fitness: string; technique: string; cooldown: string };
 
+// Короткая дата ДД.ММ.ГГ для подсветки «уже делал/давали».
+function fmtShortDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
 export default function CoachAssignmentNewPage() {
   const router = useRouter();
   const [teamId, setTeamId] = useState<string | null>(null);
@@ -59,6 +68,30 @@ export default function CoachAssignmentNewPage() {
   const [initLoading, setInitLoading] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<Array<{ athleteId: string; athleteName: string; videoTitle: string }>>([]);
+  // Активность для подсветки «уже делал» в списке видео при выдаче ДЗ.
+  const [activity, setActivity] = useState<{
+    completed: Record<string, { count: number; lastDate: string }>;
+    teamAssigned: Record<string, string>;
+    selectedCount: number;
+  } | null>(null);
+
+  // Ключ выбранных атлетов (Set нестабилен как зависимость эффекта).
+  const selectedKey = Array.from(selectedAthletes).sort().join(',');
+
+  // Тянем активность (что выбранные атлеты уже делали + что давалось команде).
+  useEffect(() => {
+    if (!teamId) { setActivity(null); return; }
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        const qs = new URLSearchParams({ teamId, athleteIds: selectedKey });
+        const res = await fetch(`/api/coach/athlete-activity?${qs.toString()}`, { signal: ctrl.signal });
+        if (!res.ok) { setActivity(null); return; }
+        setActivity(await res.json());
+      } catch { /* abort/ignore */ }
+    })();
+    return () => ctrl.abort();
+  }, [teamId, selectedKey]);
 
   const loadInitial = useCallback(async () => {
     setInitLoading(true);
@@ -132,6 +165,22 @@ export default function CoachAssignmentNewPage() {
   const filteredVideos = videos.filter((v) =>
     v.title.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Подсветка «уже делал/давали» для видео в списке. В режиме «вся команда»
+  // показываем, что уже давалось команде; при выбранных атлетах — что они уже
+  // выполняли (сколько из выбранных + дата последнего раза).
+  const allTeamSelected = members.length > 0 && members.every((m) => selectedAthletes.has(m.userId));
+  const videoActivityBadge = (videoId: string): { text: string; tone: 'done' | 'team' } | null => {
+    if (!activity) return null;
+    if (allTeamSelected) {
+      const d = activity.teamAssigned[videoId];
+      return d ? { text: `Давали команде · ${fmtShortDate(d)}`, tone: 'team' } : null;
+    }
+    const c = activity.completed[videoId];
+    if (!c) return null;
+    const who = activity.selectedCount > 1 ? `${c.count}/${activity.selectedCount} делали` : 'Уже делал';
+    return { text: `${who} · ${fmtShortDate(c.lastDate)}`, tone: 'done' };
+  };
 
   // Полноценное занятие: тренер может выбрать любые 2-4 модуля
   // (например, разминка + техника + заминка — без физподготовки).
@@ -495,6 +544,7 @@ export default function CoachAssignmentNewPage() {
                   const trainerName = v.trainer
                     ? `${v.trainer.name}${v.trainer.lastName ? ' ' + v.trainer.lastName : ''}`
                     : null;
+                  const badge = videoActivityBadge(v.id);
                   return (
                     <button
                       key={v.id}
@@ -559,6 +609,20 @@ export default function CoachAssignmentNewPage() {
                             style={{ color: '#A1FF4A', fontSize: 11, fontWeight: 700, marginTop: 3 }}
                           >
                             {trainerName}
+                          </div>
+                        )}
+                        {badge && (
+                          <div
+                            className="font-overpass"
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 5,
+                              padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 800,
+                              textTransform: 'uppercase', letterSpacing: 0.3,
+                              background: badge.tone === 'done' ? 'rgba(161,255,74,0.14)' : 'rgba(68,92,255,0.18)',
+                              color: badge.tone === 'done' ? '#A1FF4A' : '#9FB2FF',
+                            }}
+                          >
+                            {badge.tone === 'done' ? '✓' : '↺'} {badge.text}
                           </div>
                         )}
                       </div>

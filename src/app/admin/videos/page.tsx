@@ -32,6 +32,7 @@ interface Video {
   equipment: string[];
   level?: string;
   isPublished: boolean;
+  athletesNotifiedAt?: string | null;
   // Поля для алгоритма LoadType
   типМодуля?: string;
   типНагрузки?: string;
@@ -941,6 +942,31 @@ const AdminVideosPage = () => {
       .replace(/ё/g, 'е')
       .replace(/\s+/g, ' ')
       .trim();
+
+  // Рассылка push «доступно новое видео» всем атлетам (правка владельца).
+  const handleNotifyAthletes = async (video: Video) => {
+    const already = !!video.athletesNotifiedAt;
+    const msg = already
+      ? `Уведомление по «${video.title}» уже отправлялось. Отправить ещё раз?`
+      : `Отправить push «Новое видео-занятие» всем атлетам?\n\n«${video.title}»`;
+    if (!confirm(msg)) return;
+    try {
+      const res = await fetch(`/api/videos/${video.id}/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: already }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data?.error || 'Не удалось отправить уведомление');
+        return;
+      }
+      alert(`Отправлено: ${data.recipients ?? 0} атлетам (${data.subscriptions ?? 0} устройств)`);
+      fetchVideos();
+    } catch {
+      alert('Ошибка сети при отправке уведомления');
+    }
+  };
 
   const handleDeleteVideo = async (videoId: string) => {
     if (!confirm('Вы уверены, что хотите удалить это видео? Это действие нельзя отменить.')) {
@@ -1930,12 +1956,24 @@ const AdminVideosPage = () => {
                     >
                       Редактировать
                     </button>
-                    <Link 
+                    <Link
                       href={`/video/${video.id}`}
                       className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-semibold transition-colors"
                     >
                       Просмотр
                     </Link>
+                    <button
+                      onClick={() => handleNotifyAthletes(video)}
+                      disabled={!video.isPublished}
+                      title={!video.isPublished ? 'Сначала опубликуйте видео' : undefined}
+                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        video.athletesNotifiedAt
+                          ? 'bg-[#101530] text-[#A1FF4A] border border-[#A1FF4A]/40 hover:bg-[#A1FF4A]/10'
+                          : 'bg-[#A1FF4A] text-[#060919] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed'
+                      }`}
+                    >
+                      {video.athletesNotifiedAt ? '🔔 Уведомлены ✓' : '🔔 Опубликовать для атлетов'}
+                    </button>
                     <button
                       onClick={() => handleDeleteVideo(video.id)}
                       className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-semibold transition-colors"

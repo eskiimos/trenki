@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
       level: video.level,
       viewsCount: video.viewsCount,
       isPublished: video.isPublished,
+      athletesNotifiedAt: video.athletesNotifiedAt,
       trainer: {
         id: video.trainer.id,
         name: `${video.trainer.name} ${video.trainer.lastName}`,
