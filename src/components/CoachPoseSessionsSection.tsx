@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { Button } from '@/components/ui';
 
 // Плеер скелета — только в браузере (canvas)
 const PoseReplay = dynamic(() => import('./PoseReplay'), { ssr: false });
@@ -230,24 +231,9 @@ function SessionRow({
               outline: 'none',
             }}
           />
-          <button
-            type="button"
-            onClick={submit}
-            disabled={saving || rating < 1}
-            className="font-overpass uppercase"
-            style={{
-              background: rating >= 1 ? '#A1FF4A' : '#26252F',
-              color: rating >= 1 ? '#101530' : '#AEABBB',
-              fontWeight: 900,
-              fontSize: 12,
-              padding: '10px 16px',
-              borderRadius: 999,
-              border: 'none',
-              cursor: rating >= 1 ? 'pointer' : 'not-allowed',
-            }}
-          >
+          <Button type="button" variant="primary" size="sm" onClick={submit} disabled={saving || rating < 1}>
             {saving ? 'Сохранение…' : 'Сохранить оценку'}
-          </button>
+          </Button>
         </div>
       )}
     </div>

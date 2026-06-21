@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { saveAuth, getTelegramId } from '@/lib/auth';
+import { Button } from '@/components/ui';
 
 interface OnboardingProps {
   onComplete: () => void;
@@ -128,21 +129,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             </div>
 
             {/* Кнопка */}
-            <button
-              onClick={handleNext}
-              className="w-full bg-[#A1FF4A] text-[#0A0E1A] py-4 mb-6 hover:opacity-90 transition-opacity"
-              style={{ 
-                borderRadius: '32px',
-                fontFamily: 'Overpass',
-                fontWeight: 700,
-                fontSize: '14px',
-                lineHeight: '120%',
-                letterSpacing: '0.5px',
-                textTransform: 'uppercase'
-              }}
-            >
+            <Button variant="primary" fullWidth onClick={handleNext} className="mb-6">
               ГОТОВ ЗАЖЕЧЬ НА ЛЬДУ ПО-НОВОМУ?
-            </button>
+            </Button>
 
             {/* Индикатор страницы */}
             <div className="text-center text-gray-400 text-sm">
@@ -292,26 +281,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             {/* Нижняя часть с кнопкой */}
             <div>
               {/* Кнопка */}
-              <button
-                onClick={handleNext}
-                disabled={!isFormValid}
-                className="w-full py-4 mb-6 transition-all"
-                style={{ 
-                  background: isFormValid ? '#A1FF4A' : '#A1FF4A33',
-                  color: isFormValid ? '#0A0E1A' : '#FFFFFF',
-                  borderRadius: '32px',
-                  fontFamily: 'Overpass',
-                  fontWeight: 700,
-                  fontSize: '14px',
-                  lineHeight: '120%',
-                  letterSpacing: '0.5px',
-                  textTransform: 'uppercase',
-                  cursor: isFormValid ? 'pointer' : 'not-allowed',
-                  opacity: isFormValid ? 1 : 0.6
-                }}
-              >
+              <Button variant="primary" fullWidth disabled={!isFormValid} onClick={handleNext} className="mb-6">
                 ДАЛЕЕ
-              </button>
+              </Button>
 
               {/* Индикатор страницы */}
               <div className="text-center text-gray-400 text-sm">
@@ -349,21 +321,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             {/* Нижняя часть с кнопкой */}
             <div>
               {/* Кнопка */}
-              <button
-                onClick={handleNext}
-                className="w-full bg-[#A1FF4A] text-[#0A0E1A] py-4 mb-6 hover:opacity-90 transition-opacity"
-                style={{ 
-                  borderRadius: '32px',
-                  fontFamily: 'Overpass',
-                  fontWeight: 700,
-                  fontSize: '14px',
-                  lineHeight: '120%',
-                  letterSpacing: '0.5px',
-                  textTransform: 'uppercase'
-                }}
-              >
+              <Button variant="primary" fullWidth onClick={handleNext} className="mb-6">
                 К ТРЕНИРОВКАМ
-              </button>
+              </Button>
 
               {/* Индикатор страницы */}
               <div className="text-center text-gray-400 text-sm">

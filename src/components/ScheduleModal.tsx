@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 import { getTelegramId } from '@/lib/auth';
+import { Button } from '@/components/ui';
 
 interface ScheduleModalProps {
   isOpen: boolean;
@@ -600,42 +601,37 @@ export default function ScheduleModal({ isOpen, onClose, videoId }: ScheduleModa
               </div>
 
               {/* Add to Device Calendar Button */}
-              <button
+              <Button
+                variant="primary"
+                fullWidth
                 onClick={handleAddToDeviceCalendar}
                 disabled={isAddingToDevice}
-                className="w-full py-4 rounded-full font-bold text-[14px] uppercase tracking-wider bg-[#A1FF4A] text-[#060919] hover:bg-[#8FE639] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                className="flex items-center justify-center gap-2"
               >
-                <Image 
-                  src="/icons/video/Type_calendar_No.svg" 
-                  alt="Календарь" 
-                  width={20} 
-                  height={20} 
+                <Image
+                  src="/icons/video/Type_calendar_No.svg"
+                  alt="Календарь"
+                  width={20}
+                  height={20}
                 />
                 {isAddingToDevice ? 'ДОБАВЛЕНИЕ...' : 'ДОБАВИТЬ В КАЛЕНДАРЬ УСТРОЙСТВА'}
-              </button>
+              </Button>
 
               {/* Close Button */}
-              <button
-                onClick={handleClose}
-                className="w-full py-3 rounded-full font-medium text-[12px] uppercase tracking-wider bg-transparent text-white/60 hover:text-white transition-all"
-              >
+              <Button variant="ghost" size="sm" fullWidth onClick={handleClose}>
                 ЗАКРЫТЬ
-              </button>
+              </Button>
             </div>
           ) : (
             /* Save Button */
-            <button
+            <Button
+              variant="primary"
+              fullWidth
               onClick={handleSave}
               disabled={selectedDates.length === 0 || isSaving}
-              className={`w-full py-4 rounded-full font-bold text-[14px] uppercase tracking-wider transition-all
-                ${selectedDates.length > 0 
-                  ? 'bg-[#A1FF4A] text-[#060919] hover:bg-[#8FE639]' 
-                  : 'bg-[#A1FF4A33] text-[#060919] cursor-not-allowed'
-                }
-              `}
             >
               {isSaving ? 'СОХРАНЕНИЕ...' : 'СОХРАНИТЬ'}
-            </button>
+            </Button>
           )}
         </div>
       </div>

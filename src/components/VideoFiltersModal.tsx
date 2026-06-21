@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { Button } from '@/components/ui';
 import {
   MODULE_TYPE_LABELS,
   LOAD_TYPE_LABELS,
@@ -264,23 +265,9 @@ export default function VideoFiltersModal({
             backgroundColor: '#101530',
           }}
         >
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full rounded-full font-medium uppercase"
-            style={{
-              backgroundColor: '#A1FF4A',
-              color: '#060919',
-              fontFamily: 'Overpass, sans-serif',
-              fontWeight: 700,
-              fontSize: '16px',
-              letterSpacing: '0.5px',
-              height: '56px',
-              padding: '0 16px',
-            }}
-          >
+          <Button type="button" variant="primary" fullWidth onClick={onClose}>
             {matchedCount > 0 ? `Показать ${matchedCount} видео` : 'Ничего не найдено'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
