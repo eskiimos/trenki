@@ -34,17 +34,26 @@ export default function TourOverlay({ step, rect, index, total, onNext }: Props)
   const isLast = !!step.isLast;
   const isTap = step.advanceOn === 'tap';
 
-  // Тултип — bottom-sheet: по умолчанию закреплён внизу экрана. Если же
-  // подсвеченный элемент сам в нижней части (напр. кнопка «Вперёд») и
-  // нижний тултип его перекрыл бы — поднимаем тултип наверх. Без цели —
-  // по центру. Так подсказка не налезает на фокус ни на одном экране.
+  // Тултип кладём туда, где он НЕ перекрывает спотлайт: считаем свободное
+  // место сверху и снизу от подсвеченного элемента. Предпочитаем низ; если
+  // снизу не влезает — наверх; если цель высокая и не влезает нигде — в
+  // сторону с бóльшим запасом. Без цели — по центру. (Высокие цели тур ещё и
+  // подскролливает к верху — см. TourProvider — чтобы запас снизу появился.)
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-  const targetNearBottom = rect ? rect.top + rect.height > vh * 0.62 : false;
+  const TOOLTIP_H = 210; // прибл. высота карточки-подсказки + отступы
+  const spaceBelow = rect ? vh - (rect.top + rect.height) : 0;
+  const spaceAbove = rect ? rect.top : 0;
+  let placeBottom = true;
+  if (rect) {
+    if (spaceBelow >= TOOLTIP_H) placeBottom = true;
+    else if (spaceAbove >= TOOLTIP_H) placeBottom = false;
+    else placeBottom = spaceBelow >= spaceAbove;
+  }
   const tooltipPos: React.CSSProperties = !rect
     ? { top: '50%', transform: 'translateY(-50%)' }
-    : targetNearBottom
-    ? { top: 'calc(env(safe-area-inset-top, 0px) + 16px)' }
-    : { bottom: 'calc(env(safe-area-inset-bottom, 0px) + 24px)' };
+    : placeBottom
+    ? { bottom: 'calc(env(safe-area-inset-bottom, 0px) + 24px)' }
+    : { top: 'calc(env(safe-area-inset-top, 0px) + 16px)' };
 
   return (
     // pointer-events:none на контейнере — иначе прозрачный слой на весь экран

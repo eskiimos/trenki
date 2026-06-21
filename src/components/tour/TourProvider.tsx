@@ -132,7 +132,19 @@ export default function TourProvider({ children }: { children: React.ReactNode }
       if (cancelled) return;
       if (el) {
         elRef.current = el;
-        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        // Высокие цели (напр. длинный список целей) центрировать нельзя —
+        // тултипу не остаётся места и он перекрывает спотлайт. Прижимаем такую
+        // цель к верху (чуть ниже сейфзоны), тогда тултип уходит вниз без
+        // перекрытия. Обычные (невысокие) цели центрируем как раньше.
+        const vhNow = window.innerHeight;
+        const hNow = el.getBoundingClientRect().height;
+        if (hNow > vhNow * 0.5) {
+          const SAFE_TOP = 64; // прибл. env(safe-area-inset-top) + отступ
+          const curTop = el.getBoundingClientRect().top;
+          window.scrollBy({ top: curTop - SAFE_TOP, behavior: 'smooth' });
+        } else {
+          el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
         // даём скроллу осесть, затем меряем
         setTimeout(() => {
           if (cancelled) return;
