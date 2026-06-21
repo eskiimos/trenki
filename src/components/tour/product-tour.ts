@@ -33,7 +33,7 @@ export const PRODUCT_TOUR: TourStep[] = [
     anchor: 'ai-trainer-card',
     advanceOn: 'tap',
     title: 'Быстрая тренировка',
-    body: 'Нажми на карточку — соберём быструю тренировку под тебя.',
+    body: 'Нажми на карточку — моментально соберём тренировку под тебя.',
   },
   {
     id: 'assess-goal',
@@ -41,7 +41,7 @@ export const PRODUCT_TOUR: TourStep[] = [
     anchor: 'goal-section',
     advanceOn: 'tap',
     title: 'Выбери цель',
-    body: 'Над чем работаем? Нажми на одну из целей.',
+    body: 'Над чем работаем? Выбери одну из целей.',
   },
   {
     id: 'assess-energy',
