@@ -77,12 +77,15 @@ export function intentFor(kind: DayKind, energyState: EnergyState): MicrocycleIn
   return MicrocycleIntent.TIRED;
 }
 
+// «Крутые» названия нагрузок (по таблице методиста):
+//   Заряжен→Овертайм, В тонусе→База/стандарт, Устал→Лёгкая нагрузка,
+//   Разминка→Зарядка, Растяжка→Раскисление.
 export function labelFor(kind: DayKind, energyState: EnergyState): string {
-  if (kind === 'WARMUP') return 'Разминка';
-  if (kind === 'WARMUP_STRETCH') return 'Растяжка';
-  if (energyState === EnergyState.FULLY_CHARGED) return 'Заряжен';
-  if (energyState === EnergyState.IN_TONE) return 'В тонусе';
-  return 'Устал';
+  if (kind === 'WARMUP') return 'Зарядка';
+  if (kind === 'WARMUP_STRETCH') return 'Раскисление';
+  if (energyState === EnergyState.FULLY_CHARGED) return 'Овертайм';
+  if (energyState === EnergyState.IN_TONE) return 'База/стандарт';
+  return 'Лёгкая нагрузка';
 }
 
 // Прошлый день (из БД) → состояние для адаптации.

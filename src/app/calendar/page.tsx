@@ -61,12 +61,13 @@ interface ActiveMicrocycle {
   days: MicrocycleDay[];
 }
 
+// «Крутые» названия нагрузок (таблица методиста).
 const MICROCYCLE_INTENT_LABEL: Record<MicrocycleIntent, string> = {
-  IN_TONE: 'В тонусе',
-  WARMUP: 'Разминка',
-  CHARGED: 'Заряжен',
-  STRETCH: 'Растяжка',
-  TIRED: 'Устал',
+  IN_TONE: 'База/стандарт',
+  WARMUP: 'Зарядка',
+  CHARGED: 'Овертайм',
+  STRETCH: 'Раскисление',
+  TIRED: 'Лёгкая нагрузка',
 };
 
 const MICROCYCLE_INTENT_EMOJI: Record<MicrocycleIntent, string> = {

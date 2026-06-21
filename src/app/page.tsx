@@ -12,7 +12,51 @@ import BottomNavigation from '@/components/BottomNavigation';
 import WorkoutReminder from '@/components/WorkoutReminder';
 import AssignmentsBanner from '@/components/AssignmentsBanner';
 import MicrocycleFeedbackModal from '@/components/MicrocycleFeedbackModal';
+import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay';
+import { useTour } from '@/components/tour/TourProvider';
 import { Skeleton } from '@/components/Skeleton';
+
+// Плашка-гайд на главной: предлагает пройти тур новичкам. Видна, пока тур не
+// пройден и плашка не закрыта (✕). Запуск тура — useTour().startTour().
+const GuideBanner = () => {
+  const { startTour } = useTour();
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    try {
+      const done = localStorage.getItem('trenki_tour_completed');
+      const dismissed = localStorage.getItem('trenki_guide_banner_dismissed');
+      if (!done && !dismissed) setShow(true);
+    } catch {}
+  }, []);
+  if (!show) return null;
+  return (
+    <section className="px-4" style={{ paddingTop: 12 }}>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', paddingRight: 38, background: 'linear-gradient(135deg, rgba(161,255,74,0.14), rgba(68,92,255,0.18))', border: '1px solid rgba(161,255,74,0.3)', borderRadius: 12 }}>
+        <div style={{ fontSize: 22, flexShrink: 0 }}>🧭</div>
+        <div className="flex-1 min-w-0">
+          <div className="font-overpass" style={{ color: '#F9F8FE', fontSize: 14, fontWeight: 700 }}>Первый раз тут?</div>
+          <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 12 }}>Пройди быстрый тур по приложению</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => { setShow(false); startTour(); }}
+          className="font-overpass uppercase transition-transform active:scale-95"
+          style={{ background: '#A1FF4A', color: '#060919', borderRadius: 999, padding: '8px 16px', fontWeight: 800, fontSize: 12, flexShrink: 0, border: 'none' }}
+        >
+          Начать
+        </button>
+        <button
+          type="button"
+          aria-label="Закрыть"
+          onClick={() => { try { localStorage.setItem('trenki_guide_banner_dismissed', '1'); } catch {} setShow(false); }}
+          style={{ position: 'absolute', top: 6, right: 10, color: '#AEABBB', background: 'none', border: 'none', fontSize: 16, lineHeight: 1, cursor: 'pointer' }}
+        >
+          ✕
+        </button>
+      </div>
+    </section>
+  );
+};
 
 // Компонент для короткого видео
 interface ShortVideoPlayerProps {
@@ -131,6 +175,9 @@ const HomePage = () => {
       
       {/* Контейнер с максимальной шириной для планшетов и десктопов */}
       <div className="max-w-4xl mx-auto">
+        {/* Плашка-гайд для новичков (закрывается ✕) */}
+        <GuideBanner />
+
         {/* Напоминание о незавершенной тренировке */}
         <WorkoutReminder />
         
@@ -718,52 +765,83 @@ const TrenkiSection = () => {
   );
 };
 
-const TrainingsSection = () => (
+const TrainingsSection = () => {
+    const router = useRouter();
+    const [generatingCycle, setGeneratingCycle] = useState(false);
+    const [cycleError, setCycleError] = useState<string | null>(null);
+
+    // Кнопка «Собрать микроцикл» на главной (правка владельца). Идемпотентно;
+    // тот же endpoint, что в календаре. Держим экран сборки минимум ~5с.
+    const handleGenerateMicrocycle = async () => {
+        if (generatingCycle) return;
+        setCycleError(null);
+        setGeneratingCycle(true);
+        const startedAt = Date.now();
+        try {
+            const res = await fetch('/api/microcycle/generate', { method: 'POST' });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data?.error || 'Не удалось собрать микроцикл');
+            }
+            const elapsed = Date.now() - startedAt;
+            if (elapsed < 5000) await new Promise((r) => setTimeout(r, 5000 - elapsed));
+            router.push('/calendar');
+        } catch (e: any) {
+            setCycleError(e?.message || 'Ошибка');
+            setGeneratingCycle(false);
+        }
+    };
+
+    return (
     <section className="px-4" style={{ paddingBottom: '15px' }}>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2">
-            {/* Блок ИИ тренера - на мобилке во всю ширину, на планшете 1 из 3 */}
-            <Link href="/training/assessment" data-tour="ai-trainer-card" style={{textDecoration: 'none'}} className="col-span-2 sm:col-span-1">
+        {/* Кнопка «Собрать микроцикл» — главная точка входа */}
+        <button
+            type="button"
+            data-tour="microcycle-card"
+            onClick={handleGenerateMicrocycle}
+            disabled={generatingCycle}
+            className="w-full mb-2 transition-transform active:scale-[0.99]"
+            style={{
+                display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
+                background: 'linear-gradient(135deg, rgba(161, 255, 74, 0.20) 0%, rgba(68, 92, 255, 0.24) 100%)',
+                border: '1px solid rgba(161, 255, 74, 0.35)', borderRadius: 8,
+                cursor: generatingCycle ? 'wait' : 'pointer', opacity: generatingCycle ? 0.7 : 1,
+            }}
+        >
+            <div style={{ width: 40, height: 40, borderRadius: 999, background: 'rgba(161,255,74,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>⚡️</div>
+            <div className="text-left flex-1 min-w-0">
+                <div style={{ color: '#A1FF4A', fontSize: 11, fontFamily: 'Overpass', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>ИИ-тренер</div>
+                <div style={{ color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    {generatingCycle ? 'Собираю неделю…' : 'Собрать микроцикл на неделю'}
+                </div>
+            </div>
+        </button>
+        {cycleError && <div style={{ color: '#FF8C4A', fontSize: 12, marginBottom: 8, textAlign: 'center' }}>{cycleError}</div>}
+
+        <div className="grid grid-cols-2 gap-2">
+            {/* Быстрая тренировка (ИИ) */}
+            <Link href="/training/assessment" data-tour="ai-trainer-card" style={{textDecoration: 'none'}}>
                 <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex', cursor: 'pointer'}}>
-                    <Image
-                        src="/icons/icon-cards.svg"
-                        alt="Быстрая тренировка"
-                        width={24}
-                        height={24}
-                    />
+                    <Image src="/icons/icon-cards.svg" alt="Быстрая тренировка" width={24} height={24} />
                     <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50}}>
                         <span style={{color: '#A1FF4A'}}>быстрая</span> тренировка
                     </div>
                 </div>
             </Link>
-            
-            {/* Блок "Повышение потенциала" */}
-            <Link href="/video" style={{textDecoration: 'none'}} className="sm:col-span-1">
+
+            {/* Повышение потенциала */}
+            <Link href="/video" style={{textDecoration: 'none'}}>
                 <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex'}}>
-                    <Image
-                        src="/icons/ant-design-thunderbolt-filled_f.svg"
-                        alt="Потенциал"
-                        width={16}
-                        height={16}
-                    />
+                    <Image src="/icons/ant-design-thunderbolt-filled_f.svg" alt="Потенциал" width={16} height={16} />
                     <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>повышение потенциала</div>
                 </div>
             </Link>
-            
-            {/* Блок "Треньки" */}
-            <Link href="/shorts-catalog" style={{textDecoration: 'none'}} className="sm:col-span-1">
-                <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex'}}>
-                    <Image
-                        src="/icons/icon-cards-kl.svg"
-                        alt="Треньки"
-                        width={16}
-                        height={16}
-                    />
-                    <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>треньки, советы профи, разборы</div>
-                </div>
-            </Link>
         </div>
+
+        <MicrocyclePreparingOverlay open={generatingCycle} />
     </section>
-);
+    );
+};
 
 const TrainersSection = () => {
   const [trainers, setTrainers] = useState<any[]>([]);

@@ -16,12 +16,13 @@ import Image from 'next/image';
 
 type Intent = 'IN_TONE' | 'WARMUP' | 'CHARGED' | 'STRETCH' | 'TIRED';
 
+// «Крутые» названия нагрузок (таблица методиста).
 const INTENT_LABEL: Record<Intent, string> = {
-  IN_TONE: 'В тонусе',
-  WARMUP: 'Разминка',
-  CHARGED: 'Заряжен',
-  STRETCH: 'Растяжка',
-  TIRED: 'Устал',
+  IN_TONE: 'База/стандарт',
+  WARMUP: 'Зарядка',
+  CHARGED: 'Овертайм',
+  STRETCH: 'Раскисление',
+  TIRED: 'Лёгкая нагрузка',
 };
 
 const INTENT_EMOJI: Record<Intent, string> = {

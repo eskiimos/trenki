@@ -370,6 +370,32 @@ export default function CoachAssignmentNewPage() {
         {/* Игроки */}
         <Section title="Кому">
           <div className="flex flex-col gap-2">
+            {members.length > 0 && (() => {
+              const allSelected = members.every((m) => selectedAthletes.has(m.userId));
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Дать задание всей команде / снять выбор со всех (правка владельца).
+                    setSelectedAthletes(allSelected ? new Set() : new Set(members.map((m) => m.userId)));
+                  }}
+                  className="w-full text-left flex items-center justify-between font-overpass uppercase"
+                  style={{
+                    background: allSelected ? 'rgba(161,255,74,0.12)' : '#0B1030',
+                    border: `1px solid ${allSelected ? 'rgba(161,255,74,0.4)' : '#26252F'}`,
+                    borderRadius: 12,
+                    padding: '12px 14px',
+                    fontWeight: 800,
+                    fontSize: 13,
+                    letterSpacing: 0.5,
+                    color: allSelected ? '#A1FF4A' : '#F9F8FE',
+                  }}
+                >
+                  <span>👥 Вся команда</span>
+                  <span style={{ fontSize: 11, color: '#AEABBB' }}>{allSelected ? 'снять' : `все ${members.length}`}</span>
+                </button>
+              );
+            })()}
             {members.length === 0 && (
               <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 13 }}>В команде пока никого нет</div>
             )}

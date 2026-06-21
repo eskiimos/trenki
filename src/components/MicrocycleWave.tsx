@@ -16,12 +16,14 @@ export interface WavePoint {
 
 // Каноническая неделя (как в макете CEO): Пн В тонусе(3) · Вт Зарядка(1) ·
 // Ср Заряжен(4) · Чт Растяжка(1) · Пт Устал(2).
+// «Крутые» названия (компактные формы для тесной волны):
+// База/стандарт→База, Овертайм, Лёгкая нагрузка→Лёгкая, Зарядка, Раскисление.
 export const CANONICAL_WEEK: WavePoint[] = [
-  { label: 'В тонусе', height: 3, side: 'top' },
+  { label: 'База', height: 3, side: 'top' },
   { label: 'Зарядка', height: 1, side: 'bottom' },
-  { label: 'Заряжен', height: 4, side: 'top' },
-  { label: 'Растяжка', height: 1, side: 'bottom' },
-  { label: 'Устал', height: 2, side: 'top' },
+  { label: 'Овертайм', height: 4, side: 'top' },
+  { label: 'Раскисление', height: 1, side: 'bottom' },
+  { label: 'Лёгкая', height: 2, side: 'top' },
 ];
 
 interface Props {
