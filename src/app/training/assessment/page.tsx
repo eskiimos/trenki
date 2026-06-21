@@ -6,16 +6,17 @@ import { useTelegram } from '@/hooks/useTelegram';
 import { TrainingGoal } from '@/generated/prisma';
 import { GOAL_LABELS, ENERGY_STATE_LABELS } from '@/lib/training-algorithm-v3';
 import { pickCycleDayToOffer, todayCycleDayIndex } from '@/lib/microcycle/offer';
+import { useTour } from '@/components/tour/TourProvider';
 
 const trainingGoals = Object.values(TrainingGoal) as TrainingGoal[];
 
-// C-4: подписи дней цикла по intent (для предложения цикловой тренировки).
+// C-4: подписи дней цикла по intent (крутые названия нагрузок, как в календаре).
 const INTENT_LABELS: Record<string, string> = {
-  IN_TONE: 'В тонусе',
-  WARMUP: 'Разминка',
-  CHARGED: 'Заряжен',
-  STRETCH: 'Растяжка',
-  TIRED: 'Устал',
+  IN_TONE: 'База/стандарт',
+  WARMUP: 'Зарядка',
+  CHARGED: 'Овертайм',
+  STRETCH: 'Раскисление',
+  TIRED: 'Лёгкая нагрузка',
 };
 
 const GOAL_ICONS: Record<string, string> = {
@@ -35,7 +36,11 @@ const energyStates: EnergyStateValue[] = ['FULLY_CHARGED', 'IN_TONE', 'TIRED'];
 export default function TrainingAssessmentPage() {
   const router = useRouter();
   const { user, webApp, isLoading: userLoading } = useTelegram();
-  
+  // Во время обучающего тура попап «У тебя активен цикл» не показываем —
+  // он полноэкранный (fixed inset-0) и перехватывает тап по подсвеченным
+  // турами кнопкам (баг с циклом при обучалке).
+  const { isActive: tourActive } = useTour();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Состояние формы. По умолчанию ничего не выбрано — атлет сам
@@ -52,6 +57,7 @@ export default function TrainingAssessmentPage() {
   const declinedCycleSessionRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (tourActive) return; // в туре не предлагаем цикл (см. tourActive выше)
     let cancelled = false;
     (async () => {
       try {
@@ -75,7 +81,7 @@ export default function TrainingAssessmentPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [tourActive]);
 
   const acceptCycleOffer = () => {
     if (!cycleOffer) return;
@@ -199,8 +205,9 @@ export default function TrainingAssessmentPage() {
 
   return (
     <div className="min-h-screen bg-[#101530] text-white p-4" style={{ paddingBottom: '100px' }}>
-      {/* C-4: предложение сделать тренировку из активного цикла вместо быстрой */}
-      {cycleOffer && (
+      {/* C-4: предложение сделать тренировку из активного цикла вместо быстрой.
+          В обучающем туре не показываем — перекрывает подсвеченные кнопки. */}
+      {cycleOffer && !tourActive && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/60" />
           <div className="relative w-full max-w-sm rounded-xl bg-[#0B0F2A] p-5 text-left shadow-lg border border-[rgba(68,92,255,0.35)]">
