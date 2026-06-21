@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import { Button } from '@/components/ui';
 
 interface ReviewModalProps {
   isOpen: boolean;
@@ -181,28 +182,17 @@ export default function ReviewModal({
 
                 {/* Кнопки */}
                 <div className="flex gap-3 mb-4">
-                  <button
+                  <Button
+                    variant="primary"
                     onClick={handleSubmit}
                     disabled={isSubmitting || userRating === 0}
-                    className="flex-1 py-4 rounded-2xl font-bold uppercase text-sm transition-all"
-                    style={{ 
-                      fontFamily: 'Overpass',
-                      background: userRating === 0 || isSubmitting 
-                        ? '#2d3e8f' 
-                        : 'linear-gradient(90deg, #A1FF4A 0%, #7ec935 100%)',
-                      color: userRating === 0 || isSubmitting ? '#AEABBB' : '#0a1628',
-                      opacity: isSubmitting ? 0.7 : 1
-                    }}
+                    className="flex-1"
                   >
                     {isSubmitting ? 'Отправка...' : 'отправить'}
-                  </button>
-                  <button
-                    onClick={handleClose}
-                    className="flex-1 bg-[#101530] text-white py-4 rounded-2xl font-bold uppercase text-sm"
-                    style={{ fontFamily: 'Overpass' }}
-                  >
+                  </Button>
+                  <Button variant="ghost" onClick={handleClose} className="flex-1">
                     пропустить
-                  </button>
+                  </Button>
                 </div>
               </>
             ) : (
@@ -234,16 +224,9 @@ export default function ReviewModal({
                 </div>
 
                 {/* Кнопка */}
-                <button
-                  onClick={handleClose}
-                  className="w-full py-4 rounded-2xl font-bold uppercase text-sm text-white"
-                  style={{ 
-                    fontFamily: 'Overpass',
-                    background: 'linear-gradient(90deg, #445CFF 0%, #2d3e8f 100%)'
-                  }}
-                >
+                <Button variant="primary" fullWidth onClick={handleClose}>
                   к тренеровкам
-                </button>
+                </Button>
               </>
             )}
           </div>

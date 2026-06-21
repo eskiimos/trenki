@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui';
 
 interface CharacteristicsGainModalProps {
   gains: {
@@ -154,12 +155,9 @@ export default function CharacteristicsGainModal({
         </div>
 
         {/* Кнопка закрытия */}
-        <button
-          onClick={onClose}
-          className="w-full bg-gradient-to-r from-[#445CFF] to-[#7B61FF] hover:from-[#5a6fff] hover:to-[#8b71ff] text-white font-bold py-4 rounded-lg transition-all duration-300 shadow-lg font-overpass"
-        >
+        <Button variant="primary" fullWidth onClick={onClose}>
           Продолжить
-        </button>
+        </Button>
       </div>
     </div>
   );

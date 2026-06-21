@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import Cropper from 'react-easy-crop';
+import { Button } from '@/components/ui';
 
 interface ImageCropperProps {
   imageSrc: string;
@@ -109,19 +110,12 @@ export default function ImageCropper({ imageSrc, onCropDone, onCancel }: ImageCr
 
       {/* Buttons */}
       <div className="px-6 pb-10 pt-2 bg-black flex gap-3">
-        <button
-          onClick={onCancel}
-          className="flex-1 py-3 rounded-full border border-[#AEABBB] text-white text-sm font-bold uppercase tracking-wide"
-        >
+        <Button variant="ghost" onClick={onCancel} className="flex-1">
           Отмена
-        </button>
-        <button
-          onClick={handleDone}
-          disabled={isProcessing}
-          className="flex-1 py-3 rounded-full bg-[#445CFF] disabled:opacity-50 text-white text-sm font-bold uppercase tracking-wide"
-        >
+        </Button>
+        <Button variant="primary" onClick={handleDone} disabled={isProcessing} className="flex-1">
           {isProcessing ? 'Обработка...' : 'Готово'}
-        </button>
+        </Button>
       </div>
     </div>
   );
