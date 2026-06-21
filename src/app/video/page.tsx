@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import BottomNavigation from '@/components/BottomNavigation';
 import { Skeleton } from '@/components/Skeleton';
+import { Button } from '@/components/ui';
 import VideoFiltersModal, {
   VideoFilters,
   EMPTY_FILTERS,
@@ -423,24 +424,17 @@ const VideoPage = () => {
             <p className="text-gray-400 text-lg">Видео не найдены</p>
             <p className="text-gray-500 text-sm mt-2">Попробуйте изменить фильтры или поиск</p>
             {(totalActive > 0 || searchQuery) && (
-              <button
+              <Button
                 type="button"
+                variant="primary"
+                className="mt-4"
                 onClick={() => {
                   setFilters(EMPTY_FILTERS);
                   setSearchQuery('');
                 }}
-                className="mt-4 uppercase rounded-full px-5 py-3"
-                style={{
-                  backgroundColor: '#A1FF4A',
-                  color: '#060919',
-                  fontFamily: 'Overpass, sans-serif',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  letterSpacing: '0.5px',
-                }}
               >
                 Сбросить фильтры
-              </button>
+              </Button>
             )}
           </div>
         ) : (

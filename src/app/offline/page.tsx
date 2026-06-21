@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@/components/ui';
+
 export default function OfflinePage() {
   return (
     <div className="min-h-screen bg-[#0A0E1A] flex items-center justify-center px-4">
@@ -28,12 +30,9 @@ export default function OfflinePage() {
           Проверьте подключение к интернету и попробуйте снова
         </p>
         
-        <button
-          onClick={() => window.location.reload()}
-          className="bg-[#A1FF4A] text-[#0A0E1A] px-8 py-3 rounded-full font-bold hover:bg-[#90ee39] transition-colors"
-        >
+        <Button variant="primary" onClick={() => window.location.reload()}>
           Обновить страницу
-        </button>
+        </Button>
       </div>
     </div>
   );

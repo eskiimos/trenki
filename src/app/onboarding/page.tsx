@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { getTelegramId } from '@/lib/auth';
+import { Button } from '@/components/ui';
 
 export default function OnboardingProfilePage() {
   const router = useRouter();
@@ -256,17 +257,14 @@ export default function OnboardingProfilePage() {
 
         {/* Кнопка внизу */}
         <div className="space-y-4">
-          <button
+          <Button
+            variant="primary"
+            fullWidth
             onClick={handleSubmit}
             disabled={!isFormValid || isLoading}
-            className={`w-full py-4 rounded-full font-bold text-sm uppercase tracking-wider transition-all ${
-              isFormValid && !isLoading
-                ? 'bg-[#A1FF4A] text-[#0A0E1A] hover:opacity-90'
-                : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-            }`}
           >
             {isLoading ? 'Сохранение...' : 'Сохранить'}
-          </button>
+          </Button>
 
           <div className="text-center text-gray-400 text-sm">2/2</div>
         </div>

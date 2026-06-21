@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveAuth } from '@/lib/auth';
+import { Button } from '@/components/ui';
 
 // ─────────────────────────────────────────────
 // Email-логин: отправка кода и верификация
@@ -176,19 +177,21 @@ function EmailLoginForm() {
             <p className="text-red-400 text-sm text-center">{error}</p>
           </div>
         )}
-        <button
+        <Button
+          variant="primary"
+          fullWidth
           onClick={handleSendCode}
           disabled={loading || !email || !acceptedTerms || !acceptedPrivacy}
-          className="w-full bg-[#A1FF4A] hover:bg-[#8fe63a] disabled:bg-gray-600 disabled:cursor-not-allowed text-[#101530] font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all"
+          className="flex items-center justify-center gap-2"
         >
           {loading ? (
             <span className="flex items-center gap-2">
-              <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#101530] inline-block"></span> Отправка...
+              <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#060919] inline-block"></span> Отправка...
             </span>
           ) : (
             'Отправить код'
           )}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -220,19 +223,21 @@ function EmailLoginForm() {
           <p className="text-red-400 text-sm text-center">{error}</p>
         </div>
       )}
-      <button
+      <Button
+        variant="primary"
+        fullWidth
         onClick={handleVerifyCode}
         disabled={loading || code.length < 6}
-        className="w-full bg-[#A1FF4A] hover:bg-[#8fe63a] disabled:bg-gray-600 disabled:cursor-not-allowed text-[#101530] font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all"
+        className="flex items-center justify-center gap-2"
       >
         {loading ? (
           <span className="flex items-center gap-2">
-            <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#101530] inline-block"></span> Проверка...
+            <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#060919] inline-block"></span> Проверка...
           </span>
         ) : (
           'Войти'
         )}
-      </button>
+      </Button>
       <div className="flex items-center justify-between text-sm">
         <button
           onClick={() => {

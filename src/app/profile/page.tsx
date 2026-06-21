@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useTelegram } from '../../hooks/useTelegram';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { ProfileSkeleton } from '../../components/Skeleton';
+import { Button } from '@/components/ui';
 import BottomNavigation from '@/components/BottomNavigation';
 import AccountSwitcher from '@/components/AccountSwitcher';
 import PotentialSection from '@/components/PotentialSection';
@@ -287,12 +288,9 @@ const ProfilePage = () => {
         {/* Кнопка для прохождения опроса потенциала */}
         {userProfile?.profile && (userProfile.profile.potential === undefined || userProfile.profile.potential < 10) && (
           <div className="mb-6">
-            <button
-              onClick={() => router.push('/onboarding/characteristics')}
-              className="w-full bg-gradient-to-r from-[#445CFF] to-[#A1FF4A] text-white font-bold font-overpass text-base py-4 px-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
-            >
+            <Button variant="primary" fullWidth onClick={() => router.push('/onboarding/characteristics')}>
               ✨ Узнать свой потенциал
-            </button>
+            </Button>
           </div>
         )}
 
@@ -417,53 +415,48 @@ const ProfilePage = () => {
 
             {/* Вступить в команду по коду / Покинуть команду */}
             {athleteTeam ? (
-              <button
-                onClick={handleLeaveTeam}
-                className="w-full bg-white/10 hover:bg-white/15 text-white font-medium py-3 rounded-lg transition-all duration-300 text-sm"
-              >
+              <Button variant="ghost" size="sm" fullWidth onClick={handleLeaveTeam}>
                 🚪 Покинуть команду «{athleteTeam.name}»
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
+                fullWidth
                 onClick={() => {
                   const code = prompt('Введи код приглашения');
                   if (code?.trim()) router.push(`/join/${code.trim().toUpperCase()}`);
                 }}
-                className="w-full bg-white/10 hover:bg-white/15 text-white font-medium py-3 rounded-lg transition-all duration-300 text-sm"
               >
                 👥 Вступить в команду
-              </button>
+              </Button>
             )}
 
             {/* Выход */}
-            <button
-              onClick={handleLogout}
-              className="w-full bg-white/10 hover:bg-white/15 text-white/70 font-medium py-3 rounded-lg transition-all duration-300 text-sm"
-            >
+            <Button variant="ghost" size="sm" fullWidth onClick={handleLogout}>
               🚪 Выйти
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* ─── Админ ─── */}
         {isAdmin && (
           <div className="mb-6 space-y-2">
-            <button
-              onClick={() => router.push('/admin')}
-              className="w-full bg-[#A1FF4A]/10 hover:bg-[#A1FF4A]/20 text-[#A1FF4A] font-bold py-3 rounded-lg transition-all duration-300 text-sm"
-            >
+            <Button variant="ghost" size="sm" fullWidth onClick={() => router.push('/admin')}>
               ⚙️ Панель администратора
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              fullWidth
               onClick={() => {
                 router.push('/');
                 // даём главной смонтироваться, затем стартуем тур
                 setTimeout(() => startTour(), 400);
               }}
-              className="w-full bg-[#A1FF4A]/10 hover:bg-[#A1FF4A]/20 text-[#A1FF4A] font-bold py-3 rounded-lg transition-all duration-300 text-sm"
             >
               🧭 Тур по приложению
-            </button>
+            </Button>
           </div>
         )}
       </div>
