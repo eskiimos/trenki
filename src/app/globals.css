@@ -1,12 +1,78 @@
 @import "tailwindcss";
 
+/* ─── Дизайн-токены «Треньки» (единый источник правды) ─────────────────────
+   Канон-палитра. Через @theme (Tailwind 4) цвета становятся и утилитами
+   (bg-surface, text-ink, text-brand, border-brand…), и CSS-переменными
+   (var(--color-brand)) для инлайн-стилей. Имена выбраны без коллизий со
+   стандартными классами Tailwind (не base/lime/blue).                        */
+@theme {
+  --color-night: #060919;       /* фон страниц */
+  --color-surface: #101530;     /* карточки/секции */
+  --color-elevated: #0a0e1a;    /* самый тёмный (модалки, mobile-layout) */
+  --color-brand: #A1FF4A;       /* лайм-акцент: CTA, чипы, фокус, успех */
+  --color-brand-blue: #445CFF;  /* синий: тренеры, ссылки, подложки */
+  --color-ink: #F9F8FE;         /* основной текст */
+  --color-muted: #AEABBB;       /* вторичный текст / disabled */
+  --color-danger: #FF8C4A;      /* ошибки/валидация */
+
+  --radius-sm: 8px;             /* стандартная карточка */
+  --radius-md: 12px;            /* баннеры/средние блоки */
+  --radius-lg: 16px;            /* крупные блоки */
+  --radius-xl: 24px;            /* модалки-шторки */
+  --radius-pill: 999px;         /* кнопки/чипы */
+}
+
+/* Композитные токены для инлайн-стилей: 3 тира прозрачности акцентов +
+   единый акцентный градиент + hairline-рамка + scrim под модалки.
+   Применять как style={{ background:'var(--grad-accent)' }} и т.п.         */
 :root {
+  /* legacy-имена (используются в globals/body) — приведены к канону */
   --background: #060919;
-  --foreground: #ffffff;
-  --secondary: #1a1f3a;
-  --accent: #2d3448;
-  --text-muted: #8892b0;
+  --foreground: #F9F8FE;
+  --secondary: #101530;
+  --accent: #0a0e1a;
+  --text-muted: #AEABBB;
   --text-light: #ccd6f6;
+
+  /* прозрачности лайма: subtle / medium / strong */
+  --lime-subtle: rgba(161, 255, 74, 0.08);
+  --lime-medium: rgba(161, 255, 74, 0.16);
+  --lime-strong: rgba(161, 255, 74, 0.30);
+  /* прозрачность синего */
+  --blue-medium: rgba(68, 92, 255, 0.20);
+  /* рамки */
+  --border-lime: rgba(161, 255, 74, 0.30);
+  --border-hairline: rgba(174, 171, 187, 0.20);
+  /* единый акцентный градиент (135°, лайм → синий) */
+  --grad-accent: linear-gradient(135deg, rgba(161, 255, 74, 0.16) 0%, rgba(68, 92, 255, 0.20) 100%);
+  /* затемнение под модалками */
+  --scrim: rgba(6, 9, 25, 0.82);
+}
+
+/* ─── Состояния UI-примитивов (src/components/ui) ──────────────────────────
+   Инлайн-стили не умеют :hover/:active/:focus — держим их классами здесь.   */
+.ui-pressable {
+  transition: transform 0.12s ease;
+}
+.ui-pressable:active {
+  transform: scale(0.97);
+}
+.ui-btn-ghost {
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.ui-btn-ghost:hover {
+  border-color: var(--border-lime);
+  background: var(--lime-subtle);
+}
+.ui-input {
+  transition: border-color 0.15s ease;
+}
+.ui-input::placeholder {
+  color: var(--color-muted);
+}
+.ui-input:focus {
+  outline: none;
+  border-color: var(--color-brand);
 }
 
 /* Мобильная оптимизация */

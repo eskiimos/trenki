@@ -12,14 +12,9 @@ export default {
         'overpass': ['var(--font-overpass)', 'Overpass', 'Arial', 'sans-serif'],
         'russo': ['Russo One', 'cursive'],
       },
-      colors: {
-        'bg-primary': '#060919',
-        'bg-secondary': '#1a1f3a',
-        'bg-accent': '#2d3448',
-        'text-muted': '#8892b0',
-        'text-light': '#ccd6f6',
-        'accent-blue': '#445CFF',
-      },
+      // Цвета-токены живут в src/app/globals.css в блоке @theme (Tailwind 4):
+      // --color-night/surface/elevated/brand/brand-blue/ink/muted/danger.
+      // Здесь не дублируем — этот JS-конфиг в v4 без @config всё равно не грузится.
       maxWidth: {
         'mobile': '428px',
       },

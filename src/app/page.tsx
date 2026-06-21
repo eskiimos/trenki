@@ -14,6 +14,7 @@ import AssignmentsBanner from '@/components/AssignmentsBanner';
 import MicrocycleFeedbackModal from '@/components/MicrocycleFeedbackModal';
 import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay';
 import { useTour } from '@/components/tour/TourProvider';
+import { Banner, Button } from '@/components/ui';
 import { Skeleton } from '@/components/Skeleton';
 
 // Плашка-гайд на главной: предлагает пройти тур новичкам. Видна, пока тур не
@@ -31,29 +32,17 @@ const GuideBanner = () => {
   if (!show) return null;
   return (
     <section className="px-4" style={{ paddingTop: 12 }}>
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', paddingRight: 38, background: 'linear-gradient(135deg, rgba(161,255,74,0.14), rgba(68,92,255,0.18))', border: '1px solid rgba(161,255,74,0.3)', borderRadius: 12 }}>
-        <div style={{ fontSize: 22, flexShrink: 0 }}>🧭</div>
-        <div className="flex-1 min-w-0">
-          <div className="font-overpass" style={{ color: '#F9F8FE', fontSize: 14, fontWeight: 700 }}>Первый раз тут?</div>
-          <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 12 }}>Пройди быстрый тур по приложению</div>
-        </div>
-        <button
-          type="button"
-          onClick={() => { setShow(false); startTour(); }}
-          className="font-overpass uppercase transition-transform active:scale-95"
-          style={{ background: '#A1FF4A', color: '#060919', borderRadius: 999, padding: '8px 16px', fontWeight: 800, fontSize: 12, flexShrink: 0, border: 'none' }}
-        >
-          Начать
-        </button>
-        <button
-          type="button"
-          aria-label="Закрыть"
-          onClick={() => { try { localStorage.setItem('trenki_guide_banner_dismissed', '1'); } catch {} setShow(false); }}
-          style={{ position: 'absolute', top: 6, right: 10, color: '#AEABBB', background: 'none', border: 'none', fontSize: 16, lineHeight: 1, cursor: 'pointer' }}
-        >
-          ✕
-        </button>
-      </div>
+      <Banner
+        icon={<div style={{ fontSize: 22 }}>🧭</div>}
+        title="Первый раз тут?"
+        subtitle="Пройди быстрый тур по приложению"
+        action={
+          <Button size="sm" style={{ flexShrink: 0 }} onClick={() => { setShow(false); startTour(); }}>
+            Начать
+          </Button>
+        }
+        onDismiss={() => { try { localStorage.setItem('trenki_guide_banner_dismissed', '1'); } catch {} setShow(false); }}
+      />
     </section>
   );
 };
@@ -803,8 +792,8 @@ const TrainingsSection = () => {
             className="w-full mb-2 transition-transform active:scale-[0.99]"
             style={{
                 display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
-                background: 'linear-gradient(135deg, rgba(161, 255, 74, 0.20) 0%, rgba(68, 92, 255, 0.24) 100%)',
-                border: '1px solid rgba(161, 255, 74, 0.35)', borderRadius: 8,
+                background: 'var(--grad-accent)',
+                border: '1px solid var(--border-lime)', borderRadius: 8,
                 cursor: generatingCycle ? 'wait' : 'pointer', opacity: generatingCycle ? 0.7 : 1,
             }}
         >

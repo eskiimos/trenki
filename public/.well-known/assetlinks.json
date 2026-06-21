@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "app.trenki.android",
+    "sha256_cert_fingerprints": [
+      "FF:08:B2:F5:A2:3F:B6:77:8C:6B:44:3C:DB:92:5B:5B:AB:95:45:E8:B1:A7:87:B8:BE:57:29:FA:03:77:E7:93"
+    ]
+  }
+}]

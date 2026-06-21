@@ -65,7 +65,7 @@ function smoothPath(pts: { x: number; y: number }[]): string {
 
 export default function MicrocycleWave({
   points = CANONICAL_WEEK,
-  stroke = '#9FB87A',
+  stroke = '#A1FF4A', // бренд-лайм (канон); было off-palette #9FB87A
   animate = true,
 }: Props) {
   const n = points.length;

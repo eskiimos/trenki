@@ -144,9 +144,8 @@ export default function MicrocycleResultPage() {
         <div
           className="rounded-2xl p-5 mb-6"
           style={{
-            background:
-              'linear-gradient(135deg, rgba(161, 255, 74, 0.12) 0%, rgba(68, 92, 255, 0.20) 100%)',
-            border: '1px solid rgba(161, 255, 74, 0.25)',
+            background: 'var(--grad-accent)',
+            border: '1px solid var(--border-lime)',
           }}
         >
           <div
