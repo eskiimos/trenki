@@ -65,7 +65,10 @@ export default function OnboardingCoachTeamPage() {
   // Экран успеха — показываем сгенерированный код
   if (createdCode) {
     return (
-      <div className="min-h-screen bg-[#101530] text-white flex flex-col px-6 py-10 max-w-3xl md:mx-auto md:px-8">
+      <div
+        className="min-h-screen bg-[#101530] text-white flex flex-col px-6 py-10 max-w-3xl md:mx-auto md:px-8"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 40px)' }}
+      >
         <div className="flex-1 flex flex-col items-center justify-center text-center">
           <div
             style={{
@@ -168,7 +171,10 @@ export default function OnboardingCoachTeamPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#101530] text-white flex flex-col px-6 py-8 max-w-3xl md:mx-auto md:px-8">
+    <div
+      className="min-h-screen bg-[#101530] text-white flex flex-col px-6 py-8 max-w-3xl md:mx-auto md:px-8"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 32px)' }}
+    >
       <button onClick={() => router.push('/onboarding/coach')} className="self-start mb-4">
         <Image src="/icons/icon-action-back.svg" alt="Назад" width={32} height={32} />
       </button>

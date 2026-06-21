@@ -159,7 +159,7 @@ export default function CharacteristicsStatsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#101530] text-white p-4 pb-24">
+    <div className="min-h-screen bg-[#101530] text-white p-4 pb-24" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
       <h1 className="text-3xl font-bold mb-6">Статистика прогресса</h1>
 
       {/* Общий прогресс */}

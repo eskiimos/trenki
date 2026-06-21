@@ -333,7 +333,7 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#101530] text-white p-4 md:p-8">
+    <div className="min-h-screen bg-[#101530] text-white p-4 md:p-8" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

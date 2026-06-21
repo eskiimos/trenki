@@ -27,7 +27,10 @@ export default function OnboardingWelcomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#101530] flex flex-col">
+    <div
+      className="min-h-screen bg-[#101530] flex flex-col"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
+    >
       {/* Верхняя часть — фото с заголовком */}
       <div
         className="relative w-full overflow-hidden"

@@ -100,9 +100,10 @@ export default function NotificationsAdminPage() {
   };
 
   return (
-    <div style={{ 
-      padding: '20px', 
-      maxWidth: '1280px', 
+    <div style={{
+      padding: '20px',
+      paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)',
+      maxWidth: '1280px',
       margin: '0 auto',
       fontFamily: 'Overpass, sans-serif',
     }}>

@@ -285,7 +285,7 @@ export default function AdminShortsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#101530] text-white p-6">
+    <div className="min-h-screen bg-[#101530] text-white p-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 24px)' }}>
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-8">
           <h1 className="text-3xl font-bold">Управление тренями</h1>

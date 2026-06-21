@@ -463,7 +463,7 @@ export default function WorkoutPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#101530] text-white p-4" style={{ paddingBottom: '100px' }}>
+    <div className="min-h-screen bg-[#101530] text-white p-4" style={{ paddingBottom: '100px', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
       {/* Заголовок с кнопкой назад */}
       <div className="mb-6 flex items-center gap-3">
         <button onClick={() => router.back()} className="flex-shrink-0">

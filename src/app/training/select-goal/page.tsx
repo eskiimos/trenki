@@ -55,7 +55,7 @@ export default function SelectGoalPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#101530] text-white p-6">
+    <div className="min-h-screen bg-[#101530] text-white p-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 24px)' }}>
       <div className="max-w-2xl mx-auto">
         {/* Заголовок */}
         <div className="mb-8">

@@ -112,7 +112,10 @@ export default function CharacteristicsOnboardingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 text-white flex flex-col">
       {/* Шапка */}
-      <div className="px-4 pt-8 pb-3 flex-shrink-0">
+      <div
+        className="px-4 pt-8 pb-3 flex-shrink-0"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 32px)' }}
+      >
         {step === 1 && (
           <>
             <h1 className="text-base font-bold font-['Overpass'] uppercase leading-4 tracking-wide text-slate-50 text-center mb-2">

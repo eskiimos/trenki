@@ -181,7 +181,7 @@ export default function AdminTrainersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#101530] text-white p-4 md:p-8">
+    <div className="min-h-screen bg-[#101530] text-white p-4 md:p-8" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
       <div className="max-w-7xl mx-auto">
         {/* Заголовок и кнопки */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8">

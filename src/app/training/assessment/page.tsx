@@ -204,7 +204,7 @@ export default function TrainingAssessmentPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#101530] text-white p-4" style={{ paddingBottom: '100px' }}>
+    <div className="min-h-screen bg-[#101530] text-white p-4" style={{ paddingBottom: '100px', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
       {/* C-4: предложение сделать тренировку из активного цикла вместо быстрой.
           В обучающем туре не показываем — перекрывает подсвеченные кнопки. */}
       {cycleOffer && !tourActive && (

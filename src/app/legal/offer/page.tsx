@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function OfferPage() {
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8" style={{ paddingBottom: '40px' }}>
+    <div className="max-w-2xl mx-auto px-4 py-8" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 32px)', paddingBottom: '40px' }}>
       <div className="mb-8 flex items-center gap-3">
         <Link href="/" className="shrink-0">
           <img src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />

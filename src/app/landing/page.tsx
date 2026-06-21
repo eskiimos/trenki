@@ -283,7 +283,7 @@ export default function LandingPage() {
     <div style={{ background: '#060919', color: '#F9F8FE', minHeight: '100vh', overflowX: 'hidden', position: 'relative' }}>
       {/* NAV */}
       <header className="sticky top-0 z-50 flex items-center justify-between"
-        style={{ padding: '12px clamp(16px,5vw,40px)', maxWidth: 1200, margin: '0 auto', backdropFilter: 'blur(12px)', background: 'rgba(6,9,25,0.65)' }}>
+        style={{ padding: '12px clamp(16px,5vw,40px)', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)', maxWidth: 1200, margin: '0 auto', backdropFilter: 'blur(12px)', background: 'rgba(6,9,25,0.65)' }}>
         <div className="flex items-center gap-2">
           <Image src="/icons/icon-app.svg" alt="Треньки" width={30} height={30} style={{ borderRadius: 6 }} />
           <span className="font-overpass uppercase" style={{ fontWeight: 900, fontSize: 16, letterSpacing: '0.08em' }}>треньки</span>

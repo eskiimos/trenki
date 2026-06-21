@@ -103,7 +103,7 @@ export default function OfflineVideosPage() {
     <div className="min-h-screen bg-[#0f1420] text-white pb-20">
       {/* Header */}
       <div className="bg-[#1a1f3a] border-b border-white/5 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="max-w-7xl mx-auto px-4 py-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link

@@ -110,7 +110,10 @@ export default function OnboardingProfilePage() {
       />
 
       {/* Контент */}
-      <div className="relative z-10 flex-1 flex flex-col justify-between px-6 py-8">
+      <div
+        className="relative z-10 flex-1 flex flex-col justify-between px-6 py-8"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
+      >
         {/* Кнопка назад */}
         <button
           onClick={() => router.push('/onboarding/welcome')}
