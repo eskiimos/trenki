@@ -147,6 +147,35 @@ const ProfilePage = () => {
     ? calculateAge(new Date(userProfile.profile.birthDate))
     : null;
 
+  // QA-инструменты админа: прогон цикла / очистка календаря.
+  const [devBusy, setDevBusy] = useState(false);
+  const handleDevAction = async (action: 'complete' | 'clear-calendar') => {
+    const confirmMsg =
+      action === 'complete'
+        ? 'Прожать активный цикл как выполненный? На главной появится опросник переносимости.'
+        : 'Очистить твой календарь (микроциклы, их тренировки и расписание)? Действие необратимо.';
+    if (!confirm(confirmMsg)) return;
+    setDevBusy(true);
+    try {
+      const res = await fetch('/api/dev/microcycle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data?.error || 'Ошибка');
+        return;
+      }
+      alert(data?.message || 'Готово');
+      if (action === 'complete') router.push('/');
+    } catch {
+      alert('Ошибка сети');
+    } finally {
+      setDevBusy(false);
+    }
+  };
+
   // Функция выхода
   const handleLogout = async () => {
     if (confirm('Вы уверены, что хотите выйти?')) {
@@ -457,6 +486,29 @@ const ProfilePage = () => {
             >
               🧭 Тур по приложению
             </Button>
+
+            {/* QA-прогон методички (только админ) */}
+            <div className="pt-2 mt-2" style={{ borderTop: '1px solid var(--border-hairline)' }}>
+              <div
+                className="font-overpass"
+                style={{ color: '#AEABBB', fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, margin: '4px 0 8px' }}
+              >
+                QA / тест цикла
+              </div>
+              <Button variant="ghost" size="sm" fullWidth disabled={devBusy} onClick={() => handleDevAction('complete')}>
+                ✅ Прожать активный цикл
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                fullWidth
+                disabled={devBusy}
+                onClick={() => handleDevAction('clear-calendar')}
+                style={{ marginTop: 8 }}
+              >
+                🗑 Очистить мой календарь
+              </Button>
+            </div>
           </div>
         )}
       </div>
