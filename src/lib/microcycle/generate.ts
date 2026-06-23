@@ -10,29 +10,17 @@ import { prisma } from '@/lib/prisma';
 import {
   AgeGroup,
   TrainingGoal,
-  EnergyState,
   MicrocycleIntent,
   WorkoutStatus,
   MicrocycleStatus,
   MicrocycleFeedback,
 } from '@/generated/prisma';
-import {
-  GOAL_TO_MUSCLE_GROUPS,
-  GOAL_TO_LOAD_TYPES,
-  getRPERange,
-  getWorkoutStructure,
-  applyAgeModifiers,
-  getComplexityLevel,
-  getAllowedComplexityLevels,
-  type WorkoutStructure,
-} from '@/lib/training-algorithm-v3';
-import { buildWorkout } from '@/lib/training/build-workout';
+import { buildMicrocycleDayWorkout } from '@/lib/microcycle/build-day';
 import {
   planWeek,
   planFirstWeek,
   standardWeekStates,
   parsePrevDay,
-  type DayKind,
 } from '@/lib/microcycle/week-plan';
 import { getMicrocycleStartDate, getMicrocycleWeekStart } from '@/lib/microcycle/week-start';
 
@@ -59,34 +47,6 @@ interface Options {
   now?: Date;
   /** Явная стартовая дата (00:00 UTC). По умолчанию — сегодня. Cron шлёт Пн. */
   startDate?: Date;
-}
-
-// Структура тренировки по типу дня. Полный — стандартная v3-структура;
-// лёгкие дни урезаны (только разминка / разминка+заминка-растяжка).
-function structureForKind(
-  kind: DayKind,
-  energyState: EnergyState,
-  potential: number,
-): WorkoutStructure {
-  if (kind === 'WARMUP') {
-    return {
-      moduleCount: 1,
-      includeWarmup: true,
-      includeFitness: false,
-      includeTechnique: false,
-      includeCooldown: false,
-    };
-  }
-  if (kind === 'WARMUP_STRETCH') {
-    return {
-      moduleCount: 2,
-      includeWarmup: true,
-      includeFitness: false,
-      includeTechnique: false,
-      includeCooldown: true, // заминка = статическая растяжка/мобилити
-    };
-  }
-  return getWorkoutStructure(energyState, potential);
 }
 
 export async function generateMicrocycleForUser(
@@ -187,36 +147,11 @@ export async function generateMicrocycleForUser(
   for (const day of plan) {
     const { goal, energyState, kind, intent } = day;
 
-    const complexityLevel = getComplexityLevel(profile.potential);
-    const allowedComplexityLevels = getAllowedComplexityLevels(complexityLevel, energyState);
-    const structure = structureForKind(kind, energyState, profile.potential);
-    const rpeRange = getRPERange(
-      energyState,
-      profile.potential,
-      profile.ageGroup as AgeGroup | undefined,
-    );
-    const muscleGroups = GOAL_TO_MUSCLE_GROUPS[goal as TrainingGoal];
-    // Клонируем — applyAgeModifiers возвращает новый массив, и без клона мы бы
-    // мутировали общую константу GOAL_TO_LOAD_TYPES (порча между днями/юзерами,
-    // особенно в cron'е, который гонит всех юзеров в одном процессе).
-    const baseLoad = GOAL_TO_LOAD_TYPES[goal as TrainingGoal];
-    const loadTypes = {
-      ...baseLoad,
-      fitness: applyAgeModifiers(baseLoad.fitness, profile.ageGroup as AgeGroup | undefined),
-      technique: applyAgeModifiers(baseLoad.technique, profile.ageGroup as AgeGroup | undefined),
-    };
-
-    const workout = await buildWorkout({
+    const workout = await buildMicrocycleDayWorkout(
       userId,
-      goal: goal as TrainingGoal,
-      energyState,
-      structure,
-      muscleGroups,
-      loadTypes,
-      rpeRange,
-      complexityLevels: allowedComplexityLevels,
-      ageGroup: profile.ageGroup as AgeGroup | undefined,
-    });
+      { potential: profile.potential, ageGroup: profile.ageGroup as AgeGroup | undefined },
+      { goal: goal as TrainingGoal, energyState, kind },
+    );
 
     planned.push({
       dayOfWeek: day.dayOfWeek,
@@ -225,7 +160,7 @@ export async function generateMicrocycleForUser(
       missingModules: workout.missingModules,
       totalDuration: workout.totalDuration,
       moduleCount: workout.modules.length,
-      rpeAvg: Math.round((rpeRange.min + rpeRange.max) / 2),
+      rpeAvg: workout.rpeAvg,
       modules: workout.modules,
     });
   }

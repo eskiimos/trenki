@@ -88,6 +88,35 @@ export default function CalendarPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [generatingCycle, setGeneratingCycle] = useState(false);
   const [cycleError, setCycleError] = useState<string | null>(null);
+  // Пересборка дня «раскисление» под выбранную часть тела (низ/верх/всё).
+  const [stretchRebuilding, setStretchRebuilding] = useState(false);
+  const [stretchError, setStretchError] = useState<string | null>(null);
+
+  const handleStretchBodyPart = async (
+    sessionId: string,
+    bodyPart: 'lower' | 'upper' | 'full',
+  ) => {
+    if (stretchRebuilding) return;
+    setStretchError(null);
+    setStretchRebuilding(true);
+    try {
+      const res = await fetch('/api/microcycle/stretch-day', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, bodyPart }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setStretchError(data?.error || 'Не удалось пересобрать');
+        setStretchRebuilding(false);
+        return;
+      }
+      router.push(`/training/workout?id=${sessionId}`);
+    } catch {
+      setStretchError('Ошибка сети');
+      setStretchRebuilding(false);
+    }
+  };
 
   useEffect(() => {
     fetchCalendar();
@@ -568,6 +597,7 @@ export default function CalendarPage() {
               );
             }
             return (
+              <>
               <Link
                 href={`/training/workout?id=${ws.id}`}
                 className="block rounded-2xl overflow-hidden"
@@ -609,6 +639,46 @@ export default function CalendarPage() {
                   </div>
                 </div>
               </Link>
+              {d.intent === 'STRETCH' && (
+                <div className="mt-2 rounded-2xl p-3" style={{ background: 'rgba(174,171,187,0.08)' }}>
+                  <div
+                    className="font-overpass"
+                    style={{ color: '#AEABBB', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}
+                  >
+                    🧘 Куда делать растяжку?
+                  </div>
+                  <div className="flex gap-2">
+                    {([['lower', 'Низ тела'], ['upper', 'Верх тела'], ['full', 'Всё тело']] as const).map(([bp, label]) => (
+                      <button
+                        key={bp}
+                        type="button"
+                        disabled={stretchRebuilding}
+                        onClick={() => handleStretchBodyPart(ws.id, bp)}
+                        className="flex-1 font-overpass transition-transform active:scale-95"
+                        style={{
+                          background: 'rgba(161,255,74,0.12)',
+                          color: '#A1FF4A',
+                          border: '1px solid var(--border-lime)',
+                          borderRadius: 999,
+                          padding: '8px 6px',
+                          fontSize: 11,
+                          fontWeight: 800,
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.3,
+                          cursor: stretchRebuilding ? 'wait' : 'pointer',
+                          opacity: stretchRebuilding ? 0.6 : 1,
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {stretchError && (
+                    <div style={{ color: '#FF8C4A', fontSize: 11, marginTop: 6 }}>{stretchError}</div>
+                  )}
+                </div>
+              )}
+              </>
             );
           })()}
 
