@@ -27,8 +27,14 @@ import {
   type WorkoutStructure,
 } from '@/lib/training-algorithm-v3';
 import { buildWorkout } from '@/lib/training/build-workout';
-import { planWeek, parsePrevDay, type DayKind } from '@/lib/microcycle/week-plan';
-import { getMicrocycleStartDate } from '@/lib/microcycle/week-start';
+import {
+  planWeek,
+  planFirstWeek,
+  standardWeekStates,
+  parsePrevDay,
+  type DayKind,
+} from '@/lib/microcycle/week-plan';
+import { getMicrocycleStartDate, getMicrocycleWeekStart } from '@/lib/microcycle/week-start';
 
 export type GenerateStatus = 'CREATED' | 'EXISTING' | 'NO_PROFILE';
 
@@ -98,7 +104,25 @@ export async function generateMicrocycleForUser(
   }
 
   const profile = user.profile;
-  const weekStartDate = opts.startDate ?? getMicrocycleStartDate(now);
+
+  // ── Прошлый цикл (нужен и для адаптации, и для выбора даты старта) ──
+  const lastCycle = await prisma.microcycle.findFirst({
+    where: { userId },
+    orderBy: { cycleNumber: 'desc' },
+    select: {
+      cycleNumber: true,
+      feedback: true,
+      days: { select: { dayOfWeek: true, intent: true } },
+    },
+  });
+  const isFirstCycle = !lastCycle;
+
+  // Дата старта: ПЕРВЫЙ цикл — с сегодня (вводная неделя по дню старта,
+  // методичка «старт с разных дней»). Последующие — со следующего понедельника
+  // (стандартная неделя Пн-Пт; «со след. недели всегда Пн-Пт»). Cron передаёт
+  // startDate явно (ближайший Пн).
+  const weekStartDate =
+    opts.startDate ?? (isFirstCycle ? getMicrocycleStartDate(now) : getMicrocycleWeekStart(now));
 
   // ── Идемпотентность ────────────────────────────────────────────────
   const existing = await prisma.microcycle.findUnique({
@@ -121,16 +145,6 @@ export async function generateMicrocycleForUser(
     };
   }
 
-  // ── Прошлый цикл → состояния дней + фидбэк для адаптации ────────────
-  const lastCycle = await prisma.microcycle.findFirst({
-    where: { userId },
-    orderBy: { cycleNumber: 'desc' },
-    select: {
-      cycleNumber: true,
-      feedback: true,
-      days: { select: { dayOfWeek: true, intent: true } },
-    },
-  });
   const cycleNumber = (lastCycle?.cycleNumber ?? 0) + 1;
   const prevDays =
     lastCycle && lastCycle.days.length > 0
@@ -138,8 +152,20 @@ export async function generateMicrocycleForUser(
       : null;
   const feedback: MicrocycleFeedback | null = lastCycle?.feedback ?? null;
 
-  // План недели по методичке (структура + цели).
-  const plan = planWeek(prevDays, feedback, cycleNumber);
+  // ── План недели (методичка «По циклу с разных дней начало») ─────────
+  // День старта (0=Вс..6=Сб). Первый цикл — вводная структура по дню старта
+  // (короче, если не с понедельника). Если прошлый цикл был вводным
+  // (<5 дней) — со следующей недели строим стандартную Пн-Пт (с адаптацией
+  // по фидбэку, если опрос был). Иначе — обычная адаптация от прошлой недели.
+  const startDow = weekStartDate.getUTCDay();
+  let plan;
+  if (!prevDays) {
+    plan = planFirstWeek(startDow, cycleNumber);
+  } else if (prevDays.length >= 5) {
+    plan = planWeek(prevDays, feedback, cycleNumber);
+  } else {
+    plan = planWeek(standardWeekStates(), feedback, cycleNumber);
+  }
 
   // adjustmentFactor — для аналитики (как именно адаптировали).
   const adjustmentFactor =

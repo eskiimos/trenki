@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
       status: microcycle.status,
       weekStartDate: microcycle.weekStartDate,
       feedback: microcycle.feedback,
+      dayCount: microcycle.days.length,
     },
     new Date(),
   );

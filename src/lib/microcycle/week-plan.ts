@@ -215,6 +215,45 @@ export function planWeek(
   return assignGoals(adapted, cycleNumber);
 }
 
+// ─── Старт цикла с разных дней (методичка «По циклу с разных дней начало») ───
+// Если цикл собирают не с понедельника, первая (вводная) неделя короче и
+// «доезжает» до выходных лёгкими днями; со следующей недели — стандартная
+// Пн-Пт (это решает generate.ts). dayOfWeek в результате — относительный
+// порядковый день 1..N от даты старта (как и у BASE_WEEK).
+type DayKindState = { kind: DayKind; energyState: EnergyState };
+const D_IN_TONE: DayKindState = { kind: 'FULL', energyState: EnergyState.IN_TONE };          // в тонусе
+const D_CHARGED: DayKindState = { kind: 'FULL', energyState: EnergyState.FULLY_CHARGED };    // заряжен
+const D_TIRED: DayKindState = { kind: 'FULL', energyState: EnergyState.TIRED };              // устал
+const D_WARMUP: DayKindState = { kind: 'WARMUP', energyState: EnergyState.TIRED };           // зарядка
+const D_STRETCH: DayKindState = { kind: 'WARMUP_STRETCH', energyState: EnergyState.IN_TONE };// раскисление
+
+// Ключ — JS getUTCDay(): 0=Вс, 1=Пн … 6=Сб.
+const FIRST_WEEK_BY_DOW: Record<number, DayKindState[]> = {
+  1: [D_IN_TONE, D_WARMUP, D_CHARGED, D_STRETCH, D_TIRED], // Пн — полный стандарт
+  2: [D_IN_TONE, D_CHARGED, D_STRETCH, D_TIRED],           // Вт — без зарядки
+  3: [D_IN_TONE, D_STRETCH, D_TIRED, D_WARMUP],            // Ср → …Сб зарядка
+  4: [D_IN_TONE, D_TIRED, D_WARMUP],                       // Чт → …Сб зарядка
+  5: [D_IN_TONE, D_WARMUP, D_STRETCH],                     // Пт → Сб зарядка, Вс раскисление
+  6: [D_IN_TONE, D_WARMUP],                                // Сб → Вс зарядка
+  0: [D_WARMUP],                                           // Вс — только зарядка, далее Пн полный
+};
+
+/** Структура вводной недели по дню старта (getUTCDay). Пн = полный BASE_WEEK. */
+export function firstWeekStructure(startDow: number): DayState[] {
+  const seq = FIRST_WEEK_BY_DOW[startDow] ?? FIRST_WEEK_BY_DOW[1];
+  return seq.map((d, i) => ({ dayOfWeek: i + 1, kind: d.kind, energyState: d.energyState }));
+}
+
+/** План вводной недели (структура по дню старта + цели). */
+export function planFirstWeek(startDow: number, cycleNumber: number): DayPlan[] {
+  return assignGoals(firstWeekStructure(startDow), cycleNumber);
+}
+
+/** Стандартная неделя Пн-Пт (база для адаптации после вводной недели). */
+export function standardWeekStates(): DayState[] {
+  return clone(BASE_WEEK);
+}
+
 /**
  * Восстанавливает план дней (с целями и подписями) из сохранённых intent и
  * номера цикла — та же ротация целей, что при генерации. assignGoals чист и

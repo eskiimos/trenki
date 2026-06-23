@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planWeek, parsePrevDay, goalsFromStoredDays, type DayState } from '@/lib/microcycle/week-plan';
+import { planWeek, planFirstWeek, firstWeekStructure, parsePrevDay, goalsFromStoredDays, type DayState } from '@/lib/microcycle/week-plan';
 import {
   getMicrocycleStartDate,
   getMicrocycleWeekStart,
@@ -241,12 +241,13 @@ describe('microcycle/week-start', () => {
 });
 
 describe('microcycle/getEffectiveStatus', () => {
-  const monday = new Date(Date.UTC(2026, 5, 8)); // 2026-06-08
+  const monday = new Date(Date.UTC(2026, 5, 8)); // 2026-06-08 Пн
+  const full = { status: MicrocycleStatus.ACTIVE, feedback: null, dayCount: 5 };
 
   it('ARCHIVED when feedback set', () => {
     expect(
       getEffectiveStatus(
-        { status: MicrocycleStatus.ACTIVE, weekStartDate: monday, feedback: MicrocycleFeedback.NORMAL },
+        { ...full, status: MicrocycleStatus.ACTIVE, weekStartDate: monday, feedback: MicrocycleFeedback.NORMAL },
         new Date(Date.UTC(2026, 5, 10)),
       ),
     ).toBe('ARCHIVED');
@@ -255,37 +256,92 @@ describe('microcycle/getEffectiveStatus', () => {
   it('ARCHIVED when DB status is ARCHIVED', () => {
     expect(
       getEffectiveStatus(
-        { status: MicrocycleStatus.ARCHIVED, weekStartDate: monday, feedback: null },
+        { ...full, status: MicrocycleStatus.ARCHIVED, weekStartDate: monday },
         new Date(Date.UTC(2026, 5, 10)),
       ),
     ).toBe('ARCHIVED');
   });
 
-  it('ACTIVE during the week', () => {
+  it('ACTIVE during the week (5 дней)', () => {
     expect(
       getEffectiveStatus(
-        { status: MicrocycleStatus.ACTIVE, weekStartDate: monday, feedback: null },
-        new Date(Date.UTC(2026, 5, 10)), // Wed of same week
+        { ...full, weekStartDate: monday },
+        new Date(Date.UTC(2026, 5, 10)), // Ср — внутри 5 дней
       ),
     ).toBe('ACTIVE');
   });
 
-  it('AWAITING_FEEDBACK on next Monday and later', () => {
+  it('AWAITING_FEEDBACK после 5 дней (полная неделя)', () => {
+    // конец = старт + 5 = 2026-06-13 (Сб)
     expect(
-      getEffectiveStatus(
-        { status: MicrocycleStatus.ACTIVE, weekStartDate: monday, feedback: null },
-        new Date(Date.UTC(2026, 5, 15)), // next Mon — exactly 7 days later
-      ),
+      getEffectiveStatus({ ...full, weekStartDate: monday }, new Date(Date.UTC(2026, 5, 13))),
     ).toBe('AWAITING_FEEDBACK');
   });
 
-  it('boundary: exactly at weekStart+7 is AWAITING', () => {
-    const sevenDaysLater = new Date(Date.UTC(2026, 5, 15, 0, 0, 0, 0));
+  it('boundary: за день до конца ещё ACTIVE', () => {
     expect(
-      getEffectiveStatus(
-        { status: MicrocycleStatus.ACTIVE, weekStartDate: monday, feedback: null },
-        sevenDaysLater,
-      ),
+      getEffectiveStatus({ ...full, weekStartDate: monday }, new Date(Date.UTC(2026, 5, 12, 23, 0))),
+    ).toBe('ACTIVE');
+  });
+
+  // Вводные недели (старт не с понедельника, < 5 дней).
+  it('вводная Вт (4 дня) после цикла → AWAITING (опрос есть)', () => {
+    const tue = new Date(Date.UTC(2026, 5, 9)); // Вт, dayCount 4 → конец 06-13
+    expect(
+      getEffectiveStatus({ status: MicrocycleStatus.ACTIVE, feedback: null, dayCount: 4, weekStartDate: tue }, new Date(Date.UTC(2026, 5, 13))),
     ).toBe('AWAITING_FEEDBACK');
+  });
+
+  it('вводная Пт (3 дня) после цикла → ARCHIVED без опроса', () => {
+    const fri = new Date(Date.UTC(2026, 5, 12)); // Пт, dayCount 3 → конец 06-15
+    expect(
+      getEffectiveStatus({ status: MicrocycleStatus.ACTIVE, feedback: null, dayCount: 3, weekStartDate: fri }, new Date(Date.UTC(2026, 5, 15))),
+    ).toBe('ARCHIVED');
+  });
+
+  it('вводная Вс (1 день) после цикла → ARCHIVED без опроса', () => {
+    const sun = new Date(Date.UTC(2026, 5, 14)); // Вс, dayCount 1 → конец 06-15
+    expect(
+      getEffectiveStatus({ status: MicrocycleStatus.ACTIVE, feedback: null, dayCount: 1, weekStartDate: sun }, new Date(Date.UTC(2026, 5, 16))),
+    ).toBe('ARCHIVED');
+  });
+});
+
+describe('microcycle/firstWeekStructure — старт цикла с разных дней', () => {
+  // intent-последовательности по методичке (kind+state → читаем через planFirstWeek labels)
+  const dows = [
+    { dow: 1, len: 5, label: 'Пн полный' },
+    { dow: 2, len: 4, label: 'Вт без зарядки' },
+    { dow: 3, len: 4, label: 'Ср …+Сб зарядка' },
+    { dow: 4, len: 3, label: 'Чт …+Сб зарядка' },
+    { dow: 5, len: 3, label: 'Пт …Вс раскисление' },
+    { dow: 6, len: 2, label: 'Сб …Вс зарядка' },
+    { dow: 0, len: 1, label: 'Вс только зарядка' },
+  ];
+  for (const { dow, len, label } of dows) {
+    it(`старт dow=${dow} (${label}) → ${len} дн., dayOfWeek 1..${len}`, () => {
+      const s = firstWeekStructure(dow);
+      expect(s.length).toBe(len);
+      expect(s.map((d) => d.dayOfWeek)).toEqual(Array.from({ length: len }, (_, i) => i + 1));
+    });
+  }
+
+  it('Пн совпадает со стандартной BASE_WEEK (5 дней FULL/WARMUP/FULL/STRETCH/FULL)', () => {
+    const s = firstWeekStructure(1);
+    expect(s.map((d) => d.kind)).toEqual(['FULL', 'WARMUP', 'FULL', 'WARMUP_STRETCH', 'FULL']);
+  });
+
+  it('Вт-старт: первый день — полноценный (FULL), всего 4 дня, без зарядки в начале', () => {
+    const plan = planFirstWeek(2, 1);
+    expect(plan[0].kind).toBe('FULL');
+    expect(plan.length).toBe(4);
+    // в тонусе → заряжен → раскисление → устал
+    expect(plan.map((d) => d.intent)).toEqual(['IN_TONE', 'CHARGED', 'STRETCH', 'TIRED']);
+  });
+
+  it('Вс-старт: один день — только зарядка (WARMUP)', () => {
+    const plan = planFirstWeek(0, 1);
+    expect(plan.length).toBe(1);
+    expect(plan[0].kind).toBe('WARMUP');
   });
 });

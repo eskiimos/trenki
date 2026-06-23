@@ -42,6 +42,7 @@ interface MicrocycleResponse {
     feedback: 'EASY' | 'NORMAL' | 'HARD' | null;
     weekStartDate: string;
     effectiveStatus: 'ACTIVE' | 'AWAITING_FEEDBACK' | 'ARCHIVED';
+    introNoSurvey?: boolean;
     days: Array<{
       dayOfWeek: number;
       intent: Intent;
@@ -177,6 +178,19 @@ export default function MicrocycleResultPage() {
             {stats.skippedCount > 0 && ` · ${stats.skippedCount} дн. без модулей в каталоге`}
           </div>
         </div>
+
+        {/* Короткий вводный заход (Пт-Вс) — без опроса, со след. недели полный цикл */}
+        {microcycle.introNoSurvey && (
+          <div
+            className="rounded-2xl p-4 mb-6"
+            style={{ background: 'var(--blue-medium)', border: '1px solid rgba(68,92,255,0.3)' }}
+          >
+            <div className="text-white text-sm font-semibold">Это был короткий вводный заход</div>
+            <div className="text-[#AEABBB] text-xs mt-1">
+              Со следующей недели — полный цикл с понедельника по пятницу.
+            </div>
+          </div>
+        )}
 
         {/* Дельты по характеристикам */}
         <div className="mb-6">

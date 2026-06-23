@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
 import { WorkoutStatus } from '@/generated/prisma';
-import { getEffectiveStatus } from '@/lib/microcycle/status';
+import { getEffectiveStatus, isIntroWeekNoSurvey } from '@/lib/microcycle/status';
 
 export const dynamic = 'force-dynamic';
 
@@ -118,6 +118,7 @@ export async function GET(
       status: cycle.status,
       weekStartDate: cycle.weekStartDate,
       feedback: cycle.feedback,
+      dayCount: cycle.days.length,
     },
     new Date(),
   );
@@ -130,6 +131,8 @@ export async function GET(
       status: cycle.status,
       effectiveStatus,
       feedback: cycle.feedback,
+      // Короткий вводный заход Пт-Вс (без опроса) — для текста «со след. недели полный цикл».
+      introNoSurvey: isIntroWeekNoSurvey(cycle.weekStartDate, cycle.days.length),
       days: cycle.days.map((d) => ({
         dayOfWeek: d.dayOfWeek,
         intent: d.intent,
@@ -140,7 +143,7 @@ export async function GET(
       plannedCount,
       completedCount,
       inProgressCount,
-      skippedCount: 5 - plannedCount, // дни, для которых AI не нашёл модулей
+      skippedCount: cycle.days.length - plannedCount, // дни, для которых AI не нашёл модулей
       totalGain,
     },
   });
