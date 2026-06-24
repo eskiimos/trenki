@@ -126,7 +126,7 @@ function PhoneShot({ screen, label }: { screen: string; label: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`/landing/screens/${screen}.png`}
+      src={`/landing/screens/${screen}.webp`}
       alt={label}
       onError={() => setOk(false)}
       style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center', display: 'block' }}
