@@ -7,6 +7,7 @@ import { ADMIN_COOKIE_NAME } from '@/lib/admin-cookie';
 const publicRoutes = [
   '/login',
   '/landing',
+  '/preview', // публичные превью-экраны для iframe лендинга
   '/legal',
   '/join',
   '/admin/login',
