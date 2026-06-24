@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import {
   calculateWorkoutGains,
   calculatePotential,
+  videoLoadTypes,
   CharacteristicType
 } from '@/lib/characteristics';
 import { markAssignmentsCompletedForVideos } from '@/lib/coach/auto-complete';
@@ -58,10 +59,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Извлекаем теги типа LOAD
-    const loadTypeTags = video.videoTags
-      .filter(vt => vt.tag.tagType === 'LOAD' && vt.tag.loadType)
-      .map(vt => vt.tag.loadType as string);
+    // Типы нагрузки: video.loadType (enum, источник истины) с фолбэком на
+    // LOAD-теги. Раньше читались только теги → у видео без тега прирост был 0.
+    const loadTypeTags = videoLoadTypes(video);
 
     console.log('🎯 Module completed:', {
       videoTitle: video.title,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
+import { videoLoadTypes } from '@/lib/characteristics';
 
 export async function GET(request: NextRequest) {
   try {
@@ -52,14 +53,10 @@ export async function GET(request: NextRequest) {
 
     // Пока вернем текущие характеристики и список тренировок
     const workoutsWithGains = sessions.map((session) => {
-      // Собираем LoadType теги из всех видео сессии
+      // Типы нагрузки из всех видео сессии (enum video.loadType + фолбэк теги).
       const loadTypes: string[] = [];
       session.videos.forEach((sv) => {
-        sv.video.videoTags.forEach((vt) => {
-          if (vt.tag.tagType === 'LOAD' && vt.tag.loadType) {
-            loadTypes.push(vt.tag.loadType);
-          }
-        });
+        loadTypes.push(...videoLoadTypes(sv.video));
       });
 
       return {

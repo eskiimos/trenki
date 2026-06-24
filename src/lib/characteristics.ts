@@ -113,6 +113,24 @@ export function getWarmupGains(otherLoadType?: string): CharacteristicGain[] {
 export const BASE_GAIN = 0.5;
 
 /**
+ * Типы нагрузки видео для начисления прироста.
+ * Источник истины — прямое поле video.loadType (enum): именно по нему алгоритм
+ * подбирает видео в микроциклы/тренировки. LOAD-теги (старая система VideoTag)
+ * — фолбэк для видео без enum. Раньше начисление читало ТОЛЬКО теги, поэтому у
+ * видео без LOAD-тега (а таких много — у них заполнен только enum) прирост
+ * получался 0 — баллы за тренировки/ДЗ не начислялись.
+ */
+export function videoLoadTypes(video: {
+  loadType?: string | null;
+  videoTags?: Array<{ tag: { tagType: string; loadType: string | null } }>;
+}): string[] {
+  if (video.loadType) return [video.loadType];
+  return (video.videoTags ?? [])
+    .filter((vt) => vt.tag.tagType === 'LOAD' && vt.tag.loadType)
+    .map((vt) => vt.tag.loadType as string);
+}
+
+/**
  * Расчет прироста характеристики
  * Формула: прирост = base_gain * ((100 - current_value) / 100)
  * 

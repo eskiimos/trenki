@@ -4,6 +4,7 @@ import { WorkoutStatus } from '@/generated/prisma';
 import {
   calculateWorkoutGains,
   calculatePotential,
+  videoLoadTypes,
   CharacteristicType
 } from '@/lib/characteristics';
 import { markAssignmentsCompletedForVideos } from '@/lib/coach/auto-complete';
@@ -87,12 +88,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Собираем все теги LoadType из всех видео тренировки
-    const moduleTags = session.videos.map(wsVideo => {
-      return wsVideo.video.videoTags
-        .filter(vt => vt.tag.tagType === 'LOAD' && vt.tag.loadType)
-        .map(vt => vt.tag.loadType as string);
-    });
+    // Типы нагрузки по каждому видео. Берём video.loadType (enum — источник
+    // истины алгоритма) с фолбэком на LOAD-теги; раньше читались только теги,
+    // и у видео без LOAD-тега прирост был 0 (баллы не начислялись).
+    const moduleTags = session.videos.map(wsVideo => videoLoadTypes(wsVideo.video));
 
     // Флаги разминки/заминки — дают x0.5 поинтов
     const isWarmupOrCooldown = session.videos.map(wsVideo => {
