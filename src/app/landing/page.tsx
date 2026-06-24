@@ -104,16 +104,32 @@ function SectionHead({ eyebrow, title, sub }: { eyebrow?: string; title: React.R
   );
 }
 
-// Живой превью реального экрана приложения (демо-данные) через iframe
-// публичного роута /preview/[screen]. Встраивается в телефон-фрейм.
-function PreviewFrame({ screen }: { screen: string }) {
+// Слот под скриншот реального экрана в телефон-фрейме. Если файл
+// /public/landing/screens/<screen>.png есть — показываем его; иначе пустой
+// слот с подписью (заменить, когда подвезут скриншоты).
+function PhoneShot({ screen, label }: { screen: string; label: string }) {
+  const [ok, setOk] = useState(true);
+  if (!ok) {
+    return (
+      <div
+        className="font-overpass uppercase"
+        style={{
+          width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'rgba(249,248,254,0.22)', fontSize: 10, fontWeight: 800, letterSpacing: '0.18em',
+          background: '#060919', textAlign: 'center', padding: 16,
+        }}
+      >
+        {label}
+      </div>
+    );
+  }
   return (
-    <iframe
-      src={`/preview/${screen}`}
-      title={screen}
-      loading="lazy"
-      scrolling="no"
-      style={{ width: '100%', height: '100%', border: 'none', display: 'block', background: '#060919' }}
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`/landing/screens/${screen}.png`}
+      alt={label}
+      onError={() => setOk(false)}
+      style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center', display: 'block' }}
     />
   );
 }
@@ -233,7 +249,7 @@ export default function LandingPage() {
           </div>
 
           <div className="flex justify-center w-full lg:w-auto" style={{ flex: 1 }}>
-            <Phone width={300} className="lp-float"><PreviewFrame screen="catalog" /></Phone>
+            <Phone width={300} className="lp-float"><PhoneShot screen="catalog" label="Каталог" /></Phone>
           </div>
         </div>
       </section>
@@ -277,7 +293,7 @@ export default function LandingPage() {
             <div className={`flex flex-col items-center gap-10 w-full ${i % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'}`}
               style={{ padding: 'clamp(28px,6vw,52px) 0', borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.06)' }}>
               <div className="flex justify-center" style={{ flex: 1 }}>
-                <Phone width={f.w} className={i % 2 === 0 ? 'lp-float' : 'lp-float-b'}><PreviewFrame screen={f.screen} /></Phone>
+                <Phone width={f.w} className={i % 2 === 0 ? 'lp-float' : 'lp-float-b'}><PhoneShot screen={f.screen} label={f.eyebrow} /></Phone>
               </div>
               <div style={{ flex: 1.05 }}>
                 <div className="font-overpass uppercase flex items-center" style={{ color: LIME, fontWeight: 800, fontSize: 12, letterSpacing: '0.2em', marginBottom: 12 }}>
