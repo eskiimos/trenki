@@ -106,26 +106,41 @@ export function MockProfile() {
   );
 }
 
-export function MockWorkout() {
-  const mods = [
-    { t: 'Разминка', d: '4 мин', c: 'rgba(161,255,74,0.16)' },
-    { t: 'Сила ног', d: '12 мин', c: 'rgba(68,92,255,0.22)' },
-    { t: 'Техника', d: '8 мин', c: 'rgba(68,92,255,0.22)' },
-    { t: 'Заминка', d: '4 мин', c: 'rgba(161,255,74,0.16)' },
-  ];
+export interface WorkoutMod {
+  title: string;
+  duration: number; // минуты
+  thumbnail?: string | null;
+}
+
+const WORKOUT_DEMO: WorkoutMod[] = [
+  { title: 'Разминка', duration: 4 },
+  { title: 'Сила ног', duration: 12 },
+  { title: 'Техника', duration: 8 },
+  { title: 'Заминка', duration: 4 },
+];
+
+// modules приходят с сервера (реальные видео). Если пусто — демо.
+export function MockWorkout({ modules }: { modules?: WorkoutMod[] }) {
+  const mods = modules && modules.length > 0 ? modules.slice(0, 4) : WORKOUT_DEMO;
+  const totalMin = mods.reduce((s, m) => s + (m.duration || 0), 0);
+  const colors = ['rgba(161,255,74,0.16)', 'rgba(68,92,255,0.22)'];
   return (
     <div style={{ paddingTop: 8 }}>
       <ScreenHeader title="Тренировка" />
       <div className="px-3 pt-3">
         <div className="font-overpass uppercase" style={{ color: LIME, fontSize: 9, fontWeight: 800, letterSpacing: 0.5, marginBottom: 2 }}>цель · мощный бросок</div>
-        <div className="font-overpass uppercase" style={{ color: '#F9F8FE', fontSize: 13, fontWeight: 900, marginBottom: 12 }}>4 модуля · 28 мин</div>
+        <div className="font-overpass uppercase" style={{ color: '#F9F8FE', fontSize: 13, fontWeight: 900, marginBottom: 12 }}>{mods.length} модул{mods.length === 1 ? 'ь' : mods.length < 5 ? 'я' : 'ей'} · {totalMin} мин</div>
         <div className="grid grid-cols-2 gap-2">
           {mods.map((m, i) => (
-            <div key={m.t} style={{ background: m.c, borderRadius: 12, padding: 12, aspectRatio: '1 / 0.9', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-              <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 9 }}>0{i + 1}</div>
-              <div>
-                <div className="font-overpass uppercase" style={{ color: '#F9F8FE', fontSize: 11, fontWeight: 700, lineHeight: '110%' }}>{m.t}</div>
-                <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 9, marginTop: 2 }}>{m.d}</div>
+            <div key={i} style={{ background: colors[i % 2], borderRadius: 12, padding: 12, aspectRatio: '1 / 0.9', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative', overflow: 'hidden' }}>
+              {m.thumbnail && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={m.thumbnail} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.32 }} />
+              )}
+              <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 9, position: 'relative' }}>0{i + 1}</div>
+              <div style={{ position: 'relative' }}>
+                <div className="font-overpass uppercase" style={{ color: '#F9F8FE', fontSize: 11, fontWeight: 700, lineHeight: '110%', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{m.title}</div>
+                <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 9, marginTop: 2 }}>{m.duration} мин</div>
               </div>
             </div>
           ))}
@@ -135,27 +150,43 @@ export function MockWorkout() {
   );
 }
 
-export function MockCatalog() {
-  const items = [
-    { t: 'Кистевой бросок: техника', tr: 'Марк Ковалевкий', d: '6 мин', c: 'rgba(68,92,255,0.22)' },
-    { t: 'Взрывная сила ног', tr: 'Анна П.', d: '11 мин', c: 'rgba(161,255,74,0.16)' },
-    { t: 'Катание: работа рёбер', tr: 'Сергей Е.', d: '9 мин', c: 'rgba(68,92,255,0.22)' },
-    { t: 'Дриблинг под давлением', tr: 'Игорь М.', d: '7 мин', c: 'rgba(161,255,74,0.16)' },
-  ];
+export interface CatalogItem {
+  title: string;
+  trainer: string;
+  duration: number; // минуты
+  thumbnail?: string | null;
+}
+
+const CATALOG_DEMO: CatalogItem[] = [
+  { title: 'Кистевой бросок: техника', trainer: 'Марк Ковалевкий', duration: 6 },
+  { title: 'Взрывная сила ног', trainer: 'Анна П.', duration: 11 },
+  { title: 'Катание: работа рёбер', trainer: 'Сергей Е.', duration: 9 },
+  { title: 'Дриблинг под давлением', trainer: 'Игорь М.', duration: 7 },
+];
+
+// items приходят с сервера (реальные опубликованные видео). Если пусто — демо.
+export function MockCatalog({ items }: { items?: CatalogItem[] }) {
+  const list = items && items.length > 0 ? items : CATALOG_DEMO;
+  const colors = ['rgba(68,92,255,0.22)', 'rgba(161,255,74,0.16)'];
   return (
     <div style={{ paddingTop: 8 }}>
       <ScreenHeader title="Каталог" />
       <div className="px-3 pt-3 flex flex-col gap-2">
-        {items.map((v, i) => (
+        {list.map((v, i) => (
           <div key={i} className="flex items-center gap-2" style={{ background: 'rgba(16,21,48,0.6)', borderRadius: 12, padding: 8 }}>
-            <div style={{ width: 54, height: 36, borderRadius: 8, background: v.c, flexShrink: 0, position: 'relative' }}>
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F9F8FE', fontSize: 12 }}>▶</div>
+            <div style={{ width: 54, height: 36, borderRadius: 8, background: colors[i % 2], flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
+              {v.thumbnail ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={v.thumbnail} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F9F8FE', fontSize: 12 }}>▶</div>
+              )}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-overpass" style={{ color: '#F9F8FE', fontSize: 11, fontWeight: 700, lineHeight: '115%' }}>{v.t}</div>
+              <div className="font-overpass" style={{ color: '#F9F8FE', fontSize: 11, fontWeight: 700, lineHeight: '115%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title}</div>
               <div className="flex items-center gap-1" style={{ marginTop: 3 }}>
                 <div style={{ width: 12, height: 12, borderRadius: 999, background: `linear-gradient(135deg, ${BLUE}, #1a1f3a)`, flexShrink: 0 }} />
-                <span className="font-overpass" style={{ color: '#AEABBB', fontSize: 9 }}>{v.tr} · {v.d}</span>
+                <span className="font-overpass" style={{ color: '#AEABBB', fontSize: 9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.trainer} · {v.duration} мин</span>
               </div>
             </div>
           </div>
@@ -166,11 +197,3 @@ export function MockCatalog() {
 }
 
 export type PreviewScreen = 'assessment' | 'calendar' | 'profile' | 'workout' | 'catalog';
-
-export const PREVIEW_SCREENS: Record<PreviewScreen, React.ComponentType> = {
-  assessment: MockAssessment,
-  calendar: MockCalendar,
-  profile: MockProfile,
-  workout: MockWorkout,
-  catalog: MockCatalog,
-};
