@@ -150,9 +150,11 @@ function MockAssessment() {
 }
 
 const DAY_MOCK = [
-  { d: 'Пн', emoji: '⚡️', label: 'В тонусе' },
-  { d: 'Ср', emoji: '🔋', label: 'Заряжен' },
-  { d: 'Пт', emoji: '😴', label: 'Устал' },
+  { d: 'Пн', emoji: '⚡️', label: 'База' },
+  { d: 'Вт', emoji: '🏃', label: 'Зарядка' },
+  { d: 'Ср', emoji: '🔋', label: 'Овертайм' },
+  { d: 'Чт', emoji: '🧘', label: 'Раскисление' },
+  { d: 'Пт', emoji: '😴', label: 'Лёгкая нагрузка' },
 ];
 
 function MockCalendar() {
@@ -186,6 +188,7 @@ function MockCalendar() {
   );
 }
 
+// ПЛЕЙСХОЛДЕР: мок личного кабинета. Заменить на реальный скрин ЛК, когда будет.
 function MockProfile() {
   return (
     <div style={{ paddingTop: 8 }}>
@@ -204,6 +207,7 @@ function MockProfile() {
   );
 }
 
+// ПЛЕЙСХОЛДЕР: мок одной тренировки (модули). Заменить на реальный скрин.
 function MockWorkout() {
   const mods = [
     { t: 'Разминка', d: '4 мин', c: 'rgba(161,255,74,0.16)' },
@@ -233,6 +237,38 @@ function MockWorkout() {
   );
 }
 
+// ПЛЕЙСХОЛДЕР: мок каталога тренировок. Когда будут реальные скрины —
+// заменить содержимое на <Image src="/landing/catalog.png" .../>.
+function MockCatalog() {
+  const items = [
+    { t: 'Кистевой бросок: техника', tr: 'Марк Ковалевкий', d: '6 мин', c: 'rgba(68,92,255,0.22)' },
+    { t: 'Взрывная сила ног', tr: 'Анна П.', d: '11 мин', c: 'rgba(161,255,74,0.16)' },
+    { t: 'Катание: работа рёбер', tr: 'Сергей Е.', d: '9 мин', c: 'rgba(68,92,255,0.22)' },
+    { t: 'Дриблинг под давлением', tr: 'Игорь М.', d: '7 мин', c: 'rgba(161,255,74,0.16)' },
+  ];
+  return (
+    <div style={{ paddingTop: 8 }}>
+      <ScreenHeader title="Каталог" />
+      <div className="px-3 pt-3 flex flex-col gap-2">
+        {items.map((v, i) => (
+          <div key={i} className="flex items-center gap-2" style={{ background: 'rgba(16,21,48,0.6)', borderRadius: 12, padding: 8 }}>
+            <div style={{ width: 54, height: 36, borderRadius: 8, background: v.c, flexShrink: 0, position: 'relative' }}>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F9F8FE', fontSize: 12 }}>▶</div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-overpass" style={{ color: '#F9F8FE', fontSize: 11, fontWeight: 700, lineHeight: '115%' }}>{v.t}</div>
+              <div className="flex items-center gap-1" style={{ marginTop: 3 }}>
+                <div style={{ width: 12, height: 12, borderRadius: 999, background: `linear-gradient(135deg, ${BLUE}, #1a1f3a)`, flexShrink: 0 }} />
+                <span className="font-overpass" style={{ color: '#AEABBB', fontSize: 9 }}>{v.tr} · {v.d}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── data ─────────────────────────────────────────────────────────────
 const PAINS = [
   { emoji: '🤷', t: 'Тренируешься без системы', b: 'Упражнения из интернета наугад — без плана и прогрессии.' },
@@ -242,16 +278,29 @@ const PAINS = [
 ];
 
 const FEATURES = [
-  { mock: <MockAssessment />, w: 280, eyebrow: 'ИИ-тренер', title: 'Тренировка под тебя за минуту', body: 'Выбираешь цель и отмечаешь, как себя чувствуешь, — ИИ собирает персональную тренировку из модулей: разминка, основная часть, заминка. Под твою позицию, уровень и состояние.', bullets: ['Учитывает форму и усталость', 'Цель: бросок, скорость, борьба…', 'Никаких случайных видео'] },
+  { mock: <MockAssessment />, w: 280, eyebrow: 'ИИ-тренер', title: 'Тренировка под тебя за минуту', body: 'Выбирай цель и отмечай, как себя чувствуешь — ИИ соберёт персональную тренировку из модулей: разминка, физподготовка, техника, заминка. Под твои возраст, уровень, позицию и состояние.', bullets: ['Учитывает форму и усталость', 'Цель: бросок, скорость, борьба…', 'Никаких случайных видео'] },
+  { mock: <MockCatalog />, w: 280, eyebrow: 'Каталог', title: '60+ видео-занятий под рукой', body: 'Техника, физподготовка, катание и теория — от реальных тренеров. Фильтруй по цели, типу нагрузки и тренеру, добавляй в избранное.', bullets: ['60+ занятий и каталог растёт', 'Поиск по цели и тренеру', 'Разминка · ФП · техника · теория'] },
   { mock: <MockCalendar />, w: 280, eyebrow: 'Микроцикл', title: 'Целая неделя одним тапом', body: 'ИИ-тренер составляет недельный план по методике профи: от разминки к пиковой нагрузке и восстановлению перед играми. Всё в календаре.', bullets: ['5 тренировок на неделю', 'Нагрузка распределена грамотно', 'Адаптируется по твоему отклику'] },
-  { mock: <MockProfile />, w: 340, eyebrow: 'Прогресс', title: 'Видно, как ты растёшь', body: 'Сила, скорость, выносливость, техника и гибкость — пять характеристик, которые растут с каждой тренировкой. Общий потенциал — одно понятное число.', bullets: ['5 характеристик игрока', 'Кольцо общего потенциала', 'Прирост за каждую неделю'] },
+  { mock: <MockProfile />, w: 340, eyebrow: 'Прогресс', title: 'Видно, как ты растёшь', body: 'Сила, скорость, выносливость, техника и гибкость — пять характеристик, которые растут с каждой тренировкой. Общий потенциал — одно понятное число.', bullets: ['5 характеристик игрока', 'Кольцо общего потенциала', 'Прирост за каждую тренировку'] },
   { mock: <MockWorkout />, w: 280, eyebrow: 'Тренировки', title: 'Структурно, как у профи', body: 'Каждая тренировка — это модули с понятной длительностью и целью. Проходишь по очереди, отмечаешь выполнение, копишь прогресс.', bullets: ['Разминка → ФП/техника → заминка', 'Видео-упражнения от тренеров', 'Таймер и прогресс по модулям'] },
 ];
 
 const FOR_WHOM = [
-  { emoji: '🏒', t: 'Игроку', b: 'Тренируйся системно между командными занятиями и расти быстрее сверстников.' },
+  { emoji: '🏒', t: 'Игроку', b: 'Тренируйся системно между командными занятиями и прогрессируй быстрее сверстников.' },
   { emoji: '👨‍👩‍👦', t: 'Родителю', b: 'Дай ребёнку персональную программу без затрат на личного тренера.' },
   { emoji: '🧑‍🏫', t: 'Тренеру', b: 'Ставь задания команде и следи за прогрессом каждого игрока.' },
+];
+
+const ROADMAP_NOW = [
+  'Составляй одиночные полноценные тренировки индивидуально под себя и свою цель',
+  'Составляй физиологически правильные тренировочные микроциклы',
+  'Отслеживай прогресс: общий потенциал и 5 отдельных характеристик',
+  'Командные комнаты — получай задания от своего тренера прямо в приложении',
+];
+const ROADMAP_SOON = [
+  'Интеграция с носимыми устройствами: данные о здоровье и переносимости нагрузок',
+  'Игровая статистика, таблицы лидеров, внутренние соревнования',
+  'Расписание и запись на «подкатку» к любимому тренеру',
 ];
 
 const FAQ = [
@@ -276,7 +325,7 @@ function FaqItem({ q, a }: { q: string; a: string }) {
   );
 }
 
-const MARQUEE = ['Мощный бросок', 'Скорость', 'Выносливость', 'Техника', 'Сила', 'Ловкость', 'Катание', 'Реакция'];
+const MARQUEE = ['Мощный бросок', 'Скорость', 'Выносливость', 'Техника', 'Сила', 'Ловкость', 'Теория', 'Реакция'];
 
 export default function LandingPage() {
   return (
@@ -303,7 +352,7 @@ export default function LandingPage() {
         <div style={{ maxWidth: 1200, margin: '0 auto', position: 'relative' }} className="flex flex-col lg:flex-row items-start lg:items-center gap-12">
           <div style={{ flex: 1.1, width: '100%' }}>
             <div className="font-overpass uppercase flex items-center" style={{ color: LIME, fontWeight: 800, fontSize: 'clamp(11px,3vw,13px)', letterSpacing: '0.28em', marginBottom: 18 }}>
-              <span className="lp-dot" />персональный тренер по хоккею
+              <span className="lp-dot" />цифровая среда для развития хоккеиста
             </div>
             <h1 className="font-overpass uppercase" style={{ fontWeight: 900, fontSize: 'clamp(40px, 11vw, 84px)', lineHeight: '90%', letterSpacing: '0.005em', margin: 0 }}>
               Стань<br /><span className="lp-shimmer">сильнее</span><br />на льду
@@ -319,9 +368,9 @@ export default function LandingPage() {
 
             {/* stats */}
             <div className="grid grid-cols-3 gap-3" style={{ marginTop: 36, maxWidth: 460 }}>
-              {[[5, ' трен/нед собирает ИИ'], [5, ' характеристик растут'], [1, ' тап до плана']].map(([n, t], i) => (
+              {[[60, '+', 'видео-занятий на платформе'], [5, '', 'характеристик — следишь за прогрессом'], [1, '', 'клик до тренировки или плана']].map(([n, suf, t], i) => (
                 <div key={i} className="lp-card" style={{ background: 'rgba(16,21,48,0.6)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '16px 10px' }}>
-                  <div className="font-overpass" style={{ color: LIME, fontWeight: 900, fontSize: 'clamp(26px,7vw,40px)', lineHeight: 1 }}><CountUp target={n as number} /></div>
+                  <div className="font-overpass" style={{ color: LIME, fontWeight: 900, fontSize: 'clamp(26px,7vw,40px)', lineHeight: 1 }}><CountUp target={n as number} suffix={suf as string} /></div>
                   <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 10, marginTop: 6, lineHeight: 1.3 }}>{(t as string).trim()}</div>
                 </div>
               ))}
@@ -329,7 +378,7 @@ export default function LandingPage() {
           </div>
 
           <div className="flex justify-center w-full lg:w-auto" style={{ flex: 1 }}>
-            <Phone width={300} className="lp-float"><MockCalendar /></Phone>
+            <Phone width={300} className="lp-float"><MockCatalog /></Phone>
           </div>
         </div>
       </section>
@@ -477,6 +526,37 @@ export default function LandingPage() {
               </div>
             </Reveal>
           ))}
+        </div>
+      </section>
+
+      {/* ROADMAP */}
+      <section style={{ padding: '8px clamp(16px,5vw,40px) clamp(40px,7vw,64px)', maxWidth: 1200, margin: '0 auto' }}>
+        <Reveal><SectionHead eyebrow="спортсмену и родителю" title="Что уже доступно и что впереди" /></Reveal>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px,1fr))', gap: 16 }}>
+          <Reveal>
+            <div className="lp-card" style={{ padding: 26, borderRadius: 18, background: 'linear-gradient(180deg, rgba(161,255,74,0.10) 0%, rgba(16,21,48,0.5) 100%)', border: '1px solid rgba(161,255,74,0.25)', height: '100%' }}>
+              <div className="font-overpass uppercase" style={{ color: LIME, fontWeight: 800, fontSize: 12, letterSpacing: '0.16em', marginBottom: 14 }}>✅ Уже доступно</div>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {ROADMAP_NOW.map((x) => (
+                  <li key={x} className="font-overpass flex gap-2" style={{ color: '#F9F8FE', fontSize: 14, lineHeight: 1.45 }}>
+                    <span style={{ color: LIME, flexShrink: 0 }}>✓</span><span>{x}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Reveal>
+          <Reveal delay={0.08}>
+            <div className="lp-card" style={{ padding: 26, borderRadius: 18, background: 'linear-gradient(180deg, rgba(68,92,255,0.12) 0%, rgba(16,21,48,0.5) 100%)', border: '1px solid rgba(255,255,255,0.07)', height: '100%' }}>
+              <div className="font-overpass uppercase" style={{ color: '#9FB2FF', fontWeight: 800, fontSize: 12, letterSpacing: '0.16em', marginBottom: 14 }}>🚀 Скоро</div>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {ROADMAP_SOON.map((x) => (
+                  <li key={x} className="font-overpass flex gap-2" style={{ color: '#AEABBB', fontSize: 14, lineHeight: 1.45 }}>
+                    <span style={{ color: '#9FB2FF', flexShrink: 0 }}>○</span><span>{x}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Reveal>
         </div>
       </section>
 
