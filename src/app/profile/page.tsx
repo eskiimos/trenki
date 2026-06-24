@@ -176,6 +176,41 @@ const ProfilePage = () => {
     }
   };
 
+  // Бэкфилл прироста за уже выполненные тренировки (dry-run / apply).
+  const handleBackfill = async (apply: boolean) => {
+    if (
+      apply &&
+      !confirm('Применить бэкфилл прироста ко ВСЕМ профилям? Пересчитает потенциал/характеристики по выполненным тренировкам (идемпотентно, но это запись в боевые данные).')
+    ) {
+      return;
+    }
+    setDevBusy(true);
+    try {
+      const res = await fetch('/api/dev/backfill-gains', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apply }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(d?.error || 'Ошибка');
+        return;
+      }
+      const lines = (d.sample || [])
+        .map((u: any) => `${u.name}: ${u.currentPotential}→${u.correctedPotential} (${u.deltaPotential >= 0 ? '+' : ''}${u.deltaPotential})`)
+        .join('\n');
+      alert(
+        `${d.dryRun ? '🔬 ПРОБНЫЙ расчёт (ничего не записано)' : '💾 ПРИМЕНЕНО'}\n` +
+        `Профилей: ${d.profilesScanned} · с историей: ${d.usersWithHistory} · изменится: ${d.usersChanged}\n` +
+        `Сумма Δ потенциала: ${d.totalPotentialDelta}\n\nТоп:\n${lines || '—'}`
+      );
+    } catch {
+      alert('Ошибка сети');
+    } finally {
+      setDevBusy(false);
+    }
+  };
+
   // Функция выхода
   const handleLogout = async () => {
     if (confirm('Вы уверены, что хотите выйти?')) {
@@ -507,6 +542,26 @@ const ProfilePage = () => {
                 style={{ marginTop: 8 }}
               >
                 🗑 Очистить мой календарь
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                fullWidth
+                disabled={devBusy}
+                onClick={() => handleBackfill(false)}
+                style={{ marginTop: 8 }}
+              >
+                🔬 Бэкфилл прироста: пробно
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                fullWidth
+                disabled={devBusy}
+                onClick={() => handleBackfill(true)}
+                style={{ marginTop: 8 }}
+              >
+                💾 Бэкфилл прироста: применить
               </Button>
             </div>
           </div>
