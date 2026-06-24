@@ -80,9 +80,11 @@ function Phone({ children, width = 290, className = '' }: { children: React.Reac
         flexShrink: 0,
       }}
     >
-      <div style={{ borderRadius: 30, background: '#060919', overflow: 'hidden', position: 'relative', aspectRatio: '9 / 19' }}>
+      {/* aspectRatio подогнан под реальные скриншоты (~0.46 = 403/875), чтобы
+          экран влезал целиком без обрезки низа (кнопки) */}
+      <div style={{ borderRadius: 30, background: '#060919', overflow: 'hidden', position: 'relative', aspectRatio: '403 / 875' }}>
         <div style={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', width: 90, height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.18)', zIndex: 5 }} />
-        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', paddingTop: 22 }}>{children}</div>
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>{children}</div>
       </div>
     </div>
   );
@@ -129,7 +131,9 @@ function PhoneShot({ screen, label }: { screen: string; label: string }) {
       src={`/landing/screens/${screen}.webp`}
       alt={label}
       onError={() => setOk(false)}
-      style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center', display: 'block' }}
+      // contain + inset:0 — показываем экран целиком (низ не режем), надёжно
+      // заполняем фрейм без зависимости от %-height (фикс Safari/aspect-ratio)
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center', display: 'block' }}
     />
   );
 }
