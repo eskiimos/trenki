@@ -253,7 +253,7 @@ export default function LandingPage() {
           </div>
 
           <div className="flex justify-center w-full lg:w-auto" style={{ flex: 1 }}>
-            <Phone width={300} className="lp-float"><PhoneShot screen="catalog" label="Каталог" /></Phone>
+            <Phone width={300} className="lp-float"><PhoneShot screen="video" label="Видео" /></Phone>
           </div>
         </div>
       </section>
