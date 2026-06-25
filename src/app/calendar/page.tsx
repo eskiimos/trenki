@@ -42,7 +42,7 @@ interface CoachAssignment {
 type MicrocycleIntent = 'IN_TONE' | 'WARMUP' | 'CHARGED' | 'STRETCH' | 'TIRED';
 
 interface MicrocycleDay {
-  dayOfWeek: number; // 1=Пн..5=Пт
+  dayOfWeek: number; // порядковый день цикла 1..N от weekStartDate (НЕ календарный)
   intent: MicrocycleIntent;
   workoutSession: {
     id: string;
@@ -213,7 +213,9 @@ export default function CalendarPage() {
   };
 
   // Возвращает день микроцикла (если есть), привязанный к конкретной дате.
-  // weekStartDate — это понедельник; dayOfWeek 1..5 = смещение от понедельника.
+  // dayOfWeek — ПОРЯДКОВЫЙ день цикла (1..N от weekStartDate), НЕ календарный
+  // Пн=1: вводная неделя может стартовать с любого дня. Дата дня = weekStartDate
+  // + (dayOfWeek-1).
   const getMicrocycleDayForDate = (date: Date): MicrocycleDay | null => {
     if (!microcycle) return null;
     // weekStartDate приходит как ISO date-only ("YYYY-MM-DD") — парсим в UTC,
@@ -232,6 +234,20 @@ export default function CalendarPage() {
       }
     }
     return null;
+  };
+
+  // Диапазон дней цикла «Чт-Сб»/«Пн-Пт» — реальные дни недели от weekStartDate
+  // (не хардкодим Пн-Пт: вводная неделя стартует с любого дня).
+  const getCycleRangeLabel = (): string => {
+    if (!microcycle || microcycle.days.length === 0) return '';
+    const WD = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+    const ws = new Date(microcycle.weekStartDate);
+    const offsets = microcycle.days.map((d) => d.dayOfWeek);
+    const wd = (off: number) =>
+      WD[new Date(Date.UTC(ws.getUTCFullYear(), ws.getUTCMonth(), ws.getUTCDate() + (off - 1))).getUTCDay()];
+    const first = Math.min(...offsets);
+    const last = Math.max(...offsets);
+    return first === last ? wd(first) : `${wd(first)}-${wd(last)}`;
   };
 
   const hasAnyEventOnDay = (year: number, month: number, day: number) => {
@@ -505,7 +521,7 @@ export default function CalendarPage() {
                 {microcycle.cycleNumber === 1 ? 'Твой первый микроцикл' : `Микроцикл №${microcycle.cycleNumber}`}
               </div>
               <div className="text-white text-sm font-semibold leading-tight">
-                ИИ-тренер собрал тебе неделю · Пн-Пт
+                ИИ-тренер собрал тебе неделю · {getCycleRangeLabel()}
               </div>
             </div>
           </div>

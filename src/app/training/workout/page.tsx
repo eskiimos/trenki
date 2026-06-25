@@ -52,7 +52,7 @@ interface Workout {
 const GOAL_LABELS: Record<string, string> = {
   POWERFUL_SHOT: 'Мощный бросок',
   OUTRUN_OPPONENT: 'Убегаем от соперника',
-  STRENGTH_STABILITY: 'Силовая борьба',
+  STRENGTH_STABILITY: 'Силовая борьба и устойчивость',
   SOFT_HANDS: 'Мягкие ручки',
   FULL_GAME_ENDURANCE: 'Выносливость на всю игру',
   AGILITY: 'Маневренность',

@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
 import { MicrocycleFeedback, MicrocycleStatus } from '@/generated/prisma';
+import { getEffectiveStatus } from '@/lib/microcycle/status';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,7 +48,7 @@ export async function PATCH(
 
   const cycle = await prisma.microcycle.findUnique({
     where: { id },
-    select: { id: true, userId: true },
+    select: { id: true, userId: true, weekStartDate: true, days: { select: { id: true } } },
   });
 
   if (!cycle) {
@@ -56,6 +57,21 @@ export async function PATCH(
 
   if (cycle.userId !== auth.user.id) {
     return NextResponse.json({ error: 'Доступ запрещён' }, { status: 403 });
+  }
+
+  // Принимаем фидбэк только если цикл ЗАВЕРШЁН по дате. Считаем статус по дате
+  // (status=ACTIVE, feedback=null) — это позволяет перезаписать ответ, пока
+  // модалка открыта, но не даёт: (а) закрыть ещё активный цикл преждевременно,
+  // (б) поставить фидбэк короткой вводной неделе Пт-Вс (она без опроса).
+  const byDate = getEffectiveStatus(
+    { status: MicrocycleStatus.ACTIVE, weekStartDate: cycle.weekStartDate, feedback: null, dayCount: cycle.days.length },
+    new Date(),
+  );
+  if (byDate === 'ACTIVE') {
+    return NextResponse.json({ error: 'Цикл ещё не завершён' }, { status: 409 });
+  }
+  if (byDate === 'ARCHIVED') {
+    return NextResponse.json({ error: 'Этот цикл без опроса (короткая вводная неделя)' }, { status: 409 });
   }
 
   const updated = await prisma.microcycle.update({

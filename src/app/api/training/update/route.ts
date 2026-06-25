@@ -108,22 +108,24 @@ export async function POST(request: NextRequest) {
       const allCompleted = session.videos.every((v) => v.completed);
 
 
-      // Если все видео завершены - завершаем тренировку
+      // Все видео просмотрены — двигаем индекс, но НЕ ставим COMPLETED здесь.
+      // Финализацию (статус COMPLETED) И НАЧИСЛЕНИЕ прироста делает единая точка
+      // POST /api/training/complete (её зовёт кнопка «Завершить» на workout-
+      // странице). Раньше update ставил COMPLETED раньше → complete видел
+      // COMPLETED и делал no-op: прирост за цикловые тренировки не начислялся,
+      // не показывался поп-ап прироста, не срабатывали дневной лимит и
+      // автозакрытие тренерских заданий.
       if (allCompleted || nextIndex >= session.totalVideos) {
         await prisma.workoutSession.update({
           where: { id: sessionId },
-          data: {
-            status: WorkoutStatus.COMPLETED,
-            completedAt: new Date(),
-            currentVideoIndex: nextIndex,
-          },
+          data: { currentVideoIndex: nextIndex },
         });
 
 
         return NextResponse.json({
           success: true,
           completed: true,
-          message: 'Тренировка завершена! 🎉',
+          message: 'Все модули просмотрены',
         });
       } else {
         // Просто увеличиваем индекс

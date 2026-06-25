@@ -33,7 +33,15 @@ const INTENT_EMOJI: Record<Intent, string> = {
   TIRED: '😴',
 };
 
-const DOW_LABEL = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт'];
+// Календарный день недели для относительного dayOfWeek (1..N от даты старта).
+// dayOfWeek в микроцикле — ПОРЯДКОВЫЙ день цикла, НЕ календарный (Пн=1): цикл
+// может стартовать с любого дня (вводная неделя). Поэтому считаем от weekStartDate.
+const WD = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+function weekdayLabel(weekStartISO: string, dayOfWeek: number): string {
+  const s = new Date(weekStartISO);
+  const d = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate() + (dayOfWeek - 1)));
+  return WD[d.getUTCDay()];
+}
 
 interface MicrocycleResponse {
   microcycle: {
@@ -266,7 +274,7 @@ export default function MicrocycleResultPage() {
                   }}
                 >
                   <div className="text-[#AEABBB] text-xs font-bold w-6">
-                    {DOW_LABEL[d.dayOfWeek]}
+                    {weekdayLabel(microcycle.weekStartDate, d.dayOfWeek)}
                   </div>
                   <div style={{ fontSize: 20 }}>{INTENT_EMOJI[d.intent]}</div>
                   <div className="flex-1">

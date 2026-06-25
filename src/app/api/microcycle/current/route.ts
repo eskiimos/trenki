@@ -64,6 +64,13 @@ export async function GET(request: NextRequest) {
     new Date(),
   );
 
+  // Короткая вводная неделя Пт-Вс закрывается БЕЗ опроса (effectiveStatus
+  // ARCHIVED), но в БД остаётся status=ACTIVE/feedback=null. Не отдаём её как
+  // актуальный цикл — иначе календарь рисует баннер завершённой недели.
+  if (effectiveStatus === 'ARCHIVED') {
+    return NextResponse.json({ microcycle: null });
+  }
+
   return NextResponse.json({
     microcycle: {
       id: microcycle.id,
