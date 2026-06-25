@@ -214,6 +214,42 @@ const ProfilePage = () => {
     }
   };
 
+  // Бэкфилл прироста за завершённые тренировки БЕЗ истории (потерянные из-за
+  // бага update→complete no-op). dry-run / apply.
+  const handleCycleBackfill = async (apply: boolean) => {
+    if (
+      apply &&
+      !confirm('Доначислить прирост за завершённые тренировки без истории ко ВСЕМ профилям? Восстановит баллы, потерянные из-за бага (идемпотентно, но это запись в боевые данные).')
+    ) {
+      return;
+    }
+    setDevBusy(true);
+    try {
+      const res = await fetch('/api/dev/backfill-cycle-gains', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apply }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(d?.error || 'Ошибка');
+        return;
+      }
+      const lines = (d.sample || [])
+        .map((u: any) => `${u.name}: ${u.currentPotential}→${u.correctedPotential} (${u.deltaPotential >= 0 ? '+' : ''}${u.deltaPotential}) · ${u.missingSessions} трен.`)
+        .join('\n');
+      alert(
+        `${d.dryRun ? '🔬 ПРОБНЫЙ расчёт (ничего не записано)' : '💾 ПРИМЕНЕНО'}\n` +
+        `Профилей: ${d.profilesScanned} · изменится: ${d.usersChanged} · доначислено сессий: ${d.sessionsBackfilled}\n` +
+        `Сумма Δ потенциала: ${d.totalPotentialDelta}\n\nТоп:\n${lines || '—'}`
+      );
+    } catch {
+      alert('Ошибка сети');
+    } finally {
+      setDevBusy(false);
+    }
+  };
+
   // Прогон N циклов: чистый старт → генерим/начисляем/фидбэк → следующий,
   // чтобы быстро увидеть адаптацию методички и рост потенциала.
   const handleRunCycles = async () => {
@@ -605,6 +641,26 @@ const ProfilePage = () => {
                 style={{ marginTop: 8 }}
               >
                 💾 Бэкфилл прироста: применить
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                fullWidth
+                disabled={devBusy}
+                onClick={() => handleCycleBackfill(false)}
+                style={{ marginTop: 8 }}
+              >
+                🩹 Бэкфилл пропущенных трен.: пробно
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                fullWidth
+                disabled={devBusy}
+                onClick={() => handleCycleBackfill(true)}
+                style={{ marginTop: 8 }}
+              >
+                💾 Бэкфилл пропущенных трен.: применить
               </Button>
 
               {/* Прогон N циклов с адаптацией */}
