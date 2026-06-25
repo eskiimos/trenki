@@ -149,6 +149,9 @@ const ProfilePage = () => {
 
   // QA-инструменты админа: прогон цикла / очистка календаря.
   const [devBusy, setDevBusy] = useState(false);
+  const [runCount, setRunCount] = useState(4);
+  const [runFeedback, setRunFeedback] = useState<'EASY' | 'NORMAL' | 'HARD'>('EASY');
+  const [devResult, setDevResult] = useState<string | null>(null);
   const handleDevAction = async (action: 'complete' | 'clear-calendar') => {
     const confirmMsg =
       action === 'complete'
@@ -203,6 +206,46 @@ const ProfilePage = () => {
         `${d.dryRun ? '🔬 ПРОБНЫЙ расчёт (ничего не записано)' : '💾 ПРИМЕНЕНО'}\n` +
         `Профилей: ${d.profilesScanned} · с историей: ${d.usersWithHistory} · изменится: ${d.usersChanged}\n` +
         `Сумма Δ потенциала: ${d.totalPotentialDelta}\n\nТоп:\n${lines || '—'}`
+      );
+    } catch {
+      alert('Ошибка сети');
+    } finally {
+      setDevBusy(false);
+    }
+  };
+
+  // Прогон N циклов: чистый старт → генерим/начисляем/фидбэк → следующий,
+  // чтобы быстро увидеть адаптацию методички и рост потенциала.
+  const handleRunCycles = async () => {
+    const fbLabel = { EASY: 'ИЗИ', NORMAL: 'НОРМ', HARD: 'ТЯЖКО' }[runFeedback];
+    if (!confirm(
+      `Прогнать ${runCount} циклов с ответом «${fbLabel}»?\n\n⚠️ Это СНАЧАЛА удалит твои микроциклы (личное расписание видео не трогаем), затем смоделирует ${runCount} недель подряд (с начислением прироста). Профиль/история не сбрасываются — прирост накопится поверх текущего потенциала.`,
+    )) return;
+    setDevBusy(true);
+    setDevResult(null);
+    try {
+      const res = await fetch('/api/dev/microcycle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'run', cycles: runCount, feedback: runFeedback }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(d?.error || 'Ошибка');
+        return;
+      }
+      const fmt = (days: { d: string; label: string }[]) =>
+        days.map((x) => `${x.d}:${x.label}`).join(' · ');
+      const lines = (d.timeline || []).map(
+        (c: any) => `#${c.cycleNumber} ${fmt(c.days)}  | ${d.feedback} → 💪 ${c.potentialAfter}`,
+      );
+      if (d.finalCycle) {
+        lines.push(`#${d.finalCycle.cycleNumber} ${fmt(d.finalCycle.days)}  | (активен, адаптирован)`);
+      }
+      setDevResult(
+        `Прогон ${d.cycles}× ${d.feedback}\n` +
+        `Потенциал ${d.startPotential} → ${d.finalPotential} (${d.delta >= 0 ? '+' : ''}${d.delta})\n\n` +
+        lines.join('\n'),
       );
     } catch {
       alert('Ошибка сети');
@@ -563,6 +606,62 @@ const ProfilePage = () => {
               >
                 💾 Бэкфилл прироста: применить
               </Button>
+
+              {/* Прогон N циклов с адаптацией */}
+              <div className="flex items-center gap-2" style={{ marginTop: 12 }}>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={runCount}
+                  disabled={devBusy}
+                  onChange={(e) => setRunCount(Math.max(1, Math.min(10, Number(e.target.value) || 1)))}
+                  aria-label="Сколько циклов"
+                  className="font-overpass"
+                  style={{
+                    width: 56, padding: '8px 10px', borderRadius: 10, background: 'var(--color-surface)',
+                    border: '1px solid var(--border-hairline)', color: '#F9F8FE', fontSize: 14, textAlign: 'center',
+                  }}
+                />
+                <select
+                  value={runFeedback}
+                  disabled={devBusy}
+                  onChange={(e) => setRunFeedback(e.target.value as 'EASY' | 'NORMAL' | 'HARD')}
+                  aria-label="Ответ-фидбэк"
+                  className="font-overpass"
+                  style={{
+                    flex: 1, padding: '8px 10px', borderRadius: 10, background: 'var(--color-surface)',
+                    border: '1px solid var(--border-hairline)', color: '#F9F8FE', fontSize: 14,
+                  }}
+                >
+                  <option value="EASY">ИЗИ (усложняем)</option>
+                  <option value="NORMAL">НОРМ (повторяем)</option>
+                  <option value="HARD">ТЯЖКО (упрощаем)</option>
+                </select>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                fullWidth
+                disabled={devBusy}
+                onClick={handleRunCycles}
+                style={{ marginTop: 8 }}
+              >
+                🔁 Прогнать {runCount} циклов
+              </Button>
+
+              {devResult && (
+                <pre
+                  className="font-mono"
+                  style={{
+                    marginTop: 10, padding: 12, borderRadius: 10, background: 'var(--color-night)',
+                    border: '1px solid var(--border-hairline)', color: '#C9C7D4', fontSize: 11,
+                    lineHeight: 1.5, whiteSpace: 'pre-wrap', overflowX: 'auto',
+                  }}
+                >
+                  {devResult}
+                </pre>
+              )}
             </div>
           </div>
         )}
