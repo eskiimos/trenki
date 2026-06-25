@@ -6,6 +6,7 @@ import { creditSessionCompletion } from '@/lib/training/credit-session';
 import { generateMicrocycleForUser } from '@/lib/microcycle/generate';
 import { getMicrocycleWeekStart } from '@/lib/microcycle/week-start';
 import { parsePrevDay, labelFor } from '@/lib/microcycle/week-plan';
+import { getEffectiveStatus } from '@/lib/microcycle/status';
 
 // QA-инструменты для админа (прогонка методички микроцикла без ожидания
 // реальной недели). Только isAdmin. Все действия — СТРОГО над своими данными
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
     const mc = await prisma.microcycle.findFirst({
       where: { userId, feedback: null, status: { not: MicrocycleStatus.ARCHIVED } },
       orderBy: { cycleNumber: 'desc' },
-      select: { id: true, days: { select: { workoutSessionId: true } } },
+      select: { id: true, weekStartDate: true, days: { select: { workoutSessionId: true } } },
     });
     if (!mc) {
       return NextResponse.json({ error: 'Нет активного цикла для прогонки' }, { status: 404 });
@@ -109,20 +110,40 @@ export async function POST(request: NextRequest) {
     const dayCount = mc.days.length || 5;
     const now = new Date();
 
-    // «Состариваем» цикл, чтобы стал AWAITING_FEEDBACK (опрос на главной).
-    // weekStartDate + dayCount должно быть в прошлом. Ловим коллизию unique
-    // (userId, weekStartDate) — отодвигаем дальше.
+    // «Состариваем» цикл, чтобы конец оказался в прошлом → опрос на главной.
+    // ВАЖНО: сдвигаем на ЦЕЛЫЕ недели (сохраняем день недели старта). Иначе
+    // getEffectiveStatus может ложно принять вводную неделю за короткий заход
+    // Пт-Вс и скрыть опрос. Коллизию unique(userId, weekStartDate) — ещё неделя.
+    let back = new Date(Date.UTC(
+      mc.weekStartDate.getUTCFullYear(), mc.weekStartDate.getUTCMonth(), mc.weekStartDate.getUTCDate(), 0, 0, 0, 0,
+    ));
+    while (addDaysUTC(back, dayCount).getTime() >= now.getTime()) back = addDaysUTC(back, -7);
     let applied = false;
-    for (const extra of [1, 8, 15, 30]) {
-      const back = addDaysUTC(now, -(dayCount + extra));
+    for (let i = 0; i < 8; i += 1) {
       try {
         await prisma.microcycle.update({ where: { id: mc.id }, data: { weekStartDate: back } });
         applied = true;
         break;
       } catch (e: any) {
         if (e?.code !== 'P2002') throw e;
+        back = addDaysUTC(back, -7);
       }
     }
+
+    // Эффективный статус после старения — чтобы честно сказать, будет ли опрос.
+    const eff = getEffectiveStatus(
+      { status: MicrocycleStatus.ACTIVE, weekStartDate: back, feedback: null, dayCount },
+      now,
+    );
+    const surveyNote = !applied
+      ? '⚠️ дату сдвинуть не удалось — опрос может не появиться.'
+      : eff === 'AWAITING_FEEDBACK'
+        ? 'Открой главную — там опросник переносимости.'
+        : eff === 'ARCHIVED'
+          ? 'Опроса нет: это короткая вводная неделя (старт Пт-Вс) — по методичке без опроса.'
+          : 'Опрос пока не появится (цикл ещё активен).';
+
+    const grew = profBefore && profAfter && profAfter.potential > profBefore.potential;
 
     return NextResponse.json({
       ok: true,
@@ -130,9 +151,12 @@ export async function POST(request: NextRequest) {
       creditedSessions: credited,
       potentialBefore: profBefore?.potential ?? null,
       potentialAfter: profAfter?.potential ?? null,
+      effectiveStatus: eff,
       aged: applied,
-      message: `Цикл выполнен: начислено за ${credited} трен. Потенциал ${profBefore?.potential ?? '—'}→${profAfter?.potential ?? '—'}. ` +
-        (applied ? 'Открой главную — там опросник переносимости.' : '(дату сдвинуть не удалось — опрос может не появиться).'),
+      message:
+        `Цикл выполнен: начислено за ${credited} трен. ` +
+        `Потенциал ${profBefore?.potential ?? '—'}→${profAfter?.potential ?? '—'}` +
+        `${grew ? ' 📈' : credited === 0 ? ' (новых начислений нет)' : ''}. ${surveyNote}`,
     });
   }
 
