@@ -113,18 +113,22 @@ export async function generateMicrocycleForUser(
   const feedback: MicrocycleFeedback | null = lastCycle?.feedback ?? null;
 
   // ── План недели (методичка «По циклу с разных дней начало») ─────────
-  // День старта (0=Вс..6=Сб). Первый цикл — вводная структура по дню старта
-  // (короче, если не с понедельника). Если прошлый цикл был вводным
-  // (<5 дней) — со следующей недели строим стандартную Пн-Пт (с адаптацией
-  // по фидбэку, если опрос был). Иначе — обычная адаптация от прошлой недели.
+  // День старта (0=Вс..6=Сб). ЛЮБОЙ старт НЕ с понедельника (первый цикл ИЛИ
+  // ручная пересборка посреди недели) → усечённая вводная структура по дню
+  // старта (Чт → Чт-Сб, а не полная неделя со сдвигом). Адаптация по фидбэку
+  // возобновляется со следующей полной недели Пн-Пт. Старт с понедельника:
+  // первый цикл / после вводной недели → стандартная Пн-Пт; иначе — адаптация
+  // от прошлой недели.
   const startDow = weekStartDate.getUTCDay();
   let plan;
-  if (!prevDays) {
+  if (startDow !== 1) {
     plan = planFirstWeek(startDow, cycleNumber);
-  } else if (prevDays.length >= 5) {
+  } else if (prevDays && prevDays.length >= 5) {
     plan = planWeek(prevDays, feedback, cycleNumber);
   } else {
-    plan = planWeek(standardWeekStates(), feedback, cycleNumber);
+    plan = prevDays
+      ? planWeek(standardWeekStates(), feedback, cycleNumber)
+      : planFirstWeek(1, cycleNumber);
   }
 
   // adjustmentFactor — для аналитики (как именно адаптировали).
