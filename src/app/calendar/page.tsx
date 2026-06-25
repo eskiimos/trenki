@@ -129,6 +129,13 @@ export default function CalendarPage() {
   const MIN_OVERLAY_MS = 5000;
   const handleGenerateMicrocycle = async () => {
     if (generatingCycle) return;
+    // Пересборка существующего цикла — предупреждаем (план заменится, старт с сегодня).
+    if (
+      microcycle &&
+      !confirm('У тебя уже есть активный цикл на эту неделю. Пересобрать его заново?\n\nТекущий план заменится и стартует с сегодня.')
+    ) {
+      return;
+    }
     setCycleError(null);
     setGeneratingCycle(true);
     const startedAt = Date.now();
