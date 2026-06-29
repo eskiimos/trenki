@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTelegram } from '@/hooks/useTelegram';
 import CharacteristicsGainModal from '@/components/CharacteristicsGainModal';
 import Toast from '@/components/Toast';
+import ModuleSelectionModal from '@/components/ModuleSelectionModal';
 
 interface WorkoutModule {
   id: string;
@@ -90,6 +91,8 @@ export default function WorkoutPage() {
   // Состояние для замены модуля
   const [replacingModuleIndex, setReplacingModuleIndex] = useState<number | null>(null);
   const [isReplacingModule, setIsReplacingModule] = useState(false);
+  // Ручной подбор модуля (поиск/фильтр) — индекс открытого слота
+  const [pickerIndex, setPickerIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (webApp) {
@@ -858,6 +861,24 @@ export default function WorkoutPage() {
                 );
               })()}
 
+              {/* Ручной подбор модуля: поиск/фильтр видео (лупа рядом с авто-заменой) */}
+              {!isCompleted && !isLocked && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setPickerIndex(index); }}
+                  title="Выбрать вручную (поиск и фильтр)"
+                  style={{
+                    position: 'absolute', bottom: '12px', right: '50px', zIndex: 3,
+                    width: '32px', height: '32px', borderRadius: '8px',
+                    backgroundColor: 'rgba(68, 92, 255, 0.22)', border: '1px solid rgba(68, 92, 255, 0.45)',
+                    color: '#A9B6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                </button>
+              )}
+
               {/* C-8: выбор направления растяжки для заминки (дня растяжки).
                   Подменяет стретч-видео через replace-module. «Рандом» —
                   это просто уже подобранное видео (по умолчанию). */}
@@ -1114,6 +1135,16 @@ export default function WorkoutPage() {
           message={toast.message}
           type={toast.type}
           onClose={() => setToast(null)}
+        />
+      )}
+
+      {/* Ручной подбор модуля: поиск + фильтр */}
+      {pickerIndex !== null && workout && (
+        <ModuleSelectionModal
+          sessionId={workout.id}
+          moduleIndex={pickerIndex}
+          onClose={() => setPickerIndex(null)}
+          onPicked={() => { loadWorkout(); setToast({ message: '✅ Модуль обновлён', type: 'success' }); }}
         />
       )}
     </div>

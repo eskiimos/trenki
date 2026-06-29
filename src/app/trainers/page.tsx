@@ -23,6 +23,7 @@ const TrainersPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [selectedSpecs, setSelectedSpecs] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchTrainers = async () => {
@@ -40,15 +41,24 @@ const TrainersPage = () => {
     fetchTrainers();
   }, []);
 
-  // Фильтрация тренеров по поисковому запросу
+  // Специализации тренера (могут быть через запятую/перенос).
+  const specsOf = (t: Trainer) => t.speciality.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
+  // Уникальные специализации по всем тренерам — опции фильтра.
+  const allSpecs = Array.from(new Set(trainers.flatMap(specsOf))).sort((a, b) => a.localeCompare(b, 'ru'));
+  const toggleSpec = (s: string) =>
+    setSelectedSpecs((p) => (p.includes(s) ? p.filter((x) => x !== s) : [...p, s]));
+
+  // Фильтрация: поиск (по имени/специализации) И фильтр по специализациям (OR внутри).
   const filteredTrainers = trainers.filter((trainer) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      !query ||
       trainer.name.toLowerCase().includes(query) ||
       trainer.lastName.toLowerCase().includes(query) ||
-      trainer.speciality.toLowerCase().includes(query)
-    );
+      trainer.speciality.toLowerCase().includes(query);
+    const matchesSpec =
+      selectedSpecs.length === 0 || specsOf(trainer).some((s) => selectedSpecs.includes(s));
+    return matchesSearch && matchesSpec;
   });
 
   return (
@@ -99,6 +109,29 @@ const TrainersPage = () => {
           </button>
         </div>
       </div>
+
+      {/* Фильтр по специализациям */}
+      {allSpecs.length > 0 && (
+        <div className="px-4 pb-3 -mt-1">
+          <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+            <button
+              onClick={() => setSelectedSpecs([])}
+              className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide transition flex-shrink-0 ${selectedSpecs.length === 0 ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#060919] text-[#AEABBB] border border-white/10'}`}
+            >
+              Все
+            </button>
+            {allSpecs.map((s) => (
+              <button
+                key={s}
+                onClick={() => toggleSpec(s)}
+                className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide transition flex-shrink-0 ${selectedSpecs.includes(s) ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#060919] text-[#AEABBB] border border-white/10'}`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Контент страницы тренеров */}
       <div className="px-4 pb-4 flex flex-col gap-4">

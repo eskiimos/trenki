@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     if ('response' in auth) return auth.response;
     const user = auth.user;
 
-    const { workoutSessionId, moduleIndex, stretchDirection } = await request.json();
+    const { workoutSessionId, moduleIndex, stretchDirection, videoId } = await request.json();
 
     if (!workoutSessionId || moduleIndex === undefined) {
       return NextResponse.json(
@@ -135,8 +135,19 @@ export async function POST(request: NextRequest) {
 
     let newModule: any = null;
 
-    // Подбираем новый модуль того же типа
-    if (currentModuleType === ModuleType.WARMUP) {
+    // Ручной выбор: пользователь сам подобрал видео через поиск/фильтр модуля.
+    // Берём только опубликованное; тип модуля не навязываем жёстко (модалка и так
+    // показывает видео нужного типа), IDOR закрыт проверкой владельца сессии выше.
+    if (videoId) {
+      const chosen = await prisma.video.findFirst({
+        where: { id: videoId, isPublished: true },
+        include: { trainer: true },
+      });
+      if (!chosen) {
+        return NextResponse.json({ error: 'Видео не найдено или не опубликовано' }, { status: 404 });
+      }
+      newModule = chosen;
+    } else if (currentModuleType === ModuleType.WARMUP) {
       const warmupLoadTypes = getWarmupLoadTypes(energyState);
       const muscleGroups = trainingGoal
         ? GOAL_TO_MUSCLE_GROUPS[trainingGoal as TrainingGoal]?.warmup || [MuscleGroup.FULL_BODY]
