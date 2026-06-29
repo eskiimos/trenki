@@ -71,10 +71,16 @@ export async function POST(request: NextRequest) {
       let referralCode: string | null = null;
       if (refRaw) {
         const rc = await prisma.referralCode.findFirst({
-          where: { code: { equals: refRaw, mode: 'insensitive' }, isActive: true },
+          where: {
+            isActive: true,
+            OR: [
+              { code: { equals: refRaw, mode: 'insensitive' } },
+              { aliases: { has: refRaw.toLowerCase() } },
+            ],
+          },
           select: { code: true },
         });
-        if (rc) referralCode = rc.code;
+        if (rc) referralCode = rc.code; // храним канонический код, не алиас
       }
 
       const generatedId = `email_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;

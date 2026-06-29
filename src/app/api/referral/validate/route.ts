@@ -20,8 +20,17 @@ export async function GET(request: NextRequest) {
   const raw = (new URL(request.url).searchParams.get('code') || '').trim();
   if (!raw) return NextResponse.json({ valid: false });
 
+  // Матч по основному коду (без регистра) ИЛИ по алиасу (хранится в нижнем
+  // регистре; кириллица тоже корректно лоуэркейсится). Возвращаем канонический
+  // rc.code — его и привяжем при регистрации.
   const rc = await prisma.referralCode.findFirst({
-    where: { code: { equals: raw, mode: 'insensitive' }, isActive: true },
+    where: {
+      isActive: true,
+      OR: [
+        { code: { equals: raw, mode: 'insensitive' } },
+        { aliases: { has: raw.toLowerCase() } },
+      ],
+    },
     select: { code: true, label: true },
   });
   if (!rc) return NextResponse.json({ valid: false });

@@ -20,6 +20,7 @@ interface RefCode {
   id: string;
   code: string;
   label: string;
+  aliases: string[];
   isActive: boolean;
   note: string | null;
   createdAt: string;
@@ -39,6 +40,7 @@ export default function AdminReferralsPage() {
   const [newCode, setNewCode] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [newNote, setNewNote] = useState('');
+  const [newAliases, setNewAliases] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -72,11 +74,11 @@ export default function AdminReferralsPage() {
     try {
       const res = await fetch('/api/admin/referrals', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: newCode, label: newLabel, note: newNote || undefined }),
+        body: JSON.stringify({ code: newCode, label: newLabel, note: newNote || undefined, aliases: newAliases || undefined }),
       });
       const d = await res.json();
       if (!res.ok) { alert(d?.error || 'Ошибка'); return; }
-      setNewCode(''); setNewLabel(''); setNewNote('');
+      setNewCode(''); setNewLabel(''); setNewNote(''); setNewAliases('');
       await load();
     } finally { setBusy(false); }
   };
@@ -153,11 +155,13 @@ export default function AdminReferralsPage() {
           <input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="заметка (необязательно)"
             className="bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#A1FF4A]" />
         </div>
+        <input value={newAliases} onChange={(e) => setNewAliases(e.target.value)} placeholder="промокоды для ручного ввода через запятую (напр. ИГЛС, иглс)"
+          className="w-full mb-2 bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#A1FF4A]" />
         <button onClick={create} disabled={busy || !newCode.trim() || !newLabel.trim()}
           className="bg-[#A1FF4A] text-[#060919] font-bold text-sm rounded-lg px-4 py-2 disabled:opacity-50">
           Создать
         </button>
-        <div className="text-gray-500 text-xs mt-2">Код — латиница/цифры/_/- (без кириллицы). Ссылка: {origin}/r/&lt;код&gt;</div>
+        <div className="text-gray-500 text-xs mt-2">Код/слаг ссылки — латиница (ссылка {origin}/r/&lt;код&gt;). Промокоды (алиасы) можно кириллицей — по ним пускаем при ручном вводе.</div>
       </div>
 
       {err && <div className="text-red-400 text-sm mb-4">{err}</div>}
@@ -175,6 +179,9 @@ export default function AdminReferralsPage() {
                   </span>
                 </div>
                 <div className="text-gray-400 text-xs mt-1 font-mono">{c.code}</div>
+                {c.aliases?.length > 0 && (
+                  <div className="text-gray-500 text-xs mt-0.5">промокоды: {c.aliases.join(', ')}</div>
+                )}
               </div>
               <div className="flex items-center gap-2 text-xs">
                 <span className="text-[#A1FF4A] font-bold">{c.stats.registrations}</span><span className="text-gray-500">рег.</span>

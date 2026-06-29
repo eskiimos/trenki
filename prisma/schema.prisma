@@ -704,8 +704,9 @@ model InviteCode {
 // (count User по User.referralCode), без денормализации. Управляется админом.
 model ReferralCode {
   id        String   @id @default(cuid())
-  code      String   @unique // латиница, напр. "igls26"
+  code      String   @unique // основной код/слаг ссылки, латиница, напр. "igls26"
   label     String // человекочитаемое, напр. "ИГЛС"
+  aliases   String[] @default([]) // доп. коды для РУЧНОГО ввода (в т.ч. кириллица), хранятся в нижнем регистре, напр. ["иглс"]
   isActive  Boolean  @default(true)
   note      String? // заметка для админа
   createdAt DateTime @default(now())
