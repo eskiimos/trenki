@@ -203,6 +203,27 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 const MARQUEE = ['Мощный бросок', 'Скорость', 'Выносливость', 'Техника', 'Сила', 'Ловкость', 'Теория', 'Реакция'];
 
 export default function LandingPage() {
+  // Реф-код из QR печатной листовки: trenki.app/landing?ref=igls26 — как /r/<code>:
+  // валидируем и кладём в localStorage, чтобы привязать при регистрации (verify-code).
+  useEffect(() => {
+    let code = '';
+    try {
+      code = (new URLSearchParams(window.location.search).get('ref') || '').trim();
+    } catch {}
+    if (!code) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/referral/validate?code=${encodeURIComponent(code)}`);
+        const d = await res.json().catch(() => ({}));
+        if (!cancelled && d?.valid) {
+          try { localStorage.setItem('pendingReferralCode', d.code); } catch {}
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <div style={{ background: '#060919', color: '#F9F8FE', minHeight: '100vh', overflowX: 'hidden', position: 'relative' }}>
       {/* NAV */}
