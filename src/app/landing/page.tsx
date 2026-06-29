@@ -472,6 +472,31 @@ export default function LandingPage() {
         </Reveal>
       </section>
 
+      {/* INSTALL */}
+      <section id="install" style={{ padding: '8px clamp(16px,5vw,40px) clamp(40px,7vw,64px)', maxWidth: 1000, margin: '0 auto' }}>
+        <Reveal><SectionHead eyebrow="установка" title="Поставь на главный экран" sub="Это PWA — без магазинов и скачиваний. Добавляется как обычное приложение и открывается с иконки." /></Reveal>
+        <div className="flex flex-col md:flex-row gap-4">
+          {[
+            { tag: 'iPhone · Safari', steps: ['Открой trenki.app в Safari', 'Нажми «Поделиться» (квадрат со стрелкой ↑)', 'Выбери «На экран „Домой“»', '«Добавить» — иконка появится на экране'] },
+            { tag: 'Android · Chrome', steps: ['Открой trenki.app в Chrome', 'Меню ⋮ справа сверху', '«Установить приложение» / «Добавить на главный экран»', 'Подтверди — готово'] },
+          ].map((c, i) => (
+            <Reveal key={c.tag} delay={i * 0.08} className="flex-1">
+              <div style={{ height: '100%', background: 'rgba(16,21,48,0.6)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 18, padding: '20px 20px 22px' }}>
+                <div className="font-overpass uppercase" style={{ display: 'inline-block', color: LIME, fontWeight: 800, fontSize: 11, letterSpacing: '0.16em', border: '1px solid rgba(161,255,74,0.35)', borderRadius: 999, padding: '5px 12px', marginBottom: 16 }}>{c.tag}</div>
+                <ol style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {c.steps.map((s, n) => (
+                    <li key={n} className="flex items-start gap-3">
+                      <span className="font-overpass" style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 999, background: 'rgba(161,255,74,0.16)', color: LIME, fontWeight: 900, fontSize: 12, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{n + 1}</span>
+                      <span className="font-overpass" style={{ color: '#D7D5E0', fontSize: 14, lineHeight: 1.4 }}>{s}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
       {/* FOOTER */}
       <footer style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: '24px clamp(16px,5vw,40px) 28px', maxWidth: 1200, margin: '0 auto' }} className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">

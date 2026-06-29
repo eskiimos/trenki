@@ -110,7 +110,25 @@ const HomePage = () => {
     })();
     return () => { cancelled = true; };
   }, [isCheckingAuth]);
-  
+
+  // Синхронизируем таймзону устройства (Intl) — для напоминаний в локальное
+  // время. Шлём только при изменении (кэш в localStorage), после авторизации.
+  useEffect(() => {
+    if (isCheckingAuth) return;
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz && localStorage.getItem('tz_synced') !== tz) {
+        fetch('/api/user/timezone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ timezone: tz }),
+        })
+          .then((r) => { if (r.ok) { try { localStorage.setItem('tz_synced', tz); } catch {} } })
+          .catch(() => {});
+      }
+    } catch {}
+  }, [isCheckingAuth]);
+
   // Проверяем авторизацию при загрузке страницы
   useEffect(() => {
     const checkAuth = async () => {

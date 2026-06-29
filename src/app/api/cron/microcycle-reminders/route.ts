@@ -1,11 +1,12 @@
 /**
  * Cron: ежедневные напоминания о тренировке по недельному циклу (C-7).
  *
- * Запускать раз в день утром по таймзоне сервера (host crontab на reg.ru).
- * Роут сам определяет день цикла на сегодня, поэтому крон можно ставить на
- * каждый день — выходные/дни без цикла отсеются логикой:
+ * Ставить ПОЧАСОВО (host crontab на reg.ru). Роут шлёт напоминание каждому
+ * пользователю, когда у НЕГО локальные 10:00 (по User.timezone, дефолт МСК) —
+ * так «по гео» без точного GPS. На каждом часе отправляются только те, у кого
+ * сейчас 10:00; выходные/дни без цикла/выполненные отсеются логикой:
  *
- *   0 9 * * * curl -s -H "Authorization: Bearer $CRON_SECRET" \
+ *   0 * * * * curl -s -H "Authorization: Bearer $CRON_SECRET" \
  *     http://localhost:3000/api/cron/microcycle-reminders
  *
  * Логика:
@@ -58,16 +59,28 @@ export async function GET(request: NextRequest) {
       weekStartDate: { gte: rangeStart, lte: today },
     },
     include: {
-      user: { select: { id: true, firstName: true } },
+      user: { select: { id: true, firstName: true, timezone: true } },
       days: { include: { workoutSession: { select: { status: true } } } },
     },
   });
+
+  // Напоминание шлём в ~10:00 ЛОКАЛЬНОГО времени пользователя (таймзона —
+  // User.timezone, по умолчанию МСК). Крон ставится почасовым: на каждом часе
+  // отправляем тем, у кого сейчас локальные 10:00. Так «по гео» без точного GPS.
+  const TARGET_HOUR = 10;
+  const localHour = (at: Date, tz: string): number => {
+    try {
+      return parseInt(new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', hour12: false }).format(at), 10);
+    } catch {
+      return parseInt(new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Moscow', hour: '2-digit', hour12: false }).format(at), 10);
+    }
+  };
 
   // Собираем по одному напоминанию НА ПОЛЬЗОВАТЕЛЯ: у юзера может быть несколько
   // ACTIVE-циклов с перекрытием дней (статус ACTIVE не снимается без фидбэка),
   // поэтому без дедупа он получил бы 2+ пуша в день. При перекрытии берём день
   // самого свежего цикла (по weekStartDate).
-  const dueByUser = new Map<string, { name: string | null; label: string; weekStartMs: number }>();
+  const dueByUser = new Map<string, { name: string | null; label: string; weekStartMs: number; tz: string }>();
   let skipped = 0; // сегодня — день цикла, но он уже закрыт / без сессии
   let noDayToday = 0; // у цикла нет дня на сегодня (выходной/вне недели)
 
@@ -103,12 +116,14 @@ export async function GET(request: NextRequest) {
     const weekStartMs = cycle.weekStartDate.getTime();
     const prev = dueByUser.get(cycle.user.id);
     if (!prev || weekStartMs > prev.weekStartMs) {
-      dueByUser.set(cycle.user.id, { name: cycle.user.firstName, label, weekStartMs });
+      dueByUser.set(cycle.user.id, { name: cycle.user.firstName, label, weekStartMs, tz: cycle.user.timezone || 'Europe/Moscow' });
     }
   }
 
   let sent = 0;
+  let offHour = 0; // юзер «должен», но сейчас не его локальные 10:00
   for (const [userId, info] of dueByUser) {
+    if (localHour(now, info.tz) !== TARGET_HOUR) { offHour++; continue; }
     // Push не блокирует цикл; ошибки только логируем.
     sendUserPush(userId, {
       title: info.name ? `Привет, ${info.name}! Время тренировки 💪` : 'Время тренировки 💪',
@@ -123,6 +138,8 @@ export async function GET(request: NextRequest) {
     sent,
     skipped,
     noDayToday,
+    offHour,
+    targetHour: TARGET_HOUR,
     durationMs: Date.now() - startedAt,
   });
 }
