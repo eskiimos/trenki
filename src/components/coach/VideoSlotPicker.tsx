@@ -1,13 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
+import PickerFilterChips from '@/components/coach/PickerFilterChips';
 
 export interface PickerVideo {
   id: string;
   title: string;
   thumbnail?: string | null;
   duration: number; // seconds
+  loadType?: string | null;
+  muscleGroup?: string | null;
   trainer?: { id: string; name: string; lastName?: string | null } | null;
 }
 
@@ -20,6 +23,8 @@ interface Props {
   options: PickerVideo[];
   /** Передать '' если очищаем */
   onChange: (videoId: string) => void;
+  /** Бейдж «уже делал / давали команде» по видео — как в режиме «одно видео» */
+  activityBadge?: (videoId: string) => { text: string; tone: 'done' | 'team' } | null;
 }
 
 function formatDuration(sec: number): string {
@@ -33,19 +38,53 @@ function trainerName(t?: PickerVideo['trainer']): string {
   return `${t.name}${t.lastName ? ' ' + t.lastName : ''}`.trim();
 }
 
-export default function VideoSlotPicker({ slotLabel, value, options, onChange }: Props) {
+export default function VideoSlotPicker({ slotLabel, value, options, onChange, activityBadge }: Props) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [selLoad, setSelLoad] = useState<string[]>([]);
+  const [selMuscle, setSelMuscle] = useState<string[]>([]);
   const selected = value ? options.find((v) => v.id === value) ?? null : null;
 
-  // Запрещаем body scroll пока открыт sheet
+  // Запрещаем body scroll пока открыт sheet; при закрытии сбрасываем фильтры.
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setQuery('');
+      setSelLoad([]);
+      setSelMuscle([]);
+      return;
+    }
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = prev;
     };
   }, [open]);
+
+  const toggle = (arr: string[], v: string) =>
+    arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
+
+  // Доступные значения нагрузки/мышц в этом слоте — для чипов.
+  const availableLoad = useMemo(
+    () => Array.from(new Set(options.map((v) => v.loadType).filter((x): x is string => !!x))),
+    [options],
+  );
+  const availableMuscle = useMemo(
+    () => Array.from(new Set(options.map((v) => v.muscleGroup).filter((x): x is string => !!x))),
+    [options],
+  );
+
+  // Поиск (по названию + тренеру) И фильтр по нагрузке/мышцам (OR внутри группы).
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return options.filter((v) => {
+      const matchesQ =
+        !q || v.title.toLowerCase().includes(q) || trainerName(v.trainer).toLowerCase().includes(q);
+      const matchesLoad = selLoad.length === 0 || (v.loadType != null && selLoad.includes(v.loadType));
+      const matchesMuscle =
+        selMuscle.length === 0 || (v.muscleGroup != null && selMuscle.includes(v.muscleGroup));
+      return matchesQ && matchesLoad && matchesMuscle;
+    });
+  }, [options, query, selLoad, selMuscle]);
 
   return (
     <>
@@ -213,6 +252,36 @@ export default function VideoSlotPicker({ slotLabel, value, options, onChange }:
               </button>
             </div>
 
+            {/* Поиск + фильтр */}
+            {options.length > 0 && (
+              <div className="px-5 pb-3 flex flex-col gap-2">
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Поиск по названию или тренеру..."
+                  className="w-full font-overpass"
+                  style={{
+                    background: '#060919',
+                    border: '1px solid #26252F',
+                    borderRadius: 10,
+                    padding: '10px 14px',
+                    color: '#F9F8FE',
+                    fontSize: 13,
+                    outline: 'none',
+                  }}
+                />
+                <PickerFilterChips
+                  availableLoad={availableLoad}
+                  availableMuscle={availableMuscle}
+                  selectedLoad={selLoad}
+                  selectedMuscle={selMuscle}
+                  onToggleLoad={(v) => setSelLoad((p) => toggle(p, v))}
+                  onToggleMuscle={(v) => setSelMuscle((p) => toggle(p, v))}
+                />
+              </div>
+            )}
+
             {/* Список */}
             <div
               className="px-5 pb-6"
@@ -225,10 +294,18 @@ export default function VideoSlotPicker({ slotLabel, value, options, onChange }:
                 >
                   Нет подходящих видео в каталоге
                 </div>
+              ) : filtered.length === 0 ? (
+                <div
+                  className="text-center py-10 font-overpass"
+                  style={{ color: '#AEABBB', fontSize: 13 }}
+                >
+                  Ничего не найдено — измени поиск или фильтр
+                </div>
               ) : (
                 <div className="flex flex-col gap-2">
-                  {options.map((v) => {
+                  {filtered.map((v) => {
                     const isSel = v.id === value;
+                    const badge = activityBadge?.(v.id) ?? null;
                     return (
                       <button
                         key={v.id}
@@ -301,6 +378,27 @@ export default function VideoSlotPicker({ slotLabel, value, options, onChange }:
                               }}
                             >
                               {trainerName(v.trainer)}
+                            </div>
+                          )}
+                          {badge && (
+                            <div
+                              className="font-overpass"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                marginTop: 5,
+                                padding: '2px 8px',
+                                borderRadius: 999,
+                                fontSize: 10,
+                                fontWeight: 800,
+                                textTransform: 'uppercase',
+                                letterSpacing: 0.3,
+                                background: badge.tone === 'done' ? 'rgba(161,255,74,0.14)' : 'rgba(68,92,255,0.18)',
+                                color: badge.tone === 'done' ? '#A1FF4A' : '#9FB2FF',
+                              }}
+                            >
+                              {badge.tone === 'done' ? '✓' : '↺'} {badge.text}
                             </div>
                           )}
                         </div>

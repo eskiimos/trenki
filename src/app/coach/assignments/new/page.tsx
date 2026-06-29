@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import VideoSlotPicker from '@/components/coach/VideoSlotPicker';
+import PickerFilterChips from '@/components/coach/PickerFilterChips';
 
 interface Member {
   userId: string;
@@ -18,6 +19,8 @@ interface VideoItem {
   thumbnail?: string | null;
   duration: number;
   moduleType?: ModuleType | null;
+  loadType?: string | null;
+  muscleGroup?: string | null;
   trainer?: { id: string; name: string; lastName?: string | null } | null;
 }
 
@@ -63,6 +66,8 @@ export default function CoachAssignmentNewPage() {
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
   const [search, setSearch] = useState('');
+  const [selLoad, setSelLoad] = useState<string[]>([]);
+  const [selMuscle, setSelMuscle] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [initLoading, setInitLoading] = useState(true);
@@ -124,6 +129,8 @@ export default function CoachAssignmentNewPage() {
           thumbnail?: string | null;
           duration: number;
           moduleType?: ModuleType | null;
+          loadType?: string | null;
+          muscleGroup?: string | null;
           trainer?: { id: string; name: string; lastName?: string | null } | null;
         }) => ({
           id: v.id,
@@ -131,6 +138,8 @@ export default function CoachAssignmentNewPage() {
           thumbnail: v.thumbnail ?? null,
           duration: v.duration,
           moduleType: v.moduleType ?? null,
+          loadType: v.loadType ?? null,
+          muscleGroup: v.muscleGroup ?? null,
           trainer: v.trainer ?? null,
         }),
       );
@@ -162,9 +171,28 @@ export default function CoachAssignmentNewPage() {
     });
   };
 
-  const filteredVideos = videos.filter((v) =>
-    v.title.toLowerCase().includes(search.toLowerCase())
+  const toggle = (arr: string[], v: string) =>
+    arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
+
+  // Доступные нагрузки/мышцы по всему каталогу — для чипов фильтра (режим «одно видео»).
+  const availableLoad = Array.from(
+    new Set(videos.map((v) => v.loadType).filter((x): x is string => !!x)),
   );
+  const availableMuscle = Array.from(
+    new Set(videos.map((v) => v.muscleGroup).filter((x): x is string => !!x)),
+  );
+
+  const filteredVideos = videos.filter((v) => {
+    const q = search.trim().toLowerCase();
+    const tName = v.trainer
+      ? `${v.trainer.name}${v.trainer.lastName ? ' ' + v.trainer.lastName : ''}`.toLowerCase()
+      : '';
+    const matchesQ = !q || v.title.toLowerCase().includes(q) || tName.includes(q);
+    const matchesLoad = selLoad.length === 0 || (v.loadType != null && selLoad.includes(v.loadType));
+    const matchesMuscle =
+      selMuscle.length === 0 || (v.muscleGroup != null && selMuscle.includes(v.muscleGroup));
+    return matchesQ && matchesLoad && matchesMuscle;
+  });
 
   // Подсветка «уже делал/давали» для видео в списке. В режиме «вся команда»
   // показываем, что уже давалось команде; при выбранных атлетах — что они уже
@@ -501,7 +529,13 @@ export default function CoachAssignmentNewPage() {
               <button
                 key={m}
                 type="button"
-                onClick={() => setMode(m)}
+                onClick={() => {
+                  setMode(m);
+                  // Фильтры режима «одно видео» не должны «висеть» после возврата.
+                  setSearch('');
+                  setSelLoad([]);
+                  setSelMuscle([]);
+                }}
                 className="font-overpass uppercase flex-1"
                 style={{
                   background: mode === m ? '#A1FF4A' : 'transparent',
@@ -522,24 +556,50 @@ export default function CoachAssignmentNewPage() {
 
           {mode === 'single' && (
             <>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Поиск по названию..."
-                className="w-full font-overpass mb-3"
-                style={{
-                  background: '#060919',
-                  border: '1px solid #26252F',
-                  borderRadius: 10,
-                  padding: '10px 14px',
-                  color: '#F9F8FE',
-                  fontSize: 13,
-                  outline: 'none',
-                }}
-              />
+              {videos.length > 0 && (
+                <div className="flex flex-col gap-2 mb-3">
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Поиск по названию или тренеру..."
+                    className="w-full font-overpass"
+                    style={{
+                      background: '#060919',
+                      border: '1px solid #26252F',
+                      borderRadius: 10,
+                      padding: '10px 14px',
+                      color: '#F9F8FE',
+                      fontSize: 13,
+                      outline: 'none',
+                    }}
+                  />
+                  <PickerFilterChips
+                    availableLoad={availableLoad}
+                    availableMuscle={availableMuscle}
+                    selectedLoad={selLoad}
+                    selectedMuscle={selMuscle}
+                    onToggleLoad={(v) => setSelLoad((p) => toggle(p, v))}
+                    onToggleMuscle={(v) => setSelMuscle((p) => toggle(p, v))}
+                  />
+                </div>
+              )}
               <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
-                {filteredVideos.map((v) => {
+                {videos.length === 0 ? (
+                  <div
+                    className="text-center py-8 font-overpass"
+                    style={{ color: '#AEABBB', fontSize: 13 }}
+                  >
+                    Нет видео в каталоге
+                  </div>
+                ) : filteredVideos.length === 0 ? (
+                  <div
+                    className="text-center py-8 font-overpass"
+                    style={{ color: '#AEABBB', fontSize: 13 }}
+                  >
+                    Ничего не найдено — измени поиск или фильтр
+                  </div>
+                ) : filteredVideos.map((v) => {
                   const sel = selectedVideoId === v.id;
                   const trainerName = v.trainer
                     ? `${v.trainer.name}${v.trainer.lastName ? ' ' + v.trainer.lastName : ''}`
@@ -659,6 +719,7 @@ export default function CoachAssignmentNewPage() {
                       slotLabel={MODULE_LABELS[module]}
                       value={selectedId}
                       options={candidates}
+                      activityBadge={videoActivityBadge}
                       onChange={(videoId) =>
                         setSlotVideoIds((prev) => ({ ...prev, [key]: videoId }))
                       }
