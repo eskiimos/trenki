@@ -165,7 +165,12 @@ export default function VideoFiltersModal({
     >
       <div
         className="bg-[#101530] w-full rounded-t-3xl flex flex-col animate-slideUp"
-        style={{ height: '88vh', maxHeight: '88vh', marginBottom: '69px' }}
+        style={{
+          // Шторка снизу: высота по контенту, но не выше (safe-area сверху + 24px
+          // зазор от чёлки) и не ниже нижнего меню (69px). Верх всегда под чёлкой.
+          maxHeight: 'calc(100dvh - env(safe-area-inset-top, 0px) - 93px)',
+          marginBottom: '69px',
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
