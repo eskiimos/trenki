@@ -22,6 +22,7 @@ model User {
   inviteCode            String? // Код, с которым зарегистрировался пользователь (старая бета-система)
   referralCode          String? // Реф-код канала, по которому пришёл (латиница). См. ReferralCode
   timezone              String? // IANA-таймзона устройства (Intl), для напоминаний в локальное время
+  lastReminderOn        String? // локальная дата YYYY-MM-DD последнего отправленного напоминания (дедуп)
   ageConsentAt          DateTime? // Дата и время подтверждения возраста (18+ или законный представитель)
   isAdmin               Boolean                 @default(false) // Доступ к админ-панели
   role                  UserRole                @default(ATHLETE) // Роль: спортсмен или тренер

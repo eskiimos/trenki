@@ -38,11 +38,15 @@ export async function GET(request: NextRequest) {
   const slot = session.videos[moduleIndex];
   const moduleType = slot.video.moduleType;
   const usedIds = session.videos.map((v) => v.videoId);
+  // Видео, занятые ДРУГИМИ слотами этой сессии, исключаем — их нельзя выбрать
+  // (нарушился бы @@unique([sessionId, videoId])). Текущий слот оставляем.
+  const otherSlotIds = usedIds.filter((id) => id !== slot.videoId);
 
   const videos = await prisma.video.findMany({
     where: {
       isPublished: true,
       moduleType,
+      id: { notIn: otherSlotIds },
       ...(q ? { title: { contains: q, mode: 'insensitive' } } : {}),
     },
     orderBy: { createdAt: 'desc' },

@@ -18,8 +18,8 @@
  *   4. Шлём web-push с подписью дня (Заряжен/Разминка/Растяжка/В тонусе/Устал).
  *
  * Push только в PWA (web-push), Telegram отключён — см. CLAUDE.md.
- * Идемпотентность в пределах суток обеспечивается тем, что крон ставится один
- * раз в день; повторный ручной вызов в тот же день пошлёт пуш снова.
+ * Идемпотентность: дедуп по User.lastReminderOn (локальная дата последней
+ * отправки) — повторные/двойные вызовы крона в тот же день НЕ задвоят пуш.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -44,92 +44,86 @@ export async function GET(request: NextRequest) {
 
   const startedAt = Date.now();
   const now = new Date();
-  // «Сегодня» считаем по UTC-дате (как и weekStartDate @db.Date). Крон ставится
-  // по локальному времени сервера — час запуска должен быть таким, чтобы его
-  // UTC-дата совпадала с локальной (напр. 09:00 MSK = 06:00 UTC, та же дата).
-  const today = getMicrocycleStartDate(now);
-  // Цикл покрывает сегодня, если weekStartDate в [today-4; today] (5 дней: +0..+4).
-  const rangeStart = new Date(Date.UTC(
-    today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - 4, 0, 0, 0, 0,
-  ));
+  const TARGET_HOUR = 10;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  // Локальная дата (YYYY-MM-DD) и час в таймзоне юзера (Intl). Дефолт — МСК.
+  const localDateStr = (tz: string): string => {
+    try { return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(now); }
+    catch { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(now); }
+  };
+  const localHour = (tz: string): number => {
+    try { return parseInt(new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', hour12: false }).format(now), 10); }
+    catch { return parseInt(new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Moscow', hour: '2-digit', hour12: false }).format(now), 10); }
+  };
+  // UTC-дата дня цикла как YYYY-MM-DD — для сравнения с локальной датой юзера.
+  const dayDateStr = (ws: Date, dow: number): string => {
+    const d = getMicrocycleDayDate(ws, dow);
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  };
+
+  // Широкий диапазон по UTC покрывает «сегодня» в любой таймзоне (вост./зап.).
+  const anchor = getMicrocycleStartDate(now);
+  const rangeStart = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate() - 5, 0, 0, 0, 0));
+  const rangeEnd = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate() + 1, 0, 0, 0, 0));
 
   const cycles = await prisma.microcycle.findMany({
     where: {
       status: MicrocycleStatus.ACTIVE,
-      weekStartDate: { gte: rangeStart, lte: today },
+      weekStartDate: { gte: rangeStart, lte: rangeEnd },
     },
     include: {
-      user: { select: { id: true, firstName: true, timezone: true } },
+      user: { select: { id: true, firstName: true, timezone: true, lastReminderOn: true } },
       days: { include: { workoutSession: { select: { status: true } } } },
     },
   });
 
-  // Напоминание шлём в ~10:00 ЛОКАЛЬНОГО времени пользователя (таймзона —
-  // User.timezone, по умолчанию МСК). Крон ставится почасовым: на каждом часе
-  // отправляем тем, у кого сейчас локальные 10:00. Так «по гео» без точного GPS.
-  const TARGET_HOUR = 10;
-  const localHour = (at: Date, tz: string): number => {
-    try {
-      return parseInt(new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', hour12: false }).format(at), 10);
-    } catch {
-      return parseInt(new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Moscow', hour: '2-digit', hour12: false }).format(at), 10);
-    }
-  };
-
-  // Собираем по одному напоминанию НА ПОЛЬЗОВАТЕЛЯ: у юзера может быть несколько
-  // ACTIVE-циклов с перекрытием дней (статус ACTIVE не снимается без фидбэка),
-  // поэтому без дедупа он получил бы 2+ пуша в день. При перекрытии берём день
-  // самого свежего цикла (по weekStartDate).
-  const dueByUser = new Map<string, { name: string | null; label: string; weekStartMs: number; tz: string }>();
-  let skipped = 0; // сегодня — день цикла, но он уже закрыт / без сессии
-  let noDayToday = 0; // у цикла нет дня на сегодня (выходной/вне недели)
+  // Один пуш на юзера. День определяем по ЕГО ЛОКАЛЬНОЙ дате (чинит сдвиг на
+  // день у дальневосточных TZ). При нескольких ACTIVE-циклах берём свежайший.
+  const dueByUser = new Map<string, { name: string | null; label: string; tz: string; localDate: string; lastReminderOn: string | null; weekStartMs: number }>();
+  let skipped = 0; // день закрыт/без сессии
+  let noDayToday = 0; // у цикла нет дня на локальное сегодня
 
   for (const cycle of cycles) {
-    // День, чья календарная дата == сегодня (без учёта закрытости).
+    const tz = cycle.user.timezone || 'Europe/Moscow';
+    const localDate = localDateStr(tz);
     const day = cycle.days.find(
-      (d) =>
-        d.dayOfWeek >= 1 &&
-        d.dayOfWeek <= 5 &&
-        getMicrocycleDayDate(cycle.weekStartDate, d.dayOfWeek).getTime() === today.getTime(),
+      (d) => d.dayOfWeek >= 1 && d.dayOfWeek <= 5 && dayDateStr(cycle.weekStartDate, d.dayOfWeek) === localDate,
     );
-
-    if (!day) {
-      noDayToday++;
-      continue;
-    }
+    if (!day) { noDayToday++; continue; }
 
     const due = isReminderDueForDay({
-      today,
+      today: getMicrocycleDayDate(cycle.weekStartDate, day.dayOfWeek), // дата самого дня
       weekStartDate: cycle.weekStartDate,
       dayOfWeek: day.dayOfWeek,
       hasSession: day.workoutSessionId != null,
       sessionStatus: day.workoutSession?.status ?? null,
     });
-
-    if (!due) {
-      skipped++; // C-5: выполнено/отменено, либо нет сессии — не напоминаем
-      continue;
-    }
+    if (!due) { skipped++; continue; }
 
     const state = parsePrevDay(day.dayOfWeek, day.intent);
     const label = labelFor(state.kind, state.energyState);
     const weekStartMs = cycle.weekStartDate.getTime();
     const prev = dueByUser.get(cycle.user.id);
     if (!prev || weekStartMs > prev.weekStartMs) {
-      dueByUser.set(cycle.user.id, { name: cycle.user.firstName, label, weekStartMs, tz: cycle.user.timezone || 'Europe/Moscow' });
+      dueByUser.set(cycle.user.id, { name: cycle.user.firstName, label, tz, localDate, lastReminderOn: cycle.user.lastReminderOn, weekStartMs });
     }
   }
 
   let sent = 0;
-  let offHour = 0; // юзер «должен», но сейчас не его локальные 10:00
+  let offHour = 0;      // ещё не наступили локальные 10:00
+  let alreadySent = 0;  // сегодня уже слали (дедуп)
   for (const [userId, info] of dueByUser) {
-    if (localHour(now, info.tz) !== TARGET_HOUR) { offHour++; continue; }
-    // Push не блокирует цикл; ошибки только логируем.
+    // Шлём с локальных 10:00 и позже; дедуп по локальной дате — почасовой крон не
+    // задвоит, а пропущенный тик 10:00 догонится в тот же день (в 11:00 и т.д.).
+    if (localHour(info.tz) < TARGET_HOUR) { offHour++; continue; }
+    if (info.lastReminderOn === info.localDate) { alreadySent++; continue; }
+
     sendUserPush(userId, {
       title: info.name ? `Привет, ${info.name}! Время тренировки 💪` : 'Время тренировки 💪',
       body: `Стабильность — признак мастерства. Не забудь потренироваться — сегодня у тебя «${info.label}».`,
       url: '/calendar',
     }).catch((err) => console.error('microcycle reminder push failed', userId, err));
+    await prisma.user.update({ where: { id: userId }, data: { lastReminderOn: info.localDate } });
     sent++;
   }
 
@@ -139,6 +133,7 @@ export async function GET(request: NextRequest) {
     skipped,
     noDayToday,
     offHour,
+    alreadySent,
     targetHour: TARGET_HOUR,
     durationMs: Date.now() - startedAt,
   });

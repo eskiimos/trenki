@@ -53,9 +53,9 @@ export async function POST(request: NextRequest) {
 
     const { workoutSessionId, moduleIndex, stretchDirection, videoId } = await request.json();
 
-    if (!workoutSessionId || moduleIndex === undefined) {
+    if (!workoutSessionId || typeof moduleIndex !== 'number' || !Number.isInteger(moduleIndex)) {
       return NextResponse.json(
-        { error: 'workoutSessionId и moduleIndex обязательны' },
+        { error: 'workoutSessionId и числовой moduleIndex обязательны' },
         { status: 400 }
       );
     }
@@ -145,6 +145,18 @@ export async function POST(request: NextRequest) {
       });
       if (!chosen) {
         return NextResponse.json({ error: 'Видео не найдено или не опубликовано' }, { status: 404 });
+      }
+      // Тип модуля должен совпадать со слотом — иначе ломается структура/лейблы.
+      if (chosen.moduleType !== currentModuleType) {
+        return NextResponse.json({ error: 'Видео другого типа модуля' }, { status: 400 });
+      }
+      // Нельзя поставить видео, уже занятое ДРУГИМ слотом этой сессии — иначе
+      // нарушится @@unique([sessionId, videoId]) и слот потеряется.
+      const inAnotherSlot = workoutSession.videos.some(
+        (v) => v.videoId === videoId && v.id !== currentVideo.id,
+      );
+      if (inAnotherSlot) {
+        return NextResponse.json({ error: 'Это видео уже есть в тренировке' }, { status: 409 });
       }
       newModule = chosen;
     } else if (currentModuleType === ModuleType.WARMUP) {
@@ -284,23 +296,21 @@ export async function POST(request: NextRequest) {
     }
 
 
-    // Обновляем видео в тренировке
+    // Обновляем видео в тренировке. delete+create (а не update) — чтобы обойти
+    // unique constraint; АТОМАРНО в транзакции, иначе при сбое create слот
+    // потеряется безвозвратно.
     try {
-      // Используем delete + create вместо update, чтобы избежать конфликта unique constraint
-      await prisma.workoutSessionVideo.delete({
-        where: {
-          id: currentVideo.id,
-        },
-      });
-
-      await prisma.workoutSessionVideo.create({
-        data: {
-          sessionId: currentVideo.sessionId,
-          videoId: newModule.id,
-          order: currentVideo.order,
-          completed: false,
-        },
-      });
+      await prisma.$transaction([
+        prisma.workoutSessionVideo.delete({ where: { id: currentVideo.id } }),
+        prisma.workoutSessionVideo.create({
+          data: {
+            sessionId: currentVideo.sessionId,
+            videoId: newModule.id,
+            order: currentVideo.order,
+            completed: false,
+          },
+        }),
+      ]);
 
 
       return NextResponse.json({
