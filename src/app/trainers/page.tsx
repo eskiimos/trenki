@@ -43,10 +43,17 @@ const TrainersPage = () => {
 
   // Специализации тренера (могут быть через запятую/перенос).
   const specsOf = (t: Trainer) => t.speciality.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
-  // Уникальные специализации по всем тренерам — опции фильтра.
-  const allSpecs = Array.from(new Set(trainers.flatMap(specsOf))).sort((a, b) => a.localeCompare(b, 'ru'));
-  const toggleSpec = (s: string) =>
-    setSelectedSpecs((p) => (p.includes(s) ? p.filter((x) => x !== s) : [...p, s]));
+  // Уникальные специализации БЕЗ учёта регистра («физ подготовка»/«Физ
+  // подготовка» = один чип). key — нижний регистр, label — первое написание.
+  const specMap = new Map<string, string>();
+  for (const t of trainers) for (const s of specsOf(t)) {
+    const k = s.toLowerCase();
+    if (!specMap.has(k)) specMap.set(k, s);
+  }
+  const allSpecs = Array.from(specMap, ([key, label]) => ({ key, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'ru'));
+  const toggleSpec = (key: string) =>
+    setSelectedSpecs((p) => (p.includes(key) ? p.filter((x) => x !== key) : [...p, key]));
 
   // Фильтрация: поиск (по имени/специализации) И фильтр по специализациям (OR внутри).
   const filteredTrainers = trainers.filter((trainer) => {
@@ -57,7 +64,7 @@ const TrainersPage = () => {
       trainer.lastName.toLowerCase().includes(query) ||
       trainer.speciality.toLowerCase().includes(query);
     const matchesSpec =
-      selectedSpecs.length === 0 || specsOf(trainer).some((s) => selectedSpecs.includes(s));
+      selectedSpecs.length === 0 || specsOf(trainer).some((s) => selectedSpecs.includes(s.toLowerCase()));
     return matchesSearch && matchesSpec;
   });
 
@@ -122,11 +129,11 @@ const TrainersPage = () => {
             </button>
             {allSpecs.map((s) => (
               <button
-                key={s}
-                onClick={() => toggleSpec(s)}
-                className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide transition flex-shrink-0 ${selectedSpecs.includes(s) ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#060919] text-[#AEABBB] border border-white/10'}`}
+                key={s.key}
+                onClick={() => toggleSpec(s.key)}
+                className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide transition flex-shrink-0 ${selectedSpecs.includes(s.key) ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#060919] text-[#AEABBB] border border-white/10'}`}
               >
-                {s}
+                {s.label}
               </button>
             ))}
           </div>
