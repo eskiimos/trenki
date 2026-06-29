@@ -65,6 +65,18 @@ export async function POST(request: NextRequest) {
     let needsOnboarding = false;
 
     if (!user) {
+      // Реф-код канала (по ссылке /r/<code> или ручным вводом). Привязываем
+      // ТОЛЬКО при создании нового пользователя и только если код активен.
+      const refRaw = (body.referralCode || '').trim();
+      let referralCode: string | null = null;
+      if (refRaw) {
+        const rc = await prisma.referralCode.findFirst({
+          where: { code: { equals: refRaw, mode: 'insensitive' }, isActive: true },
+          select: { code: true },
+        });
+        if (rc) referralCode = rc.code;
+      }
+
       const generatedId = `email_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       user = await prisma.user.create({
         data: {
@@ -72,6 +84,7 @@ export async function POST(request: NextRequest) {
           email,
           emailVerified: true,
           firstName: email.split('@')[0],
+          referralCode,
         },
       });
       needsOnboarding = true;

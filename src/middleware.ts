@@ -8,6 +8,8 @@ const publicRoutes = [
   '/login',
   '/landing',
   '/preview', // публичные превью-экраны для iframe лендинга
+  '/r', // реф-ссылки /r/<code> (лендинг приглашения, до входа)
+  '/api/referral', // публичная валидация реф-кода (до входа)
   '/legal',
   '/join',
   '/admin/login',
@@ -19,7 +21,10 @@ const publicRoutes = [
 ];
 
 function isPublicRoute(pathname: string): boolean {
-  return publicRoutes.some(route => pathname.startsWith(route));
+  // Сегментное совпадение, НЕ голый startsWith: иначе '/r' открыл бы и
+  // /register (и любой /r*), а '/legal' — /legalfoo. Матчим точный путь или
+  // путь с разделителем сегмента.
+  return publicRoutes.some((route) => pathname === route || pathname.startsWith(route + '/'));
 }
 
 /** Случайный base64-nonce для CSP. */

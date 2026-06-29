@@ -19,7 +19,8 @@ model User {
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
   lastActivity          DateTime                @default(now())
-  inviteCode            String? // Код, с которым зарегистрировался пользователь
+  inviteCode            String? // Код, с которым зарегистрировался пользователь (старая бета-система)
+  referralCode          String? // Реф-код канала, по которому пришёл (латиница). См. ReferralCode
   ageConsentAt          DateTime? // Дата и время подтверждения возраста (18+ или законный представитель)
   isAdmin               Boolean                 @default(false) // Доступ к админ-панели
   role                  UserRole                @default(ATHLETE) // Роль: спортсмен или тренер
@@ -47,6 +48,7 @@ model User {
   coachWorkoutSessions  WorkoutSession[]        @relation("CoachWorkoutSessions")
   microcycles           Microcycle[]
 
+  @@index([referralCode])
   @@map("users")
 }
 
@@ -694,6 +696,21 @@ model InviteCode {
   description String? // Описание (например, "Бета-тестирование 25 человек")
 
   @@map("invite_codes")
+}
+
+// Реферальный канал (сбор/школа/клуб): человек регистрируется по ссылке
+// trenki.app/r/<code> или вводит код вручную. Код — латиница (igls26 и т.п.),
+// label — человекочитаемое имя. Сколько пришло по коду — считаем запросом
+// (count User по User.referralCode), без денормализации. Управляется админом.
+model ReferralCode {
+  id        String   @id @default(cuid())
+  code      String   @unique // латиница, напр. "igls26"
+  label     String // человекочитаемое, напр. "ИГЛС"
+  isActive  Boolean  @default(true)
+  note      String? // заметка для админа
+  createdAt DateTime @default(now())
+
+  @@map("referral_codes")
 }
 
 // ========================================

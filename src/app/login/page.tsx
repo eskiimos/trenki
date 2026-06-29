@@ -17,6 +17,15 @@ function EmailLoginForm() {
   const [countdown, setCountdown] = useState(0);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+  const [refCode, setRefCode] = useState('');
+
+  // Реф-код из ссылки /r/<code> (положен в localStorage) — префилл поля.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('pendingReferralCode');
+      if (saved) setRefCode(saved);
+    } catch {}
+  }, []);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -59,7 +68,7 @@ function EmailLoginForm() {
       const res = await fetch('/api/auth/email/verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code }),
+        body: JSON.stringify({ email, code, referralCode: refCode.trim() || undefined }),
         credentials: 'include',
       });
       const data = await res.json();
@@ -67,6 +76,7 @@ function EmailLoginForm() {
         setError(data.error || 'Ошибка проверки кода');
         return;
       }
+      try { localStorage.removeItem('pendingReferralCode'); } catch {}
       saveAuth({
         telegramId: data.user.id, // сервер вернул User.id — этого достаточно для UX-кеша
         firstName: data.user.firstName,
@@ -108,6 +118,19 @@ function EmailLoginForm() {
             placeholder="example@mail.ru"
             className="w-full bg-[#0A0E1A] text-white border border-[#2a2f4a] rounded-xl px-4 py-3 focus:outline-none focus:border-[#A1FF4A] transition-colors placeholder-gray-600"
             autoComplete="email"
+          />
+        </div>
+        <div>
+          <label className="block text-gray-400 text-sm mb-2">Код приглашения <span className="text-gray-600">(если есть)</span></label>
+          <input
+            type="text"
+            value={refCode}
+            onChange={e => setRefCode(e.target.value)}
+            placeholder="например, igls26"
+            className="w-full bg-[#0A0E1A] text-white border border-[#2a2f4a] rounded-xl px-4 py-3 focus:outline-none focus:border-[#A1FF4A] transition-colors placeholder-gray-600"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
           />
         </div>
         <div className="flex flex-col gap-3">

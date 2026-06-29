@@ -321,6 +321,7 @@ export default function AdminPage() {
             <SectionTitle>👥 Пользователи</SectionTitle>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <NavCard href="/admin/users" icon="👤" title="Пользователи" desc="Список и управление" />
+              <NavCard href="/admin/referrals" icon="🔗" title="Реферальные каналы" desc="Коды/ссылки сборов и кто пришёл" />
               <NavCard href="/admin/invite-codes" icon="🎟️" title="Инвайт-коды" desc="Коды приглашений" />
               <NavCard href="/admin/admins" icon="🔐" title="Администраторы" desc="Права доступа" />
               <NavCard
