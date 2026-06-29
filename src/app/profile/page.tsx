@@ -575,6 +575,16 @@ const ProfilePage = () => {
               </Button>
             )}
 
+            {/* Обратная связь */}
+            <Button
+              variant="ghost"
+              size="sm"
+              fullWidth
+              onClick={() => window.open('https://t.me/Mark_Kovalevskii', '_blank', 'noopener,noreferrer')}
+            >
+              💬 Обратная связь
+            </Button>
+
             {/* Выход */}
             <Button variant="ghost" size="sm" fullWidth onClick={handleLogout}>
               🚪 Выйти

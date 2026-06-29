@@ -272,7 +272,7 @@ const VideoPage = () => {
             Тренировки
           </h1>
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => {
               const next = !showSearch;
@@ -282,19 +282,30 @@ const VideoPage = () => {
             className="text-white hover:text-gray-300 relative"
             aria-label="Поиск"
           >
-            <Image src="/icons/video/search.svg" alt="Поиск" width={24} height={24} />
+            {/* Чистая лупа (с ручкой) вместо иконки-кружка */}
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
             {searchQuery && (
               <span className="absolute -top-1 -right-1 bg-[#A1FF4A] rounded-full w-2 h-2" />
             )}
           </button>
           <button
             onClick={() => setShowFiltersModal(true)}
-            className="text-white hover:text-gray-300 relative"
+            className="flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-bold uppercase tracking-wide transition"
+            style={{
+              borderColor: totalActive > 0 ? '#A1FF4A' : 'rgba(255,255,255,0.18)',
+              color: totalActive > 0 ? '#A1FF4A' : '#FFFFFF',
+            }}
             aria-label="Фильтр"
           >
-            <Image src="/icons/video/Filter.svg" alt="Фильтр" width={24} height={24} />
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <line x1="4" y1="7" x2="20" y2="7" /><line x1="7" y1="12" x2="17" y2="12" /><line x1="10" y1="17" x2="14" y2="17" />
+            </svg>
+            Фильтр
             {totalActive > 0 && (
-              <span className="absolute -top-1 -right-1 bg-[#A1FF4A] text-[#060919] text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              <span className="bg-[#A1FF4A] text-[#060919] text-xs font-bold rounded-full min-w-[20px] h-5 px-1 flex items-center justify-center">
                 {totalActive}
               </span>
             )}

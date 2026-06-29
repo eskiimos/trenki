@@ -269,6 +269,18 @@ export default function CalendarPage() {
     );
   };
 
+  // День, в который атлет реально ВЫПОЛНИЛ тренировку (подсветим лаймом):
+  // выполненное расписание, завершённый день микроцикла или закрытое ДЗ тренера.
+  const hasCompletedEventOnDay = (year: number, month: number, day: number) => {
+    const checkDate = new Date(year, month, day);
+    if (scheduledWorkouts.some((w) => w.completed && isSameDay(new Date(w.date), checkDate))) return true;
+    const mc = getMicrocycleDayForDate(checkDate);
+    if (mc?.workoutSession?.status === 'COMPLETED') return true;
+    return coachAssignments.some(
+      (a) => a.status === 'COMPLETED' && isSameDay(new Date(a.dueDate), checkDate),
+    );
+  };
+
   const renderCalendar = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -300,17 +312,20 @@ export default function CalendarPage() {
       
       const isToday = isCurrentMonth && today.getDate() === i;
       
-      const hasWorkouts = hasAnyEventOnDay(year, month, i);
+      const isDone = hasCompletedEventOnDay(year, month, i);
+      const hasWorkouts = hasAnyEventOnDay(year, month, i) || isDone;
+      // Выполненный день — лайм, запланированный (без выполнения) — синий.
+      const markColor = isDone ? '#A1FF4A' : '#445CFF';
 
       days.push(
         <button
           key={i}
           onClick={() => handleDateClick(date)}
           className={`h-10 w-10 flex flex-col items-center justify-center rounded-full relative text-sm font-medium transition-colors
-            ${isSelected 
-              ? 'bg-[#445CFF] text-white' 
-              : isToday 
-                ? 'text-white' 
+            ${isSelected
+              ? 'bg-[#445CFF] text-white'
+              : isToday
+                ? 'text-white'
                 : 'text-white hover:bg-white/10'
             }
           `}
@@ -320,10 +335,10 @@ export default function CalendarPage() {
         >
           {i}
           {hasWorkouts && !isSelected && !isToday && (
-             <span className="absolute inset-0 flex items-center justify-center text-[#445CFF] font-bold">{i}</span>
+             <span className="absolute inset-0 flex items-center justify-center font-bold" style={{ color: markColor }}>{i}</span>
           )}
-          {hasWorkouts && !isSelected && !isToday && (
-            <span className="absolute bottom-1 w-1 h-1 bg-[#445CFF] rounded-full"></span>
+          {hasWorkouts && !isSelected && (!isToday || isDone) && (
+            <span className="absolute bottom-1 w-1 h-1 rounded-full" style={{ background: markColor }}></span>
           )}
         </button>
       );
@@ -562,6 +577,16 @@ export default function CalendarPage() {
             {/* Calendar Grid */}
             <div className="grid grid-cols-7 gap-1 place-items-center">
               {renderCalendar()}
+            </div>
+
+            {/* Легенда индикаторов */}
+            <div className="flex items-center justify-center gap-4 mt-3 text-[11px] text-[#AEABBB]">
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#A1FF4A' }}></span>выполнено
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#445CFF' }}></span>запланировано
+              </span>
             </div>
           </div>
         </div>
