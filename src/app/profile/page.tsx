@@ -580,9 +580,18 @@ const ProfilePage = () => {
               variant="ghost"
               size="sm"
               fullWidth
-              onClick={() => window.open('https://t.me/Mark_Kovalevskii', '_blank', 'noopener,noreferrer')}
+              onClick={() => window.open('https://t.me/trenki_support', '_blank', 'noopener,noreferrer')}
             >
-              💬 Обратная связь
+              💬 Поддержка в Telegram
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              fullWidth
+              onClick={() => window.open('https://vk.com/mark_kovalevskiy', '_blank', 'noopener,noreferrer')}
+              style={{ marginTop: 8 }}
+            >
+              🅥 Мы во ВКонтакте
             </Button>
 
             {/* Выход */}

@@ -44,6 +44,8 @@ type MicrocycleIntent = 'IN_TONE' | 'WARMUP' | 'CHARGED' | 'STRETCH' | 'TIRED';
 interface MicrocycleDay {
   dayOfWeek: number; // порядковый день цикла 1..N от weekStartDate (НЕ календарный)
   intent: MicrocycleIntent;
+  goal: string | null; // направленность/цель дня
+  modules: string[]; // названия модулей тренировки дня
   workoutSession: {
     id: string;
     status: string;
@@ -679,6 +681,9 @@ export default function CalendarPage() {
                     <div className="text-white text-sm font-semibold leading-tight">
                       Тренировка · {ws.totalVideos} модул{ws.totalVideos === 1 ? 'ь' : ws.totalVideos < 5 ? 'я' : 'ей'}
                     </div>
+                    {d.goal && (
+                      <div className="text-[#A1FF4A] text-xs font-bold mt-1">🎯 {d.goal}</div>
+                    )}
                     <div className="text-[#AEABBB] text-xs mt-1">
                       ~{ws.targetDuration} мин
                       {ws.status === 'IN_PROGRESS' && ` · в процессе (${ws.currentVideoIndex}/${ws.totalVideos})`}
@@ -687,6 +692,24 @@ export default function CalendarPage() {
                   </div>
                 </div>
               </Link>
+              {d.modules.length > 0 && (
+                <div className="mt-2 rounded-2xl p-3" style={{ background: 'rgba(174,171,187,0.06)' }}>
+                  <div
+                    className="font-overpass"
+                    style={{ color: '#AEABBB', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}
+                  >
+                    Что в тренировке
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {d.modules.map((m, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className="text-[#A1FF4A] text-xs font-bold mt-[1px]">{i + 1}</span>
+                        <span className="text-white text-xs leading-snug">{m}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {d.intent === 'STRETCH' && (
                 <div className="mt-2 rounded-2xl p-3" style={{ background: 'rgba(174,171,187,0.08)' }}>
                   <div

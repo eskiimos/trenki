@@ -15,6 +15,8 @@ import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
 import { MicrocycleStatus } from '@/generated/prisma';
 import { getEffectiveStatus } from '@/lib/microcycle/status';
+import { goalsFromStoredDays } from '@/lib/microcycle/week-plan';
+import { GOAL_LABELS } from '@/lib/training-algorithm-v3';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +45,7 @@ export async function GET(request: NextRequest) {
               targetDuration: true,
               totalVideos: true,
               currentVideoIndex: true,
+              videos: { orderBy: { order: 'asc' }, select: { video: { select: { title: true } } } },
             },
           },
         },
@@ -71,6 +74,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ microcycle: null });
   }
 
+  // Цель (направленность) каждого дня — та же ротация, что при генерации.
+  const plans = goalsFromStoredDays(
+    microcycle.days.map((d) => ({ dayOfWeek: d.dayOfWeek, intent: d.intent })),
+    microcycle.cycleNumber,
+  );
+  const goalByDay = new Map(plans.map((p) => [p.dayOfWeek, GOAL_LABELS[p.goal]?.label ?? null]));
+
   return NextResponse.json({
     microcycle: {
       id: microcycle.id,
@@ -82,7 +92,17 @@ export async function GET(request: NextRequest) {
       days: microcycle.days.map((d) => ({
         dayOfWeek: d.dayOfWeek,
         intent: d.intent,
-        workoutSession: d.workoutSession,
+        goal: goalByDay.get(d.dayOfWeek) ?? null, // направленность/цель дня
+        modules: d.workoutSession?.videos.map((v) => v.video.title) ?? [], // названия модулей
+        workoutSession: d.workoutSession
+          ? {
+              id: d.workoutSession.id,
+              status: d.workoutSession.status,
+              targetDuration: d.workoutSession.targetDuration,
+              totalVideos: d.workoutSession.totalVideos,
+              currentVideoIndex: d.workoutSession.currentVideoIndex,
+            }
+          : null,
       })),
     },
   });
