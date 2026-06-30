@@ -413,69 +413,56 @@ const ProfilePage = () => {
                 для обычного — только если уже есть >=2 аккаунтов */}
             <AccountSwitcher hideWhenSingle={!(isAdmin || userProfile?.role === 'COACH')} />
 
-            {/* Вступить в команду по коду / Покинуть команду */}
-            {athleteTeam ? (
-              <Button variant="ghost" size="sm" fullWidth onClick={handleLeaveTeam}>
-                🚪 Покинуть команду «{athleteTeam.name}»
-              </Button>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                fullWidth
-                onClick={() => {
-                  const code = prompt('Введи код приглашения');
-                  if (code?.trim()) router.push(`/join/${code.trim().toUpperCase()}`);
-                }}
-              >
-                👥 Вступить в команду
-              </Button>
-            )}
+            {/* Действия аккаунта — строки в стиле «Навигация»/«Настройки» */}
+            <div className="bg-[#060919] rounded-lg px-4">
+              {athleteTeam ? (
+                <ActionRow label={`Покинуть команду «${athleteTeam.name}»`} onClick={handleLeaveTeam} />
+              ) : (
+                <ActionRow
+                  label="Вступить в команду"
+                  onClick={() => {
+                    const code = prompt('Введи код приглашения');
+                    if (code?.trim()) router.push(`/join/${code.trim().toUpperCase()}`);
+                  }}
+                />
+              )}
+              <div className="h-[1px] bg-[#26252F]" />
+              <ActionRow
+                label="Поддержка в Telegram"
+                onClick={() => window.open('https://t.me/trenki_support', '_blank', 'noopener,noreferrer')}
+              />
+              <div className="h-[1px] bg-[#26252F]" />
+              <ActionRow
+                label="Мы во ВКонтакте"
+                onClick={() => window.open('https://vk.com/mark_kovalevskiy', '_blank', 'noopener,noreferrer')}
+              />
+            </div>
 
-            {/* Обратная связь */}
-            <Button
-              variant="ghost"
-              size="sm"
-              fullWidth
-              onClick={() => window.open('https://t.me/trenki_support', '_blank', 'noopener,noreferrer')}
-            >
-              💬 Поддержка в Telegram
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              fullWidth
-              onClick={() => window.open('https://vk.com/mark_kovalevskiy', '_blank', 'noopener,noreferrer')}
-              style={{ marginTop: 8 }}
-            >
-              🅥 Мы во ВКонтакте
-            </Button>
-
-            {/* Выход */}
-            <Button variant="ghost" size="sm" fullWidth onClick={handleLogout}>
-              🚪 Выйти
-            </Button>
+            {/* Выход — отдельной строкой, danger, без стрелки */}
+            <div className="bg-[#060919] rounded-lg px-4">
+              <ActionRow label="Выйти" danger chevron={false} onClick={handleLogout} />
+            </div>
           </div>
         </div>
 
         {/* ─── Админ ─── */}
         {isAdmin && (
-          <div className="mb-6 space-y-2">
-            <Button variant="ghost" size="sm" fullWidth onClick={() => router.push('/admin')}>
-              ⚙️ Панель администратора
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              fullWidth
-              onClick={() => {
-                router.push('/');
-                // даём главной смонтироваться, затем стартуем тур
-                setTimeout(() => startTour(), 400);
-              }}
-            >
-              🧭 Тур по приложению
-            </Button>
+          <div className="mb-6">
+            <h2 className="text-white/50 text-xs font-medium font-overpass uppercase tracking-wide mb-2 px-1">
+              Администратор
+            </h2>
+            <div className="bg-[#060919] rounded-lg px-4">
+              <ActionRow label="Панель администратора" onClick={() => router.push('/admin')} />
+              <div className="h-[1px] bg-[#26252F]" />
+              <ActionRow
+                label="Тур по приложению"
+                onClick={() => {
+                  router.push('/');
+                  // даём главной смонтироваться, затем стартуем тур
+                  setTimeout(() => startTour(), 400);
+                }}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -485,6 +472,33 @@ const ProfilePage = () => {
     </div>
   );
 };
+
+// Строка-действие в стиле секций «Навигация»/«Настройки»: текст слева + стрелка
+// справа (для destructive — danger-цвет без стрелки).
+const ActionRow = ({
+  label,
+  onClick,
+  danger = false,
+  chevron = true,
+}: {
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  chevron?: boolean;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="w-full flex justify-between items-center py-4 cursor-pointer hover:opacity-80 transition-opacity text-left"
+  >
+    <span
+      className={`text-sm font-medium font-overpass uppercase tracking-wide ${danger ? 'text-[#FF8C4A]' : 'text-white'}`}
+    >
+      {label}
+    </span>
+    {chevron && <Image src="/icons/arrow.svg" alt="" width={20} height={20} className="opacity-50" />}
+  </button>
+);
 
 // Компонент для характеристик
 const CharacteristicBar = ({ emoji, label, value }: {
