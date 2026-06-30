@@ -23,7 +23,8 @@ export default function ReferralLandingPage() {
         const d = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (d?.valid) {
-          try { localStorage.setItem('pendingReferralCode', d.code); } catch {}
+          // Кладём РУССКИЙ промокод (как на флаере); verify-code привяжет канонический.
+          try { localStorage.setItem('pendingReferralCode', d.promo || d.code); } catch {}
           setLabel(d.label || '');
           setStatus('valid');
         } else {

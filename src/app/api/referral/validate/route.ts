@@ -31,8 +31,14 @@ export async function GET(request: NextRequest) {
         { aliases: { has: raw.toLowerCase() } },
       ],
     },
-    select: { code: true, label: true },
+    select: { code: true, label: true, aliases: true },
   });
   if (!rc) return NextResponse.json({ valid: false });
-  return NextResponse.json({ valid: true, code: rc.code, label: rc.label });
+  // promo — РУССКИЙ код для подстановки в поле «Код приглашения» (как на флаере):
+  // кириллический алиас в верхнем регистре. Фолбэк — канонический code.
+  // На входе verify-code всё равно резолвит алиас → канонический, так что в БД
+  // привяжется правильный code, а юзер видит привычный русский промокод.
+  const cyrillicAlias = (rc.aliases || []).find((a) => /[а-яё]/i.test(a));
+  const promo = cyrillicAlias ? cyrillicAlias.toUpperCase() : rc.code;
+  return NextResponse.json({ valid: true, code: rc.code, label: rc.label, promo });
 }
