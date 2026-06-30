@@ -912,3 +912,18 @@ model MicrocycleDay {
   @@unique([microcycleId, dayOfWeek])
   @@map("microcycle_days")
 }
+
+// ======================================================================
+//                       НАСТРОЙКИ ПРИЛОЖЕНИЯ (key-value)
+// ======================================================================
+// Простое хранилище редактируемых из админки параметров. Сейчас — время
+// уведомлений (см. src/lib/settings.ts). value хранится строкой; парсинг и
+// дефолты — в settings.ts. Ключи: reminder.dailyTime ("HH:MM"),
+// reminder.preworkoutEarlyMin, reminder.preworkoutLateMin.
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
+}

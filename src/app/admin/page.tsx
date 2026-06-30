@@ -339,6 +339,7 @@ export default function AdminPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <NavCard href="/admin/stats" icon="📊" title="Статистика" desc="Полная аналитика" />
               <NavCard href="/admin/notifications" icon="🔔" title="Уведомления" desc="Push-рассылки" />
+              <NavCard href="/admin/reminders" icon="⏰" title="Время уведомлений" desc="Когда слать пуши (ежедн. + предтрен.)" />
             </div>
           </div>
 

@@ -1,12 +1,13 @@
 /**
  * Cron: ежедневные напоминания о тренировке по недельному циклу (C-7).
  *
- * Ставить ПОЧАСОВО (host crontab на reg.ru). Роут шлёт напоминание каждому
- * пользователю, когда у НЕГО локальные 10:00 (по User.timezone, дефолт МСК) —
- * так «по гео» без точного GPS. На каждом часе отправляются только те, у кого
- * сейчас 10:00; выходные/дни без цикла/выполненные отсеются логикой:
+ * Ставить РАЗ В МИНУТУ (host crontab на reg.ru) — время напоминания теперь с
+ * точностью до минуты и настраивается из админки (/admin/reminders, дефолт
+ * 10:00). Роут шлёт каждому юзеру, когда у НЕГО наступает это локальное время
+ * (по User.timezone, дефолт МСК) — так «по гео» без точного GPS. Дедуп по
+ * локальной дате гарантирует один пуш в день:
  *
- *   0 * * * * curl -s -H "Authorization: Bearer $CRON_SECRET" \
+ *   * * * * * curl -s -H "Authorization: Bearer $CRON_SECRET" \
  *     http://localhost:3000/api/cron/microcycle-reminders
  *
  * Логика:
@@ -29,6 +30,7 @@ import { getMicrocycleStartDate, getMicrocycleDayDate } from '@/lib/microcycle/w
 import { isReminderDueForDay } from '@/lib/microcycle/reminders';
 import { parsePrevDay, labelFor } from '@/lib/microcycle/week-plan';
 import { MicrocycleStatus } from '@/generated/prisma';
+import { getReminderSettings } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,16 +46,27 @@ export async function GET(request: NextRequest) {
 
   const startedAt = Date.now();
   const now = new Date();
-  const TARGET_HOUR = 10;
+  // Время ежедневного напоминания — из настроек (админка), дефолт 10:00.
+  const { dailyHour, dailyMinute, dailyTime } = await getReminderSettings();
+  const targetMinutes = dailyHour * 60 + dailyMinute;
   const pad = (n: number) => String(n).padStart(2, '0');
-  // Локальная дата (YYYY-MM-DD) и час в таймзоне юзера (Intl). Дефолт — МСК.
+  // Локальная дата (YYYY-MM-DD) и минуты-от-полуночи в таймзоне юзера (Intl).
+  // Дефолт — МСК (если tz битый).
   const localDateStr = (tz: string): string => {
     try { return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(now); }
     catch { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(now); }
   };
-  const localHour = (tz: string): number => {
-    try { return parseInt(new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', hour12: false }).format(now), 10); }
-    catch { return parseInt(new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Moscow', hour: '2-digit', hour12: false }).format(now), 10); }
+  const localMinuteOfDay = (tz: string): number => {
+    const read = (zone: string) => {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: zone, hour: '2-digit', minute: '2-digit', hour12: false,
+      }).formatToParts(now);
+      const h = Number(parts.find((p) => p.type === 'hour')?.value ?? '0');
+      const m = Number(parts.find((p) => p.type === 'minute')?.value ?? '0');
+      // hour12:false может дать "24" в полночь — нормализуем через %24.
+      return ((Number.isFinite(h) ? h : 0) % 24) * 60 + (Number.isFinite(m) ? m : 0);
+    };
+    try { return read(tz); } catch { return read('Europe/Moscow'); }
   };
   // UTC-дата дня цикла как YYYY-MM-DD — для сравнения с локальной датой юзера.
   const dayDateStr = (ws: Date, dow: number): string => {
@@ -110,20 +123,27 @@ export async function GET(request: NextRequest) {
   }
 
   let sent = 0;
-  let offHour = 0;      // ещё не наступили локальные 10:00
+  let offHour = 0;      // ещё не наступило локальное время напоминания
   let alreadySent = 0;  // сегодня уже слали (дедуп)
   for (const [userId, info] of dueByUser) {
-    // Шлём с локальных 10:00 и позже; дедуп по локальной дате — почасовой крон не
-    // задвоит, а пропущенный тик 10:00 догонится в тот же день (в 11:00 и т.д.).
-    if (localHour(info.tz) < TARGET_HOUR) { offHour++; continue; }
+    // Шлём, когда локальное время юзера >= целевого; дедуп по локальной дате —
+    // поминутный крон не задвоит, а пропущенный тик догонится тем же днём.
+    if (localMinuteOfDay(info.tz) < targetMinutes) { offHour++; continue; }
     if (info.lastReminderOn === info.localDate) { alreadySent++; continue; }
+
+    // Атомарно «занимаем» отправку на сегодня: при наложении двух прогонов крона
+    // (минутный тик дольше минуты) гонку выиграет только один — count===1.
+    const claim = await prisma.user.updateMany({
+      where: { id: userId, OR: [{ lastReminderOn: null }, { lastReminderOn: { not: info.localDate } }] },
+      data: { lastReminderOn: info.localDate },
+    });
+    if (claim.count !== 1) { alreadySent++; continue; }
 
     sendUserPush(userId, {
       title: info.name ? `Привет, ${info.name}! Время тренировки 💪` : 'Время тренировки 💪',
       body: `Стабильность — признак мастерства. Не забудь потренироваться — сегодня у тебя «${info.label}».`,
       url: '/calendar',
     }).catch((err) => console.error('microcycle reminder push failed', userId, err));
-    await prisma.user.update({ where: { id: userId }, data: { lastReminderOn: info.localDate } });
     sent++;
   }
 
@@ -134,7 +154,7 @@ export async function GET(request: NextRequest) {
     noDayToday,
     offHour,
     alreadySent,
-    targetHour: TARGET_HOUR,
+    targetTime: dailyTime,
     durationMs: Date.now() - startedAt,
   });
 }
