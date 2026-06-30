@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { priorityTier } from '@/lib/content-check-priority';
 
 interface GapAnalysis {
   goal: string;
@@ -126,6 +127,7 @@ export default function AdminContentCheckPage() {
   const [activeTab, setActiveTab] = useState<'priorities' | 'metadata' | 'stats'>('priorities');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [expandedGaps, setExpandedGaps] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     checkContent();
@@ -133,31 +135,46 @@ export default function AdminContentCheckPage() {
 
   const checkContent = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const response = await fetch('/api/admin/content-check');
-      const data = await response.json();
+      if (response.status === 401) {
+        setError('Сессия администратора истекла. Войдите в админку заново.');
+        setResult(null);
+        return;
+      }
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success || !data?.stats) {
+        setError(data?.error || 'Не удалось проанализировать контент. Попробуйте обновить.');
+        setResult(null);
+        return;
+      }
       setResult(data);
-    } catch (error) {
-      console.error('Error checking content:', error);
+    } catch (err) {
+      console.error('Error checking content:', err);
+      setError('Ошибка сети. Проверьте соединение и обновите.');
+      setResult(null);
     } finally {
       setIsLoading(false);
     }
   };
 
   const getPriorityColor = (priority: number) => {
-    if (priority >= 9) return 'from-red-600 to-red-800';
-    if (priority >= 7) return 'from-orange-600 to-orange-800';
+    const tier = priorityTier(priority);
+    if (tier === 'critical') return 'from-red-600 to-red-800';
+    if (tier === 'important') return 'from-orange-600 to-orange-800';
     return 'from-blue-600 to-blue-800';
   };
 
   const getPriorityBadge = (priority: number) => {
-    if (priority >= 9)
+    const tier = priorityTier(priority);
+    if (tier === 'critical')
       return (
         <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-xs font-bold">
           🔥 КРИТИЧНО
         </span>
       );
-    if (priority >= 7)
+    if (tier === 'important')
       return (
         <span className="px-3 py-1 bg-orange-500/20 text-orange-400 rounded-full text-xs font-bold">
           ⚠️ ВАЖНО
@@ -200,9 +217,7 @@ export default function AdminContentCheckPage() {
   const filteredGaps = gapsSource.filter((gap) => {
     if (goalFilter && gap.goal !== goalFilter) return false;
     if (moduleFilter && gap.moduleType !== moduleFilter) return false;
-    if (priorityFilter === 'critical' && gap.priority < 9) return false;
-    if (priorityFilter === 'important' && (gap.priority < 6 || gap.priority >= 9)) return false;
-    if (priorityFilter === 'desirable' && gap.priority >= 6) return false;
+    if (priorityFilter && priorityTier(gap.priority) !== priorityFilter) return false;
     return true;
   });
 
@@ -244,8 +259,21 @@ export default function AdminContentCheckPage() {
           </div>
         )}
 
+        {/* Error */}
+        {!isLoading && error && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-8 text-center">
+            <p className="text-red-300 font-semibold mb-4">{error}</p>
+            <button
+              onClick={checkContent}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
+            >
+              🔄 Повторить
+            </button>
+          </div>
+        )}
+
         {/* Results */}
-        {!isLoading && result && (
+        {!isLoading && !error && result && (
           <>
             {/* Tabs */}
             <div className="flex flex-wrap gap-2 mb-6">
@@ -605,151 +633,6 @@ export default function AdminContentCheckPage() {
                 </div>
               </>
             )}
-
-            {/* Top Priorities */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold">
-                  🎯 Топ-{result.topPriorities.length} приоритетов
-                </h3>
-                <button
-                  onClick={() => setShowAllGaps(!showAllGaps)}
-                  className="text-sm text-blue-400 hover:text-blue-300"
-                >
-                  {showAllGaps ? 'Скрыть все' : `Показать все (${result.allGaps.length})`}
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                <select
-                  value={goalFilter}
-                  onChange={(e) => setGoalFilter(e.target.value)}
-                  className="bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                >
-                  <option value="">Все цели</option>
-                  {Object.keys(result.stats.byGoal).map((goal) => (
-                    <option key={goal} value={goal}>
-                      {GOAL_LABELS[goal] || goal}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={moduleFilter}
-                  onChange={(e) => setModuleFilter(e.target.value)}
-                  className="bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                >
-                  <option value="">Все модули</option>
-                  {Object.keys(MODULE_LABELS).map((moduleType) => (
-                    <option key={moduleType} value={moduleType}>
-                      {MODULE_LABELS[moduleType]}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={priorityFilter}
-                  onChange={(e) => setPriorityFilter(e.target.value)}
-                  className="bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                >
-                  <option value="">Все приоритеты</option>
-                  <option value="critical">🔥 Критично</option>
-                  <option value="important">⚠️ Важно</option>
-                  <option value="desirable">💡 Желательно</option>
-                </select>
-              </div>
-
-              <div className="space-y-4">
-                {filteredGaps.map((gap, index) => (
-                  <div
-                    key={index}
-                    className={`bg-gradient-to-r ${getPriorityColor(gap.priority)} rounded-lg p-6`}
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2 flex-wrap">
-                          <h4 className="text-lg font-bold">
-                            {MODULE_LABELS[gap.moduleType] || gap.moduleType}
-                          </h4>
-                          {getPriorityBadge(gap.priority)}
-                          <span className="px-3 py-1 bg-black/30 rounded-full text-xs font-medium">
-                            {gap.currentCount}/{gap.recommendedCount} видео
-                          </span>
-                          <span className="px-3 py-1 bg-black/30 rounded-full text-xs font-medium">
-                            {GOAL_LABELS[gap.goal] || gap.goal}
-                          </span>
-                        </div>
-
-                        <div className="space-y-2 mb-3">
-                          <div className="flex items-center gap-2 text-sm">
-                            <span className="text-white/60">Тип нагрузки:</span>
-                            <span className="font-medium">
-                              {LOAD_TYPE_LABELS[gap.loadType] || gap.loadType}
-                            </span>
-                          </div>
-
-                          {gap.muscleGroup && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <span className="text-white/60">Мышечная группа:</span>
-                              <span className="font-medium">
-                                {MUSCLE_GROUP_LABELS[gap.muscleGroup] || gap.muscleGroup}
-                              </span>
-                            </div>
-                          )}
-
-                          {gap.ageGroup && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <span className="text-white/60">Возраст:</span>
-                              <span className="font-medium">
-                                {AGE_GROUP_LABELS[gap.ageGroup] || gap.ageGroup}
-                              </span>
-                            </div>
-                          )}
-
-                          {gap.complexity && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <span className="text-white/60">Сложность:</span>
-                              <span className="font-medium">
-                                {COMPLEXITY_LABELS[gap.complexity] || gap.complexity}
-                              </span>
-                            </div>
-                          )}
-
-                          {gap.energyState && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <span className="text-white/60">Состояние:</span>
-                              <span className="font-medium">
-                                {ENERGY_LABELS[gap.energyState] || gap.energyState}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        <p className="text-sm text-white/90 bg-black/20 rounded p-3">
-                          💡 {gap.reason}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="w-full bg-black/30 rounded-full h-2 mb-3">
-                      <div
-                        className="bg-white h-2 rounded-full transition-all"
-                        style={{
-                          width: `${Math.min(
-                            (gap.currentCount / gap.recommendedCount) * 100,
-                            100
-                          )}%`,
-                        }}
-                      />
-                    </div>
-
-                    {/* Priority Number */}
-                    <div className="text-right text-xs text-white/60">
-                      Приоритет: {gap.priority}/10
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
 
             {/* Quick Actions */}
             <div className="bg-[#1a1f3a] rounded-lg p-6 mt-6">

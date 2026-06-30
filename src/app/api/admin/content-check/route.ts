@@ -17,6 +17,7 @@ import {
 } from '@/lib/training-algorithm-v3';
 
 import { requireAdminAsync } from '@/lib/admin-session';
+import { priorityTier } from '@/lib/content-check-priority';
 
 /**
  * GET /api/admin/content-check
@@ -344,9 +345,9 @@ export async function GET(request: NextRequest) {
         v.ageGroups && v.ageGroups.length > 0 &&
         v.trainingGoals && v.trainingGoals.length > 0
       ).length,
-      criticalGaps: gaps.filter((g) => g.priority >= 9).length,
-      importantGaps: gaps.filter((g) => g.priority >= 6 && g.priority < 9).length,
-      desirableGaps: gaps.filter((g) => g.priority < 6).length,
+      criticalGaps: gaps.filter((g) => priorityTier(g.priority) === 'critical').length,
+      importantGaps: gaps.filter((g) => priorityTier(g.priority) === 'important').length,
+      desirableGaps: gaps.filter((g) => priorityTier(g.priority) === 'desirable').length,
     };
 
     return NextResponse.json({
