@@ -71,20 +71,20 @@ export async function POST(request: NextRequest) {
 
     const { firstName, lastName, username, profile, email } = body;
 
-    // Валидация имени/фамилии: только буквы и дефис, ограничение длины.
+    // Валидация имени/фамилии: только кириллица + дефис, минимум 2 буквы.
     // Защита от обхода клиентской маски — не доверяем телу запроса.
     // Не-строковые значения тоже отбиваем чистым 400 (иначе Prisma даст 500).
     if (firstName !== undefined && firstName !== null &&
-        (typeof firstName !== 'string' || (firstName.length > 0 && !isValidName(firstName, NAME_MAX_FIRST)))) {
+        (typeof firstName !== 'string' || !isValidName(firstName, NAME_MAX_FIRST))) {
       return NextResponse.json(
-        { error: 'Имя: разрешены только буквы и дефис, до 10 символов' },
+        { error: 'Имя: только кириллица, минимум 2 символа' },
         { status: 400 },
       );
     }
     if (lastName !== undefined && lastName !== null &&
-        (typeof lastName !== 'string' || (lastName.length > 0 && !isValidName(lastName, NAME_MAX_LAST)))) {
+        (typeof lastName !== 'string' || !isValidName(lastName, NAME_MAX_LAST))) {
       return NextResponse.json(
-        { error: 'Фамилия: разрешены только буквы и дефис, до 15 символов' },
+        { error: 'Фамилия: только кириллица, минимум 2 символа' },
         { status: 400 },
       );
     }

@@ -5,24 +5,24 @@
 export const NAME_MAX_FIRST = 10; // имя
 export const NAME_MAX_LAST = 15; // фамилия
 
-// Разрешены только буквы (латиница + кириллица, включая Ёё) и дефис.
-// А-Я не включает Ё, поэтому Ёё добавлены явно.
-const DISALLOWED_NAME_CHARS = /[^A-Za-zА-Яа-яЁё-]/g;
-const VALID_NAME = /^[A-Za-zА-Яа-яЁё-]*$/;
+// Разрешена ТОЛЬКО кириллица (включая Ёё) и дефис (для составных фамилий).
+// А-Я не включает Ё, поэтому Ёё добавлены явно. Латиница/цифры/пробелы — нельзя.
+const DISALLOWED_NAME_CHARS = /[^А-Яа-яЁё-]/g;
+const VALID_NAME = /^[А-Яа-яЁё-]*$/;
 
-/** Убирает запрещённые символы и обрезает до max длины. Для onChange и загрузки формы. */
+/** Убирает всё кроме кириллицы и дефиса, обрезает до max. Для onChange и загрузки формы. */
 export function sanitizeName(value: string, max: number): string {
   return value.replace(DISALLOWED_NAME_CHARS, '').slice(0, max);
 }
 
-// Хотя бы одна буква — чтобы не проходили имена из одних дефисов ('-', '--').
-const HAS_LETTER = /[A-Za-zА-Яа-яЁё]/;
+// Минимум 2 кириллические буквы — чтобы не проходили '', '-', 'А', 'А-' и т.п.
+export const NAME_MIN_LETTERS = 2;
+const CYRILLIC_LETTER = /[А-Яа-яЁё]/g;
 
-/** Формат и длина корректны. Пустая строка допустима (имя не обязательно),
- *  но непустое значение должно содержать хотя бы одну букву. */
+/** Корректно: только кириллица/дефис, длина ≤ max и не менее 2 кириллических букв. */
 export function isValidName(value: string, max: number): boolean {
   if (value.length > max || !VALID_NAME.test(value)) return false;
-  return value.length === 0 || HAS_LETTER.test(value);
+  return (value.match(CYRILLIC_LETTER) || []).length >= NAME_MIN_LETTERS;
 }
 
 /** Маска ввода игрового номера: только цифры, без ведущих нулей, максимум 2. */

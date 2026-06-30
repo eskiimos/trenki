@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { getTelegramId } from '@/lib/auth';
 import { Button } from '@/components/ui';
+import { sanitizeName, isValidName, NAME_MAX_FIRST, NAME_MAX_LAST } from '@/lib/profile-validation';
 
 export default function OnboardingProfilePage() {
   const router = useRouter();
@@ -34,10 +35,10 @@ export default function OnboardingProfilePage() {
     checkAuth();
   }, [router]);
 
-  const isFormValid = 
-    firstName.trim() !== '' && 
-    lastName.trim() !== '' && 
-    birthDate.trim() !== '' && 
+  const isFormValid =
+    isValidName(firstName, NAME_MAX_FIRST) &&
+    isValidName(lastName, NAME_MAX_LAST) &&
+    birthDate.trim() !== '' &&
     selectedGender !== null &&
     ageConfirmed;
 
@@ -140,9 +141,10 @@ export default function OnboardingProfilePage() {
               <label className="text-white text-sm mb-2 block">ИМЯ</label>
               <input
                 type="text"
+                inputMode="text"
                 placeholder="Имя"
                 value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
+                onChange={(e) => setFirstName(sanitizeName(e.target.value, NAME_MAX_FIRST))}
                 className="w-full text-white placeholder-gray-400 px-4 border focus:outline-none transition-colors"
                 style={{
                   background: '#AEABBB33',
@@ -153,15 +155,19 @@ export default function OnboardingProfilePage() {
                 onFocus={(e) => (e.target.style.border = '1px solid #A1FF4A')}
                 onBlur={(e) => (e.target.style.border = '1px solid transparent')}
               />
+              {firstName.length > 0 && !isValidName(firstName, NAME_MAX_FIRST) && (
+                <p className="text-[#FF6B6B] text-xs mt-1 ml-1">Только кириллица, минимум 2 буквы</p>
+              )}
             </div>
 
             {/* Фамилия */}
             <div>
               <input
                 type="text"
+                inputMode="text"
                 placeholder="Фамилия"
                 value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
+                onChange={(e) => setLastName(sanitizeName(e.target.value, NAME_MAX_LAST))}
                 className="w-full text-white placeholder-gray-400 px-4 border focus:outline-none transition-colors"
                 style={{
                   background: '#AEABBB33',
@@ -172,6 +178,9 @@ export default function OnboardingProfilePage() {
                 onFocus={(e) => (e.target.style.border = '1px solid #A1FF4A')}
                 onBlur={(e) => (e.target.style.border = '1px solid transparent')}
               />
+              {lastName.length > 0 && !isValidName(lastName, NAME_MAX_LAST) && (
+                <p className="text-[#FF6B6B] text-xs mt-1 ml-1">Только кириллица, минимум 2 буквы</p>
+              )}
             </div>
 
             {/* Дата рождения */}

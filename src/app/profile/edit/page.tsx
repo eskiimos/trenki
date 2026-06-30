@@ -11,6 +11,7 @@ import { apiCache } from '@/lib/cache';
 import ImageCropper from '@/components/ImageCropper';
 import {
   sanitizeName,
+  isValidName,
   sanitizeNumberInput,
   NAME_MAX_FIRST,
   NAME_MAX_LAST,
@@ -485,6 +486,9 @@ const ProfileEditPage = () => {
             onFocus={(e) => (e.target.style.border = '1px solid #A1FF4A')}
             onBlur={(e) => (e.target.style.border = '1px solid transparent')}
           />
+          {formData.firstName.length > 0 && !isValidName(formData.firstName, NAME_MAX_FIRST) && (
+            <p className="text-[#FF6B6B] text-xs mt-1 ml-1">Только кириллица, минимум 2 буквы</p>
+          )}
         </div>
 
         {/* Фамилия */}
@@ -505,6 +509,9 @@ const ProfileEditPage = () => {
             onFocus={(e) => (e.target.style.border = '1px solid #A1FF4A')}
             onBlur={(e) => (e.target.style.border = '1px solid transparent')}
           />
+          {formData.lastName.length > 0 && !isValidName(formData.lastName, NAME_MAX_LAST) && (
+            <p className="text-[#FF6B6B] text-xs mt-1 ml-1">Только кириллица, минимум 2 буквы</p>
+          )}
         </div>
 
         {/* Дата рождения */}
@@ -844,8 +851,12 @@ const ProfileEditPage = () => {
         {/* Кнопка сохранения */}
         <button
           onClick={handleSubmit}
-          disabled={isSaving}
-          className="w-full py-3 rounded-full font-bold uppercase transition-all mt-6"
+          disabled={
+            isSaving ||
+            !isValidName(formData.firstName, NAME_MAX_FIRST) ||
+            !isValidName(formData.lastName, NAME_MAX_LAST)
+          }
+          className="w-full py-3 rounded-full font-bold uppercase transition-all mt-6 disabled:opacity-60"
           style={{
             background: isSaving ? '#AEABBB66' : '#A1FF4A',
             color: isSaving ? '#AEABBB' : '#060919',

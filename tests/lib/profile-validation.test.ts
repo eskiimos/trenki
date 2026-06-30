@@ -17,14 +17,15 @@ import {
 } from '@/lib/profile-validation';
 
 describe('sanitizeName', () => {
-  it('оставляет буквы (латиница + кириллица) и дефис', () => {
-    expect(sanitizeName('Иван-Петр', NAME_MAX_FIRST)).toBe('Иван-Петр');
-    expect(sanitizeName('Anna-Maria', NAME_MAX_LAST)).toBe('Anna-Maria');
+  it('оставляет кириллицу и дефис, латиницу убирает', () => {
+    expect(sanitizeName('Иван-Пётр', NAME_MAX_LAST)).toBe('Иван-Пётр');
+    expect(sanitizeName('Anna-Maria', NAME_MAX_LAST)).toBe('-'); // латиница вырезана, остаётся дефис
+    expect(sanitizeName('Bob', NAME_MAX_LAST)).toBe('');
   });
 
-  it('вырезает цифры, пробелы и спецсимволы', () => {
+  it('вырезает цифры, пробелы, спецсимволы и латиницу', () => {
     expect(sanitizeName('Ив4ан Пе!тр', NAME_MAX_LAST)).toBe('ИванПетр');
-    expect(sanitizeName('O’Brien 99', NAME_MAX_LAST)).toBe('OBrien');
+    expect(sanitizeName('O’Brien 99', NAME_MAX_LAST)).toBe('');
   });
 
   it('сохраняет Ёё', () => {
@@ -39,10 +40,13 @@ describe('sanitizeName', () => {
 });
 
 describe('isValidName', () => {
-  it('принимает валидные имена и пустую строку', () => {
-    expect(isValidName('', NAME_MAX_FIRST)).toBe(true);
+  it('принимает кириллицу ≥2 букв, отклоняет пустую/латиницу/1 букву', () => {
     expect(isValidName('Иван', NAME_MAX_FIRST)).toBe(true);
+    expect(isValidName('Ян', NAME_MAX_FIRST)).toBe(true);
     expect(isValidName('Анна-Мария', NAME_MAX_LAST)).toBe(true);
+    expect(isValidName('', NAME_MAX_FIRST)).toBe(false);
+    expect(isValidName('Я', NAME_MAX_FIRST)).toBe(false);
+    expect(isValidName('Bob', NAME_MAX_FIRST)).toBe(false);
   });
 
   it('отклоняет пробелы, цифры и превышение длины', () => {
