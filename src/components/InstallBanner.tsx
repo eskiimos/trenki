@@ -10,6 +10,11 @@ import {
   subscribeDeferredPrompt,
   promptInstall,
 } from '@/lib/platform';
+import {
+  subscribeBanners,
+  highestActivePriority,
+  BANNER_PRIORITY,
+} from '@/lib/bottom-banner-registry';
 
 // Баннер «установить на экран Домой». Показывается ТОЛЬКО на главной, адаптивно:
 // - Android/Chromium (есть beforeinstallprompt) → кнопка нативной установки;
@@ -25,6 +30,14 @@ type Mode = 'android' | 'ios' | 'inapp';
 
 export default function InstallBanner() {
   const [mode, setMode] = useState<Mode | null>(null);
+  // Уступаем важным нижним баннерам (напр. напоминанию о тренировке): пока висит
+  // кто-то приоритетнее — install молчит, чтобы не налезать.
+  const [blocked, setBlocked] = useState(false);
+  useEffect(() => {
+    const check = () => setBlocked(highestActivePriority('install') > BANNER_PRIORITY.install);
+    check();
+    return subscribeBanners(check);
+  }, []);
 
   useEffect(() => {
     if (isStandalone()) return; // уже в приложении
@@ -69,7 +82,7 @@ export default function InstallBanner() {
     if (ok) setMode(null);
   };
 
-  if (!mode) return null;
+  if (!mode || blocked) return null;
 
   return (
     <div

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { registerBanner, BANNER_PRIORITY } from '@/lib/bottom-banner-registry';
 
 interface WorkoutData {
   id: string;
@@ -66,6 +67,14 @@ export default function WorkoutReminder() {
 
     fetchCurrentWorkout();
   }, []);
+
+  // Пока напоминание видимо — регистрируем его как активный нижний баннер,
+  // чтобы менее важные (install) не налезали снизу.
+  const visible = !isLoading && !!workout;
+  useEffect(() => {
+    if (!visible) return;
+    return registerBanner('workout-reminder', BANNER_PRIORITY.workoutReminder);
+  }, [visible]);
 
   if (isLoading || !workout) return null;
 
