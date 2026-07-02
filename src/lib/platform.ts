@@ -18,8 +18,9 @@ export function isStandalone(): boolean {
 }
 
 const IOS_RE = /iPhone|iPad|iPod/i;
-// Встроенные вебвью, где установка на «Домой» недоступна.
-const INAPP_RE = /Instagram|FBAN|FBAV|FB_IAB|VKClient|VKAndroidApp|OKApp|Line\//i;
+// Встроенные вебвью, где установка на «Домой» недоступна. Telegram не всегда
+// добавляет свой токен в UA — ловим когда есть, иначе (редко) баннер промолчит.
+const INAPP_RE = /Instagram|FBAN|FBAV|FB_IAB|VKClient|VKAndroidApp|OKApp|Telegram|Line\//i;
 // iOS-браузеры НЕ Safari (у них тоже нет установки, но подсказку про «Поделиться» не даём).
 const IOS_NON_SAFARI_RE = /CriOS|FxiOS|EdgiOS|OPiOS|YaBrowser/i;
 
@@ -39,7 +40,9 @@ export function isInAppBrowser(): boolean {
 }
 
 export function isIOSSafari(): boolean {
-  return isIOS() && !IOS_NON_SAFARI_RE.test(navigator.userAgent || '');
+  // Именно Safari: не сторонний iOS-браузер и не встроенный вебвью (у них нет
+  // «Поделиться → На экран „Домой“»).
+  return isIOS() && !IOS_NON_SAFARI_RE.test(navigator.userAgent || '') && !isInAppBrowser();
 }
 
 // ── Захват beforeinstallprompt (Android/Chromium). Слушатель ставим при импорте

@@ -39,13 +39,20 @@ export default function InstallBanner() {
 
     const decide = () => {
       if (getDeferredPrompt()) setMode('android');
+      else if (isInAppBrowser()) setMode('inapp'); // вебвью раньше iOS Safari
       else if (isIOSSafari()) setMode('ios');
-      else if (isInAppBrowser()) setMode('inapp');
       // Android до прихода beforeinstallprompt / desktop / iOS-не-Safari — ждём или молчим.
     };
     decide();
     // beforeinstallprompt может прийти чуть позже — переоценим по событию.
-    return subscribeDeferredPrompt(decide);
+    // appinstalled (в т.ч. установка через меню браузера) — прячем баннер.
+    const onInstalled = () => setMode(null);
+    window.addEventListener('appinstalled', onInstalled);
+    const unsub = subscribeDeferredPrompt(decide);
+    return () => {
+      unsub();
+      window.removeEventListener('appinstalled', onInstalled);
+    };
   }, []);
 
   const dismiss = () => {
