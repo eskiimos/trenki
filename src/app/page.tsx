@@ -9,6 +9,7 @@ import { useTelegram } from '../hooks/useTelegram';
 import { apiCache } from '../lib/cache';
 import { getTelegramId } from '@/lib/auth';
 import BottomNavigation from '@/components/BottomNavigation';
+import InstallBanner from '@/components/InstallBanner';
 import WorkoutReminder from '@/components/WorkoutReminder';
 import AssignmentsBanner from '@/components/AssignmentsBanner';
 import MicrocycleFeedbackModal from '@/components/MicrocycleFeedbackModal';
@@ -209,6 +210,9 @@ const HomePage = () => {
       
       {/* Нижнее меню */}
       <BottomNavigation activeTab="home" />
+
+      {/* Баннер установки на «Домой» (адаптивно; закрывается на 7 дней) */}
+      <InstallBanner />
 
       {/* Опрос после микроцикла */}
       {pendingFeedbackCycle && !feedbackModalDismissed && (

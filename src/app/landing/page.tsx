@@ -259,6 +259,7 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-wrap items-center gap-3" style={{ marginTop: 28 }}>
               <Link href="/login" className="lp-cta font-overpass uppercase" style={ctaStyle}>Начать бесплатно</Link>
+              <a href="#install" className="font-overpass uppercase lp-ghost" style={{ color: '#F9F8FE', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 999, padding: '16px 26px', fontWeight: 800, fontSize: 14 }}>Как установить</a>
               <a href="#features" className="font-overpass uppercase lp-ghost" style={{ color: '#F9F8FE', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 999, padding: '16px 26px', fontWeight: 800, fontSize: 14 }}>Смотреть фичи</a>
             </div>
             <div className="font-overpass" style={{ color: '#8C8A99', fontSize: 12, marginTop: 16 }}>Бесплатный старт · Без банковской карты · Работает в браузере</div>
