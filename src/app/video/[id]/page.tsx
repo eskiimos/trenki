@@ -63,12 +63,13 @@ interface VideoData {
 const POS_PREFIX = 'video_pos_';
 const posKey = (id: string) => POS_PREFIX + id;
 
-function saveVideoPosition(id: string, t: number, d: number, creditPercent: number) {
+function saveVideoPosition(id: string, t: number, d: number, endEpsilonSec: number) {
   try {
     if (!id || !d || isNaN(d) || isNaN(t)) return;
-    // Не храним: вступление (t<5) ИЛИ позицию за порогом зачёта — иначе
-    // возобновление с >=порога давало бы мгновенный/повторный зачёт потенциала.
-    if (t < 5 || t >= d * (creditPercent / 100)) {
+    // Не храним: вступление (t<5) ИЛИ позицию у самого конца (в пределах
+    // endEpsilonSec) — иначе возобновление у конца давало бы мгновенный/повторный
+    // зачёт потенциала.
+    if (t < 5 || t >= d - endEpsilonSec) {
       localStorage.removeItem(posKey(id));
       return;
     }
@@ -133,9 +134,11 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [watchMode, setWatchMode] = useState<'training' | 'test'>('training');
   const canSeek = !fromWorkout && watchMode === 'test';
   const canSeekRef = useRef(false); // зеркало canSeek для хоткеев без stale-стейта
-  // % просмотра для зачёта. Раньше было 99% + зависимость от onEnded → на Android
-  // (ребуфер/уход в фон в конце ролика) видео часто «не считалось».
-  const WATCH_CREDIT_PERCENT = 90;
+  // Завершение/зачёт — по РЕАЛЬНОМУ концу ролика: когда до конца осталось ≤ этого.
+  // onEnded — основной путь (100%), а near-end порог — страховка для Android, где
+  // onEnded в конце часто не приходит (ребуфер/уход в фон). Раньше стоял 90% → видео
+  // обрывалось за ~10% до конца (баг «правой отпрыгали, а левая 5 секунд и вылетает»).
+  const END_EPSILON_SEC = 0.5;
 
   // Состояние для скачивания видео
   const [isDownloaded, setIsDownloaded] = useState(false);
@@ -304,10 +307,8 @@ export default function VideoPage({ params }: VideoPageProps) {
   // Отслеживание прогресса просмотра видео
   const handleVideoProgress = useCallback(async (currentTime: number, duration: number) => {
     if (!duration) return;
-    
-    const progressPercent = (currentTime / duration) * 100;
-    
-    // Для тренировки - отправляем прогресс и проверяем 90%
+
+    // Для тренировки — прогресс каждые 5с + завершение по РЕАЛЬНОМУ концу.
     if (fromWorkout && sessionId && videoId) {
       // Отправляем обновление прогресса каждые 5 секунд
       const now = Date.now();
@@ -330,10 +331,11 @@ export default function VideoPage({ params }: VideoPageProps) {
         }
       }
 
-      // Завершаем видео по достижении порога ИЛИ по onEnded (что раньше).
-      // Раньше зависели ТОЛЬКО от onEnded — а он на Android часто не приходит
-      // (ребуфер/уход в фон в конце ролика) → видео не засчитывалось.
-      if (!videoCompletedRef.current && progressPercent >= WATCH_CREDIT_PERCENT) {
+      // Завершаем/засчитываем ТОЛЬКО когда ролик доигран до конца (зачёт на 100%).
+      // onEnded (handleVideoEnded) — основной путь; этот near-end тик — страховка
+      // для Android, где onEnded в конце часто не приходит. Оба латчатся одним
+      // videoCompletedRef, чтобы не задвоить complete/переход.
+      if (!videoCompletedRef.current && currentTime >= duration - END_EPSILON_SEC) {
         videoCompletedRef.current = true; // оптимистично — против дублей на соседних тиках
         const ok = await completeVideoInWorkout();
         // При сбое (сеть/не-ok) снимаем флаг: даём onEnded и следующим тикам повторить.
@@ -345,7 +347,7 @@ export default function VideoPage({ params }: VideoPageProps) {
     // (просмотр уже записан в историю на старте, record-watch). Флаг латчим
     // только когда реально пытались начислить, иначе test→training терял бы зачёт.
     else if (!fromWorkout && videoId) {
-      if (!gainsCreditedRef.current && watchMode === 'training' && progressPercent >= WATCH_CREDIT_PERCENT) {
+      if (!gainsCreditedRef.current && watchMode === 'training' && currentTime >= duration - END_EPSILON_SEC) {
         gainsCreditedRef.current = true; // оптимистично — против дублей
         const ok = await creditGainsForWatching();
         if (!ok) gainsCreditedRef.current = false; // при сбое — повтор на следующем тике
@@ -987,14 +989,26 @@ export default function VideoPage({ params }: VideoPageProps) {
     setIsBuffering(false);
     clearVideoPosition(videoId); // O-3: досмотрено — не возобновляем с конца
 
-    // Завершаем видео в тренировке, если ещё не завершено
-    if (fromWorkout && sessionId && !videoCompletedRef.current) {
-      videoCompletedRef.current = true;
-      const ok = await completeVideoInWorkout();
-      if (!ok) videoCompletedRef.current = false; // сбой — позволяем повторить
-      return; // Не запускаем autoplay, возвращаемся к тренировке
+    // В тренировке всегда выходим к странице тренировки БЕЗ превью следующего.
+    // (near-end тик мог уже завершить видео и запланировать переход — тогда просто
+    // выходим, не мигая рекомендацией; иначе — завершаем здесь.)
+    if (fromWorkout && sessionId) {
+      if (!videoCompletedRef.current) {
+        videoCompletedRef.current = true;
+        const ok = await completeVideoInWorkout();
+        if (!ok) videoCompletedRef.current = false; // сбой — позволяем повторить
+      }
+      return;
     }
-    
+
+    // Свободный просмотр: зачёт потенциала по РЕАЛЬНОМУ концу (страховка к near-end
+    // тику в handleVideoProgress; латч gainsCreditedRef защищает от дубля).
+    if (!fromWorkout && videoId && !gainsCreditedRef.current && watchMode === 'training') {
+      gainsCreditedRef.current = true;
+      const ok = await creditGainsForWatching();
+      if (!ok) gainsCreditedRef.current = false;
+    }
+
     // Автоплея нет: в конце просто показываем рекомендацию следующего видео
     // (обложка + название, без воспроизведения). Переход — по тапу.
     if (nextVideo) {
@@ -1334,7 +1348,7 @@ export default function VideoPage({ params }: VideoPageProps) {
                     const nowTs = Date.now();
                     if (nowTs - lastPosSaveRef.current > 5000) {
                       lastPosSaveRef.current = nowTs;
-                      saveVideoPosition(videoId, video.currentTime, video.duration, WATCH_CREDIT_PERCENT);
+                      saveVideoPosition(videoId, video.currentTime, video.duration, END_EPSILON_SEC);
                     }
                   }
 
@@ -1379,13 +1393,15 @@ export default function VideoPage({ params }: VideoPageProps) {
                   // (до автостарта). Флаг ставим ТОЛЬКО когда duration уже известна —
                   // иначе ранний canPlay с duration=0/NaN (Android) «съел» бы
                   // единственный resume; повторные canPlay (ребуфер) отсекаются им же.
-                  // Сохранённая позиция всегда НИЖЕ порога зачёта (saveVideoPosition
-                  // не пишет >=порога), поэтому мгновенного/повторного зачёта от
-                  // resume нет — зачёт начисляет обычный тик при достижении 90%.
+                  // Сохранённая позиция всегда НИЖЕ near-end порога (saveVideoPosition
+                  // не пишет позицию у самого конца), поэтому мгновенного/повторного
+                  // зачёта от resume нет — зачёт начисляется по реальному концу.
+                  // Порог восстановления тот же END_EPSILON_SEC, что и у сохранения,
+                  // иначе была бы мёртвая зона [d-1, d-eps) «сохранили, но не вернули».
                   if (!resumeAppliedRef.current && !fromWorkout && video.duration && !isNaN(video.duration)) {
                     resumeAppliedRef.current = true;
                     const saved = loadVideoPosition(videoId);
-                    if (saved !== null && saved >= 5 && saved < video.duration - 1) {
+                    if (saved !== null && saved >= 5 && saved < video.duration - END_EPSILON_SEC) {
                       video.currentTime = saved;
                     }
                   }
