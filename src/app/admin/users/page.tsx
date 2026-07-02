@@ -68,6 +68,11 @@ export default function AdminUsersPage() {
   const [updatedUserIds, setUpdatedUserIds] = useState<Set<string>>(new Set());
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isDeletingUserId, setIsDeletingUserId] = useState<string | null>(null);
+  // Пикер реф-канала (выбор из существующих кодов)
+  const [refCodes, setRefCodes] = useState<Array<{ code: string; label: string; isActive: boolean }>>([]);
+  const [refPickerUser, setRefPickerUser] = useState<User | null>(null);
+  const [refPickerValue, setRefPickerValue] = useState('');
+  const [refSaving, setRefSaving] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -84,6 +89,24 @@ export default function AdminUsersPage() {
       if (interval) clearInterval(interval);
     };
   }, [isLive]);
+
+  // Список реф-кодов для выпадающего пикера (один раз).
+  useEffect(() => {
+    fetch('/api/admin/referrals')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (Array.isArray(d?.codes)) {
+          setRefCodes(
+            d.codes.map((c: { code: string; label: string; isActive: boolean }) => ({
+              code: c.code,
+              label: c.label,
+              isActive: c.isActive,
+            })),
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const fetchUsers = async (silent = false) => {
     try {
@@ -194,20 +217,21 @@ export default function AdminUsersPage() {
   };
 
   // Ручная привязка юзера к реф-каналу (напр. подвязать существующего под тренера).
-  // Принимает канонический код ИЛИ алиас (в т.ч. кириллицу); пусто — снять привязку.
-  const handleSetReferral = async (user: User) => {
-    const input = window.prompt(
-      `Реф-код канала для ${user.firstName || user.telegramId} (пусто — снять):`,
-      user.referralCode || '',
-    );
-    if (input == null) return;
-    const referralCode = input.trim();
+  // Открывает пикер с выпадающим списком существующих реф-кодов.
+  const handleSetReferral = (user: User) => {
+    setRefPickerValue(user.referralCode || '');
+    setRefPickerUser(user);
+  };
 
+  // Сохранение выбора из пикера. Пусто — снять привязку (null).
+  const submitReferral = async () => {
+    if (!refPickerUser) return;
+    setRefSaving(true);
     try {
-      const res = await fetch(`/api/admin/users/${user.id}/referral`, {
+      const res = await fetch(`/api/admin/users/${refPickerUser.id}/referral`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ referralCode }),
+        body: JSON.stringify({ referralCode: refPickerValue }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -215,14 +239,16 @@ export default function AdminUsersPage() {
         return;
       }
       const nextCode: string | null = data?.referralCode ?? null;
-      setUsers(prev => prev.map(u => (u.id === user.id ? { ...u, referralCode: nextCode } : u)));
-      if (selectedUser?.id === user.id) {
+      setUsers(prev => prev.map(u => (u.id === refPickerUser.id ? { ...u, referralCode: nextCode } : u)));
+      if (selectedUser?.id === refPickerUser.id) {
         setSelectedUser({ ...selectedUser, referralCode: nextCode });
       }
-      alert(nextCode ? `Привязан к каналу «${data?.label || nextCode}»` : 'Реф-код снят');
+      setRefPickerUser(null);
     } catch (e) {
       console.error('set referral failed', e);
       alert('Сетевая ошибка');
+    } finally {
+      setRefSaving(false);
     }
   };
 
@@ -779,6 +805,53 @@ export default function AdminUsersPage() {
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Пикер реф-канала: выбор из существующих промокодов (выпадающий список) */}
+        {refPickerUser && (
+          <div
+            className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4"
+            onClick={() => !refSaving && setRefPickerUser(null)}
+          >
+            <div
+              className="bg-[#1a1f3a] rounded-lg w-full max-w-sm p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-bold text-white mb-1">Реф-канал</h3>
+              <p className="text-sm text-gray-400 mb-4 truncate">
+                {refPickerUser.firstName || refPickerUser.email || refPickerUser.telegramId}
+              </p>
+              <select
+                value={refPickerValue}
+                onChange={(e) => setRefPickerValue(e.target.value)}
+                disabled={refSaving}
+                className="w-full bg-[#0f1428] border border-gray-700 rounded-lg px-3 py-3 text-white mb-4 focus:outline-none focus:border-[#A1FF4A]"
+              >
+                <option value="">— без канала —</option>
+                {refCodes.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.label} ({c.code}){c.isActive ? '' : ' · неактивен'}
+                  </option>
+                ))}
+              </select>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setRefPickerUser(null)}
+                  disabled={refSaving}
+                  className="px-4 py-2 rounded-lg bg-[#2d3448] text-gray-300 hover:bg-[#3a4255] text-sm disabled:opacity-50"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={submitReferral}
+                  disabled={refSaving}
+                  className="px-4 py-2 rounded-lg bg-[#A1FF4A]/20 text-[#A1FF4A] hover:bg-[#A1FF4A]/30 text-sm font-medium disabled:opacity-50"
+                >
+                  {refSaving ? 'Сохраняю…' : 'Сохранить'}
+                </button>
               </div>
             </div>
           </div>
