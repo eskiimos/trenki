@@ -57,6 +57,22 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [videoUrl, setVideoUrl] = useState<string>('');
 
+  // Оптимистичный лайк: сердце/счётчик реагируют на тап МГНОВЕННО, не завися от
+  // virtual-кэша Swiper и от того, успел ли родитель обновить массив. Ресид при
+  // смене шортса и при подтверждении/откате родителем (по props short.*).
+  const [likedLocal, setLikedLocal] = useState(!!short.isLiked);
+  const [likesLocal, setLikesLocal] = useState(short.likesCount);
+  useEffect(() => {
+    setLikedLocal(!!short.isLiked);
+    setLikesLocal(short.likesCount);
+  }, [short.id, short.isLiked, short.likesCount]);
+  const handleLikeTap = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setLikedLocal((v) => !v);
+    setLikesLocal((c) => c + (likedLocal ? -1 : 1));
+    onLike();
+  };
+
   // Синхронизируем ref с актуальным значением
   useEffect(() => {
     isActiveRef.current = isActive;
@@ -309,13 +325,13 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
           </button>
 
           {/* Like */}
-          <button onClick={(e) => { e.stopPropagation(); onLike(); }} className="flex flex-col items-center">
+          <button onClick={handleLikeTap} className="flex flex-col items-center">
             <div className="w-12 h-12 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center active:scale-90 transition-transform">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill={short.isLiked ? "#ff2d55" : "none"} stroke={short.isLiked ? "#ff2d55" : "white"} strokeWidth="2">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill={likedLocal ? "#ff2d55" : "none"} stroke={likedLocal ? "#ff2d55" : "white"} strokeWidth="2">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
               </svg>
             </div>
-            <span className="text-white text-xs mt-1">{short.likesCount}</span>
+            <span className="text-white text-xs mt-1">{likesLocal}</span>
           </button>
 
           {/* Comments */}

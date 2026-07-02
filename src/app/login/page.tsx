@@ -126,7 +126,7 @@ function EmailLoginForm() {
             type="text"
             value={refCode}
             onChange={e => setRefCode(e.target.value)}
-            placeholder="например, ИГЛС"
+            placeholder="например, лето26"
             className="w-full bg-[#0A0E1A] text-white border border-[#2a2f4a] rounded-xl px-4 py-3 focus:outline-none focus:border-[#A1FF4A] transition-colors placeholder-gray-600"
             autoCapitalize="none"
             autoCorrect="off"

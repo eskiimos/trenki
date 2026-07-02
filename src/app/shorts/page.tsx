@@ -142,43 +142,41 @@ const ShortsContent = () => {
 
   // Лайк
   const handleLike = async () => {
-    if (!userId || !currentShort) {
-      alert('Пожалуйста, войдите в приложение');
-      return;
-    }
+    if (!currentShort) return;
 
-    const wasLiked = currentShort.isLiked;
-    
+    const id = currentShort.id;
+    const wasLiked = !!currentShort.isLiked;
+    const baseCount = currentShort.likesCount;
+
+    const setLikeState = (isLiked: boolean, likesCount: number) =>
+      setShorts(prev => prev.map((s, i) => (i === currentIndex ? { ...s, isLiked, likesCount } : s)));
+
     // Оптимистичное обновление
-    setShorts(prev => prev.map((s, i) => 
-      i === currentIndex 
-        ? { ...s, isLiked: !wasLiked, likesCount: wasLiked ? s.likesCount - 1 : s.likesCount + 1 }
-        : s
-    ));
+    setLikeState(!wasLiked, wasLiked ? baseCount - 1 : baseCount + 1);
 
     try {
-      const response = await fetch(`/api/shorts/${currentShort.id}/likes`, {
+      // Сессия — по cookie (requireAuthUser на сервере). НЕ полагаемся на
+      // telegramId из localStorage: раньше при пустом кэше кидало «войдите»
+      // даже с валидной сессией.
+      const response = await fetch(`/api/shorts/${id}/likes`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Telegram-User-ID': userId,
-        },
+        headers: { 'Content-Type': 'application/json' },
       });
 
+      if (response.status === 401) {
+        setLikeState(wasLiked, baseCount); // откат
+        router.push('/login');
+        return;
+      }
       if (response.ok) {
         const data = await response.json();
-        setShorts(prev => prev.map((s, i) =>
-          i === currentIndex ? { ...s, isLiked: data.isLiked, likesCount: data.likesCount } : s
-        ));
+        setLikeState(!!data.isLiked, data.likesCount);
+      } else {
+        setLikeState(wasLiked, baseCount); // откат
       }
     } catch (error) {
       console.error('Error toggling like:', error);
-      // Откат
-      setShorts(prev => prev.map((s, i) => 
-        i === currentIndex 
-          ? { ...s, isLiked: wasLiked, likesCount: currentShort.likesCount }
-          : s
-      ));
+      setLikeState(wasLiked, baseCount); // откат
     }
   };
 

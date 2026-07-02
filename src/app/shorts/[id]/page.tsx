@@ -79,8 +79,14 @@ export default function ShortPage({ params }: ShortPageProps) {
         const currentId = resolvedParams.id;
         setShortId(currentId);
         
-        // Сессия передаётся cookie, isLiked заполнит сервер
-        const allResponse = await fetch('/api/shorts');
+        // Если открыто со страницы тренера (?trainerId=) — лента свайпа = только
+        // его шортсы; иначе (прямая/расшаренная ссылка) — все, как раньше.
+        // Сессия передаётся cookie, isLiked заполнит сервер.
+        let trainerId = '';
+        try { trainerId = new URLSearchParams(window.location.search).get('trainerId') || ''; } catch {}
+        const allResponse = await fetch(
+          trainerId ? `/api/shorts?trainerId=${encodeURIComponent(trainerId)}` : '/api/shorts',
+        );
 
         if (allResponse.ok) {
           const allData = await allResponse.json();
@@ -132,38 +138,44 @@ export default function ShortPage({ params }: ShortPageProps) {
     loadComments();
   }, [shortId]);
 
-  // Лайк
+  // Лайк. Плеер рендерится из МАССИВА shorts, поэтому обновляем именно массив
+  // (раньше писали только в singleton short → лайк «слетал» после свайпа
+  // туда-обратно). Мгновенный отклик даёт локальный стейт в ShortsPlayer.
   const handleLike = async () => {
     if (!short) return;
+    const id = short.id;
+    const wasLiked = !!short.isLiked;
+    const baseCount = short.likesCount;
 
-    const wasLiked = short.isLiked;
+    const setLikeState = (isLiked: boolean, likesCount: number) => {
+      setShorts(prev => prev.map(s => (s.id === id ? { ...s, isLiked, likesCount } : s)));
+      setShort(prev => (prev && prev.id === id ? { ...prev, isLiked, likesCount } : prev));
+    };
 
-    setShort(prev => prev ? {
-      ...prev,
-      isLiked: !wasLiked,
-      likesCount: wasLiked ? prev.likesCount - 1 : prev.likesCount + 1
-    } : null);
+    // оптимистично
+    setLikeState(!wasLiked, wasLiked ? baseCount - 1 : baseCount + 1);
 
     try {
-      const response = await fetch(`/api/shorts/${short.id}/likes`, {
+      const response = await fetch(`/api/shorts/${id}/likes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
 
       if (response.status === 401) {
-        // Откатываем оптимистичное обновление и редиректим на логин
-        setShort(prev => prev ? { ...prev, isLiked: wasLiked, likesCount: short.likesCount } : null);
+        setLikeState(wasLiked, baseCount); // откат
         router.push('/login');
         return;
       }
 
       if (response.ok) {
         const data = await response.json();
-        setShort(prev => prev ? { ...prev, isLiked: data.isLiked, likesCount: data.likesCount } : null);
+        setLikeState(!!data.isLiked, data.likesCount); // точное значение сервера
+      } else {
+        setLikeState(wasLiked, baseCount); // откат
       }
     } catch (error) {
       console.error('Error toggling like:', error);
-      setShort(prev => prev ? { ...prev, isLiked: wasLiked, likesCount: short.likesCount } : null);
+      setLikeState(wasLiked, baseCount); // откат
     }
   };
 
