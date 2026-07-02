@@ -49,40 +49,29 @@ export async function POST(
 
     const { id: shortId } = await context.params;
 
+    // Идемпотентный toggle: deleteMany/createMany(skipDuplicates) НЕ бросают на
+    // гонках (P2025/P2002), поэтому быстрые повторные тапы безопасны (не 500).
     const existingLike = await prisma.shortLike.findUnique({
       where: { userId_shortId: { userId, shortId } }
     });
 
     let isLiked: boolean;
-    let short;
-
     if (existingLike) {
-      await prisma.shortLike.delete({
-        where: { userId_shortId: { userId, shortId } }
-      });
-      short = await prisma.short.update({
-        where: { id: shortId },
-        data: { likesCount: { decrement: 1 } }
-      });
+      await prisma.shortLike.deleteMany({ where: { userId, shortId } });
       isLiked = false;
     } else {
-      await prisma.shortLike.create({
-        data: { userId, shortId }
-      });
-      short = await prisma.short.update({
-        where: { id: shortId },
-        data: { likesCount: { increment: 1 } }
-      });
+      await prisma.shortLike.createMany({ data: [{ userId, shortId }], skipDuplicates: true });
       isLiked = true;
     }
 
+    // Счётчик пересчитываем из ИСТИНЫ (COUNT), чтобы денормализованный likesCount
+    // не дрейфовал при конкурентных запросах.
+    const likesCount = await prisma.shortLike.count({ where: { shortId } });
+    await prisma.short.update({ where: { id: shortId }, data: { likesCount } });
+
     await updateUserActivity(userId);
 
-    return NextResponse.json({
-      success: true,
-      isLiked,
-      likesCount: short.likesCount
-    });
+    return NextResponse.json({ success: true, isLiked, likesCount });
   } catch (error) {
     console.error('Error toggling like:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -101,16 +90,12 @@ export async function DELETE(
 
     const { id: shortId } = await context.params;
 
-    await prisma.shortLike.delete({
-      where: { userId_shortId: { userId, shortId } }
-    }).catch(() => null);
+    await prisma.shortLike.deleteMany({ where: { userId, shortId } });
+    // Пересчёт из истины — без слепого decrement (не даём счётчику уйти в минус/дрейф).
+    const likesCount = await prisma.shortLike.count({ where: { shortId } });
+    await prisma.short.update({ where: { id: shortId }, data: { likesCount } });
 
-    await prisma.short.update({
-      where: { id: shortId },
-      data: { likesCount: { decrement: 1 } }
-    });
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, likesCount });
   } catch (error) {
     console.error('Error deleting like:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

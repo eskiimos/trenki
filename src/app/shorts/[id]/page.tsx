@@ -98,10 +98,16 @@ export default function ShortPage({ params }: ShortPageProps) {
             setCurrentIndex(idx);
             setShort(allShorts[idx]);
           } else {
+            // Открытого шортса нет в ленте (неопубликованный / прямая ссылка /
+            // другой trainerId / пустой фид) — догружаем отдельно и рендерим
+            // ИМЕННО его: плеер рендерит из массива shorts, поэтому кладём массив
+            // из одного элемента (иначе был бы пустой/чужой экран).
             const singleResponse = await fetch(`/api/shorts/${currentId}`);
             if (singleResponse.ok) {
               const singleData = await singleResponse.json();
+              setShorts(singleData.short ? [singleData.short] : []);
               setShort(singleData.short);
+              setCurrentIndex(0);
             } else {
               router.push('/shorts');
             }
