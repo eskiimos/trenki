@@ -569,9 +569,9 @@ export default function AdminUsersPage() {
               onClick={(e) => e.stopPropagation()}
             >
               {/* Заголовок модального окна */}
-              <div className="sticky top-0 bg-[#1a1f3a] border-b border-gray-700 p-6 flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold flex items-center gap-3 flex-wrap">
+              <div className="sticky top-0 bg-[#1a1f3a] border-b border-gray-700 p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="min-w-0">
+                  <h2 className="text-2xl font-bold flex items-center gap-3 flex-wrap break-words">
                     {selectedUser.firstName || selectedUser.username || `User ${selectedUser.telegramId.slice(0, 8)}`}
                     {selectedUser.lastName && ` ${selectedUser.lastName}`}
                     
@@ -605,7 +605,7 @@ export default function AdminUsersPage() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 md:justify-end md:shrink-0">
                   <button
                     onClick={() => handleAttachEmail(selectedUser)}
                     className="px-4 py-2 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors text-sm font-medium"
