@@ -35,6 +35,7 @@ interface User {
   username: string | null;
   email: string | null;
   emailVerified: boolean;
+  referralCode?: string | null;
   createdAt: string;
   updatedAt: string;
   lastActivity: string;
@@ -188,6 +189,39 @@ export default function AdminUsersPage() {
       }
     } catch (e) {
       console.error('attach email failed', e);
+      alert('Сетевая ошибка');
+    }
+  };
+
+  // Ручная привязка юзера к реф-каналу (напр. подвязать существующего под тренера).
+  // Принимает канонический код ИЛИ алиас (в т.ч. кириллицу); пусто — снять привязку.
+  const handleSetReferral = async (user: User) => {
+    const input = window.prompt(
+      `Реф-код канала для ${user.firstName || user.telegramId} (пусто — снять):`,
+      user.referralCode || '',
+    );
+    if (input == null) return;
+    const referralCode = input.trim();
+
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/referral`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ referralCode }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert(data?.error || 'Не удалось установить реф-код');
+        return;
+      }
+      const nextCode: string | null = data?.referralCode ?? null;
+      setUsers(prev => prev.map(u => (u.id === user.id ? { ...u, referralCode: nextCode } : u)));
+      if (selectedUser?.id === user.id) {
+        setSelectedUser({ ...selectedUser, referralCode: nextCode });
+      }
+      alert(nextCode ? `Привязан к каналу «${data?.label || nextCode}»` : 'Реф-код снят');
+    } catch (e) {
+      console.error('set referral failed', e);
       alert('Сетевая ошибка');
     }
   };
@@ -591,6 +625,13 @@ export default function AdminUsersPage() {
                     title="Ручная выдача/снятие премиум-доступа"
                   >
                     {selectedUser.accessTier === 'PREMIUM' ? 'Снять PREMIUM' : 'Выдать PREMIUM'}
+                  </button>
+                  <button
+                    onClick={() => handleSetReferral(selectedUser)}
+                    className="px-4 py-2 rounded-lg bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 transition-colors text-sm font-medium"
+                    title="Привязать пользователя к реф-каналу (напр. к тренеру). Принимает код или алиас; пусто — снять."
+                  >
+                    Реф-код: {selectedUser.referralCode || '—'}
                   </button>
                   <button
                     onClick={() => handleDeleteUser(selectedUser)}

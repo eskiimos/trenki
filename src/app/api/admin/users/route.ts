@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
           username: user.username,
           email: user.email,
           emailVerified: user.emailVerified,
+          referralCode: user.referralCode, // реф-код канала (для ручной привязки)
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
           lastActivity: user.lastActivity || user.updatedAt,
