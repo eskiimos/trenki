@@ -595,8 +595,10 @@ export default function AdminUsersPage() {
               onClick={(e) => e.stopPropagation()}
             >
               {/* Заголовок модального окна */}
-              <div className="sticky top-0 bg-[#1a1f3a] border-b border-gray-700 p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="min-w-0">
+              <div className="sticky top-0 bg-[#1a1f3a] border-b border-gray-700 p-6">
+                {/* Верхняя строка: имя + всегда видимая кнопка «Закрыть» */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
                   <h2 className="text-2xl font-bold flex items-center gap-3 flex-wrap break-words">
                     {selectedUser.firstName || selectedUser.username || `User ${selectedUser.telegramId.slice(0, 8)}`}
                     {selectedUser.lastName && ` ${selectedUser.lastName}`}
@@ -629,9 +631,20 @@ export default function AdminUsersPage() {
                       {selectedUser.profile.number && ` #${selectedUser.profile.number}`}
                     </p>
                   )}
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedUser(null)}
+                    aria-label="Закрыть"
+                    className="shrink-0 inline-flex items-center gap-1.5 h-10 px-4 rounded-full bg-[#2d3448] hover:bg-[#3a4255] text-gray-200 text-sm font-medium transition-colors"
+                  >
+                    <span className="text-lg leading-none">×</span>
+                    Закрыть
+                  </button>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 md:justify-end md:shrink-0">
+                {/* Действия над пользователем */}
+                <div className="flex flex-wrap items-center gap-2 mt-4">
                   <button
                     onClick={() => handleAttachEmail(selectedUser)}
                     className="px-4 py-2 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors text-sm font-medium"
@@ -665,12 +678,6 @@ export default function AdminUsersPage() {
                     className="px-4 py-2 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isDeletingUserId === selectedUser.id ? 'Удаление...' : 'Удалить'}
-                  </button>
-                  <button
-                    onClick={() => setSelectedUser(null)}
-                    className="w-10 h-10 rounded-full bg-[#2d3448] hover:bg-[#3a4255] flex items-center justify-center transition-colors"
-                  >
-                    <span className="text-2xl">×</span>
                   </button>
                 </div>
               </div>
