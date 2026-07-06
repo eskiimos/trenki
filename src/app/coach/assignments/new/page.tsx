@@ -11,6 +11,8 @@ interface Member {
   firstName: string;
   lastName: string;
   position: string | null;
+  hasPremium?: boolean;
+  subscriptionBlocked?: boolean; // задание можно давать только подписчикам (п.6g)
 }
 
 interface VideoItem {
@@ -448,13 +450,16 @@ export default function CoachAssignmentNewPage() {
         <Section title="Кому">
           <div className="flex flex-col gap-2">
             {members.length > 0 && (() => {
-              const allSelected = members.every((m) => selectedAthletes.has(m.userId));
+              // «Вся команда» оперирует только доступными игроками (подписчиками).
+              const selectable = members.filter((m) => !m.subscriptionBlocked);
+              const allSelected = selectable.length > 0 && selectable.every((m) => selectedAthletes.has(m.userId));
               return (
                 <button
                   type="button"
+                  disabled={selectable.length === 0}
                   onClick={() => {
                     // Дать задание всей команде / снять выбор со всех (правка владельца).
-                    setSelectedAthletes(allSelected ? new Set() : new Set(members.map((m) => m.userId)));
+                    setSelectedAthletes(allSelected ? new Set() : new Set(selectable.map((m) => m.userId)));
                   }}
                   className="w-full text-left flex items-center justify-between font-overpass uppercase"
                   style={{
@@ -482,7 +487,7 @@ export default function CoachAssignmentNewPage() {
                     </span>
                     👥 Вся команда
                   </span>
-                  <span style={{ fontSize: 11, color: '#AEABBB' }}>{allSelected ? 'снять' : `все ${members.length}`}</span>
+                  <span style={{ fontSize: 11, color: '#AEABBB' }}>{allSelected ? 'снять' : `все ${selectable.length}`}</span>
                 </button>
               );
             })()}
@@ -491,30 +496,40 @@ export default function CoachAssignmentNewPage() {
             )}
             {members.map((m) => {
               const checked = selectedAthletes.has(m.userId);
+              const blocked = !!m.subscriptionBlocked;
               return (
                 <button
                   key={m.userId}
                   type="button"
-                  onClick={() => toggleAthlete(m.userId)}
+                  disabled={blocked}
+                  onClick={() => !blocked && toggleAthlete(m.userId)}
                   className="w-full text-left flex items-center justify-between"
                   style={{
                     background: '#060919',
                     border: checked ? '1px solid #A1FF4A' : '1px solid #26252F',
                     borderRadius: 12,
                     padding: '12px 14px',
+                    opacity: blocked ? 0.5 : 1,
+                    cursor: blocked ? 'not-allowed' : 'pointer',
                   }}
                 >
                   <div>
                     <div className="font-overpass" style={{ fontWeight: 800, fontSize: 14 }}>
                       {m.firstName} {m.lastName}
                     </div>
-                    {m.position && (
-                      <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 12, marginTop: 2 }}>
-                        {m.position}
+                    {blocked ? (
+                      <div className="font-overpass" style={{ color: '#FF9F45', fontSize: 12, marginTop: 2 }}>
+                        🔒 только для подписчиков
                       </div>
+                    ) : (
+                      m.position && (
+                        <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 12, marginTop: 2 }}>
+                          {m.position}
+                        </div>
+                      )
                     )}
                   </div>
-                  <Checkbox checked={checked} />
+                  {blocked ? <span style={{ fontSize: 16 }}>🔒</span> : <Checkbox checked={checked} />}
                 </button>
               );
             })}

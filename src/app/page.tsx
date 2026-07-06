@@ -14,6 +14,9 @@ import WorkoutReminder from '@/components/WorkoutReminder';
 import AssignmentsBanner from '@/components/AssignmentsBanner';
 import MicrocycleFeedbackModal from '@/components/MicrocycleFeedbackModal';
 import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay';
+import PotentialIslandBanner from '@/components/PotentialIslandBanner';
+import { openSubscriptionModal, handlePaywallResponse } from '@/lib/subscription-modal';
+import { useSubscription } from '@/hooks/useSubscription';
 import { useTour } from '@/components/tour/TourProvider';
 import { Banner, Button } from '@/components/ui';
 import { Skeleton } from '@/components/Skeleton';
@@ -206,6 +209,9 @@ const HomePage = () => {
         
         {/* Промо-баннер */}
         <AllVideosSection />
+
+        {/* Голубой островок «раскрой потенциал с подпиской» (п.1, только когда paywall активен) */}
+        <PotentialIslandBanner />
       </div>
       
       {/* Нижнее меню */}
@@ -781,6 +787,7 @@ const TrainingsSection = () => {
     const [generatingCycle, setGeneratingCycle] = useState(false);
     const [cycleError, setCycleError] = useState<string | null>(null);
     const [hasActiveCycle, setHasActiveCycle] = useState(false);
+    const { paywalled } = useSubscription();
 
     // Узнаём, есть ли уже собранный активный цикл. Если есть — кнопка НЕ
     // пересобирает неделю при каждом тапе (правка владельца), а ведёт в
@@ -805,11 +812,15 @@ const TrainingsSection = () => {
     const handleMicrocycleClick = async () => {
         if (generatingCycle) return;
         if (hasActiveCycle) { router.push('/calendar'); return; }
+        // Микроцикл — платная фича целиком: при активном paywall сразу зовём подписку.
+        if (paywalled) { openSubscriptionModal('microcycle'); return; }
         setCycleError(null);
         setGeneratingCycle(true);
         const startedAt = Date.now();
         try {
             const res = await fetch('/api/microcycle/generate', { method: 'POST' });
+            // 402 (напр. режим включили между загрузкой и тапом) → показать подписку.
+            if (await handlePaywallResponse(res, 'microcycle')) { setGeneratingCycle(false); return; }
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
                 throw new Error(data?.error || 'Не удалось собрать микроцикл');

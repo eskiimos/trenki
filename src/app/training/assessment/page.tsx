@@ -6,6 +6,7 @@ import { useTelegram } from '@/hooks/useTelegram';
 import { TrainingGoal } from '@/generated/prisma';
 import { GOAL_LABELS, ENERGY_STATE_LABELS } from '@/lib/training-algorithm-v3';
 import { pickCycleDayToOffer, todayCycleDayIndex } from '@/lib/microcycle/offer';
+import { openSubscriptionModal } from '@/lib/subscription-modal';
 import { useTour } from '@/components/tour/TourProvider';
 
 const trainingGoals = Object.values(TrainingGoal) as TrainingGoal[];
@@ -136,6 +137,13 @@ export default function TrainingAssessmentPage() {
       if (generateResponse.status === 401) {
         alert('Сессия истекла. Войдите заново.');
         router.push('/login');
+        return;
+      }
+
+      // 402: бесплатная недельная квота исчерпана → предлагаем подписку.
+      if (generateResponse.status === 402) {
+        openSubscriptionModal('ai-workout');
+        setIsSubmitting(false);
         return;
       }
 

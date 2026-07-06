@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TrainingGoal, EnergyState } from '@/generated/prisma';
 import { GOAL_LABELS, ENERGY_STATE_LABELS } from '@/lib/training-algorithm-v3';
+import { openSubscriptionModal } from '@/lib/subscription-modal';
 
 // Преобразуем const объекты в массивы значений
 const trainingGoals = Object.values(TrainingGoal) as TrainingGoal[];
@@ -36,6 +37,12 @@ export default function SelectGoalPage() {
       if (response.status === 401) {
         alert('Сессия истекла. Войдите заново.');
         router.push('/login');
+        return;
+      }
+
+      // 402: недельная квота бесплатных ИИ-тренировок исчерпана → подписка.
+      if (response.status === 402) {
+        openSubscriptionModal('ai-workout');
         return;
       }
 

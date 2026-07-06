@@ -13,6 +13,7 @@ import ScheduleModal from '@/components/ScheduleModal';
 import Toast from '@/components/Toast';
 import { isKinescopeUrl, getKinescopeDirectUrl } from '@/lib/videoQuality';
 import { calculateWorkoutGains, CharacteristicType } from '@/lib/characteristics';
+import { openSubscriptionModal } from '@/lib/subscription-modal';
 import {
   downloadVideo,
   isVideoDownloaded,
@@ -201,6 +202,12 @@ export default function VideoPage({ params }: VideoPageProps) {
       try {
         setIsLoading(true);
         const response = await fetch(`/api/videos/${resolvedParams.id}`);
+        // Видео-занятия платные: 402 → показать подписку и вернуть в каталог.
+        if (response.status === 402) {
+          openSubscriptionModal('video');
+          router.replace('/video');
+          return;
+        }
         if (response.ok) {
           const video = await response.json();
           setVideoData(video);

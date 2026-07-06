@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireCoach, requireTeamOwnership } from '@/lib/coach/guards';
+import { hasPremium } from '@/lib/access';
+import { isPaywalled } from '@/lib/paywall';
+import { getPaywallMode } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,6 +71,9 @@ export async function GET(request: NextRequest, ctx: RouteContext) {
           id: true,
           firstName: true,
           lastName: true,
+          accessTier: true,
+          premiumUntil: true,
+          isAdmin: true,
           profile: {
             select: {
               position: true,
@@ -110,6 +116,10 @@ export async function GET(request: NextRequest, ctx: RouteContext) {
     }
   }
 
+  // Режим paywall — чтобы отдать тренеру ТОЧНЫЙ признак «кому нельзя выдать задание»
+  // (совпадает с серверным гейтом POST /api/assignments во всех режимах).
+  const paywallMode = await getPaywallMode();
+
   return NextResponse.json({
     members: members.map((m) => ({
       memberId: m.id,
@@ -122,6 +132,9 @@ export async function GET(request: NextRequest, ctx: RouteContext) {
       number: m.user.profile?.number ?? null,
       avatarUrl: m.user.profile?.avatarUrl ?? null,
       potential: m.user.profile?.potential ?? 0,
+      hasPremium: hasPremium(m.user),
+      // задание можно давать только подписчикам (п.6g). true → в пикере дизейбл.
+      subscriptionBlocked: isPaywalled(m.user, paywallMode),
       assignmentStatus: statusByAthlete.get(m.userId) ?? 'none',
     })),
   });
