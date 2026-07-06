@@ -28,8 +28,29 @@ export default function SubscriptionModal() {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<PaywallReason>('generic');
   const [promo, setPromo] = useState('');
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
   const { referralCode } = useSubscription();
   const pricing = useSubscriptionPricing();
+
+  const handleSubscribe = async () => {
+    if (paying) return;
+    setPaying(true);
+    setPayError(null);
+    try {
+      const res = await fetch('/api/payments/init', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.paymentURL) {
+        window.location.href = data.paymentURL; // редирект на оплату T-Bank
+        return;
+      }
+      setPayError(data?.error || 'Не удалось перейти к оплате');
+    } catch {
+      setPayError('Сетевая ошибка');
+    } finally {
+      setPaying(false);
+    }
+  };
 
   useEffect(() => {
     return subscribeSubscriptionModal((isOpen, r) => {
@@ -178,12 +199,10 @@ export default function SubscriptionModal() {
           </div>
         )}
 
-        {/* Оформить — заглушка до подключения оплаты (T-Bank, отдельный трек) */}
+        {/* Оформить → T-Bank Init → редирект на оплату */}
         <button
-          onClick={() => {
-            /* TODO(T-Bank): здесь запуск оплаты (Init → PaymentURL). Пока — заглушка. */
-            alert('Оплата скоро подключится. Пока подписку активирует администратор.');
-          }}
+          onClick={handleSubscribe}
+          disabled={paying}
           className="font-overpass uppercase transition-transform active:scale-95"
           style={{
             width: '100%',
@@ -196,13 +215,17 @@ export default function SubscriptionModal() {
             fontWeight: 900,
             fontSize: 15,
             letterSpacing: 0.3,
-            cursor: 'pointer',
+            cursor: paying ? 'wait' : 'pointer',
+            opacity: paying ? 0.7 : 1,
           }}
         >
-          {t.cta}
+          {paying ? 'Переходим к оплате…' : t.cta}
         </button>
+        {payError && (
+          <p style={{ color: '#FF6B6B', fontSize: 12, textAlign: 'center', marginTop: 8 }}>{payError}</p>
+        )}
         <p style={{ color: '#6E6B7B', fontSize: 11, textAlign: 'center', marginTop: 10, lineHeight: 1.4 }}>
-          Оплата картой скоро. Отменить можно в любой момент.
+          Оплата картой. Списание {pricing.priceMonthlyRub} ₽/мес, отменить можно в любой момент.
         </p>
       </div>
     </div>

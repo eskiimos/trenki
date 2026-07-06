@@ -32,6 +32,8 @@ model User {
   premiumUntil          DateTime? // null + tier=PREMIUM = бессрочно; иначе — срок действия
   premiumNote           String? // Кто/за что выдал (ручная выдача, аудит)
   expiryReminderSentFor String? // premiumUntil (ISO), о котором уже слали «скоро кончится» — дедуп, переармится при продлении
+  tbankRebillId         String? // сохранённая карта T-Bank для автосписания подписки (рекуррент)
+  payments              Payment[]
   favorites             FavoriteVideo[]
   profile               Profile?
   coachProfile          CoachProfile?
@@ -927,4 +929,28 @@ model AppSetting {
   updatedAt DateTime @updatedAt
 
   @@map("app_settings")
+}
+
+// Платежи T-Bank (аудит + связь заказа с юзером). Amount ВСЕГДА в копейках.
+// status — из T-Bank: NEW/FORM_SHOWED/AUTHORIZED/CONFIRMED/REJECTED/REFUNDED/...
+// kind: 'init' — первичный (Recurrent=Y, с редиректом); 'charge' — автосписание по rebillId.
+model Payment {
+  id              String   @id @default(cuid())
+  orderId         String   @unique // наш OrderId, переданный в T-Bank (уникальный)
+  paymentId       String? // PaymentId от T-Bank
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amountKopecks   Int
+  status          String   @default("NEW")
+  kind            String   @default("init") // 'init' | 'charge'
+  isRecurrentInit Boolean  @default(false) // первичный платёж подписки (сохраняет карту)
+  rebillId        String? // RebillId из нотификации (для последующих Charge)
+  errorCode       String?
+  raw             Json? // последняя нотификация/ответ (аудит)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([paymentId])
+  @@map("payments")
 }

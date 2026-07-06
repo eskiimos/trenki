@@ -143,3 +143,35 @@ export interface GetStateResult {
 export async function getState(config: TbankConfig, paymentId: string): Promise<GetStateResult> {
   return callApi<GetStateResult>(config, 'GetState', { PaymentId: paymentId });
 }
+
+export interface ChargeResult {
+  Success: boolean;
+  ErrorCode: string;
+  Status?: string;
+  PaymentId?: string;
+  OrderId?: string;
+  Amount?: number;
+  Message?: string;
+  Details?: string;
+}
+
+/**
+ * Автосписание по сохранённой карте (рекуррент): Init нового платежа (без
+ * редиректа клиента) → Charge с PaymentId + RebillId. Списывает сразу.
+ */
+export async function chargeByRebill(
+  config: TbankConfig,
+  p: { orderId: string; amountKopecks: number; rebillId: string; description?: string },
+): Promise<{ init: InitResult; charge?: ChargeResult }> {
+  const init = await initPayment(config, {
+    amountKopecks: p.amountKopecks,
+    orderId: p.orderId,
+    description: p.description,
+  });
+  if (!init.Success || !init.PaymentId) return { init };
+  const charge = await callApi<ChargeResult>(config, 'Charge', {
+    PaymentId: init.PaymentId,
+    RebillId: p.rebillId,
+  });
+  return { init, charge };
+}

@@ -1,0 +1,58 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { requireAuthUser } from '@/lib/coach/guards';
+import { getTbankConfig, getState } from '@/lib/payments/tbank';
+import { grantPremiumPeriod } from '@/lib/payments/grant';
+import { hasPremium } from '@/lib/access';
+import { logger } from '@/lib/logger';
+
+// GET /api/payments/status?orderId=... — статус платежа для страницы ожидания.
+// Основной источник выдачи премиума — вебхук; здесь подстраховываемся GetState
+// (если нотификация задержалась), выдаём премиум идемпотентно при CONFIRMED.
+export const dynamic = 'force-dynamic';
+
+export async function GET(request: NextRequest) {
+  const auth = await requireAuthUser(request);
+  if ('response' in auth) return auth.response;
+
+  const orderId = request.nextUrl.searchParams.get('orderId') ?? '';
+  if (!orderId) return NextResponse.json({ error: 'orderId required' }, { status: 400 });
+
+  const payment = await prisma.payment.findUnique({ where: { orderId } });
+  // Доступ только к своему заказу (не доверяем orderId из query для чужого юзера).
+  if (!payment || payment.userId !== auth.user.id) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  let status = payment.status;
+
+  // Подстраховка: если ещё не CONFIRMED — спросим банк напрямую.
+  const config = getTbankConfig();
+  if (config && payment.paymentId && status !== 'CONFIRMED' && status !== 'REJECTED' && status !== 'REFUNDED') {
+    try {
+      const st = await getState(config, payment.paymentId);
+      if (st.Success && st.Status) {
+        status = st.Status;
+        const wasConfirmed = payment.status === 'CONFIRMED';
+        await prisma.payment.update({ where: { orderId }, data: { status } });
+        if (status === 'CONFIRMED' && !wasConfirmed) {
+          await grantPremiumPeriod(payment.userId, { note: `T-Bank ${payment.kind} ${orderId}` });
+        }
+      }
+    } catch (e) {
+      logger.warn('payments/status GetState failed', { err: String(e) });
+    }
+  }
+
+  const fresh = await prisma.user.findUnique({
+    where: { id: auth.user.id },
+    select: { accessTier: true, premiumUntil: true },
+  });
+
+  return NextResponse.json({
+    status,
+    paid: status === 'CONFIRMED',
+    hasPremium: hasPremium(fresh),
+    premiumUntil: fresh?.premiumUntil ?? null,
+  });
+}

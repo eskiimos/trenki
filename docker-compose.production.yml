@@ -64,6 +64,12 @@ services:
       # пишет триггер-файл в /tmp/deploy-trigger (см. volumes ниже).
       # Host-cron подбирает файл и запускает /home/trenki/deploy.sh.
       - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      # T-Bank интернет-эквайринг (Трек B). Секреты — только в .env.production.
+      # Пусто → оплата недоступна (getTbankConfig()=null), приложение работает.
+      - TBANK_TERMINAL_KEY=${TBANK_TERMINAL_KEY:-}
+      - TBANK_PASSWORD=${TBANK_PASSWORD:-}
+      - TBANK_API_BASE=${TBANK_API_BASE:-}
+      - TBANK_RETURN_ORIGIN=${TBANK_RETURN_ORIGIN:-https://trenki.app}
     volumes:
       # Shared dir с хостом для auto-deploy trigger'а. На хосте должна
       # существовать ./deploy-trigger; host-cron поллит её.
