@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
     hasPremium: premium,
     premiumUntil: user.premiumUntil,
     paywalled: isPaywalled(user, mode),
+    paywallActive: mode !== 'off', // включён ли paywall вообще (для premium-UI: баннер продления)
     referralCode: user.referralCode, // канал (для окна «Оформить» — поле промокода тренера)
   });
 }

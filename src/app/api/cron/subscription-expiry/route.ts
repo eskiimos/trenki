@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendUserPush } from '@/lib/coach/push';
+import { getPaywallMode } from '@/lib/settings';
 import { AccessTier } from '@/generated/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -40,6 +41,12 @@ export async function GET(request: NextRequest) {
   }
   if (request.headers.get('authorization') !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Пока paywall выключен — не шлём уведомления о продлении (иначе в 'off'
+  // премиум-юзеры получали бы пуши там, где до paywall их не было).
+  if ((await getPaywallMode()) === 'off') {
+    return NextResponse.json({ skipped: 'paywall off', sent: 0 });
   }
 
   const startedAt = Date.now();
@@ -71,8 +78,10 @@ export async function GET(request: NextRequest) {
     });
     if (claim.count !== 1) { alreadySent++; continue; }
 
-    const days = Math.max(0, Math.ceil((u.premiumUntil.getTime() - now.getTime()) / DAY_MS));
-    const when = days <= 0 ? 'сегодня' : `через ${days} ${pluralDays(days)}`;
+    const msLeft = u.premiumUntil.getTime() - now.getTime();
+    const days = Math.ceil(msLeft / DAY_MS);
+    // premiumUntil всегда > now (фильтр gt), поэтому days >= 1; при <24ч — «менее суток».
+    const when = msLeft < DAY_MS ? 'менее чем через сутки' : `через ${days} ${pluralDays(days)}`;
     sendUserPush(u.id, {
       title: 'Подписка скоро закончится',
       body: `Доступ ко всем возможностям заканчивается ${when}. Продли, чтобы не потерять прогресс.`,

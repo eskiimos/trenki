@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 export interface SubscriptionStatus {
   hasPremium: boolean;
   paywalled: boolean; // нужно ли показывать paywall ЭТОМУ юзеру (с учётом режима обкатки)
+  paywallActive: boolean; // включён ли paywall в принципе (mode != off) — для premium-UI
   premiumUntil: string | null;
   isAdmin: boolean;
   referralCode: string | null;
@@ -19,6 +20,7 @@ type Snapshot = SubscriptionStatus & { loading: boolean; loaded: boolean };
 const EMPTY: SubscriptionStatus = {
   hasPremium: false,
   paywalled: false,
+  paywallActive: false,
   premiumUntil: null,
   isAdmin: false,
   referralCode: null,
@@ -43,6 +45,7 @@ async function fetchStatus(): Promise<void> {
     cache = {
       hasPremium: Boolean(d.hasPremium),
       paywalled: Boolean(d.paywalled),
+      paywallActive: Boolean(d.paywallActive),
       premiumUntil: d.premiumUntil ?? null,
       isAdmin: Boolean(d.isAdmin),
       referralCode: d.referralCode ?? null,

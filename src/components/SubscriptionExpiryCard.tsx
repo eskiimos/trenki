@@ -18,9 +18,11 @@ function pluralDays(n: number): string {
 }
 
 export default function SubscriptionExpiryCard() {
-  const { hasPremium, premiumUntil } = useSubscription();
+  const { hasPremium, premiumUntil, paywallActive } = useSubscription();
 
-  if (!hasPremium || !premiumUntil) return null;
+  // В режиме 'off' paywall не активен → баннер продления не показываем (иначе
+  // премиум-юзеры увидели бы новый баннер там, где до paywall его не было).
+  if (!paywallActive || !hasPremium || !premiumUntil) return null;
   const until = new Date(premiumUntil).getTime();
   if (isNaN(until)) return null;
 
