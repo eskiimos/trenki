@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import type { User } from '../../generated/prisma';
 import { getSessionFromRequest } from '@/lib/session';
+import { getPaywallMode } from '@/lib/settings';
+import { isPaywalled } from '@/lib/paywall';
 
 /**
  * Достаёт текущего пользователя по подписанной сессии (httpOnly cookie).
@@ -19,6 +21,32 @@ export async function requireAuthUser(
     return { response: NextResponse.json({ error: 'User not found' }, { status: 401 }) };
   }
   return { user };
+}
+
+/**
+ * Требует авторизованного пользователя С активной подпиской — с учётом режима
+ * paywall (AppSetting paywall.mode, см. '@/lib/paywall').
+ * - режим 'off'    → не блокирует НИКОГДА (paywall выключен, безопасно для деплоя);
+ * - режим 'admins' → блокирует только админов приложения (обкатка), живых юзеров пропускает;
+ * - режим 'on'     → блокирует всех без активного премиума.
+ * При блокировке отдаёт 402 с кодом SUBSCRIPTION_REQUIRED (клиент показывает paywall).
+ * Навешивать на роуты, отдающие платный ресурс (видео-URL, ИИ-план, микроцикл).
+ */
+export async function requireActiveSubscription(
+  request: NextRequest,
+): Promise<{ user: User } | { response: NextResponse }> {
+  const result = await requireAuthUser(request);
+  if ('response' in result) return result;
+  const mode = await getPaywallMode();
+  if (isPaywalled(result.user, mode)) {
+    return {
+      response: NextResponse.json(
+        { error: 'Subscription required', code: 'SUBSCRIPTION_REQUIRED' },
+        { status: 402 },
+      ),
+    };
+  }
+  return { user: result.user };
 }
 
 /**

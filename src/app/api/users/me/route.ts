@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getSessionUserId } from '@/lib/auth-server';
+import { hasPremium } from '@/lib/access';
+import { isPaywalled } from '@/lib/paywall';
+import { getPaywallMode } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,15 +39,26 @@ export async function GET(request: NextRequest) {
     activeTeamId = team?.id ?? null;
   }
 
+  // Статус подписки для клиента: premium — есть ли активный доступ; paywalled —
+  // нужно ли ЭТОМУ юзеру показывать paywall (с учётом режима obкатки paywall.mode).
+  // premiumUntil нужен клиенту для отсчёта «подписка кончается через N дней».
+  const mode = await getPaywallMode();
+  const premium = hasPremium(user);
+
   return NextResponse.json({
     id: user.id,
     telegramId: user.telegramId,
     firstName: user.firstName,
     lastName: user.lastName,
     role: user.role,
+    isAdmin: user.isAdmin,
     hasAthleteProfile: Boolean(user.profile),
     hasCoachProfile: Boolean(user.coachProfile),
     coachClubName: user.coachProfile?.clubName ?? null,
     activeTeamId,
+    // Подписка / paywall
+    hasPremium: premium,
+    premiumUntil: user.premiumUntil,
+    paywalled: isPaywalled(user, mode),
   });
 }

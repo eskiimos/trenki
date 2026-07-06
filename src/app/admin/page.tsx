@@ -347,6 +347,12 @@ export default function AdminPage() {
             <SectionTitle>⚙️ Система</SectionTitle>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <NavCard
+                href="/admin/paywall"
+                icon="🔒"
+                title="Paywall (подписка)"
+                desc="Вкл/выкл, режим обкатки на админах"
+              />
+              <NavCard
                 href="/admin/content-check"
                 icon="🔎"
                 title="Проверка контента"

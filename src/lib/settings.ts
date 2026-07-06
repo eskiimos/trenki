@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { normalizePaywallMode, type PaywallMode } from '@/lib/paywall';
 
 /**
  * Настройки приложения (таблица app_settings, key-value). Сейчас — время
@@ -11,6 +12,7 @@ export const SETTING_KEYS = {
   dailyTime: 'reminder.dailyTime', // "HH:MM" — ежедневное напоминание (локально по TZ юзера)
   preworkoutEarlyMin: 'reminder.preworkoutEarlyMin', // минут до тренировки — раннее
   preworkoutLateMin: 'reminder.preworkoutLateMin', // минут до тренировки — позднее
+  paywallMode: 'paywall.mode', // 'off' | 'admins' | 'on' — роллаут-контроль paywall
 } as const;
 
 export const REMINDER_DEFAULTS = {
@@ -89,4 +91,20 @@ export async function setAppSetting(key: string, value: string): Promise<void> {
     update: { value },
     create: { key, value },
   });
+}
+
+/**
+ * Текущий режим paywall (роллаут-контроль). Дефолт 'off', если значение не задано,
+ * битое или таблицы ещё нет (до миграции) — чтобы paywall по умолчанию был выключен.
+ */
+export async function getPaywallMode(): Promise<PaywallMode> {
+  try {
+    const row = await prisma.appSetting.findUnique({
+      where: { key: SETTING_KEYS.paywallMode },
+      select: { value: true },
+    });
+    return normalizePaywallMode(row?.value);
+  } catch {
+    return normalizePaywallMode(undefined); // таблицы может не быть — 'off'
+  }
 }
