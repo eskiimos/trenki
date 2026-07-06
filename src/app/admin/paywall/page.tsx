@@ -33,6 +33,13 @@ export default function PaywallAdminPage() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
+  // Цены (редактируются здесь же)
+  const [priceMonthly, setPriceMonthly] = useState('1200');
+  const [discount, setDiscount] = useState('75');
+  const [months, setMonths] = useState('3');
+  const [savingPrice, setSavingPrice] = useState(false);
+  const [priceMsg, setPriceMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
   useEffect(() => {
     (async () => {
       try {
@@ -40,6 +47,11 @@ export default function PaywallAdminPage() {
         if (res.ok) {
           const d = await res.json();
           if (d?.mode) setMode(d.mode);
+          if (d?.pricing) {
+            setPriceMonthly(String(d.pricing.priceMonthlyRub ?? 1200));
+            setDiscount(String(d.pricing.introDiscountPercent ?? 75));
+            setMonths(String(d.pricing.introMonths ?? 3));
+          }
         }
       } catch {
         /* ignore */
@@ -48,6 +60,41 @@ export default function PaywallAdminPage() {
       }
     })();
   }, []);
+
+  const introPreview = Math.round(Number(priceMonthly) * (1 - Number(discount) / 100));
+
+  const savePricing = async () => {
+    setSavingPrice(true);
+    setPriceMsg(null);
+    try {
+      const res = await fetch('/api/admin/paywall', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pricing: {
+            priceMonthlyRub: Number(priceMonthly),
+            introDiscountPercent: Number(discount),
+            introMonths: Number(months),
+          },
+        }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPriceMsg({ type: 'err', text: d?.error || 'Ошибка сохранения' });
+        return;
+      }
+      if (d?.pricing) {
+        setPriceMonthly(String(d.pricing.priceMonthlyRub));
+        setDiscount(String(d.pricing.introDiscountPercent));
+        setMonths(String(d.pricing.introMonths));
+      }
+      setPriceMsg({ type: 'ok', text: 'Цены сохранены ✓' });
+    } catch {
+      setPriceMsg({ type: 'err', text: 'Сетевая ошибка' });
+    } finally {
+      setSavingPrice(false);
+    }
+  };
 
   const save = async (next: Mode) => {
     setSaving(true);
@@ -151,6 +198,92 @@ export default function PaywallAdminPage() {
                 {msg.text}
               </div>
             )}
+
+            {/* Цены подписки */}
+            <section
+              style={{
+                marginTop: 20,
+                background: '#0B1030',
+                border: '1px solid #26252F',
+                borderRadius: 16,
+                padding: 18,
+              }}
+            >
+              <div style={{ color: '#F9F8FE', fontWeight: 800, fontSize: 15, marginBottom: 4 }}>
+                💳 Цены подписки
+              </div>
+              <div style={{ color: '#AEABBB', fontSize: 12.5, lineHeight: 1.45, marginBottom: 14 }}>
+                Отображаются в окне оформления. Годовой тариф пока не используется.
+              </div>
+              <div className="flex gap-4 flex-wrap">
+                {[
+                  { lbl: 'Цена ₽/мес', val: priceMonthly, set: setPriceMonthly, min: 1, max: 1000000 },
+                  { lbl: 'Скидка по промо, %', val: discount, set: setDiscount, min: 0, max: 100 },
+                  { lbl: 'Интро, мес', val: months, set: setMonths, min: 0, max: 36 },
+                ].map((f) => (
+                  <div key={f.lbl}>
+                    <div style={{ color: '#AEABBB', fontSize: 12, marginBottom: 4 }}>{f.lbl}</div>
+                    <input
+                      type="number"
+                      min={f.min}
+                      max={f.max}
+                      value={f.val}
+                      onChange={(e) => f.set(e.target.value)}
+                      style={{
+                        background: '#060919',
+                        border: '1px solid #26252F',
+                        borderRadius: 10,
+                        padding: '12px 14px',
+                        color: '#F9F8FE',
+                        fontSize: 16,
+                        outline: 'none',
+                        colorScheme: 'dark',
+                        width: 120,
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div style={{ color: '#AEABBB', fontSize: 13, marginTop: 12 }}>
+                Со скидкой:{' '}
+                <b style={{ color: '#A1FF4A' }}>
+                  {Number.isFinite(introPreview) ? introPreview : '—'} ₽/мес
+                </b>{' '}
+                на первые {months} мес.
+              </div>
+              {priceMsg && (
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    marginTop: 10,
+                    color: priceMsg.type === 'ok' ? '#A1FF4A' : '#FF6B6B',
+                  }}
+                >
+                  {priceMsg.text}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={savePricing}
+                disabled={savingPrice}
+                className="font-overpass uppercase transition-transform active:scale-95"
+                style={{
+                  marginTop: 14,
+                  background: '#A1FF4A',
+                  color: '#060919',
+                  border: 'none',
+                  borderRadius: 999,
+                  padding: '12px 22px',
+                  fontWeight: 900,
+                  fontSize: 13,
+                  cursor: savingPrice ? 'not-allowed' : 'pointer',
+                  opacity: savingPrice ? 0.6 : 1,
+                }}
+              >
+                {savingPrice ? 'Сохраняю…' : 'Сохранить цены'}
+              </button>
+            </section>
 
             <div
               style={{

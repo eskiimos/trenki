@@ -7,6 +7,7 @@ import OnboardingWrapper from "@/components/OnboardingWrapper";
 import PWAInit from "@/components/PWAInit";
 import OfflineHandler from "@/components/OfflineHandler";
 import AppLoader from "@/components/AppLoader";
+import SubscriptionModal from "@/components/SubscriptionModal";
 
 const overpass = Overpass({
   subsets: ["cyrillic", "latin"],
@@ -99,6 +100,7 @@ export default async function RootLayout({
             {children}
           </div>
         </OnboardingWrapper>
+        <SubscriptionModal />
       </body>
     </html>
   );

@@ -1,5 +1,10 @@
 import { prisma } from '@/lib/prisma';
 import { normalizePaywallMode, type PaywallMode } from '@/lib/paywall';
+import {
+  PRICING_DEFAULTS,
+  computeIntroPrice,
+  type SubscriptionPricing,
+} from '@/lib/subscription-plan';
 
 /**
  * Настройки приложения (таблица app_settings, key-value). Сейчас — время
@@ -13,6 +18,9 @@ export const SETTING_KEYS = {
   preworkoutEarlyMin: 'reminder.preworkoutEarlyMin', // минут до тренировки — раннее
   preworkoutLateMin: 'reminder.preworkoutLateMin', // минут до тренировки — позднее
   paywallMode: 'paywall.mode', // 'off' | 'admins' | 'on' — роллаут-контроль paywall
+  priceMonthly: 'subscription.priceMonthlyRub', // базовая цена подписки ₽/мес
+  introDiscountPercent: 'subscription.introDiscountPercent', // макс. скидка по промо, %
+  introMonths: 'subscription.introMonths', // на сколько месяцев действует интро-скидка
 } as const;
 
 export const REMINDER_DEFAULTS = {
@@ -107,4 +115,58 @@ export async function getPaywallMode(): Promise<PaywallMode> {
   } catch {
     return normalizePaywallMode(undefined); // таблицы может не быть — 'off'
   }
+}
+
+/** Целое в диапазоне [min, max] или дефолт (для битого/пустого value). */
+function parseIntInRange(v: string | undefined | null, def: number, min: number, max: number): number {
+  const n = Number(v);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n < min || n > max) return def;
+  return n;
+}
+
+/**
+ * Цены подписки (редактируются из админки, /admin/paywall). Если значения не заданы
+ * или таблицы нет — отдаём дефолты из PRICING_DEFAULTS. introPriceRub вычисляется.
+ */
+export async function getSubscriptionPricing(): Promise<SubscriptionPricing> {
+  let rows: { key: string; value: string }[] = [];
+  try {
+    rows = await prisma.appSetting.findMany({
+      where: {
+        key: {
+          in: [SETTING_KEYS.priceMonthly, SETTING_KEYS.introDiscountPercent, SETTING_KEYS.introMonths],
+        },
+      },
+      select: { key: true, value: true },
+    });
+  } catch {
+    // таблицы может не быть до миграции — дефолты
+  }
+  const map = new Map(rows.map((r) => [r.key, r.value]));
+
+  const priceMonthlyRub = parseIntInRange(
+    map.get(SETTING_KEYS.priceMonthly),
+    PRICING_DEFAULTS.priceMonthlyRub,
+    1,
+    1_000_000,
+  );
+  const introDiscountPercent = parseIntInRange(
+    map.get(SETTING_KEYS.introDiscountPercent),
+    PRICING_DEFAULTS.introDiscountPercent,
+    0,
+    100,
+  );
+  const introMonths = parseIntInRange(
+    map.get(SETTING_KEYS.introMonths),
+    PRICING_DEFAULTS.introMonths,
+    0,
+    36,
+  );
+
+  return {
+    priceMonthlyRub,
+    introDiscountPercent,
+    introMonths,
+    introPriceRub: computeIntroPrice(priceMonthlyRub, introDiscountPercent),
+  };
 }

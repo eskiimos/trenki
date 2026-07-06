@@ -60,5 +60,6 @@ export async function GET(request: NextRequest) {
     hasPremium: premium,
     premiumUntil: user.premiumUntil,
     paywalled: isPaywalled(user, mode),
+    referralCode: user.referralCode, // канал (для окна «Оформить» — поле промокода тренера)
   });
 }

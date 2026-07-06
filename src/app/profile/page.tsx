@@ -11,13 +11,17 @@ import { Button } from '@/components/ui';
 import BottomNavigation from '@/components/BottomNavigation';
 import AccountSwitcher from '@/components/AccountSwitcher';
 import PotentialSection from '@/components/PotentialSection';
+import SubscriptionExpiryCard from '@/components/SubscriptionExpiryCard';
 import { useTour } from '@/components/tour/TourProvider';
 import { clearAuth, getTelegramId } from '@/lib/auth';
 import { calculateAge } from '@/lib/age-utils';
+import { useSubscription } from '@/hooks/useSubscription';
+import { openSubscriptionModal } from '@/lib/subscription-modal';
 
 const ProfilePage = () => {
   const router = useRouter();
   const { user } = useTelegram();
+  const { paywalled } = useSubscription();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [recentGains, setRecentGains] = useState<any>(null);
@@ -264,23 +268,75 @@ const ProfilePage = () => {
 
         {/* Секция потенциала — pure CSS/SVG, повторяет дизайн из Figma */}
         <div className="mb-6 md:mb-0" data-tour="potential-ring">
-          <PotentialSection
-            ratingEndurance={userProfile?.profile?.ratingEndurance}
-            ratingTechnique={userProfile?.profile?.ratingTechnique}
-            ratingPower={userProfile?.profile?.ratingPower}
-            ratingSpeed={userProfile?.profile?.ratingSpeed}
-            ratingFlexibility={userProfile?.profile?.ratingFlexibility}
-            potential={userProfile?.profile?.potential}
-            gains={{
-              endurance: recentGains?.gainEndurance,
-              technique: recentGains?.gainTechnique,
-              power: recentGains?.gainPower,
-              speed: recentGains?.gainSpeed,
-              flexibility: recentGains?.gainFlexibility,
-            }}
-          />
+          <div style={{ position: 'relative' }}>
+            {/* Для FREE/paywalled потенциал серый и цифры скрыты (п.2) */}
+            <div
+              style={
+                paywalled
+                  ? { filter: 'grayscale(1) blur(6px)', opacity: 0.5, pointerEvents: 'none', userSelect: 'none' }
+                  : undefined
+              }
+              aria-hidden={paywalled}
+            >
+              <PotentialSection
+                ratingEndurance={userProfile?.profile?.ratingEndurance}
+                ratingTechnique={userProfile?.profile?.ratingTechnique}
+                ratingPower={userProfile?.profile?.ratingPower}
+                ratingSpeed={userProfile?.profile?.ratingSpeed}
+                ratingFlexibility={userProfile?.profile?.ratingFlexibility}
+                potential={userProfile?.profile?.potential}
+                gains={{
+                  endurance: recentGains?.gainEndurance,
+                  technique: recentGains?.gainTechnique,
+                  power: recentGains?.gainPower,
+                  speed: recentGains?.gainSpeed,
+                  flexibility: recentGains?.gainFlexibility,
+                }}
+              />
+            </div>
+            {paywalled && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  textAlign: 'center',
+                  padding: 20,
+                  gap: 14,
+                }}
+              >
+                <div style={{ color: '#F9F8FE', fontWeight: 800, fontSize: 14, lineHeight: 1.4, maxWidth: 280 }}>
+                  Оформи подписку и получи доступ ко всем возможностям
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openSubscriptionModal('potential')}
+                  className="font-overpass uppercase transition-transform active:scale-95"
+                  style={{
+                    background: '#A1FF4A',
+                    color: '#060919',
+                    border: 'none',
+                    borderRadius: 999,
+                    padding: '12px 22px',
+                    fontWeight: 900,
+                    fontSize: 13,
+                    letterSpacing: 0.3,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Оформить подписку
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         </div>
+
+        {/* Баннер «подписка скоро закончится» (п.5) — для премиума за 3 дня до конца */}
+        <SubscriptionExpiryCard />
 
         {/* На планшете возвращаем нижний отступ после двухколоночного блока */}
         <div className="hidden md:block md:h-6" />
