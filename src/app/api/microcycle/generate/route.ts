@@ -19,7 +19,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAuthUser } from '@/lib/coach/guards';
+import { requireActiveSubscription } from '@/lib/coach/guards';
 import { generateMicrocycleForUser } from '@/lib/microcycle/generate';
 import { getMicrocycleStartDate } from '@/lib/microcycle/week-start';
 import { MicrocycleStatus } from '@/generated/prisma';
@@ -27,7 +27,9 @@ import { MicrocycleStatus } from '@/generated/prisma';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAuthUser(request);
+  // Сборка микроцикла/календаря от ИИ — платная (Трек A, п.6f). В режиме 'off' —
+  // сквозной пропуск (как requireAuthUser), при 'admins'/'on' — требует подписку.
+  const auth = await requireActiveSubscription(request);
   if ('response' in auth) return auth.response;
   const userId = auth.user.id;
 

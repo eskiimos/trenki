@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminAsync } from '@/lib/admin-session';
+import { gatePaidContent } from '@/lib/coach/guards';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Видео-занятия — платный контент (Трек A, п.6). В режиме paywall 'off' гейт
+    // сквозной (поведение как раньше); при 'admins'/'on' — не отдаём videoUrl без подписки.
+    const blocked = await gatePaidContent(request);
+    if (blocked) return blocked;
+
     const { id } = await params;
-    
+
     const video = await prisma.video.findUnique({
       where: { id },
       select: {

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
+import { getPaywallMode } from '@/lib/settings';
+import { isPaywalled } from '@/lib/paywall';
 import {
   TrainingGoal,
   EnergyState,
@@ -33,6 +35,31 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuthUser(request);
     if ('response' in auth) return auth.response;
+
+    // Быстрая ИИ-тренировка (Трек A, п.6e): бесплатно 1 в неделю, дальше — подписка.
+    // Гейтим только когда paywall активен для этого юзера (в 'off' — безлимит, как раньше;
+    // премиум isPaywalled=false → безлимит). Квоту считаем по standalone-сессиям
+    // (не тренерским, не микроцикл-дням, не заданиям) за последние 7 дней.
+    const mode = await getPaywallMode();
+    if (isPaywalled(auth.user, mode)) {
+      const FREE_PER_WEEK = 1;
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const usedThisWeek = await prisma.workoutSession.count({
+        where: {
+          userId: auth.user.id,
+          createdAt: { gte: weekAgo },
+          coachId: null,
+          microcycleDay: { is: null },
+          assignment: { is: null },
+        },
+      });
+      if (usedThisWeek >= FREE_PER_WEEK) {
+        return NextResponse.json(
+          { error: 'Subscription required', code: 'SUBSCRIPTION_REQUIRED', reason: 'weekly_quota' },
+          { status: 402 },
+        );
+      }
+    }
 
     const { goal, energyState } = await request.json();
 

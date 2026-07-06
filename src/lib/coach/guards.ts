@@ -50,6 +50,20 @@ export async function requireActiveSubscription(
 }
 
 /**
+ * Гейт для роутов, отдающих платный КОНТЕНТ, которые исторически были ПУБЛИЧНЫМИ
+ * (видео-URL, kinescope-метаданные). В режиме 'off' — НЕ трогаем (остаётся как было,
+ * без обязательной авторизации), чтобы не поломать текущее поведение при выключенном
+ * paywall. Как только paywall включён (admins/on) — требуем активную подписку.
+ * Возвращает null, если запрос можно пропустить, или NextResponse, если блокируем.
+ */
+export async function gatePaidContent(request: NextRequest): Promise<NextResponse | null> {
+  const mode = await getPaywallMode();
+  if (mode === 'off') return null;
+  const gate = await requireActiveSubscription(request);
+  return 'response' in gate ? gate.response : null;
+}
+
+/**
  * Требует пользователя с ролью COACH.
  */
 export async function requireCoach(

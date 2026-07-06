@@ -3,6 +3,8 @@ import prisma from '@/lib/prisma';
 import { LoadDirection, WorkoutStatus } from '@/generated/prisma';
 import { requireCoach, requireAuthUser, requireTeamOwnership } from '@/lib/coach/guards';
 import { sendUserPush } from '@/lib/coach/push';
+import { getPaywallMode } from '@/lib/settings';
+import { isPaywalled } from '@/lib/paywall';
 
 export const dynamic = 'force-dynamic';
 
@@ -115,7 +117,9 @@ export async function POST(request: NextRequest) {
     where: { teamId, status: 'ACTIVE', userId: { in: selfFiltered } },
     select: {
       userId: true,
-      user: { select: { firstName: true, lastName: true } },
+      user: {
+        select: { firstName: true, lastName: true, accessTier: true, premiumUntil: true, isAdmin: true },
+      },
     },
   });
   const validIds = new Set(members.map((m) => m.userId));
@@ -123,6 +127,25 @@ export async function POST(request: NextRequest) {
   const filtered = selfFiltered.filter((id) => validIds.has(id));
   if (filtered.length === 0) {
     return NextResponse.json({ error: 'Игроки не найдены в команде' }, { status: 400 });
+  }
+
+  // Задания — платная фича атлета (Трек A, п.6g): выдавать можно только игрокам с
+  // подпиской. В режиме paywall 'off' isPaywalled=false у всех → пропускаем (как раньше);
+  // при 'admins'/'on' — отклоняем всю выдачу, называя игроков без подписки (клиент их
+  // и так дизейблит в пикере, это серверная защита от обхода).
+  const paywallMode = await getPaywallMode();
+  const blockedNames = filtered
+    .map((id) => memberById.get(id))
+    .filter((u): u is NonNullable<typeof u> => !!u && isPaywalled(u, paywallMode))
+    .map((u) => `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || 'игрок');
+  if (blockedNames.length > 0) {
+    return NextResponse.json(
+      {
+        error: `Задание можно давать только игрокам с подпиской. Без подписки: ${blockedNames.join(', ')}`,
+        code: 'ATHLETE_SUBSCRIPTION_REQUIRED',
+      },
+      { status: 402 },
+    );
   }
 
   // Проверяем существование всех видео (в зависимости от режима)
