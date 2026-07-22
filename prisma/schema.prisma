@@ -946,6 +946,7 @@ model Payment {
   isRecurrentInit Boolean  @default(false) // первичный платёж подписки (сохраняет карту)
   rebillId        String? // RebillId из нотификации (для последующих Charge)
   errorCode       String?
+  premiumGrantedAt DateTime? // когда по ЭТОМУ заказу выдан премиум — атомарный флаг идемпотентности (клейм через updateMany)
   raw             Json? // последняя нотификация/ответ (аудит)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

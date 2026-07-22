@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getTbankConfig, verifyNotificationToken } from '@/lib/payments/tbank';
-import { grantPremiumPeriod } from '@/lib/payments/grant';
+import { grantPremiumForPayment } from '@/lib/payments/grant';
 import { logger } from '@/lib/logger';
 
 // POST /api/webhook/tbank — Notification от T-Bank о статусе платежа.
@@ -41,14 +41,14 @@ export async function POST(request: NextRequest) {
     return okText();
   }
 
-  // Идемпотентность: выдаём премиум ТОЛЬКО при первом переходе в CONFIRMED.
-  const alreadyConfirmed = payment.status === 'CONFIRMED';
-  const nowConfirmed = status === 'CONFIRMED';
+  // Статус не откатываем назад: нотификации могут прийти не по порядку (ретраи),
+  // а CONFIRMED — терминальный успех. Возврат (REFUNDED) обрабатываем отдельно.
+  const keepConfirmed = payment.status === 'CONFIRMED' && status !== 'REFUNDED';
 
   await prisma.payment.update({
     where: { orderId },
     data: {
-      status: status || payment.status,
+      status: keepConfirmed ? payment.status : status || payment.status,
       paymentId: paymentId ?? payment.paymentId,
       rebillId: rebillId ?? payment.rebillId,
       errorCode,
@@ -56,18 +56,28 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  if (nowConfirmed && !alreadyConfirmed) {
+  // Сохранённую карту фиксируем на юзере СРАЗУ (не только внутри гранта) — иначе
+  // при гонке «опрос статуса выдал премиум раньше вебхука» RebillId бы потерялся,
+  // и рекуррент молча не запустился бы.
+  if (rebillId) {
+    await prisma.user
+      .update({ where: { id: payment.userId }, data: { tbankRebillId: rebillId } })
+      .catch((e) => logger.warn('tbank webhook: rebill save failed', { orderId, err: String(e) }));
+  }
+
+  // Выдача премиума ИДЕМПОТЕНТНА по orderId (атомарный клейм внутри) — вебхук,
+  // его ретраи и опрос статуса вместе выдадут ровно один период.
+  if (status === 'CONFIRMED') {
     try {
-      const until = await grantPremiumPeriod(payment.userId, {
-        rebillId,
-        note: `T-Bank ${payment.kind} ${orderId}`,
-      });
-      logger.info('tbank webhook: premium granted', {
-        userId: payment.userId,
-        orderId,
-        until: until.toISOString(),
-        rebillSaved: Boolean(rebillId),
-      });
+      const r = await grantPremiumForPayment(orderId, { rebillId, note: `T-Bank ${payment.kind} ${orderId}` });
+      if (r.granted) {
+        logger.info('tbank webhook: premium granted', {
+          userId: payment.userId,
+          orderId,
+          until: r.until?.toISOString(),
+          rebillSaved: Boolean(rebillId),
+        });
+      }
     } catch (e) {
       logger.error('tbank webhook: grant failed', e);
       // Не отвечаем OK — пусть T-Bank повторит, чтобы не потерять выдачу.

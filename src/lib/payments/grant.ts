@@ -37,3 +37,37 @@ export async function grantPremiumPeriod(
   });
   return premiumUntil;
 }
+
+/**
+ * Идемпотентная выдача премиума ПО ЗАКАЗУ. Атомарно «клеймит» Payment
+ * (premiumGrantedAt: null → now через updateMany) и продлевает премиум ровно один
+ * раз на orderId — сколько бы раз ни дёрнули (вебхук + ретраи + опрос статуса +
+ * гонки). Возвращает granted=false, если премиум по этому заказу уже выдан.
+ * rebillId берём из opts или из самой записи Payment (сохранён при Init/нотификации).
+ */
+export async function grantPremiumForPayment(
+  orderId: string,
+  opts: { rebillId?: string | null; note?: string; now?: Date } = {},
+): Promise<{ granted: boolean; until?: Date }> {
+  const now = opts.now ?? new Date();
+
+  // Атомарный клейм: пройдёт только у ОДНОГО вызова (count === 1).
+  const claim = await prisma.payment.updateMany({
+    where: { orderId, premiumGrantedAt: null },
+    data: { premiumGrantedAt: now },
+  });
+  if (claim.count !== 1) return { granted: false };
+
+  const payment = await prisma.payment.findUnique({
+    where: { orderId },
+    select: { userId: true, rebillId: true, kind: true },
+  });
+  if (!payment) return { granted: false };
+
+  const until = await grantPremiumPeriod(payment.userId, {
+    rebillId: opts.rebillId ?? payment.rebillId,
+    note: opts.note ?? `T-Bank ${payment.kind} ${orderId}`,
+    now,
+  });
+  return { granted: true, until };
+}

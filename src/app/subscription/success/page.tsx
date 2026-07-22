@@ -24,7 +24,9 @@ function SuccessInner() {
       try {
         const res = await fetch(`/api/payments/status?orderId=${encodeURIComponent(orderId)}`);
         const d = await res.json().catch(() => ({}));
-        if (!stopped && (d.paid || d.hasPremium)) {
+        // Успех — ТОЛЬКО если подтверждён ИМЕННО этот заказ (d.paid), а не любой
+        // уже имеющийся премиум (иначе отменённая оплата у премиум-юзера показала бы «успех»).
+        if (!stopped && d.paid) {
           invalidateSubscription();
           setState('paid');
           return;

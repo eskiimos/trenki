@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
 import { getTbankConfig, getState } from '@/lib/payments/tbank';
-import { grantPremiumPeriod } from '@/lib/payments/grant';
+import { grantPremiumForPayment } from '@/lib/payments/grant';
 import { hasPremium } from '@/lib/access';
 import { logger } from '@/lib/logger';
 
@@ -33,10 +33,10 @@ export async function GET(request: NextRequest) {
       const st = await getState(config, payment.paymentId);
       if (st.Success && st.Status) {
         status = st.Status;
-        const wasConfirmed = payment.status === 'CONFIRMED';
         await prisma.payment.update({ where: { orderId }, data: { status } });
-        if (status === 'CONFIRMED' && !wasConfirmed) {
-          await grantPremiumPeriod(payment.userId, { note: `T-Bank ${payment.kind} ${orderId}` });
+        // Идемпотентно по orderId: даже если вебхук уже выдал — второй раз не выдаст.
+        if (status === 'CONFIRMED') {
+          await grantPremiumForPayment(orderId, { note: `T-Bank ${payment.kind} ${orderId}` });
         }
       }
     } catch (e) {

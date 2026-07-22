@@ -6,18 +6,21 @@
  *
  * Берёт PREMIUM-юзеров с сохранённым tbankRebillId, у кого premiumUntil на исходе
  * (<= now + RENEW_BEFORE_DAYS), и списывает следующий период через chargeByRebill.
- * Премиум продлевает ВЕБХУК при CONFIRMED (как у первичного платежа) — здесь только
- * инициируем списание и пишем Payment(kind='charge'). Защита от повторных списаний:
- * пропускаем юзера, если у него есть свежая (< GUARD_HOURS) charge-попытка не в REJECTED.
+ * Charge синхронный: при CONFIRMED премиум продлевается ЗДЕСЬ же, идемпотентно по
+ * orderId (grantPremiumForPayment); вебхук по тому же orderId выдачу не задвоит.
+ * Защита от повторных списаний: пропускаем юзера со свежей (< GUARD_HOURS) charge-
+ * попыткой не в REJECTED (окно > суток покрывает суточный крон).
  *
- * ТЕСТ рекуррента без ожидания: ?userId=<id> с тем же Bearer — списать конкретного
- * юзера сейчас (игнорируя окно).
+ * ТЕСТ рекуррента без ожидания: ?userId=<id>&force=1 с тем же Bearer — списать
+ * конкретного юзера сейчас (снимает окно premiumUntil и guard). force=1 обязателен,
+ * иначе guard заблокирует повтор.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { getTbankConfig, chargeByRebill } from '@/lib/payments/tbank';
+import { getTbankConfig, chargeByRebill, getReturnOrigin } from '@/lib/payments/tbank';
+import { grantPremiumForPayment } from '@/lib/payments/grant';
 import { getSubscriptionPricing } from '@/lib/settings';
 import { AccessTier } from '@/generated/prisma';
 import { logger } from '@/lib/logger';
@@ -26,7 +29,7 @@ export const dynamic = 'force-dynamic';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const RENEW_BEFORE_DAYS = 1; // списываем за день до конца
-const GUARD_HOURS = 6; // не повторяем списание чаще, чем раз в 6ч
+const GUARD_HOURS = 25; // > суточного крона: одна charge-попытка на юзера в сутки
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -40,6 +43,9 @@ export async function GET(request: NextRequest) {
 
   const now = new Date();
   const forceUserId = request.nextUrl.searchParams.get('userId');
+  // ?force=1 — списать даже при свежей попытке (только для ручного теста рекуррента).
+  const force = request.nextUrl.searchParams.get('force') === '1';
+  const notificationURL = `${getReturnOrigin()}/api/webhook/tbank`;
 
   const candidates = forceUserId
     ? await prisma.user.findMany({
@@ -74,7 +80,7 @@ export async function GET(request: NextRequest) {
       },
       select: { id: true },
     });
-    if (recent && !forceUserId) { skipped++; continue; }
+    if (recent && !force) { skipped++; continue; }
 
     const orderId = `chg_${Date.now().toString(36)}_${crypto.randomBytes(4).toString('hex')}`;
     await prisma.payment.create({
@@ -87,19 +93,29 @@ export async function GET(request: NextRequest) {
         amountKopecks,
         rebillId: u.tbankRebillId,
         description: 'Продление подписки «Треньки»',
+        notificationURL,
       });
       const status = charge?.Status ?? init.Status ?? (init.Success ? 'NEW' : 'REJECTED');
       await prisma.payment.update({
         where: { orderId },
         data: { status, paymentId: init.PaymentId ?? null, errorCode: charge?.ErrorCode ?? init.ErrorCode ?? null },
       });
-      // Премиум продлит вебхук при CONFIRMED. Если банк сразу вернул CONFIRMED —
-      // тоже ок, вебхук отработает идемпотентно.
-      if (init.Success && (charge?.Success ?? false)) charged++;
-      else failed++;
+      // Charge — СИНХРОННЫЙ: при CONFIRMED продлеваем премиум ЗДЕСЬ же (идемпотентно
+      // по orderId), не полагаясь только на вебхук. Иначе premiumUntil не двигался бы
+      // и юзера списывало бы каждый день. Вебхук по этому же orderId вернёт granted=false.
+      if (status === 'CONFIRMED') {
+        await grantPremiumForPayment(orderId, { rebillId: u.tbankRebillId, note: `T-Bank charge ${orderId}` });
+        charged++;
+      } else if (init.Success && (charge?.Success ?? false)) {
+        charged++;
+      } else {
+        failed++;
+      }
     } catch (e) {
       logger.error('subscription-charge failed', { userId: u.id, orderId, e });
-      await prisma.payment.update({ where: { orderId }, data: { status: 'REJECTED', errorCode: 'CHARGE_ERROR' } }).catch(() => {});
+      // НЕ помечаем REJECTED вслепую: при таймауте деньги могли уйти. Оставляем
+      // статус NEW (попадёт под guard — повторно за сутки не спишем) + errorCode.
+      await prisma.payment.update({ where: { orderId }, data: { errorCode: 'CHARGE_ERROR' } }).catch(() => {});
       failed++;
     }
   }

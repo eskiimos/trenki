@@ -25,6 +25,11 @@ export function getTbankConfig(): TbankConfig | null {
   };
 }
 
+/** Базовый origin для Notification/Success/Fail URL. Из env TBANK_RETURN_ORIGIN. */
+export function getReturnOrigin(): string {
+  return (process.env.TBANK_RETURN_ORIGIN || 'https://trenki.app').replace(/\/+$/, '');
+}
+
 // Параметры, не участвующие в подписи Token.
 const EXCLUDED_FROM_TOKEN = new Set(['Token', 'Receipt', 'DATA']);
 
@@ -161,12 +166,13 @@ export interface ChargeResult {
  */
 export async function chargeByRebill(
   config: TbankConfig,
-  p: { orderId: string; amountKopecks: number; rebillId: string; description?: string },
+  p: { orderId: string; amountKopecks: number; rebillId: string; description?: string; notificationURL?: string },
 ): Promise<{ init: InitResult; charge?: ChargeResult }> {
   const init = await initPayment(config, {
     amountKopecks: p.amountKopecks,
     orderId: p.orderId,
     description: p.description,
+    notificationURL: p.notificationURL, // чтобы вебхук пришёл и по автосписанию тоже
   });
   if (!init.Success || !init.PaymentId) return { init };
   const charge = await callApi<ChargeResult>(config, 'Charge', {

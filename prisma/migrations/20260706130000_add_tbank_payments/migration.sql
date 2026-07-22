@@ -14,6 +14,7 @@ CREATE TABLE "payments" (
     "isRecurrentInit" BOOLEAN NOT NULL DEFAULT false,
     "rebillId" TEXT,
     "errorCode" TEXT,
+    "premiumGrantedAt" TIMESTAMP(3),
     "raw" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
