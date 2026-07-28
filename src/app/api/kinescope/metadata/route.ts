@@ -26,10 +26,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Video URL is required' }, { status: 400 });
     }
 
-    // Резолв реального URL воспроизведения — платный чокпоинт (defense-in-depth к videos/[id]).
-    // 'off' — сквозной; 'admins'/'on' — только с активной подпиской.
-    // Исключение — «бесплатное занятие недели» (сверяем по videoUrl этого видео).
-    const freeLessonId = await getFreeLessonVideoId();
+    // Резолв реального URL воспроизведения — платный чокпоинт (defense-in-depth к
+    // videos/[id]). Но этот роут резолвит ЛЮБОЙ kinescope-контент, в том числе
+    // БЕСПЛАТНЫЙ: шортсы и «занятие недели». Гейтим только платные видео-занятия,
+    // иначе при включённом paywall ломаются шортсы (они бесплатны по продукту).
+    const [freeLessonId, short] = await Promise.all([
+      getFreeLessonVideoId(),
+      prisma.short.findFirst({ where: { videoUrl }, select: { id: true } }),
+    ]);
+
     let isFreeLesson = false;
     if (freeLessonId) {
       const free = await prisma.video.findUnique({
@@ -38,7 +43,8 @@ export async function POST(request: NextRequest) {
       });
       isFreeLesson = !!free && free.videoUrl === videoUrl;
     }
-    if (!isFreeLesson) {
+
+    if (!short && !isFreeLesson) {
       const blocked = await gatePaidContent(request);
       if (blocked) return blocked;
     }
