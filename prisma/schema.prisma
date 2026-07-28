@@ -972,7 +972,9 @@ model AppSetting {
 
 // Платежи T-Bank (аудит + связь заказа с юзером). Amount ВСЕГДА в копейках.
 // status — из T-Bank: NEW/FORM_SHOWED/AUTHORIZED/CONFIRMED/REJECTED/REFUNDED/...
-// kind: 'init' — первичный (Recurrent=Y, с редиректом); 'charge' — автосписание по rebillId.
+// Оплата РАЗОВАЯ (30 дней доступа), автосписаний нет. kind оставлен на будущее:
+// сейчас всегда 'init'. Поля isRecurrentInit/rebillId — легаси рекуррента, не
+// используются; удалим отдельной миграцией, если рекуррент не вернём.
 model Payment {
   id              String   @id @default(cuid())
   orderId         String   @unique // наш OrderId, переданный в T-Bank (уникальный)

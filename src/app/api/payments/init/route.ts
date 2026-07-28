@@ -6,9 +6,10 @@ import { getTbankConfig, initPayment } from '@/lib/payments/tbank';
 import { getSubscriptionPricing } from '@/lib/settings';
 import { logger } from '@/lib/logger';
 
-// POST /api/payments/init — старт оформления подписки (рекуррент).
-// Создаёт Payment(NEW), зовёт T-Bank Init с Recurrent=Y и CustomerKey=user.id,
-// возвращает PaymentURL для редиректа. Реальный статус — из вебхука + GetState.
+// POST /api/payments/init — старт оплаты доступа. Оплата РАЗОВАЯ: списание один
+// раз, премиум на 30 дней, продление — вручную новой оплатой (автосписания нет).
+// Создаёт Payment(NEW), зовёт T-Bank Init, возвращает PaymentURL для редиректа.
+// Реальный статус — из вебхука + GetState, а не из редиректа.
 export const dynamic = 'force-dynamic';
 
 function returnOrigin(): string {
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
 
   // Запись заказа ДО обращения к банку (аудит + идемпотентность по orderId).
   await prisma.payment.create({
-    data: { orderId, userId: user.id, amountKopecks, status: 'NEW', kind: 'init', isRecurrentInit: true },
+    data: { orderId, userId: user.id, amountKopecks, status: 'NEW', kind: 'init', isRecurrentInit: false },
   });
 
   let res;
@@ -40,9 +41,10 @@ export async function POST(request: NextRequest) {
     res = await initPayment(config, {
       amountKopecks,
       orderId,
-      description: 'Подписка «Треньки» (1 месяц)',
-      customerKey: user.id, // стабильный ключ клиента для рекуррента
-      recurrent: true,
+      description: 'Доступ «Треньки» на 30 дней',
+      customerKey: user.id, // стабильный ключ клиента на стороне банка
+      // Recurrent НЕ передаём: оплата разовая, автосписания нет. Это ещё и
+      // требование тест-кейса №1 T-Bank («не передавайте Recurrent=Y»).
       notificationURL: `${origin}/api/webhook/tbank`,
       successURL: `${origin}/subscription/success?orderId=${orderId}`,
       failURL: `${origin}/subscription/fail?orderId=${orderId}`,

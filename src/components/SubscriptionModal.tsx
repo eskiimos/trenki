@@ -167,7 +167,7 @@ export default function SubscriptionModal() {
           }}
         >
           <div style={{ color: '#F9F8FE', fontSize: 22, fontWeight: 900 }}>
-            {pricing.priceMonthlyRub} ₽<span style={{ fontSize: 14, color: '#AEABBB', fontWeight: 700 }}>/мес</span>
+            {pricing.priceMonthlyRub} ₽<span style={{ fontSize: 14, color: '#AEABBB', fontWeight: 700 }}> / 30 дней</span>
           </div>
           {pricing.introDiscountPercent > 0 && pricing.introMonths > 0 && (
             <div style={{ color: '#AEABBB', fontSize: 13, marginTop: 2 }}>
@@ -225,7 +225,8 @@ export default function SubscriptionModal() {
           <p style={{ color: '#FF6B6B', fontSize: 12, textAlign: 'center', marginTop: 8 }}>{payError}</p>
         )}
         <p style={{ color: '#6E6B7B', fontSize: 11, textAlign: 'center', marginTop: 10, lineHeight: 1.4 }}>
-          Оплата картой. Списание {pricing.priceMonthlyRub} ₽/мес, отменить можно в любой момент.
+          Оплата картой — разовая, за 30 дней доступа. Автосписаний нет: когда срок
+          закончится, продлить можно вручную.
         </p>
       </div>
     </div>
