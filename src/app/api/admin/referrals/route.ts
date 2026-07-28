@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminAsync } from '@/lib/admin-session';
+import { hasPremium } from '@/lib/access';
 
 // Админ-API реферальных каналов. Только isAdmin (requireAdminAsync).
 //  GET    — список кодов + статистика (регистрации / прошли онбординг / активны
@@ -39,6 +40,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true, firstName: true, lastName: true, email: true, role: true,
         createdAt: true, lastActivity: true, referralCode: true,
+        accessTier: true, premiumUntil: true,
         profile: { select: { id: true } },
         coachProfile: { select: { userId: true } },
       },
@@ -57,6 +59,8 @@ export async function GET(request: NextRequest) {
     const withUsers = codes.map((c) => {
       const users = byCode.get(c.code) ?? [];
       const onboarded = users.filter((u) => u.profile || u.coachProfile).length;
+      // Премиум «на сейчас» — единая проверка hasPremium (PREMIUM + срок не истёк).
+      const premium = users.filter((u) => hasPremium(u)).length;
       const active7d = users.filter((u) => {
         const la = new Date(u.lastActivity).getTime();
         const ca = new Date(u.createdAt).getTime();
@@ -64,13 +68,14 @@ export async function GET(request: NextRequest) {
       }).length;
       return {
         id: c.id, code: c.code, label: c.label, aliases: c.aliases, isActive: c.isActive, note: c.note, createdAt: c.createdAt,
-        stats: { registrations: users.length, onboarded, active7d },
+        stats: { registrations: users.length, onboarded, active7d, premium },
         users: users.map((u) => ({
           id: u.id,
           name: `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || '—',
           email: u.email,
           role: u.role,
           onboarded: !!(u.profile || u.coachProfile),
+          premium: hasPremium(u),
           createdAt: u.createdAt,
           lastActivity: u.lastActivity,
         })),

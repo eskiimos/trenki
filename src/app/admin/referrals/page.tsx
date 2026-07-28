@@ -13,6 +13,7 @@ interface RefUser {
   email: string | null;
   role: string;
   onboarded: boolean;
+  premium: boolean;
   createdAt: string;
   lastActivity: string;
 }
@@ -24,7 +25,7 @@ interface RefCode {
   isActive: boolean;
   note: string | null;
   createdAt: string;
-  stats: { registrations: number; onboarded: number; active7d: number };
+  stats: { registrations: number; onboarded: number; active7d: number; premium: number };
   users: RefUser[];
 }
 
@@ -111,9 +112,9 @@ export default function AdminReferralsPage() {
       if (/^[=+\-@\t\r]/.test(v)) v = `'${v}`;
       return `"${v.replace(/"/g, '""')}"`;
     };
-    const header = ['Имя', 'Email', 'Роль', 'Онбординг', 'Регистрация', 'Последняя активность'];
+    const header = ['Имя', 'Email', 'Роль', 'Онбординг', 'Премиум', 'Регистрация', 'Последняя активность'];
     const rows = c.users.map((u) => [
-      u.name, u.email || '', u.role, u.onboarded ? 'да' : 'нет',
+      u.name, u.email || '', u.role, u.onboarded ? 'да' : 'нет', u.premium ? 'да' : 'нет',
       new Date(u.createdAt).toISOString().slice(0, 10),
       new Date(u.lastActivity).toISOString().slice(0, 10),
     ].map(esc).join(','));
@@ -183,9 +184,10 @@ export default function AdminReferralsPage() {
                   <div className="text-gray-500 text-xs mt-0.5">промокоды: {c.aliases.join(', ')}</div>
                 )}
               </div>
-              <div className="flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-2 text-xs flex-wrap justify-end">
                 <span className="text-[#A1FF4A] font-bold">{c.stats.registrations}</span><span className="text-gray-500">рег.</span>
-                <span className="text-gray-300">{c.stats.onboarded}</span><span className="text-gray-500">онб.</span>
+                <span className="text-gray-300" title="Прошёл онбординг — заполнен профиль">{c.stats.onboarded}</span><span className="text-gray-500">действ.</span>
+                <span className="text-amber-400 font-bold" title="Активная подписка сейчас">{c.stats.premium}</span><span className="text-gray-500">премиум</span>
                 <span className="text-gray-300">{c.stats.active7d}</span><span className="text-gray-500">акт.7д</span>
               </div>
             </div>
@@ -214,7 +216,7 @@ export default function AdminReferralsPage() {
                     <thead>
                       <tr className="text-gray-500 text-left">
                         <th className="py-1 pr-2">Имя</th><th className="py-1 pr-2">Email</th><th className="py-1 pr-2">Роль</th>
-                        <th className="py-1 pr-2">Онб.</th><th className="py-1 pr-2">Дата</th>
+                        <th className="py-1 pr-2">Действ.</th><th className="py-1 pr-2">Премиум</th><th className="py-1 pr-2">Дата</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -224,6 +226,7 @@ export default function AdminReferralsPage() {
                           <td className="py-1.5 pr-2 text-gray-400">{u.email || '—'}</td>
                           <td className="py-1.5 pr-2 text-gray-400">{u.role === 'COACH' ? 'тренер' : 'атлет'}</td>
                           <td className="py-1.5 pr-2">{u.onboarded ? '✓' : '—'}</td>
+                          <td className="py-1.5 pr-2">{u.premium ? <span className="text-amber-400">★</span> : '—'}</td>
                           <td className="py-1.5 pr-2 text-gray-400">{new Date(u.createdAt).toLocaleDateString('ru-RU')}</td>
                         </tr>
                       ))}

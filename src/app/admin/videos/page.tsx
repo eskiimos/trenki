@@ -116,6 +116,9 @@ const AdminVideosPage = () => {
     ageGroups: [] as string[],
     trainingGoals: [] as string[],
     audience: 'HOCKEY',
+    // СФП: подходит не только хоккею → список видов спорта
+    isSfp: false,
+    sports: [] as string[],
   };
   
   // Данные формы
@@ -184,6 +187,8 @@ const AdminVideosPage = () => {
         ageGroups: formData.ageGroups,
         trainingGoals: formData.trainingGoals,
         audience: formData.audience,
+        isSfp: formData.isSfp,
+        sports: formData.isSfp ? formData.sports : [],
       };
 
       console.log('Sending payload:', payload);
@@ -521,6 +526,8 @@ const AdminVideosPage = () => {
       ageGroups: (video as any).ageGroups || [],
       trainingGoals: (video as any).trainingGoals || [],
       audience: (video as any).audience || 'HOCKEY',
+      isSfp: Boolean((video as any).isSfp),
+      sports: (video as any).sports || [],
     });
     
     // Загружаем теги из базы данных для этого видео
@@ -1822,6 +1829,61 @@ const AdminVideosPage = () => {
                     <p className="text-xs text-gray-400 mt-2">
                       ✓ Выбрано: {formData.ageGroups.length > 0 ? `${formData.ageGroups.length} из 4` : 'Не указано'}
                     </p>
+
+                    {/* СФП — подходит не только хоккею */}
+                    <div className="mt-5 pt-4 border-t border-green-900/40">
+                      <label className="flex items-center gap-2 p-2 rounded hover:bg-green-900/20 cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={formData.isSfp}
+                          onChange={(e) =>
+                            setFormData(prev => ({
+                              ...prev,
+                              isSfp: e.target.checked,
+                              sports: e.target.checked ? prev.sports : [],
+                            }))
+                          }
+                          className="w-5 h-5 rounded border-2 border-green-500 bg-[#2d3448] checked:bg-green-600 checked:border-green-600 focus:ring-2 focus:ring-green-500 cursor-pointer"
+                        />
+                        <span className="text-sm font-medium text-green-300">🏋️ СФП (общая физподготовка)</span>
+                      </label>
+                      <p className="text-xs text-gray-400 ml-9 -mt-1">
+                        Тренировка подходит не только хоккею — укажи виды спорта
+                      </p>
+
+                      {formData.isSfp && (
+                        <div className="mt-3 ml-9">
+                          <div className="grid grid-cols-2 gap-2">
+                            {([
+                              ['HOCKEY', '🏒 Хоккей'],
+                              ['FOOTBALL', '⚽ Футбол'],
+                              ['BASKETBALL', '🏀 Баскетбол'],
+                              ['BOXING', '🥊 Бокс'],
+                            ] as const).map(([value, label]) => (
+                              <label key={value} className="flex items-center gap-2 p-2 rounded hover:bg-green-900/20 cursor-pointer transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={formData.sports.includes(value)}
+                                  onChange={(e) =>
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      sports: e.target.checked
+                                        ? [...prev.sports, value]
+                                        : prev.sports.filter(s => s !== value),
+                                    }))
+                                  }
+                                  className="w-5 h-5 rounded border-2 border-green-500 bg-[#2d3448] checked:bg-green-600 checked:border-green-600 focus:ring-2 focus:ring-green-500 cursor-pointer"
+                                />
+                                <span className="text-sm text-gray-200">{label}</span>
+                              </label>
+                            ))}
+                          </div>
+                          {formData.sports.length === 0 && (
+                            <p className="text-xs text-amber-400 mt-2">Выбери хотя бы один вид спорта</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Цели тренировок (множественный выбор) */}

@@ -157,6 +157,8 @@ export async function POST(request: NextRequest) {
       ageGroups, // НОВОЕ для Алгоритма 2.0
       trainingGoals, // НОВОЕ для Алгоритма 2.0
       audience,
+      isSfp, // СФП: подходит не только хоккею
+      sports, // виды спорта (только если isSfp)
     } = body;
 
     if (!title || !videoUrl || !category || !difficulty || !trainerId) {
@@ -211,6 +213,9 @@ export async function POST(request: NextRequest) {
     // Обрабатываем массивы для Алгоритма 2.0
     const ageGroupsArray = Array.isArray(ageGroups) ? ageGroups : [];
     const trainingGoalsArray = Array.isArray(trainingGoals) ? trainingGoals : [];
+    // СФП: виды спорта имеют смысл только при поднятой галочке.
+    const isSfpFlag = Boolean(isSfp);
+    const sportsArray = isSfpFlag && Array.isArray(sports) ? sports : [];
 
     console.log('isPublished value:', isPublished, 'type:', typeof isPublished);
     console.log('moduleTypeRaw:', moduleTypeRaw, '→ moduleTypeEnum:', moduleTypeEnum);
@@ -241,6 +246,8 @@ export async function POST(request: NextRequest) {
         ageGroups: ageGroupsArray, // НОВОЕ
         trainingGoals: trainingGoalsArray, // НОВОЕ
         audience: audience || 'HOCKEY',
+        isSfp: isSfpFlag,
+        sports: sportsArray as any,
       },
       include: {
         trainer: true

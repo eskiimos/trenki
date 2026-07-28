@@ -190,6 +190,11 @@ model Video {
   ageGroups     AgeGroup[] // целевые возрастные группы (массив)
   audience      Audience       @default(HOCKEY) // для какого субдомена
 
+  // СФП (специальная физическая подготовка). Если isSfp — тренировка подходит
+  // не только хоккею: в sports перечислены виды спорта. Пусто при isSfp=false.
+  isSfp  Boolean @default(false)
+  sports Sport[]
+
   favorites           FavoriteVideo[]
   trainingModules     TrainingModule[]
   sessions            TrainingSession[]
@@ -492,6 +497,14 @@ enum Audience {
   HOCKEY
   ADAPTIVE
   ALL
+}
+
+// Виды спорта для СФП-видео (Video.isSfp + Video.sports).
+enum Sport {
+  HOCKEY
+  FOOTBALL
+  BASKETBALL
+  BOXING
 }
 
 enum VideoCategory {

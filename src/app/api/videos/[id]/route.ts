@@ -38,6 +38,8 @@ export async function GET(
         rpeMax: true,
         ageGroups: true,
         trainingGoals: true,
+        isSfp: true,
+        sports: true,
         trainer: {
           select: {
             id: true,
@@ -94,6 +96,8 @@ export async function PUT(
       ageGroups,
       trainingGoals,
       audience,
+      isSfp,
+      sports,
     } = body;
 
     if (!title || !videoUrl || !category || !difficulty || !trainerId) {
@@ -146,6 +150,9 @@ export async function PUT(
     // Обрабатываем массивы для Алгоритма 2.0
     const ageGroupsArray = Array.isArray(ageGroups) ? ageGroups : [];
     const trainingGoalsArray = Array.isArray(trainingGoals) ? trainingGoals : [];
+    // СФП: снятая галочка обнуляет список видов спорта.
+    const isSfpFlag = Boolean(isSfp);
+    const sportsArray = isSfpFlag && Array.isArray(sports) ? sports : [];
     
     console.log('Updating video - loadType:', body.loadType, '→', loadTypeValue);
     console.log('Updating video - ageGroups:', ageGroupsArray);
@@ -176,6 +183,8 @@ export async function PUT(
         ageGroups: ageGroupsArray,
         trainingGoals: trainingGoalsArray,
         audience: audience || undefined,
+        isSfp: isSfpFlag,
+        sports: sportsArray as any,
       },
       include: {
         trainer: {
