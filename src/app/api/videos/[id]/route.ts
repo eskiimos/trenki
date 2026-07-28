@@ -2,18 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminAsync } from '@/lib/admin-session';
 import { gatePaidContent } from '@/lib/coach/guards';
+import { getFreeLessonVideoId } from '@/lib/settings';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+
     // Видео-занятия — платный контент (Трек A, п.6). В режиме paywall 'off' гейт
     // сквозной (поведение как раньше); при 'admins'/'on' — не отдаём videoUrl без подписки.
-    const blocked = await gatePaidContent(request);
-    if (blocked) return blocked;
-
-    const { id } = await params;
+    // Исключение — «бесплатное занятие недели»: оно открыто всем.
+    const freeLessonId = await getFreeLessonVideoId();
+    if (id !== freeLessonId) {
+      const blocked = await gatePaidContent(request);
+      if (blocked) return blocked;
+    }
 
     const video = await prisma.video.findUnique({
       where: { id },

@@ -40,6 +40,48 @@ export default function PaywallAdminPage() {
   const [savingPrice, setSavingPrice] = useState(false);
   const [priceMsg, setPriceMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
+  // «Бесплатное занятие недели» — выбирается вручную из списка опубликованных видео.
+  const [freeLesson, setFreeLesson] = useState<{ id: string; title: string } | null>(null);
+  const [videos, setVideos] = useState<Array<{ id: string; title: string }>>([]);
+  const [pickedVideoId, setPickedVideoId] = useState('');
+  const [savingLesson, setSavingLesson] = useState(false);
+  const [lessonMsg, setLessonMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/videos', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (Array.isArray(d?.videos)) {
+          setVideos(d.videos.map((v: { id: string; title: string }) => ({ id: v.id, title: v.title })));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const saveFreeLesson = async (videoId: string) => {
+    setSavingLesson(true);
+    setLessonMsg(null);
+    try {
+      const res = await fetch('/api/admin/paywall', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ freeLessonVideoId: videoId }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setLessonMsg({ type: 'err', text: d?.error || 'Ошибка сохранения' });
+        return;
+      }
+      setFreeLesson(d.freeLesson ?? null);
+      setPickedVideoId('');
+      setLessonMsg({ type: 'ok', text: d.freeLesson ? 'Занятие недели обновлено ✓' : 'Занятие недели снято' });
+    } catch {
+      setLessonMsg({ type: 'err', text: 'Сетевая ошибка' });
+    } finally {
+      setSavingLesson(false);
+    }
+  };
+
   useEffect(() => {
     (async () => {
       try {
@@ -52,6 +94,7 @@ export default function PaywallAdminPage() {
             setDiscount(String(d.pricing.introDiscountPercent ?? 75));
             setMonths(String(d.pricing.introMonths ?? 3));
           }
+          setFreeLesson(d?.freeLesson ?? null);
         }
       } catch {
         /* ignore */
@@ -283,6 +326,115 @@ export default function PaywallAdminPage() {
               >
                 {savingPrice ? 'Сохраняю…' : 'Сохранить цены'}
               </button>
+            </section>
+
+            {/* Бесплатное занятие недели */}
+            <section
+              style={{
+                marginTop: 16,
+                background: '#0B1030',
+                border: '1px solid #26252F',
+                borderRadius: 16,
+                padding: 18,
+              }}
+            >
+              <div style={{ color: '#F9F8FE', fontWeight: 800, fontSize: 15, marginBottom: 4 }}>
+                🎁 Бесплатное занятие недели
+              </div>
+              <div style={{ color: '#AEABBB', fontSize: 12.5, lineHeight: 1.45, marginBottom: 12 }}>
+                Это видео открыто всем даже при включённом paywall. Меняй раз в неделю.
+              </div>
+
+              <div
+                style={{
+                  padding: 12,
+                  borderRadius: 10,
+                  background: '#060919',
+                  border: '1px solid #26252F',
+                  marginBottom: 12,
+                }}
+              >
+                <div style={{ color: '#AEABBB', fontSize: 12 }}>Сейчас выбрано:</div>
+                <div style={{ color: freeLesson ? '#A1FF4A' : '#6E6B7B', fontSize: 14, fontWeight: 700, marginTop: 2 }}>
+                  {freeLesson ? freeLesson.title : '— не задано (все видео платные) —'}
+                </div>
+              </div>
+
+              <select
+                value={pickedVideoId}
+                onChange={(e) => setPickedVideoId(e.target.value)}
+                disabled={savingLesson}
+                style={{
+                  width: '100%',
+                  background: '#060919',
+                  border: '1px solid #26252F',
+                  borderRadius: 10,
+                  padding: '12px 14px',
+                  color: '#F9F8FE',
+                  fontSize: 14,
+                  outline: 'none',
+                }}
+              >
+                <option value="">— выбрать видео —</option>
+                {videos.map((v) => (
+                  <option key={v.id} value={v.id}>{v.title}</option>
+                ))}
+              </select>
+
+              {lessonMsg && (
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    marginTop: 10,
+                    color: lessonMsg.type === 'ok' ? '#A1FF4A' : '#FF6B6B',
+                  }}
+                >
+                  {lessonMsg.text}
+                </div>
+              )}
+
+              <div className="flex gap-2 flex-wrap" style={{ marginTop: 14 }}>
+                <button
+                  type="button"
+                  onClick={() => pickedVideoId && saveFreeLesson(pickedVideoId)}
+                  disabled={savingLesson || !pickedVideoId}
+                  className="font-overpass uppercase transition-transform active:scale-95"
+                  style={{
+                    background: '#A1FF4A',
+                    color: '#060919',
+                    border: 'none',
+                    borderRadius: 999,
+                    padding: '12px 22px',
+                    fontWeight: 900,
+                    fontSize: 13,
+                    cursor: savingLesson || !pickedVideoId ? 'not-allowed' : 'pointer',
+                    opacity: savingLesson || !pickedVideoId ? 0.5 : 1,
+                  }}
+                >
+                  {savingLesson ? 'Сохраняю…' : 'Назначить'}
+                </button>
+                {freeLesson && (
+                  <button
+                    type="button"
+                    onClick={() => saveFreeLesson('')}
+                    disabled={savingLesson}
+                    className="font-overpass uppercase"
+                    style={{
+                      background: '#2d3448',
+                      color: '#AEABBB',
+                      border: 'none',
+                      borderRadius: 999,
+                      padding: '12px 18px',
+                      fontWeight: 800,
+                      fontSize: 12,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Снять
+                  </button>
+                )}
+              </div>
             </section>
 
             <div

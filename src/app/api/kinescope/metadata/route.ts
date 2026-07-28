@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { gatePaidContent } from '@/lib/coach/guards';
+import { getFreeLessonVideoId } from '@/lib/settings';
+import { prisma } from '@/lib/prisma';
 
 // In-memory кэш метаданных Kinescope.
 // Kinescope CDN ссылки на assets обычно не меняются для одного видео,
@@ -18,15 +20,27 @@ const inflight = new Map<string, Promise<any>>();
 
 export async function POST(request: NextRequest) {
   try {
-    // Резолв реального URL воспроизведения — платный чокпоинт (defense-in-depth к videos/[id]).
-    // 'off' — сквозной; 'admins'/'on' — только с активной подпиской.
-    const blocked = await gatePaidContent(request);
-    if (blocked) return blocked;
-
     const { videoUrl } = await request.json();
 
     if (!videoUrl) {
       return NextResponse.json({ error: 'Video URL is required' }, { status: 400 });
+    }
+
+    // Резолв реального URL воспроизведения — платный чокпоинт (defense-in-depth к videos/[id]).
+    // 'off' — сквозной; 'admins'/'on' — только с активной подпиской.
+    // Исключение — «бесплатное занятие недели» (сверяем по videoUrl этого видео).
+    const freeLessonId = await getFreeLessonVideoId();
+    let isFreeLesson = false;
+    if (freeLessonId) {
+      const free = await prisma.video.findUnique({
+        where: { id: freeLessonId },
+        select: { videoUrl: true },
+      });
+      isFreeLesson = !!free && free.videoUrl === videoUrl;
+    }
+    if (!isFreeLesson) {
+      const blocked = await gatePaidContent(request);
+      if (blocked) return blocked;
     }
 
     // Извлекаем ID видео из URL Kinescope

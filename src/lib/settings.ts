@@ -18,6 +18,7 @@ export const SETTING_KEYS = {
   preworkoutEarlyMin: 'reminder.preworkoutEarlyMin', // минут до тренировки — раннее
   preworkoutLateMin: 'reminder.preworkoutLateMin', // минут до тренировки — позднее
   paywallMode: 'paywall.mode', // 'off' | 'admins' | 'on' — роллаут-контроль paywall
+  freeLessonVideoId: 'freeLesson.videoId', // «бесплатное занятие недели» — id видео, открытого всем
   priceMonthly: 'subscription.priceMonthlyRub', // базовая цена подписки ₽/мес
   introDiscountPercent: 'subscription.introDiscountPercent', // макс. скидка по промо, %
   introMonths: 'subscription.introMonths', // на сколько месяцев действует интро-скидка
@@ -114,6 +115,23 @@ export async function getPaywallMode(): Promise<PaywallMode> {
     return normalizePaywallMode(row?.value);
   } catch {
     return normalizePaywallMode(undefined); // таблицы может не быть — 'off'
+  }
+}
+
+/**
+ * «Бесплатное занятие недели» — id видео, открытого всем даже при активном
+ * paywall. Ставится вручную из админки. null — не задано.
+ */
+export async function getFreeLessonVideoId(): Promise<string | null> {
+  try {
+    const row = await prisma.appSetting.findUnique({
+      where: { key: SETTING_KEYS.freeLessonVideoId },
+      select: { value: true },
+    });
+    const v = (row?.value ?? '').trim();
+    return v || null;
+  } catch {
+    return null; // таблицы может не быть — считаем, что не задано
   }
 }
 

@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAsync } from '@/lib/admin-session';
-import { getPaywallMode, getSubscriptionPricing, setAppSetting, SETTING_KEYS } from '@/lib/settings';
+import {
+  getPaywallMode,
+  getSubscriptionPricing,
+  getFreeLessonVideoId,
+  setAppSetting,
+  SETTING_KEYS,
+} from '@/lib/settings';
+import { prisma } from '@/lib/prisma';
 import { PAYWALL_MODES, normalizePaywallMode } from '@/lib/paywall';
 import { logger } from '@/lib/logger';
 
@@ -14,8 +21,19 @@ export async function GET(request: NextRequest) {
   const denied = await requireAdminAsync(request);
   if (denied) return denied;
   try {
-    const [mode, pricing] = await Promise.all([getPaywallMode(), getSubscriptionPricing()]);
-    return NextResponse.json({ mode, modes: PAYWALL_MODES, pricing });
+    const [mode, pricing, freeLessonVideoId] = await Promise.all([
+      getPaywallMode(),
+      getSubscriptionPricing(),
+      getFreeLessonVideoId(),
+    ]);
+    // Название текущего бесплатного занятия — чтобы админ видел, что выбрано.
+    const freeLesson = freeLessonVideoId
+      ? await prisma.video.findUnique({
+          where: { id: freeLessonVideoId },
+          select: { id: true, title: true, isPublished: true },
+        })
+      : null;
+    return NextResponse.json({ mode, modes: PAYWALL_MODES, pricing, freeLesson });
   } catch (error) {
     logger.error('admin/paywall GET failed', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
@@ -68,7 +86,24 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ pricing });
     }
 
-    return NextResponse.json({ error: 'Нужен mode или pricing' }, { status: 400 });
+    // Ветка 3: «бесплатное занятие недели». Пустая строка — снять.
+    if (typeof body.freeLessonVideoId === 'string') {
+      const id = body.freeLessonVideoId.trim();
+      if (id) {
+        const video = await prisma.video.findUnique({ where: { id }, select: { id: true, title: true, isPublished: true } });
+        if (!video) {
+          return NextResponse.json({ error: 'Видео с таким id не найдено' }, { status: 400 });
+        }
+        await setAppSetting(SETTING_KEYS.freeLessonVideoId, video.id);
+        logger.info('admin set free lesson', { videoId: video.id });
+        return NextResponse.json({ freeLesson: video });
+      }
+      await setAppSetting(SETTING_KEYS.freeLessonVideoId, '');
+      logger.info('admin cleared free lesson');
+      return NextResponse.json({ freeLesson: null });
+    }
+
+    return NextResponse.json({ error: 'Нужен mode, pricing или freeLessonVideoId' }, { status: 400 });
   } catch (error) {
     logger.error('admin/paywall PATCH failed', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

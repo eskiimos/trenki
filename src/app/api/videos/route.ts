@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { updateUserActivity } from '@/lib/updateUserActivity';
 import { requireAdminAsync } from '@/lib/admin-session';
 import { getSessionUserId } from '@/lib/auth-server';
+import { getFreeLessonVideoId } from '@/lib/settings';
 
 export async function GET(request: NextRequest) {
   try {
@@ -109,7 +110,9 @@ export async function GET(request: NextRequest) {
       await updateUserActivity(sessionUserId);
     }
 
-    return NextResponse.json({ videos: formattedVideos });
+    // id «бесплатного занятия недели» — чтобы каталог мог пометить его бейджем.
+    const freeLessonVideoId = await getFreeLessonVideoId();
+    return NextResponse.json({ videos: formattedVideos, freeLessonVideoId });
   } catch (error) {
     console.error('Error fetching videos:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
