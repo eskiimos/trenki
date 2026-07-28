@@ -59,7 +59,14 @@ export default function MicrocycleFeedbackModal({
         throw new Error(data?.error || 'Не удалось закрыть неделю');
       }
       onSubmitted?.();
-      router.push(goTrain ? '/training/assessment' : '/');
+      if (goTrain) {
+        router.push('/training/assessment');
+        return;
+      }
+      // «Позже» — просто закрываем окно. router.push('/') не годится: модалка
+      // живёт на главной, навигация «в себя» не размонтирует её и окно зависало.
+      setAckSubmitting(false);
+      onClose();
     } catch (err: any) {
       setError(err?.message || 'Ошибка');
       setAckSubmitting(false);

@@ -15,9 +15,13 @@ const VIDEO_CACHE_NAME = 'trenki-videos-v3';
  */
 function notifySwVideo(type: 'VIDEO_CACHED' | 'VIDEO_REMOVED', url: string) {
   try {
-    navigator.serviceWorker?.controller?.postMessage({ type, url });
+    // Именно через ready + active: controller бывает null (первая загрузка после
+    // регистрации, hard-reload), и тогда сообщение молча терялось бы.
+    navigator.serviceWorker?.ready
+      ?.then((reg) => reg.active?.postMessage({ type, url }))
+      .catch(() => {});
   } catch {
-    // SW недоступен — не критично, реестр поднимется при следующей активации
+    // SW недоступен — не критично: реестр лениво поднимется из кэша в самом воркере
   }
 }
 

@@ -76,6 +76,10 @@ export async function GET(request: NextRequest) {
       muscleGroup: video.muscleGroup,
       ageGroups: video.ageGroups,
       trainingGoals: video.trainingGoals,
+      // СФП: без этих полей форма админки читала undefined и при любом
+      // сохранении затирала СФП-разметку видео.
+      isSfp: video.isSfp,
+      sports: video.sports,
     }));
 
     return NextResponse.json({ videos: formattedVideos });

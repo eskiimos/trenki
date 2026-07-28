@@ -63,13 +63,20 @@ const WatchHistoryPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   // Две вкладки: составленные тренировки и отдельные видео (решение владельца —
   // одиночные просмотры не теряем).
-  const [tab, setTab] = useState<'workouts' | 'videos'>('workouts');
+  // Стартуем с «Видео»: у большинства избранных тренировок ещё нет, и вкладка
+  // по умолчанию встречала бы пустым экраном. Переключаемся на «Тренировки»
+  // автоматически, если они есть.
+  const [tab, setTab] = useState<'workouts' | 'videos'>('videos');
   const [workouts, setWorkouts] = useState<FavWorkout[]>([]);
 
   useEffect(() => {
     fetch('/api/favorites/workouts')
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setWorkouts(d?.workouts ?? []))
+      .then((d) => {
+        const list = d?.workouts ?? [];
+        setWorkouts(list);
+        if (list.length > 0) setTab('workouts');
+      })
       .catch(() => {});
   }, []);
 

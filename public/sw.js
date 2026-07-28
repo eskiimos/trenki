@@ -8,6 +8,11 @@ const VIDEO_CACHE_NAME = 'trenki-videos-v3';
 // для нескачанного видео это гарантированный промах кэша + проксирование каждого
 // byte-range запроса через SW — отсюда «долго грузит» и лишние ребуферы.
 let downloadedVideoUrls = new Set();
+// Промис-латч ленивой инициализации. Воркер усыпляется по простою и при
+// пробуждении скрипт перевычисляется заново, а 'activate' повторно НЕ приходит —
+// поэтому реестр надо уметь поднимать из кэша на первом же медиа-запросе,
+// иначе скачанные ролики перестают играть офлайн.
+let registryReady = null;
 
 async function refreshDownloadedVideos() {
   try {
@@ -19,15 +24,26 @@ async function refreshDownloadedVideos() {
   }
 }
 
+function ensureRegistry() {
+  if (!registryReady) registryReady = refreshDownloadedVideos();
+  return registryReady;
+}
+
 // Страница сообщает о скачивании/удалении ролика, чтобы реестр не устаревал.
 self.addEventListener('message', (event) => {
   const data = event.data || {};
   if (data.type === 'VIDEO_CACHED' && data.url) {
-    downloadedVideoUrls.add(new URL(data.url, self.location.origin).href);
+    // Реестр мог быть ещё не поднят — сначала инициализируем, потом добавляем.
+    event.waitUntil(ensureRegistry().then(() => {
+      downloadedVideoUrls.add(new URL(data.url, self.location.origin).href);
+    }));
   } else if (data.type === 'VIDEO_REMOVED' && data.url) {
-    downloadedVideoUrls.delete(new URL(data.url, self.location.origin).href);
+    event.waitUntil(ensureRegistry().then(() => {
+      downloadedVideoUrls.delete(new URL(data.url, self.location.origin).href);
+    }));
   } else if (data.type === 'VIDEOS_REFRESH') {
-    event.waitUntil(refreshDownloadedVideos());
+    registryReady = refreshDownloadedVideos();
+    event.waitUntil(registryReady);
   }
 });
 
@@ -66,7 +82,10 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    }).then(refreshDownloadedVideos) // поднимаем реестр скачанных роликов
+    }).then(() => {
+      registryReady = refreshDownloadedVideos(); // поднимаем реестр скачанных роликов
+      return registryReady;
+    })
   );
   self.clients.claim();
 });
@@ -105,11 +124,17 @@ self.addEventListener('fetch', (event) => {
     request.destination === 'video' || url.pathname.match(/\.(mp4|webm|ogg)$/);
 
   if (isMediaRequest) {
-    if (!downloadedVideoUrls.has(url.href)) return; // не наш офлайн-ролик — не мешаем
+    // Реестр мог не успеть подняться (свежепроснувшийся воркер) — ждём его, но
+    // если ролик не скачан, честно уходим в сеть тем же запросом (отказаться от
+    // обработки после respondWith уже нельзя).
     event.respondWith(
-      caches.open(VIDEO_CACHE_NAME).then((cache) =>
-        cache.match(request).then((cachedResponse) => cachedResponse || fetch(request)),
-      ),
+      ensureRegistry().then(() => {
+        if (!downloadedVideoUrls.has(url.href)) return fetch(request);
+        return caches.open(VIDEO_CACHE_NAME).then((cache) =>
+          // Range игнорируем намеренно: ролик лежит целиком, отдаём его.
+          cache.match(request, { ignoreSearch: false }).then((cached) => cached || fetch(request)),
+        );
+      }),
     );
     return;
   }

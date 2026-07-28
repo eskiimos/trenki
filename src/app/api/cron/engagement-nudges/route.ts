@@ -21,7 +21,7 @@ import { prisma } from '@/lib/prisma';
 import { sendUserPush } from '@/lib/coach/push';
 import { hasPremium } from '@/lib/access';
 import { decideNudge, DUSTY_AFTER_DAYS } from '@/lib/notifications/nudges';
-import { WorkoutStatus } from '@/generated/prisma';
+import { WorkoutStatus, UserRole } from '@/generated/prisma';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,7 +57,13 @@ export async function GET(request: NextRequest) {
   }
 
   const users = await prisma.user.findMany({
-    where: { id: { in: subscribedIds } },
+    where: {
+      id: { in: subscribedIds },
+      role: UserRole.ATHLETE, // тренерам атлетский дрип не нужен (у них нет своих тренировок)
+    },
+    // Кому дольше всех не слали — первыми. Без этого batch каждый день упирался
+    // бы в одну и ту же «голову» выборки, а хвост не получал нуджей никогда.
+    orderBy: { lastNudgeOn: { sort: 'asc', nulls: 'first' } },
     select: {
       id: true,
       createdAt: true,
@@ -66,7 +72,9 @@ export async function GET(request: NextRequest) {
       premiumUntil: true,
       nudgeStep: true,
       lastNudgeOn: true,
+      lastDustyNudgeAt: true,
       lastReminderOn: true,
+      role: true,
     },
     take: MAX_BATCH,
   });
@@ -81,13 +89,15 @@ export async function GET(request: NextRequest) {
     if (u.lastNudgeOn === today || u.lastReminderOn === today) { skipped++; continue; }
 
     // Последняя ЗАВЕРШЁННАЯ тренировка — по ней считаем простой.
+    // ВАЖНО: по completedAt, а не createdAt — сессии микроцикла создаются пачкой
+    // на всю неделю заранее, и по createdAt активный юзер выглядел бы «пропавшим».
     const lastDone = await prisma.workoutSession.findFirst({
-      where: { userId: u.id, status: WorkoutStatus.COMPLETED },
-      orderBy: { createdAt: 'desc' },
-      select: { createdAt: true },
+      where: { userId: u.id, status: WorkoutStatus.COMPLETED, completedAt: { not: null } },
+      orderBy: { completedAt: 'desc' },
+      select: { completedAt: true },
     });
-    const daysSince = lastDone
-      ? Math.floor((now.getTime() - lastDone.createdAt.getTime()) / DAY_MS)
+    const daysSince = lastDone?.completedAt
+      ? Math.floor((now.getTime() - lastDone.completedAt.getTime()) / DAY_MS)
       : null;
 
     const decision = decideNudge(
@@ -97,6 +107,9 @@ export async function GET(request: NextRequest) {
         daysSinceLastTraining: daysSince,
         hasPremium: hasPremium(u),
         nudgeStep: u.nudgeStep,
+        daysSinceLastDusty: u.lastDustyNudgeAt
+          ? Math.floor((now.getTime() - u.lastDustyNudgeAt.getTime()) / DAY_MS)
+          : null,
       },
       now,
     );
@@ -105,7 +118,11 @@ export async function GET(request: NextRequest) {
     // Атомарно занимаем отправку на сегодня (гонку выиграет один тик).
     const claim = await prisma.user.updateMany({
       where: { id: u.id, OR: [{ lastNudgeOn: null }, { lastNudgeOn: { not: today } }] },
-      data: { lastNudgeOn: today, nudgeStep: decision.nextStep },
+      data: {
+        lastNudgeOn: today,
+        nudgeStep: decision.nextStep,
+        ...(decision.kind === 'dusty' ? { lastDustyNudgeAt: now } : {}),
+      },
     });
     if (claim.count !== 1) { skipped++; continue; }
 

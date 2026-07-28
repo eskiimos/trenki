@@ -10,6 +10,7 @@ const base = {
   daysSinceLastTraining: 0,
   hasPremium: false,
   nudgeStep: 0,
+  daysSinceLastDusty: null,
 };
 
 describe('онбординг-дрип (ни разу не тренировался)', () => {
@@ -73,6 +74,16 @@ describe('нудж «гантели запылились»', () => {
   it('НЕ шлёт подписчику (это нудж для тех, кто без подписки)', () => {
     const d = decideNudge({ ...base, daysSinceLastTraining: 10, hasPremium: true }, NOW);
     expect(d).toBeNull();
+  });
+
+  it('НЕ повторяется на следующий день после отправки', () => {
+    const d = decideNudge({ ...base, daysSinceLastTraining: 10, daysSinceLastDusty: 1 }, NOW);
+    expect(d).toBeNull();
+  });
+
+  it('повторяется, когда интервал выдержан', () => {
+    const d = decideNudge({ ...base, daysSinceLastTraining: 10, daysSinceLastDusty: DUSTY_AFTER_DAYS }, NOW);
+    expect(d?.kind).toBe('dusty');
   });
 
   it('не трогает nudgeStep дрипа', () => {

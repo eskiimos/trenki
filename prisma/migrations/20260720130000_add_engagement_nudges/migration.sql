@@ -4,6 +4,10 @@
 -- nudgeStep  — шаг дрипа (0 = ещё ничего не слали).
 -- Аддитивно, бэкфилл не нужен.
 
+-- lastDustyNudgeAt — когда последний раз ушёл нудж «гантели запылились»
+-- (интервал повтора, иначе условие «простой ≥ N дней» слало бы его ежедневно).
+
 ALTER TABLE "users"
   ADD COLUMN "lastNudgeOn" TEXT,
-  ADD COLUMN "nudgeStep" INTEGER NOT NULL DEFAULT 0;
+  ADD COLUMN "nudgeStep" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN "lastDustyNudgeAt" TIMESTAMP(3);

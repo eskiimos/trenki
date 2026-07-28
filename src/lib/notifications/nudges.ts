@@ -53,6 +53,8 @@ export interface NudgeCandidate {
   hasPremium: boolean;
   /** Шаг дрипа, который уже отправлен (0 — ничего). */
   nudgeStep: number;
+  /** Дней с последнего нуджа «гантели запылились». null — ни разу не слали. */
+  daysSinceLastDusty: number | null;
 }
 
 export interface NudgeDecision {
@@ -86,8 +88,13 @@ export function decideNudge(c: NudgeCandidate, now: Date): NudgeDecision | null 
   }
 
   // 2) «Гантели запылились» — только без подписки и с реальным простоем.
+  // Повторяем не чаще, чем раз в DUSTY_AFTER_DAYS: без этого условие «простой ≥ N»
+  // истинно каждый следующий день и пуш уходил бы ежедневно и бесконечно.
   if (!c.hasPremium && c.daysSinceLastTraining !== null && c.daysSinceLastTraining >= DUSTY_AFTER_DAYS) {
-    return { kind: 'dusty', text: DUSTY_NUDGE, nextStep: c.nudgeStep };
+    const cooledDown = c.daysSinceLastDusty === null || c.daysSinceLastDusty >= DUSTY_AFTER_DAYS;
+    if (cooledDown) {
+      return { kind: 'dusty', text: DUSTY_NUDGE, nextStep: c.nudgeStep };
+    }
   }
 
   return null;

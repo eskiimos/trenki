@@ -310,6 +310,12 @@ export default function VideoPage({ params }: VideoPageProps) {
 
   // Отмечаем начало видео в тренировке или записываем просмотр
   useEffect(() => {
+    // Сброс позиции продолжения — ЗДЕСЬ, до отправки start-POST: этот эффект
+    // владеет videoId, поэтому ответ POST-а (который заполнит рефы) не может
+    // прийти раньше сброса и быть затёртым.
+    workoutResumeRef.current = 0;
+    workoutResumeReadyRef.current = false;
+
     const notifyVideoStart = async () => {
       if (fromWorkout && sessionId && videoId) {
         try {
@@ -505,8 +511,10 @@ export default function VideoPage({ params }: VideoPageProps) {
     gainsCreditedRef.current = false;
     resumeAppliedRef.current = false; // O-3: для нового видео заново применим resume
     lastPosSaveRef.current = 0;
-    workoutResumeRef.current = 0;
-    workoutResumeReadyRef.current = false;
+    // ВНИМАНИЕ: workoutResumeRef/ReadyRef здесь НЕ сбрасываем. Этот эффект висит
+    // на videoData, а ответ start-POST может прийти раньше — сброс затирал бы уже
+    // полученную позицию, и продолжение с места обрыва терялось. Их сбрасывает
+    // эффект, владеющий videoId (там же, где шлётся start-POST).
     seekedInPlaythroughRef.current = false;
     setWatchMode('training'); // каждое новое видео стартует в режиме «Тренировка»
     setShowModeMenu(false);
@@ -692,6 +700,18 @@ export default function VideoPage({ params }: VideoPageProps) {
       window.removeEventListener('orientationchange', checkOrientation);
     };
   }, []);
+
+  // Закрытие меню «Режим» при клике вне его (как у меню качества) — иначе оно
+  // оставалось открытым внутри скрытой панели контролов.
+  useEffect(() => {
+    if (!showModeMenu) return;
+    const close = () => setShowModeMenu(false);
+    const t = setTimeout(() => document.addEventListener('click', close), 0);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('click', close);
+    };
+  }, [showModeMenu]);
 
   // Закрытие меню качества при клике вне его
   useEffect(() => {
@@ -1065,6 +1085,9 @@ export default function VideoPage({ params }: VideoPageProps) {
     setIsPlaying(false);
     setIsBuffering(false);
     clearVideoPosition(videoId); // O-3: досмотрено — не возобновляем с конца
+    // Ролик доигран — начинается новый «проход». Снимаем метку перемотки, иначе
+    // честный повторный просмотр того же видео уже никогда не начислил бы потенциал.
+    seekedInPlaythroughRef.current = false;
 
     // В тренировке всегда выходим к странице тренировки БЕЗ превью следующего.
     // (near-end тик мог уже завершить видео и запланировать переход — тогда просто
@@ -1410,8 +1433,8 @@ export default function VideoPage({ params }: VideoPageProps) {
                 controlsList="nodownload"
                 preload="auto"
                 onPlay={() => setIsPlaying(true)}
-                onPause={() => { setIsPlaying(false); setIsBuffering(false); }}
-                onError={() => setIsBuffering(false)}
+                onPause={() => { cancelBufferingSoon(); setIsPlaying(false); setIsBuffering(false); }}
+                onError={() => { cancelBufferingSoon(); setIsBuffering(false); }}
                 onSeeked={(e) => {
                   setIsBuffering(false);
                   // Перемотка пользователем (не programmatic resume) — помечаем проход
