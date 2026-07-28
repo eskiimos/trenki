@@ -32,6 +32,9 @@ model User {
   premiumUntil          DateTime? // null + tier=PREMIUM = бессрочно; иначе — срок действия
   premiumNote           String? // Кто/за что выдал (ручная выдача, аудит)
   expiryReminderSentFor String? // premiumUntil (ISO), о котором уже слали «скоро кончится» — дедуп, переармится при продлении
+  // Вовлекающие пуши (нудж «гантели запылились» и онбординг-дрип).
+  lastNudgeOn           String? // локальная дата YYYY-MM-DD последнего нуджа — не чаще раза в день
+  nudgeStep             Int     @default(0) // шаг онбординг-дрипа (0 — ещё не слали)
   tbankRebillId         String? // сохранённая карта T-Bank для автосписания подписки (рекуррент)
   payments              Payment[]
   favorites             FavoriteVideo[]
