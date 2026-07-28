@@ -38,6 +38,7 @@ model User {
   tbankRebillId         String? // сохранённая карта T-Bank для автосписания подписки (рекуррент)
   payments              Payment[]
   favorites             FavoriteVideo[]
+  favoriteWorkouts      FavoriteWorkout[]
   profile               Profile?
   coachProfile          CoachProfile?
   shortComments         ShortComment[]
@@ -224,6 +225,23 @@ model TrainingSession {
   video     Video    @relation(fields: [videoId], references: [id])
 
   @@map("training_sessions")
+}
+
+// Избранная ЦЕЛИКОМ тренировка от ИИ. Состав — снапшот (videoIds фиксируются в
+// момент добавления), чтобы правки каталога молча не меняли сохранённое занятие.
+model FavoriteWorkout {
+  id          String        @id @default(cuid())
+  userId      String
+  title       String // «Убегаем от соперника · Лёгкая нагрузка»
+  goal        TrainingGoal?
+  energyState EnergyState?
+  videoIds    String[] // снапшот состава, в порядке прохождения
+  sourceSessionId String? // из какой сессии сохранили (для истории; связи нет намеренно)
+  createdAt   DateTime      @default(now())
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("favorite_workouts")
 }
 
 model FavoriteVideo {
@@ -423,6 +441,10 @@ model WorkoutSession {
   currentVideoIndex     Int                     @default(0)
   startedAt             DateTime?
   totalVideos           Int                     @default(0)
+  // С какими параметрами собрана тренировка — для названия в истории и избранном
+  // («Убегаем от соперника · Лёгкая нагрузка»).
+  goal                  TrainingGoal?
+  energyState           EnergyState?
   videos                WorkoutSessionVideo[]
   characteristicHistory CharacteristicHistory[]
   coach                 User?                   @relation("CoachWorkoutSessions", fields: [coachId], references: [id], onDelete: SetNull)

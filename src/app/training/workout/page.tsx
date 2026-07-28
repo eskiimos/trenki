@@ -132,6 +132,36 @@ export default function WorkoutPage() {
 
   const allCompleted = !!workout && workout.modules.length > 0 && workout.modules.every(m => m.completed);
 
+  // «Понравилась вся тренировка?» — сохранение составленного занятия целиком.
+  const [favSaving, setFavSaving] = useState(false);
+  const [favSaved, setFavSaved] = useState(false);
+
+  const saveWorkoutToFavorites = async () => {
+    if (!workout || favSaving || favSaved) return;
+    setFavSaving(true);
+    try {
+      const res = await fetch('/api/favorites/workouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: workout.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setToast({ message: data?.error || 'Не удалось сохранить', type: 'error' });
+        return;
+      }
+      setFavSaved(true);
+      setToast({
+        message: data?.alreadyExists ? 'Уже в избранном' : '★ Тренировка сохранена в избранное',
+        type: 'success',
+      });
+    } catch {
+      setToast({ message: 'Сетевая ошибка', type: 'error' });
+    } finally {
+      setFavSaving(false);
+    }
+  };
+
   const loadWorkout = async () => {
     try {
       // Проверяем, есть ли ID тренировки в URL (при переходе из напоминания)
@@ -1100,6 +1130,57 @@ export default function WorkoutPage() {
             >
               Отличная работа! Ты молодец, все модули пройдены успешно 💪
             </p>
+
+            {/* Понравилась вся тренировка? — сохраняем составленное занятие целиком */}
+            {workout && (
+              <div
+                style={{
+                  background: 'rgba(174, 171, 187, 0.08)',
+                  border: '1px solid rgba(174, 171, 187, 0.2)',
+                  borderRadius: '16px',
+                  padding: '16px',
+                  marginBottom: '20px',
+                  textAlign: 'left',
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: 'Overpass, sans-serif',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    color: '#F9F8FE',
+                    marginBottom: 4,
+                  }}
+                >
+                  Понравилась вся тренировка?
+                </div>
+                <div style={{ fontFamily: 'Overpass, sans-serif', fontSize: '12px', color: '#AEABBB', marginBottom: 12 }}>
+                  Сохрани её целиком — сможешь повторить в любой момент из избранного.
+                </div>
+                <button
+                  type="button"
+                  disabled={favSaving || favSaved}
+                  onClick={saveWorkoutToFavorites}
+                  style={{
+                    width: '100%',
+                    height: '44px',
+                    borderRadius: '22px',
+                    background: favSaved ? 'rgba(161,255,74,0.15)' : 'transparent',
+                    border: `1.5px solid ${favSaved ? '#A1FF4A' : 'rgba(161,255,74,0.5)'}`,
+                    color: '#A1FF4A',
+                    fontFamily: 'Overpass, sans-serif',
+                    fontWeight: 800,
+                    fontSize: '13px',
+                    letterSpacing: '0.5px',
+                    textTransform: 'uppercase',
+                    cursor: favSaving || favSaved ? 'default' : 'pointer',
+                    opacity: favSaving ? 0.6 : 1,
+                  }}
+                >
+                  {favSaved ? '★ В избранном' : favSaving ? 'Сохраняю…' : '☆ Добавить в избранное'}
+                </button>
+              </div>
+            )}
 
             {/* Кнопка завершения */}
             <button

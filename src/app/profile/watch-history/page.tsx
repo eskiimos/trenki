@@ -48,9 +48,39 @@ interface Video {
   rpeMax?: number;
 }
 
+// Избранная тренировка целиком (составленная ИИ).
+interface FavWorkout {
+  id: string;
+  title: string;
+  createdAt: string;
+  modules: { id: string; title: string; thumbnail?: string | null }[];
+  missingCount: number;
+  totalDuration: number;
+}
+
 const WatchHistoryPage = () => {
   const [videos, setVideos] = useState<Video[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Две вкладки: составленные тренировки и отдельные видео (решение владельца —
+  // одиночные просмотры не теряем).
+  const [tab, setTab] = useState<'workouts' | 'videos'>('workouts');
+  const [workouts, setWorkouts] = useState<FavWorkout[]>([]);
+
+  useEffect(() => {
+    fetch('/api/favorites/workouts')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setWorkouts(d?.workouts ?? []))
+      .catch(() => {});
+  }, []);
+
+  const removeWorkout = async (id: string) => {
+    setWorkouts((prev) => prev.filter((w) => w.id !== id)); // оптимистично
+    try {
+      await fetch(`/api/favorites/workouts?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    } catch {
+      /* при сбое список восстановится на следующей загрузке */
+    }
+  };
 
   useEffect(() => {
     const fetchWatchHistory = async () => {
@@ -157,13 +187,96 @@ const WatchHistoryPage = () => {
               textTransform: 'uppercase'
             }}
           >
-            История тренировок
+            История и избранное
           </h1>
         </div>
       </header>
 
-      {/* Video Grid */}
-      <div>
+      {/* Вкладки: составленные тренировки / отдельные видео */}
+      <div className="flex gap-2 px-4 pb-3">
+        {([
+          ['workouts', `Тренировки${workouts.length ? ` (${workouts.length})` : ''}`],
+          ['videos', 'Видео'],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className="font-overpass uppercase"
+            style={{
+              flex: 1,
+              padding: '10px 12px',
+              borderRadius: 999,
+              fontWeight: 800,
+              fontSize: 12,
+              letterSpacing: '0.5px',
+              border: `1px solid ${tab === key ? '#A1FF4A' : '#2a2f4a'}`,
+              background: tab === key ? 'rgba(161,255,74,0.12)' : 'transparent',
+              color: tab === key ? '#A1FF4A' : '#AEABBB',
+              cursor: 'pointer',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Вкладка «Тренировки» — сохранённые целиком занятия от ИИ */}
+      {tab === 'workouts' && (
+        <div className="px-4">
+          {workouts.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-400 text-lg">Пока пусто</p>
+              <p className="text-gray-500 text-sm mt-2">
+                Заверши тренировку от ИИ-тренера и добавь её в избранное — она появится здесь
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {workouts.map((w) => (
+                <div
+                  key={w.id}
+                  className="rounded-2xl p-4"
+                  style={{ background: '#060919', border: '1px solid #2a2f4a' }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-overpass" style={{ color: '#F9F8FE', fontWeight: 800, fontSize: 15 }}>
+                        {w.title}
+                      </div>
+                      <div style={{ color: '#AEABBB', fontSize: 12, marginTop: 4 }}>
+                        {w.modules.length} модул{w.modules.length === 1 ? 'ь' : w.modules.length < 5 ? 'я' : 'ей'}
+                        {w.totalDuration > 0 && ` · ${Math.round(w.totalDuration / 60)} мин`}
+                        {w.missingCount > 0 && ` · ${w.missingCount} недоступно`}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeWorkout(w.id)}
+                      aria-label="Убрать из избранного"
+                      style={{ color: '#A1FF4A', fontSize: 18, background: 'none', border: 'none', cursor: 'pointer' }}
+                    >
+                      ★
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 mt-3">
+                    {w.modules.map((m, i) => (
+                      <Link key={`${w.id}-${m.id}`} href={`/video/${m.id}`} className="flex items-center gap-2">
+                        <span style={{ color: '#445CFF', fontSize: 11, fontWeight: 800, width: 16 }}>{i + 1}</span>
+                        <span style={{ color: '#AEABBB', fontSize: 13 }} className="truncate">{m.title}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Вкладка «Видео» — история отдельных просмотров */}
+      <div style={{ display: tab === 'videos' ? 'block' : 'none' }}>
         {videos.length === 0 ? (
           <div className="text-center py-12 px-4">
             <p className="text-gray-400 text-lg">История пуста</p>

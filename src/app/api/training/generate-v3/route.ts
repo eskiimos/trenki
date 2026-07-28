@@ -164,6 +164,9 @@ export async function POST(request: NextRequest) {
         status: WorkoutStatus.PENDING,
         totalVideos: workout.modules.length,
         currentVideoIndex: 0,
+        // Параметры сборки — для названия в истории и избранном
+        goal: goal as TrainingGoal,
+        energyState: energyState as EnergyState,
         videos: {
           create: workout.modules.map((module: any, index: number) => ({
             videoId: module.id,
