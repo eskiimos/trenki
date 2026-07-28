@@ -128,12 +128,13 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [nextVideo, setNextVideo] = useState<VideoData | null>(null);
   const [showNextVideoPreview, setShowNextVideoPreview] = useState(false);
 
-  // LK-3. Режим просмотра: тренировочный (без перемотки, идёт в потенциал) /
-  // тестовый (с перемоткой, БЕЗ начисления потенциала, дневной лимит не тратит,
-  // но просмотр пишется в историю). Переключается пользователем в плеере.
-  // В тренировке (fromWorkout) — всегда тренировочный, перемотка запрещена.
-  const [watchMode, setWatchMode] = useState<'training' | 'test'>('training');
-  const canSeek = !fromWorkout && watchMode === 'test';
+  // Режим просмотра: «Тренировка» (без перемотки, идёт в зачёт потенциала) /
+  // «Просмотр» (с перемоткой, БЕЗ начисления потенциала; просмотр всё равно
+  // пишется в историю). Переключается кнопкой «Режим» в плеере.
+  // В тренировке (fromWorkout) — всегда «Тренировка», перемотка запрещена.
+  const [watchMode, setWatchMode] = useState<'training' | 'view'>('training');
+  const [showModeMenu, setShowModeMenu] = useState(false);
+  const canSeek = !fromWorkout && watchMode === 'view';
   const canSeekRef = useRef(false); // зеркало canSeek для хоткеев без stale-стейта
   // Завершение/зачёт — по РЕАЛЬНОМУ концу ролика: когда до конца осталось ≤ этого.
   // onEnded — основной путь (100%), а near-end порог — страховка для Android, где
@@ -192,6 +193,7 @@ export default function VideoPage({ params }: VideoPageProps) {
 
   // Получаем params асинхронно и загружаем данные видео
   useEffect(() => {
+    let cancelled = false;
     const getParams = async () => {
       const resolvedParams = await params;
       setVideoId(resolvedParams.id);
@@ -221,7 +223,12 @@ export default function VideoPage({ params }: VideoPageProps) {
       // В фоне (не блокируем UI) подтягиваем nextVideo и список всех — нужны
       // только для оверлея «следующее видео» в конце просмотра. Профиль тоже
       // лениво.
+      // Каталог нужен ТОЛЬКО для оверлея «следующее видео» в конце просмотра, а
+      // запрос тяжёлый (весь список без пагинации). Откладываем — иначе он
+      // конкурирует за сеть с первыми чанками видео и плеер стартует медленнее.
       void (async () => {
+        await new Promise((r) => setTimeout(r, 8000));
+        if (cancelled) return;
         try {
           const listRes = await fetch('/api/videos', { cache: 'no-store' });
           if (!listRes.ok) return;
@@ -253,6 +260,9 @@ export default function VideoPage({ params }: VideoPageProps) {
       })();
     };
     getParams();
+    return () => {
+      cancelled = true;
+    };
   }, [params]);
 
   // Проверяем, скачано ли видео
@@ -269,17 +279,41 @@ export default function VideoPage({ params }: VideoPageProps) {
   // Отслеживание завершения видео (90% или конец)
   const videoCompletedRef = useRef(false);
   const lastProgressUpdateRef = useRef(0);
+  // Продолжение модуля тренировки с места обрыва. Источник истины — СЕРВЕР
+  // (WorkoutSessionVideo.watchedDuration, приходит в ответе action:'start'), а не
+  // localStorage: иначе свободный просмотр этого же ролика подарил бы «перемотку»
+  // внутри тренировки и ложный зачёт потенциала.
+  const workoutResumeRef = useRef(0);
+  const workoutResumeReadyRef = useRef(false);
   
   // Отслеживание достижения 80% для начисления баллов (обычный просмотр)
   const gainsCreditedRef = useRef(false);
+
+  // Ставит видео на сохранённую серверную позицию модуля. Вызывается и из
+  // onCanPlay, и из ответа start-POST (кто успеет позже) — латч resumeAppliedRef
+  // гарантирует однократность. Позицию у самого конца игнорируем: иначе вход в
+  // модуль сразу давал бы повторный зачёт.
+  const applyWorkoutResume = useCallback(() => {
+    if (!fromWorkout) return;
+    if (resumeAppliedRef.current) return;
+    if (!workoutResumeReadyRef.current) return;
+    const video = videoRef.current;
+    if (!video || !video.duration || isNaN(video.duration)) return;
+
+    resumeAppliedRef.current = true;
+    const at = workoutResumeRef.current;
+    if (at >= 5 && at < video.duration - END_EPSILON_SEC && video.currentTime < 5) {
+      seekingProgrammaticRef.current = true;
+      video.currentTime = at;
+    }
+  }, [fromWorkout]);
 
   // Отмечаем начало видео в тренировке или записываем просмотр
   useEffect(() => {
     const notifyVideoStart = async () => {
       if (fromWorkout && sessionId && videoId) {
         try {
-          console.log('🎬 Starting video in workout:', { sessionId, videoId });
-          await fetch('/api/training/update', {
+          const res = await fetch('/api/training/update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -288,8 +322,15 @@ export default function VideoPage({ params }: VideoPageProps) {
               action: 'start',
             }),
           });
+          // Сервер вернул, сколько уже просмотрено этого модуля — продолжаем с него.
+          const d = await res.json().catch(() => null);
+          workoutResumeRef.current = typeof d?.resumeAt === 'number' ? d.resumeAt : 0;
+          workoutResumeReadyRef.current = true;
+          // Гонка: canplay мог случиться раньше ответа — тогда применяем позицию тут.
+          applyWorkoutResume();
         } catch (error) {
           console.error('Ошибка отметки начала видео:', error);
+          workoutResumeReadyRef.current = true; // не блокируем воспроизведение
         }
       } else if (!fromWorkout && videoId) {
         // Записываем обычный просмотр в историю (userId сервер берёт из сессии)
@@ -354,7 +395,7 @@ export default function VideoPage({ params }: VideoPageProps) {
     // (просмотр уже записан в историю на старте, record-watch). Флаг латчим
     // только когда реально пытались начислить, иначе test→training терял бы зачёт.
     else if (!fromWorkout && videoId) {
-      if (!gainsCreditedRef.current && watchMode === 'training' && currentTime >= duration - END_EPSILON_SEC) {
+      if (!gainsCreditedRef.current && watchMode === 'training' && !seekedInPlaythroughRef.current && currentTime >= duration - END_EPSILON_SEC) {
         gainsCreditedRef.current = true; // оптимистично — против дублей
         const ok = await creditGainsForWatching();
         if (!ok) gainsCreditedRef.current = false; // при сбое — повтор на следующем тике
@@ -464,7 +505,11 @@ export default function VideoPage({ params }: VideoPageProps) {
     gainsCreditedRef.current = false;
     resumeAppliedRef.current = false; // O-3: для нового видео заново применим resume
     lastPosSaveRef.current = 0;
-    setWatchMode('training'); // каждое новое видео стартует в тренировочном режиме
+    workoutResumeRef.current = 0;
+    workoutResumeReadyRef.current = false;
+    seekedInPlaythroughRef.current = false;
+    setWatchMode('training'); // каждое новое видео стартует в режиме «Тренировка»
+    setShowModeMenu(false);
 
     const loadKinescopeUrl = async () => {
       if (videoData?.videoUrl && isKinescopeUrl(videoData.videoUrl)) {
@@ -829,10 +874,35 @@ export default function VideoPage({ params }: VideoPageProps) {
   const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const showControlsRef = useRef(true); // зеркало showControls для тап-логики без stale-стейта (#1)
   const isBufferingRef = useRef(false); // зеркало isBuffering — чтобы onTimeUpdate не читал stale-стейт
+  // Дебаунс спиннера буферизации: реальная задержка видна не сразу, а через
+  // BUFFER_SPINNER_DELAY_MS. Короткие ребуферы проходят незаметно.
+  const bufferingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const BUFFER_SPINNER_DELAY_MS = 400;
+  const cancelBufferingSoon = useCallback(() => {
+    if (bufferingTimerRef.current) {
+      clearTimeout(bufferingTimerRef.current);
+      bufferingTimerRef.current = null;
+    }
+  }, []);
+  const showBufferingSoon = useCallback(() => {
+    if (bufferingTimerRef.current) return;
+    bufferingTimerRef.current = setTimeout(() => {
+      bufferingTimerRef.current = null;
+      setIsBuffering(true);
+    }, BUFFER_SPINNER_DELAY_MS);
+  }, []);
+  // Снимаем отложенный показ, когда видео поехало / размонтировались.
+  useEffect(() => cancelBufferingSoon, [cancelBufferingSoon]);
   const hasShownHintRef = useRef(false); // Флаг для показа подсказки только один раз
   const pendingSeekRef = useRef<number | null>(null); // Позиция для восстановления после смены качества
   const resumeAppliedRef = useRef(false); // O-3: позицию из localStorage применяем один раз на видео
   const lastPosSaveRef = useRef(0); // O-3: троттлинг сохранения позиции
+  // Была ли перемотка в текущем проходе. Если да — потенциал за этот просмотр не
+  // начисляем, даже если юзер вернул режим «Тренировка». Иначе: перемотал в
+  // «Просмотре» на конец → переключил режим → получил полный зачёт за 0 работы.
+  const seekedInPlaythroughRef = useRef(false);
+  // Программная установка позиции (resume, смена качества) — не считается перемоткой.
+  const seekingProgrammaticRef = useRef(false);
 
   // Держим ref в синхроне с showControls — нужно для решения show/hide внутри
   // отложенного single-tap обработчика (замыкание видит свежее значение).
@@ -1010,7 +1080,7 @@ export default function VideoPage({ params }: VideoPageProps) {
 
     // Свободный просмотр: зачёт потенциала по РЕАЛЬНОМУ концу (страховка к near-end
     // тику в handleVideoProgress; латч gainsCreditedRef защищает от дубля).
-    if (!fromWorkout && videoId && !gainsCreditedRef.current && watchMode === 'training') {
+    if (!fromWorkout && videoId && !gainsCreditedRef.current && watchMode === 'training' && !seekedInPlaythroughRef.current) {
       gainsCreditedRef.current = true;
       const ok = await creditGainsForWatching();
       if (!ok) gainsCreditedRef.current = false;
@@ -1342,7 +1412,16 @@ export default function VideoPage({ params }: VideoPageProps) {
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => { setIsPlaying(false); setIsBuffering(false); }}
                 onError={() => setIsBuffering(false)}
-                onSeeked={() => setIsBuffering(false)}
+                onSeeked={(e) => {
+                  setIsBuffering(false);
+                  // Перемотка пользователем (не programmatic resume) — помечаем проход
+                  // как «с перемоткой», чтобы за него не начислять потенциал.
+                  if (resumeAppliedRef.current && !seekingProgrammaticRef.current) {
+                    seekedInPlaythroughRef.current = true;
+                  }
+                  seekingProgrammaticRef.current = false;
+                  void e;
+                }}
                 onTimeUpdate={(e) => {
                   const video = e.currentTarget;
                   setCurrentTime(video.currentTime);
@@ -1361,6 +1440,7 @@ export default function VideoPage({ params }: VideoPageProps) {
 
                   // Видео реально двигается — значит не застряло на буферизации.
                   // Читаем через ref, чтобы не дёргать setState на stale-значении.
+                  cancelBufferingSoon();
                   if (isBufferingRef.current) setIsBuffering(false);
 
                   // Обновляем буферизацию
@@ -1379,7 +1459,6 @@ export default function VideoPage({ params }: VideoPageProps) {
                   const video = e.currentTarget;
                   if (video.duration && !isNaN(video.duration)) {
                     setDuration(video.duration);
-                    console.log('Duration set from loadedmetadata:', video.duration);
                   }
                 }}
                 onCanPlay={(e) => {
@@ -1389,6 +1468,7 @@ export default function VideoPage({ params }: VideoPageProps) {
                   // приоритет над resume из localStorage — отмечаем resume как
                   // применённый, чтобы он не перебил позицию смены качества.
                   if (pendingSeekRef.current !== null) {
+                    seekingProgrammaticRef.current = true;
                     video.currentTime = pendingSeekRef.current;
                     pendingSeekRef.current = null;
                     resumeAppliedRef.current = true;
@@ -1409,8 +1489,15 @@ export default function VideoPage({ params }: VideoPageProps) {
                     resumeAppliedRef.current = true;
                     const saved = loadVideoPosition(videoId);
                     if (saved !== null && saved >= 5 && saved < video.duration - END_EPSILON_SEC) {
+                      seekingProgrammaticRef.current = true;
                       video.currentTime = saved;
                     }
+                  }
+
+                  // В тренировке позицию берём с сервера (watchedDuration). Если
+                  // ответ start-POST ещё не пришёл — применит он сам, когда придёт.
+                  if (fromWorkout) {
+                    applyWorkoutResume();
                   }
 
                   // Пытаемся начать воспроизведение когда видео готово.
@@ -1436,15 +1523,19 @@ export default function VideoPage({ params }: VideoPageProps) {
                   }
                 }}
                 onWaiting={() => {
-                  setIsBuffering(true);
+                  // Дебаунс: показываем спиннер, только если ждём дольше 400мс.
+                  // Микро-ребуферы (и waiting после seek) больше не мигают кружком.
+                  showBufferingSoon();
                 }}
                 onPlaying={() => {
+                  cancelBufferingSoon();
                   setIsBuffering(false);
                 }}
-                onStalled={() => {
-                  setIsBuffering(true);
-                }}
+                /* onStalled НЕ показывает спиннер: у прогрессивного MP4 stalled
+                   срабатывает штатно, когда браузер набрал буфер и приостановил
+                   докачку. Именно он давал «кружок каждые ~5 секунд». */
                 onCanPlayThrough={() => {
+                  cancelBufferingSoon();
                   setIsBuffering(false);
                 }}
                 onEnded={handleVideoEnded}
@@ -1705,25 +1796,69 @@ export default function VideoPage({ params }: VideoPageProps) {
               </div>
               
               <div className={`flex items-center space-x-2 ${isLandscape ? 'space-x-3' : ''}`}>
-                {/* LK-3. Переключатель режима просмотра. В тренировке скрыт —
-                    там всегда тренировочный (без перемотки, идёт в прогресс). */}
+                {/* Кнопка «Режим» с двумя пунктами и пояснением. В тренировке
+                    скрыта — там всегда режим «Тренировка» (без перемотки). */}
                 {!fromWorkout && (
-                  <button
-                    onClick={() => {
-                      setWatchMode(prev => (prev === 'training' ? 'test' : 'training'));
-                      showControlsTemporarily();
-                    }}
-                    className={`px-2 py-0.5 rounded border text-xs font-semibold transition-all ${
-                      watchMode === 'test'
-                        ? 'border-[#A1FF4A] text-[#A1FF4A] bg-white/10'
-                        : 'border-white/40 text-white hover:border-white/70 hover:bg-white/10'
-                    }`}
-                    title={watchMode === 'training'
-                      ? 'Тренировочный режим: без перемотки, идёт в прогресс. Нажмите для тестового.'
-                      : 'Тестовый режим: с перемоткой, без начисления прогресса. Нажмите для тренировочного.'}
-                  >
-                    {watchMode === 'training' ? 'Тренировка' : 'Тест'}
-                  </button>
+                  <div className="relative" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => {
+                        setShowModeMenu(prev => !prev);
+                        showControlsTemporarily();
+                      }}
+                      className={`px-2 py-0.5 rounded border text-xs font-semibold transition-all ${
+                        showModeMenu || watchMode === 'view'
+                          ? 'border-[#A1FF4A] text-[#A1FF4A] bg-white/10'
+                          : 'border-white/40 text-white hover:border-white/70 hover:bg-white/10'
+                      }`}
+                      title="Режим просмотра"
+                    >
+                      Режим: {watchMode === 'training' ? 'тренировка' : 'просмотр'}
+                    </button>
+
+                    {showModeMenu && (
+                      <div
+                        className="absolute bottom-full mb-2 right-0 bg-black/90 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden shadow-2xl w-64 z-50"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {([
+                          {
+                            key: 'training' as const,
+                            title: 'Тренировка',
+                            hint: 'Без перемотки. Занятие идёт в зачёт роста потенциала.',
+                          },
+                          {
+                            key: 'view' as const,
+                            title: 'Просмотр',
+                            hint: 'Можно перематывать, но очки потенциала не начисляются.',
+                          },
+                        ]).map((m) => (
+                          <button
+                            key={m.key}
+                            onClick={() => {
+                              setWatchMode(m.key);
+                              setShowModeMenu(false);
+                              showControlsTemporarily();
+                            }}
+                            className={`w-full text-left px-4 py-2.5 transition-colors ${
+                              watchMode === m.key ? 'bg-white/10' : 'hover:bg-white/10'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className={`text-sm font-semibold ${watchMode === m.key ? 'text-[#A1FF4A]' : 'text-white'}`}>
+                                {m.title}
+                              </span>
+                              {watchMode === m.key && (
+                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                  <path d="M2 6L5 9L10 3" stroke="#A1FF4A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              )}
+                            </div>
+                            <div className="text-[11px] leading-snug text-white/60 mt-0.5">{m.hint}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {/* Quality Selector — только если доступно несколько качеств */}

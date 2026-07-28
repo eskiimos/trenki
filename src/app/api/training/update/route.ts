@@ -54,10 +54,19 @@ export async function POST(request: NextRequest) {
         data: { startedAt: new Date() },
       });
 
+      // Позиция для продолжения с места обрыва: прогресс пишется сюда каждые 5с
+      // (action:'progress'). Завершённый модуль отдаёт 0 — иначе повторный вход
+      // сразу прыгал бы в конец и давал ложный зачёт.
+      const row = await prisma.workoutSessionVideo.findUnique({
+        where: { sessionId_videoId: { sessionId, videoId } },
+        select: { watchedDuration: true, completed: true },
+      });
+      const resumeAt = row && !row.completed ? row.watchedDuration ?? 0 : 0;
 
       return NextResponse.json({
         success: true,
         message: 'Видео начато',
+        resumeAt,
       });
     }
 

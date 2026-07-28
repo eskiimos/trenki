@@ -8,6 +8,19 @@ const STORE_NAME = 'videos';
 // и атлет потеряет скачанные оффлайн-видео.
 const VIDEO_CACHE_NAME = 'trenki-videos-v3';
 
+/**
+ * Сообщает service worker'у о скачивании/удалении ролика. SW перехватывает
+ * медиа-запросы ТОЛЬКО для скачанных видео (реестр downloadedVideoUrls) — без
+ * этого уведомления офлайн-ролик игрался бы из сети до перезапуска SW.
+ */
+function notifySwVideo(type: 'VIDEO_CACHED' | 'VIDEO_REMOVED', url: string) {
+  try {
+    navigator.serviceWorker?.controller?.postMessage({ type, url });
+  } catch {
+    // SW недоступен — не критично, реестр поднимется при следующей активации
+  }
+}
+
 export interface OfflineVideo {
   id: string;
   title: string;
@@ -114,6 +127,8 @@ export async function downloadVideo(video: OfflineVideo, onProgress?: (progress:
       headers: response.headers,
     });
     await cache.put(video.videoUrl, cacheResponse);
+    // SW перехватывает медиа только для скачанных роликов — сообщаем ему о новом.
+    notifySwVideo('VIDEO_CACHED', video.videoUrl);
 
     // Также кэшируем thumbnail если есть
     if (video.thumbnail) {
@@ -163,7 +178,8 @@ export async function deleteVideo(videoId: string): Promise<void> {
     // Удаляем из Cache API
     const cache = await caches.open(VIDEO_CACHE_NAME);
     await cache.delete(video.videoUrl);
-    
+    notifySwVideo('VIDEO_REMOVED', video.videoUrl);
+
     if (video.thumbnail) {
       await cache.delete(video.thumbnail);
     }

@@ -623,16 +623,13 @@ export default function WorkoutPage() {
           const isActive = !isCompleted && index === firstIncompleteIndex;
           const isLocked = !isCompleted && !isActive;
 
-          // Логирование для отладки
-          console.log(`Module ${index}:`, {
-            title: module.title?.substring(0, 30),
-            completed: isCompleted,
-            firstIncompleteIndex,
-            isActive,
-            isLocked,
-            currentVideoIndex: workout.currentVideoIndex,
-          });
-          
+          // Незавершённый модуль, который уже начинали — покажем, с какого места
+          // продолжим (сервер помнит watchedDuration, плеер туда и перемотает).
+          const resumeAt = !isCompleted && module.watchedDuration && module.watchedDuration >= 5
+            ? module.watchedDuration
+            : 0;
+
+
           // Определяем фоновое изображение
           const backgroundImages: Record<string, string> = {
             'WARMUP': '/images/AI_t/1_warm_up.webp',
@@ -806,17 +803,26 @@ export default function WorkoutPage() {
                 {info?.label || module.типМодуля || module.moduleType || 'МОДУЛЬ'}
               </div>
 
+              {/* Начатый модуль — продолжим с сохранённого места */}
+              {resumeAt > 0 && isActive && (
+                <div style={{
+                  position: 'relative',
+                  zIndex: 2,
+                  marginTop: 4,
+                  fontFamily: 'Overpass',
+                  fontWeight: 700,
+                  fontSize: '11px',
+                  letterSpacing: '0.3px',
+                  color: '#A1FF4A',
+                  textAlign: 'center',
+                }}>
+                  Продолжить с {Math.floor(resumeAt / 60)}:{String(Math.floor(resumeAt % 60)).padStart(2, '0')}
+                </div>
+              )}
+
               {/* Кнопка замены модуля (нижний правый угол) */}
               {(() => {
                 const canReplace = !isCompleted && !isLocked && module.equipment && module.equipment.length > 0;
-                if (index === 0 || index === 1) { // логируем первые два модуля для debug
-                  console.log(`Module ${index} (${module.title}):`, {
-                    completed: isCompleted,
-                    locked: isLocked,
-                    equipment: module.equipment,
-                    canReplace,
-                  });
-                }
                 return canReplace && (
                   <button
                     onClick={(e) => {

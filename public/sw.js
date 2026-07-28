@@ -3,6 +3,34 @@ const CACHE_NAME = 'trenki-v3';
 const RUNTIME_CACHE = 'trenki-runtime-v3';
 const VIDEO_CACHE_NAME = 'trenki-videos-v3';
 
+// Реестр РЕАЛЬНО скачанных видео (ключи VIDEO_CACHE_NAME). Нужен, чтобы SW
+// перехватывал только офлайн-ролики. Раньше перехватывались ВСЕ медиа-запросы:
+// для нескачанного видео это гарантированный промах кэша + проксирование каждого
+// byte-range запроса через SW — отсюда «долго грузит» и лишние ребуферы.
+let downloadedVideoUrls = new Set();
+
+async function refreshDownloadedVideos() {
+  try {
+    const cache = await caches.open(VIDEO_CACHE_NAME);
+    const keys = await cache.keys();
+    downloadedVideoUrls = new Set(keys.map((r) => r.url));
+  } catch (e) {
+    downloadedVideoUrls = new Set();
+  }
+}
+
+// Страница сообщает о скачивании/удалении ролика, чтобы реестр не устаревал.
+self.addEventListener('message', (event) => {
+  const data = event.data || {};
+  if (data.type === 'VIDEO_CACHED' && data.url) {
+    downloadedVideoUrls.add(new URL(data.url, self.location.origin).href);
+  } else if (data.type === 'VIDEO_REMOVED' && data.url) {
+    downloadedVideoUrls.delete(new URL(data.url, self.location.origin).href);
+  } else if (data.type === 'VIDEOS_REFRESH') {
+    event.waitUntil(refreshDownloadedVideos());
+  }
+});
+
 // Ресурсы для кэширования при установке
 const STATIC_CACHE_URLS = [
   '/',
@@ -38,7 +66,7 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    })
+    }).then(refreshDownloadedVideos) // поднимаем реестр скачанных роликов
   );
   self.clients.claim();
 });
@@ -70,25 +98,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Для офлайн-видео используем Cache-First стратегию
-  if (url.pathname.includes('/offline-videos') || 
-      request.destination === 'video' ||
-      url.pathname.match(/\.(mp4|webm|ogg)$/)) {
+  // Офлайн-видео: Cache-First ТОЛЬКО для реально скачанных роликов. Остальные
+  // медиа-запросы не перехватываем вовсе — пусть идут нативным путём браузера
+  // (быстрее, корректные range-запросы, меньше ребуферов).
+  const isMediaRequest =
+    request.destination === 'video' || url.pathname.match(/\.(mp4|webm|ogg)$/);
+
+  if (isMediaRequest) {
+    if (!downloadedVideoUrls.has(url.href)) return; // не наш офлайн-ролик — не мешаем
     event.respondWith(
-      caches.open(VIDEO_CACHE_NAME).then((cache) => {
-        return cache.match(request).then((cachedResponse) => {
-          if (cachedResponse) {
-            console.log('[SW] Serving video from cache:', request.url);
-            return cachedResponse;
-          }
-          
-          // Если нет в кэше - идем в сеть
-          return fetch(request).then((response) => {
-            // Не кэшируем видео автоматически (только через downloadVideo)
-            return response;
-          });
-        });
-      })
+      caches.open(VIDEO_CACHE_NAME).then((cache) =>
+        cache.match(request).then((cachedResponse) => cachedResponse || fetch(request)),
+      ),
     );
     return;
   }

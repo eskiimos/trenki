@@ -79,15 +79,6 @@ const TagsSection: React.FC<TagsSectionProps> = ({
 }) => {
   const [dbTags, setDbTags] = useState<Tag[]>([]);
 
-  console.log('🔍 TagsSection props:', {
-    moduleType,
-    loadType,
-    muscleGroup,
-    difficulty,
-    rpeMin,
-    rpeMax,
-    gainTag: !!gainTag,
-  });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -281,7 +272,6 @@ const TagsSection: React.FC<TagsSectionProps> = ({
               : rpeMin != null ? `RPE ${rpeMin}+` : `RPE ≤${rpeMax}`,
           },
         ].filter(Boolean) as { label: string }[];
-        console.log('🎯 Before render:', { moduleType, loadType, muscleGroup, difficulty, rpeMin, rpeMax });
         const hasBubbles = infoBubbles.length > 0 || !!gainTag;
         if (!hasBubbles) return null;
 
