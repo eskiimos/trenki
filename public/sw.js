@@ -29,6 +29,11 @@ function ensureRegistry() {
   return registryReady;
 }
 
+// Поднимаем реестр СРАЗУ при старте/пробуждении воркера. Проверка в fetch должна
+// быть синхронной, поэтому реестр обязан наполниться как можно раньше: 'activate'
+// приходит только один раз на версию SW, а воркер усыпляется по простою.
+ensureRegistry();
+
 // Страница сообщает о скачивании/удалении ролика, чтобы реестр не устаревал.
 self.addEventListener('message', (event) => {
   const data = event.data || {};
@@ -124,17 +129,16 @@ self.addEventListener('fetch', (event) => {
     request.destination === 'video' || url.pathname.match(/\.(mp4|webm|ogg)$/);
 
   if (isMediaRequest) {
-    // Реестр мог не успеть подняться (свежепроснувшийся воркер) — ждём его, но
-    // если ролик не скачан, честно уходим в сеть тем же запросом (отказаться от
-    // обработки после respondWith уже нельзя).
+    // КРИТИЧНО: решение о перехвате — СИНХРОННОЕ. Нельзя уходить в await и потом
+    // отдавать fetch(request): переотправка range-запроса к CDN через SW ломает
+    // воспроизведение (браузер ждёт 206, а получает переотправленный/opaque
+    // ответ). Не наш офлайн-ролик — вообще не вмешиваемся, пусть играет нативно.
+    if (!downloadedVideoUrls.has(url.href)) return;
+
     event.respondWith(
-      ensureRegistry().then(() => {
-        if (!downloadedVideoUrls.has(url.href)) return fetch(request);
-        return caches.open(VIDEO_CACHE_NAME).then((cache) =>
-          // Range игнорируем намеренно: ролик лежит целиком, отдаём его.
-          cache.match(request, { ignoreSearch: false }).then((cached) => cached || fetch(request)),
-        );
-      }),
+      caches.open(VIDEO_CACHE_NAME).then((cache) =>
+        cache.match(request).then((cached) => cached || fetch(request)),
+      ),
     );
     return;
   }
