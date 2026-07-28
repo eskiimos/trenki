@@ -86,7 +86,7 @@ const HomePage = () => {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   // Микроцикл, ждущий фидбэк (если есть). Загружается параллельно с auth.
   const [pendingFeedbackCycle, setPendingFeedbackCycle] = useState<
-    { id: string; cycleNumber: number } | null
+    { id: string; cycleNumber: number; completedCount: number } | null
   >(null);
   const [feedbackModalDismissed, setFeedbackModalDismissed] = useState(false);
 
@@ -106,6 +106,7 @@ const HomePage = () => {
           setPendingFeedbackCycle({
             id: data.microcycle.id,
             cycleNumber: data.microcycle.cycleNumber,
+            completedCount: data.microcycle.completedCount ?? 0,
           });
         }
       } catch {
@@ -226,6 +227,7 @@ const HomePage = () => {
           open
           microcycleId={pendingFeedbackCycle.id}
           cycleNumber={pendingFeedbackCycle.cycleNumber}
+          completedCount={pendingFeedbackCycle.completedCount}
           onClose={() => setFeedbackModalDismissed(true)}
         />
       )}

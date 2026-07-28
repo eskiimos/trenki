@@ -31,6 +31,7 @@ import { isReminderDueForDay } from '@/lib/microcycle/reminders';
 import { parsePrevDay, labelFor } from '@/lib/microcycle/week-plan';
 import { MicrocycleStatus } from '@/generated/prisma';
 import { getReminderSettings } from '@/lib/settings';
+import { buildDailyReminder } from '@/lib/notifications/reminder-texts';
 
 export const dynamic = 'force-dynamic';
 
@@ -139,9 +140,11 @@ export async function GET(request: NextRequest) {
     });
     if (claim.count !== 1) { alreadySent++; continue; }
 
+    // Текст чередуется по дням (детерминированно от локальной даты и userId).
+    const text = buildDailyReminder(info.localDate, userId, info.name, info.label);
     sendUserPush(userId, {
-      title: info.name ? `Привет, ${info.name}! Время тренировки 💪` : 'Время тренировки 💪',
-      body: `Стабильность — признак мастерства. Не забудь потренироваться — сегодня у тебя «${info.label}».`,
+      title: text.title,
+      body: text.body,
       url: '/calendar',
     }).catch((err) => console.error('microcycle reminder push failed', userId, err));
     sent++;

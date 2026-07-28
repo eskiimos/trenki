@@ -38,8 +38,12 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
   const feedback = body?.feedback as MicrocycleFeedback | undefined;
+  // acknowledge: закрыть неделю БЕЗ оценки. Нужен для «нулевой недели» — когда
+  // тренировок не было, оценивать нечего, но цикл надо закрыть, иначе экран
+  // завершения будет висеть вечно.
+  const acknowledgeOnly = body?.acknowledge === true;
 
-  if (!feedback || !VALID_FEEDBACK.has(feedback)) {
+  if (!acknowledgeOnly && (!feedback || !VALID_FEEDBACK.has(feedback))) {
     return NextResponse.json(
       { error: 'feedback должен быть EASY, NORMAL или HARD' },
       { status: 400 },
@@ -77,7 +81,9 @@ export async function PATCH(
   const updated = await prisma.microcycle.update({
     where: { id },
     data: {
-      feedback,
+      // acknowledge → закрываем неделю без оценки (feedback остаётся null:
+      // адаптация следующей недели пойдёт по дефолту, как при отсутствии ответа).
+      ...(acknowledgeOnly ? {} : { feedback }),
       status: MicrocycleStatus.ARCHIVED,
     },
     select: { id: true, feedback: true, status: true },

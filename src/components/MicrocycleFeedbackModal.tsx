@@ -14,6 +14,8 @@ interface Props {
   onClose: () => void;
   /** Вызывается после успешной отправки фидбэка (чтобы родитель перезагрузил состояние) */
   onSubmitted?: () => void;
+  /** Сколько тренировок недели выполнено. 0 → вместо опроса показываем поддержку. */
+  completedCount?: number;
 }
 
 type Choice = 'EASY' | 'NORMAL' | 'HARD';
@@ -30,12 +32,39 @@ export default function MicrocycleFeedbackModal({
   cycleNumber,
   onClose,
   onSubmitted,
+  completedCount,
 }: Props) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState<Choice | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [ackSubmitting, setAckSubmitting] = useState(false);
+  // Неделя без единой выполненной тренировки — оценивать нечего.
+  const zeroWeek = completedCount === 0;
 
   if (!open) return null;
+
+  // Закрыть неделю без оценки (экран «ни одной тренировки»).
+  const handleAcknowledge = async (goTrain: boolean) => {
+    if (ackSubmitting) return;
+    setError(null);
+    setAckSubmitting(true);
+    try {
+      const res = await fetch(`/api/microcycle/${microcycleId}/feedback`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acknowledge: true }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || 'Не удалось закрыть неделю');
+      }
+      onSubmitted?.();
+      router.push(goTrain ? '/training/assessment' : '/');
+    } catch (err: any) {
+      setError(err?.message || 'Ошибка');
+      setAckSubmitting(false);
+    }
+  };
 
   const handlePick = async (choice: Choice) => {
     if (submitting) return;
@@ -91,7 +120,7 @@ export default function MicrocycleFeedbackModal({
                 lineHeight: '120%',
               }}
             >
-              Как перенёс неделю?
+              {zeroWeek ? 'Ни одной тренировки :(' : 'Как перенёс неделю?'}
             </h2>
           </div>
           <button
@@ -110,11 +139,52 @@ export default function MicrocycleFeedbackModal({
             className="font-overpass"
             style={{ color: '#AEABBB', fontSize: 13, lineHeight: 1.45 }}
           >
-            Ответ важен — на его основе ИИ-тренер подберёт следующий цикл под
-            твою реальную форму.
+            {zeroWeek
+              ? 'На этой неделе ты не выполнил ни одной тренировки. Бывает — главное вернуться. Начнём новую неделю?'
+              : 'Ответ важен — на его основе ИИ-тренер подберёт следующий цикл под твою реальную форму.'}
           </p>
         </div>
 
+        {/* Нулевая неделя: вместо опроса — поддержка и путь обратно в тренировки */}
+        {zeroWeek ? (
+          <div className="px-6 pt-2 flex flex-col gap-2">
+            <button
+              type="button"
+              disabled={ackSubmitting}
+              onClick={() => handleAcknowledge(true)}
+              className="font-overpass uppercase rounded-2xl px-4 py-4 transition-all duration-150"
+              style={{
+                background: '#A1FF4A',
+                color: '#060919',
+                fontWeight: 900,
+                fontSize: 15,
+                letterSpacing: '0.5px',
+                border: 'none',
+                cursor: ackSubmitting ? 'wait' : 'pointer',
+                opacity: ackSubmitting ? 0.6 : 1,
+              }}
+            >
+              {ackSubmitting ? 'Секунду…' : 'Начать тренировку'}
+            </button>
+            <button
+              type="button"
+              disabled={ackSubmitting}
+              onClick={() => handleAcknowledge(false)}
+              className="font-overpass uppercase rounded-2xl px-4 py-3 transition-all duration-150"
+              style={{
+                background: 'rgba(174, 171, 187, 0.08)',
+                border: '1px solid rgba(174, 171, 187, 0.2)',
+                color: '#AEABBB',
+                fontWeight: 800,
+                fontSize: 13,
+                letterSpacing: '0.5px',
+                cursor: ackSubmitting ? 'wait' : 'pointer',
+              }}
+            >
+              Позже
+            </button>
+          </div>
+        ) : (
         <div className="px-6 pt-2 flex flex-col gap-2">
           {CHOICES.map((c) => {
             const isPicked = submitting === c.key;
@@ -166,6 +236,7 @@ export default function MicrocycleFeedbackModal({
             );
           })}
         </div>
+        )}
 
         {error && (
           <div

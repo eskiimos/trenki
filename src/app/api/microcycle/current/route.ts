@@ -89,6 +89,9 @@ export async function GET(request: NextRequest) {
       status: microcycle.status,
       effectiveStatus,
       awaitingFeedback: effectiveStatus === 'AWAITING_FEEDBACK',
+      // Сколько тренировок недели реально выполнено. Ноль → вместо опроса
+      // «как перенёс неделю» показываем поддерживающий экран (нечего оценивать).
+      completedCount: microcycle.days.filter((d) => d.workoutSession?.status === 'COMPLETED').length,
       days: microcycle.days.map((d) => ({
         dayOfWeek: d.dayOfWeek,
         intent: d.intent,
