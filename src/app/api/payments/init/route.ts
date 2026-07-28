@@ -3,7 +3,9 @@ import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
 import { getTbankConfig, initPayment } from '@/lib/payments/tbank';
-import { getSubscriptionPricing } from '@/lib/settings';
+import { getSubscriptionPricing, getReceiptSettings } from '@/lib/settings';
+import { buildReceipt } from '@/lib/payments/receipt';
+import { SUBSCRIPTION_PERIOD_DAYS } from '@/lib/payments/grant';
 import { logger } from '@/lib/logger';
 
 // POST /api/payments/init — старт оплаты доступа. Оплата РАЗОВАЯ: списание один
@@ -28,6 +30,31 @@ export async function POST(request: NextRequest) {
 
   const pricing = await getSubscriptionPricing();
   const amountKopecks = pricing.priceMonthlyRub * 100;
+
+  // Чек 54-ФЗ. Включается в админке — только когда подключена облачная касса и
+  // подтверждена система налогообложения. Пока выключен, платёж идёт без чека
+  // (как и раньше), чтобы неверные реквизиты не ломали оплату.
+  const receiptSettings = await getReceiptSettings();
+  let receipt: Record<string, unknown> | undefined;
+  if (receiptSettings.enabled) {
+    const built = buildReceipt({
+      amountKopecks,
+      email: user.email,
+      name: `Доступ к сервису «Треньки», ${SUBSCRIPTION_PERIOD_DAYS} дней`,
+      taxation: receiptSettings.taxation,
+      vat: receiptSettings.vat,
+    });
+    if (!built) {
+      // Чек включён, но собрать его нельзя (нет email у покупателя). Платить без
+      // чека нельзя — это нарушение 54-ФЗ, поэтому честно останавливаемся.
+      logger.error('receipt build failed', { userId: user.id, hasEmail: Boolean(user.email) });
+      return NextResponse.json(
+        { error: 'Для оплаты нужен email в профиле — на него придёт чек' },
+        { status: 400 },
+      );
+    }
+    receipt = built as unknown as Record<string, unknown>;
+  }
   const orderId = `sub_${Date.now().toString(36)}_${crypto.randomBytes(4).toString('hex')}`;
   const origin = returnOrigin();
 
@@ -48,6 +75,7 @@ export async function POST(request: NextRequest) {
       notificationURL: `${origin}/api/webhook/tbank`,
       successURL: `${origin}/subscription/success?orderId=${orderId}`,
       failURL: `${origin}/subscription/fail?orderId=${orderId}`,
+      receipt, // не участвует в подписи Token (см. tbank.ts)
     });
   } catch (e) {
     logger.error('tbank Init failed', e);

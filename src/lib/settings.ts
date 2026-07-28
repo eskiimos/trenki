@@ -5,6 +5,7 @@ import {
   computeIntroPrice,
   type SubscriptionPricing,
 } from '@/lib/subscription-plan';
+import { normalizeTaxation, normalizeVat, type Taxation, type Vat } from '@/lib/payments/receipt';
 
 /**
  * Настройки приложения (таблица app_settings, key-value). Сейчас — время
@@ -19,6 +20,9 @@ export const SETTING_KEYS = {
   preworkoutLateMin: 'reminder.preworkoutLateMin', // минут до тренировки — позднее
   paywallMode: 'paywall.mode', // 'off' | 'admins' | 'on' — роллаут-контроль paywall
   freeLessonVideoId: 'freeLesson.videoId', // «бесплатное занятие недели» — id видео, открытого всем
+  receiptEnabled: 'receipt.enabled', // формировать ли чек 54-ФЗ ('1'/'0')
+  receiptTaxation: 'receipt.taxation', // система налогообложения (osn/usn_income/...)
+  receiptVat: 'receipt.vat', // ставка НДС в позиции чека (none/vat20/...)
   priceMonthly: 'subscription.priceMonthlyRub', // базовая цена подписки ₽/мес
   introDiscountPercent: 'subscription.introDiscountPercent', // макс. скидка по промо, %
   introMonths: 'subscription.introMonths', // на сколько месяцев действует интро-скидка
@@ -133,6 +137,37 @@ export async function getFreeLessonVideoId(): Promise<string | null> {
   } catch {
     return null; // таблицы может не быть — считаем, что не задано
   }
+}
+
+export interface ReceiptSettings {
+  enabled: boolean;
+  taxation: Taxation;
+  vat: Vat;
+}
+
+/**
+ * Настройки чека 54-ФЗ. По умолчанию ВЫКЛЮЧЕНО: пока не подключена облачная
+ * касса и не подтверждена система налогообложения, слать Receipt нельзя —
+ * банк отклонит платёж, а неверные реквизиты в чеке нарушают 54-ФЗ.
+ */
+export async function getReceiptSettings(): Promise<ReceiptSettings> {
+  let rows: { key: string; value: string }[] = [];
+  try {
+    rows = await prisma.appSetting.findMany({
+      where: {
+        key: { in: [SETTING_KEYS.receiptEnabled, SETTING_KEYS.receiptTaxation, SETTING_KEYS.receiptVat] },
+      },
+      select: { key: true, value: true },
+    });
+  } catch {
+    // таблицы может не быть — чеки выключены
+  }
+  const map = new Map(rows.map((r) => [r.key, r.value]));
+  return {
+    enabled: map.get(SETTING_KEYS.receiptEnabled) === '1',
+    taxation: normalizeTaxation(map.get(SETTING_KEYS.receiptTaxation)),
+    vat: normalizeVat(map.get(SETTING_KEYS.receiptVat)),
+  };
 }
 
 /** Целое в диапазоне [min, max] или дефолт (для битого/пустого value). */

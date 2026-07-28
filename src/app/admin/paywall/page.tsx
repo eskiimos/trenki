@@ -47,6 +47,35 @@ export default function PaywallAdminPage() {
   const [savingLesson, setSavingLesson] = useState(false);
   const [lessonMsg, setLessonMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
+  // Чек 54-ФЗ
+  const [rcEnabled, setRcEnabled] = useState(false);
+  const [rcTaxation, setRcTaxation] = useState('usn_income');
+  const [rcVat, setRcVat] = useState('none');
+  const [savingRc, setSavingRc] = useState(false);
+  const [rcMsg, setRcMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  const saveReceipt = async () => {
+    setSavingRc(true);
+    setRcMsg(null);
+    try {
+      const res = await fetch('/api/admin/paywall', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ receipt: { enabled: rcEnabled, taxation: rcTaxation, vat: rcVat } }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setRcMsg({ type: 'err', text: d?.error || 'Ошибка сохранения' });
+        return;
+      }
+      setRcMsg({ type: 'ok', text: rcEnabled ? 'Чеки включены ✓' : 'Чеки выключены' });
+    } catch {
+      setRcMsg({ type: 'err', text: 'Сетевая ошибка' });
+    } finally {
+      setSavingRc(false);
+    }
+  };
+
   useEffect(() => {
     fetch('/api/videos', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
@@ -95,6 +124,11 @@ export default function PaywallAdminPage() {
             setMonths(String(d.pricing.introMonths ?? 3));
           }
           setFreeLesson(d?.freeLesson ?? null);
+          if (d?.receipt) {
+            setRcEnabled(Boolean(d.receipt.enabled));
+            setRcTaxation(d.receipt.taxation ?? 'usn_income');
+            setRcVat(d.receipt.vat ?? 'none');
+          }
         }
       } catch {
         /* ignore */
@@ -325,6 +359,103 @@ export default function PaywallAdminPage() {
                 }}
               >
                 {savingPrice ? 'Сохраняю…' : 'Сохранить цены'}
+              </button>
+            </section>
+
+            {/* Чек 54-ФЗ */}
+            <section
+              style={{
+                marginTop: 16,
+                background: '#0B1030',
+                border: `1px solid ${rcEnabled ? 'rgba(161,255,74,0.4)' : '#26252F'}`,
+                borderRadius: 16,
+                padding: 18,
+              }}
+            >
+              <div style={{ color: '#F9F8FE', fontWeight: 800, fontSize: 15, marginBottom: 4 }}>
+                🧾 Чеки 54-ФЗ
+              </div>
+              <div style={{ color: '#AEABBB', fontSize: 12.5, lineHeight: 1.45, marginBottom: 14 }}>
+                Включай, только когда подключена облачная касса «Чеки от Т-Бизнеса» и бухгалтер
+                подтвердил систему налогообложения. Пока выключено — платежи идут без чека.
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer" style={{ marginBottom: 14 }}>
+                <input
+                  type="checkbox"
+                  checked={rcEnabled}
+                  onChange={(e) => setRcEnabled(e.target.checked)}
+                  disabled={savingRc}
+                  style={{ width: 18, height: 18, cursor: 'pointer' }}
+                />
+                <span style={{ color: '#F9F8FE', fontSize: 14, fontWeight: 700 }}>
+                  Формировать чек при оплате
+                </span>
+              </label>
+
+              <div className="flex gap-4 flex-wrap">
+                <div>
+                  <div style={{ color: '#AEABBB', fontSize: 12, marginBottom: 4 }}>Налогообложение</div>
+                  <select
+                    value={rcTaxation}
+                    onChange={(e) => setRcTaxation(e.target.value)}
+                    disabled={savingRc}
+                    style={{
+                      background: '#060919', border: '1px solid #26252F', borderRadius: 10,
+                      padding: '10px 12px', color: '#F9F8FE', fontSize: 14, outline: 'none',
+                    }}
+                  >
+                    <option value="usn_income">УСН Доходы</option>
+                    <option value="usn_income_outcome">УСН Доходы−Расходы</option>
+                    <option value="osn">ОСН (общая)</option>
+                    <option value="patent">Патент</option>
+                    <option value="envd">ЕНВД</option>
+                    <option value="esn">ЕСХН</option>
+                  </select>
+                </div>
+                <div>
+                  <div style={{ color: '#AEABBB', fontSize: 12, marginBottom: 4 }}>Ставка НДС</div>
+                  <select
+                    value={rcVat}
+                    onChange={(e) => setRcVat(e.target.value)}
+                    disabled={savingRc}
+                    style={{
+                      background: '#060919', border: '1px solid #26252F', borderRadius: 10,
+                      padding: '10px 12px', color: '#F9F8FE', fontSize: 14, outline: 'none',
+                    }}
+                  >
+                    <option value="none">Без НДС (УСН)</option>
+                    <option value="vat0">0%</option>
+                    <option value="vat10">10%</option>
+                    <option value="vat20">20%</option>
+                    <option value="vat110">10/110</option>
+                    <option value="vat120">20/120</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ color: '#6E6B7B', fontSize: 11.5, marginTop: 10, lineHeight: 1.4 }}>
+                Чек уходит на email покупателя. Позиция: услуга, полный расчёт, сумма чека равна сумме платежа.
+              </div>
+
+              {rcMsg && (
+                <div style={{ fontSize: 14, fontWeight: 700, marginTop: 10, color: rcMsg.type === 'ok' ? '#A1FF4A' : '#FF6B6B' }}>
+                  {rcMsg.text}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={saveReceipt}
+                disabled={savingRc}
+                className="font-overpass uppercase transition-transform active:scale-95"
+                style={{
+                  marginTop: 14, background: '#A1FF4A', color: '#060919', border: 'none',
+                  borderRadius: 999, padding: '12px 22px', fontWeight: 900, fontSize: 13,
+                  cursor: savingRc ? 'not-allowed' : 'pointer', opacity: savingRc ? 0.6 : 1,
+                }}
+              >
+                {savingRc ? 'Сохраняю…' : 'Сохранить настройки чека'}
               </button>
             </section>
 

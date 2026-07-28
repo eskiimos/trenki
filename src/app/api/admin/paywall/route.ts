@@ -4,9 +4,11 @@ import {
   getPaywallMode,
   getSubscriptionPricing,
   getFreeLessonVideoId,
+  getReceiptSettings,
   setAppSetting,
   SETTING_KEYS,
 } from '@/lib/settings';
+import { TAXATION_VALUES, VAT_VALUES } from '@/lib/payments/receipt';
 import { prisma } from '@/lib/prisma';
 import { PAYWALL_MODES, normalizePaywallMode } from '@/lib/paywall';
 import { logger } from '@/lib/logger';
@@ -21,10 +23,11 @@ export async function GET(request: NextRequest) {
   const denied = await requireAdminAsync(request);
   if (denied) return denied;
   try {
-    const [mode, pricing, freeLessonVideoId] = await Promise.all([
+    const [mode, pricing, freeLessonVideoId, receipt] = await Promise.all([
       getPaywallMode(),
       getSubscriptionPricing(),
       getFreeLessonVideoId(),
+      getReceiptSettings(),
     ]);
     // Название текущего бесплатного занятия — чтобы админ видел, что выбрано.
     const freeLesson = freeLessonVideoId
@@ -33,7 +36,14 @@ export async function GET(request: NextRequest) {
           select: { id: true, title: true, isPublished: true },
         })
       : null;
-    return NextResponse.json({ mode, modes: PAYWALL_MODES, pricing, freeLesson });
+    return NextResponse.json({
+      mode,
+      modes: PAYWALL_MODES,
+      pricing,
+      freeLesson,
+      receipt,
+      receiptOptions: { taxations: TAXATION_VALUES, vats: VAT_VALUES },
+    });
   } catch (error) {
     logger.error('admin/paywall GET failed', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
@@ -103,7 +113,28 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ freeLesson: null });
     }
 
-    return NextResponse.json({ error: 'Нужен mode, pricing или freeLessonVideoId' }, { status: 400 });
+    // Ветка 4: чек 54-ФЗ.
+    if (body.receipt && typeof body.receipt === 'object') {
+      const r = body.receipt;
+      const enabled = Boolean(r.enabled);
+      const taxation = String(r.taxation ?? '');
+      const vat = String(r.vat ?? '');
+      if (!TAXATION_VALUES.includes(taxation as never)) {
+        return NextResponse.json({ error: 'Некорректная система налогообложения' }, { status: 400 });
+      }
+      if (!VAT_VALUES.includes(vat as never)) {
+        return NextResponse.json({ error: 'Некорректная ставка НДС' }, { status: 400 });
+      }
+      await Promise.all([
+        setAppSetting(SETTING_KEYS.receiptEnabled, enabled ? '1' : '0'),
+        setAppSetting(SETTING_KEYS.receiptTaxation, taxation),
+        setAppSetting(SETTING_KEYS.receiptVat, vat),
+      ]);
+      logger.info('admin set receipt settings', { enabled, taxation, vat });
+      return NextResponse.json({ receipt: await getReceiptSettings() });
+    }
+
+    return NextResponse.json({ error: 'Нужен mode, pricing, freeLessonVideoId или receipt' }, { status: 400 });
   } catch (error) {
     logger.error('admin/paywall PATCH failed', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
