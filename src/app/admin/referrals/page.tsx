@@ -24,6 +24,7 @@ interface RefCode {
   aliases: string[];
   isActive: boolean;
   note: string | null;
+  trialDays: number;
   createdAt: string;
   stats: { registrations: number; onboarded: number; active7d: number; premium: number };
   users: RefUser[];
@@ -42,7 +43,10 @@ export default function AdminReferralsPage() {
   const [newLabel, setNewLabel] = useState('');
   const [newNote, setNewNote] = useState('');
   const [newAliases, setNewAliases] = useState('');
+  const [newTrial, setNewTrial] = useState('0');
   const [copied, setCopied] = useState<string | null>(null);
+  // Черновики поля «триал» по каждому коду (ключ — id). Пусто — показываем текущее.
+  const [trialEdit, setTrialEdit] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -75,11 +79,31 @@ export default function AdminReferralsPage() {
     try {
       const res = await fetch('/api/admin/referrals', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: newCode, label: newLabel, note: newNote || undefined, aliases: newAliases || undefined }),
+        body: JSON.stringify({ code: newCode, label: newLabel, note: newNote || undefined, aliases: newAliases || undefined, trialDays: Number(newTrial) || 0 }),
       });
       const d = await res.json();
       if (!res.ok) { alert(d?.error || 'Ошибка'); return; }
-      setNewCode(''); setNewLabel(''); setNewNote(''); setNewAliases('');
+      setNewCode(''); setNewLabel(''); setNewNote(''); setNewAliases(''); setNewTrial('0');
+      await load();
+    } finally { setBusy(false); }
+  };
+
+  // Сохранить пробный период по коду. Валидируем на клиенте (сервер тоже проверит).
+  const saveTrial = async (c: RefCode) => {
+    const raw = trialEdit[c.id];
+    if (raw === undefined) return;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 0 || n > 365) { alert('Триал — целое от 0 до 365 дней'); return; }
+    if (n === c.trialDays) { setTrialEdit((m) => { const { [c.id]: _, ...rest } = m; return rest; }); return; }
+    setBusy(true);
+    try {
+      const res = await fetch('/api/admin/referrals', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: c.id, trialDays: n }),
+      });
+      const d = await res.json();
+      if (!res.ok) { alert(d?.error || 'Ошибка'); return; }
+      setTrialEdit((m) => { const { [c.id]: _, ...rest } = m; return rest; });
       await load();
     } finally { setBusy(false); }
   };
@@ -158,6 +182,12 @@ export default function AdminReferralsPage() {
         </div>
         <input value={newAliases} onChange={(e) => setNewAliases(e.target.value)} placeholder="промокоды для ручного ввода через запятую (напр. ИГЛС, иглс)"
           className="w-full mb-2 bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#A1FF4A]" />
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-gray-400 text-xs">Пробный период:</span>
+          <input type="number" min={0} max={365} value={newTrial} onChange={(e) => setNewTrial(e.target.value)}
+            className="w-20 bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#A1FF4A]" />
+          <span className="text-gray-500 text-xs">дней премиума при регистрации по этому коду (0 — без триала)</span>
+        </div>
         <button onClick={create} disabled={busy || !newCode.trim() || !newLabel.trim()}
           className="bg-[#A1FF4A] text-[#060919] font-bold text-sm rounded-lg px-4 py-2 disabled:opacity-50">
           Создать
@@ -178,6 +208,11 @@ export default function AdminReferralsPage() {
                   <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: c.isActive ? 'rgba(161,255,74,0.18)' : 'rgba(174,171,187,0.18)', color: c.isActive ? '#A1FF4A' : '#AEABBB' }}>
                     {c.isActive ? 'активен' : 'выкл'}
                   </span>
+                  {c.trialDays > 0 && (
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.22)', color: '#A5B4FC' }} title="Пробный период при регистрации по этому коду">
+                      🎁 триал {c.trialDays} дн.
+                    </span>
+                  )}
                 </div>
                 <div className="text-gray-400 text-xs mt-1 font-mono">{c.code}</div>
                 {c.aliases?.length > 0 && (
@@ -205,6 +240,17 @@ export default function AdminReferralsPage() {
               <button onClick={() => exportCsv(c)} disabled={c.users.length === 0} className="text-xs bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-3 py-1.5 hover:border-[#A1FF4A] disabled:opacity-40">⬇️ CSV</button>
               <button onClick={() => toggle(c)} disabled={busy} className="text-xs bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-3 py-1.5 hover:border-[#A1FF4A]">{c.isActive ? 'выключить' : 'включить'}</button>
               <button onClick={() => remove(c)} disabled={busy} className="text-xs text-red-400 border border-red-500/40 rounded-lg px-3 py-1.5 hover:bg-red-500/10">удалить</button>
+              <span className="inline-flex items-center gap-1 text-xs ml-auto">
+                <span className="text-gray-500">триал</span>
+                <input type="number" min={0} max={365}
+                  value={trialEdit[c.id] ?? String(c.trialDays)}
+                  onChange={(e) => setTrialEdit((m) => ({ ...m, [c.id]: e.target.value }))}
+                  className="w-16 bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#A1FF4A]" />
+                <span className="text-gray-500">дн.</span>
+                {trialEdit[c.id] !== undefined && trialEdit[c.id] !== String(c.trialDays) && (
+                  <button onClick={() => saveTrial(c)} disabled={busy} className="bg-[#A1FF4A] text-[#060919] font-bold rounded-lg px-2.5 py-1.5">✓ сохранить</button>
+                )}
+              </span>
             </div>
 
             {expanded === c.id && (

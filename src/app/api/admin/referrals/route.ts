@@ -6,8 +6,8 @@ import { hasPremium } from '@/lib/access';
 // Админ-API реферальных каналов. Только isAdmin (requireAdminAsync).
 //  GET    — список кодов + статистика (регистрации / прошли онбординг / активны
 //           за 7д) + сами пользователи (для дрилл-дауна и CSV на клиенте).
-//  POST   — создать код { code (латиница), label, note? }.
-//  PATCH  — { id, isActive? , label?, note? } — вкл/выкл и редактирование.
+//  POST   — создать код { code (латиница), label, note?, aliases?, trialDays? }.
+//  PATCH  — { id, isActive?, label?, note?, aliases?, trialDays? } — вкл/выкл и редактирование.
 //  DELETE — ?id=... удалить код (привязки User.referralCode остаются как есть).
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +24,15 @@ function parseAliases(input: unknown): string[] {
       ? input.split(',')
       : [];
   return Array.from(new Set(arr.map((s) => s.trim().toLowerCase()).filter(Boolean)));
+}
+
+// Пробный период по коду: целое 0..365 дней. Возвращает null, если значение
+// задано, но некорректно (чтобы вернуть 400, а не молча обнулить).
+const MAX_TRIAL_DAYS = 365;
+function parseTrialDays(input: unknown): number | null {
+  const n = Number(input);
+  if (!Number.isInteger(n) || n < 0 || n > MAX_TRIAL_DAYS) return null;
+  return n;
 }
 
 export async function GET(request: NextRequest) {
@@ -67,7 +76,7 @@ export async function GET(request: NextRequest) {
         return la - ca > ACTIVE_MIN_GAP && now - la <= SEVEN_DAYS;
       }).length;
       return {
-        id: c.id, code: c.code, label: c.label, aliases: c.aliases, isActive: c.isActive, note: c.note, createdAt: c.createdAt,
+        id: c.id, code: c.code, label: c.label, aliases: c.aliases, isActive: c.isActive, note: c.note, trialDays: c.trialDays, createdAt: c.createdAt,
         stats: { registrations: users.length, onboarded, active7d, premium },
         users: users.map((u) => ({
           id: u.id,
@@ -115,6 +124,11 @@ export async function POST(request: NextRequest) {
     if (!label) {
       return NextResponse.json({ error: 'Укажите название (label)' }, { status: 400 });
     }
+    // trialDays необязателен при создании; по умолчанию 0 (без триала).
+    const trialDays = body?.trialDays === undefined ? 0 : parseTrialDays(body.trialDays);
+    if (trialDays === null) {
+      return NextResponse.json({ error: `Пробный период — целое от 0 до ${MAX_TRIAL_DAYS} дней` }, { status: 400 });
+    }
 
     const exists = await prisma.referralCode.findUnique({ where: { code } });
     if (exists) {
@@ -122,7 +136,7 @@ export async function POST(request: NextRequest) {
     }
 
     const created = await prisma.referralCode.create({
-      data: { code, label, note, aliases: parseAliases(body?.aliases) },
+      data: { code, label, note, aliases: parseAliases(body?.aliases), trialDays },
     });
     return NextResponse.json({ success: true, code: created }, { status: 201 });
   } catch (error) {
@@ -139,11 +153,18 @@ export async function PATCH(request: NextRequest) {
     const id = String(body?.id || '');
     if (!id) return NextResponse.json({ error: 'id обязателен' }, { status: 400 });
 
-    const data: { isActive?: boolean; label?: string; note?: string | null; aliases?: string[] } = {};
+    const data: { isActive?: boolean; label?: string; note?: string | null; aliases?: string[]; trialDays?: number } = {};
     if (typeof body.isActive === 'boolean') data.isActive = body.isActive;
     if (typeof body.label === 'string' && body.label.trim()) data.label = body.label.trim();
     if (typeof body.note === 'string') data.note = body.note.trim() || null;
     if (body.aliases !== undefined) data.aliases = parseAliases(body.aliases);
+    if (body.trialDays !== undefined) {
+      const td = parseTrialDays(body.trialDays);
+      if (td === null) {
+        return NextResponse.json({ error: `Пробный период — целое от 0 до ${MAX_TRIAL_DAYS} дней` }, { status: 400 });
+      }
+      data.trialDays = td;
+    }
 
     const updated = await prisma.referralCode.update({ where: { id }, data });
     return NextResponse.json({ success: true, code: updated });

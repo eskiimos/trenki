@@ -753,6 +753,7 @@ model ReferralCode {
   aliases   String[] @default([]) // доп. коды для РУЧНОГО ввода (в т.ч. кириллица), хранятся в нижнем регистре, напр. ["иглс"]
   isActive  Boolean  @default(true)
   note      String? // заметка для админа
+  trialDays Int      @default(0) // сколько дней премиума выдать при регистрации по этому коду (0 = без триала)
   createdAt DateTime @default(now())
 
   @@map("referral_codes")

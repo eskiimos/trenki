@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { signSession, setSessionCookie } from '@/lib/session';
 import { rateLimit } from '@/lib/coach/rate-limit';
+import { grantPremiumDays } from '@/lib/payments/grant';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -69,6 +70,7 @@ export async function POST(request: NextRequest) {
       // ТОЛЬКО при создании нового пользователя и только если код активен.
       const refRaw = (body.referralCode || '').trim();
       let referralCode: string | null = null;
+      let trialDays = 0;
       if (refRaw) {
         const rc = await prisma.referralCode.findFirst({
           where: {
@@ -78,9 +80,12 @@ export async function POST(request: NextRequest) {
               { aliases: { has: refRaw.toLowerCase() } },
             ],
           },
-          select: { code: true },
+          select: { code: true, trialDays: true },
         });
-        if (rc) referralCode = rc.code; // храним канонический код, не алиас
+        if (rc) {
+          referralCode = rc.code; // храним канонический код, не алиас
+          trialDays = rc.trialDays; // пробный период по этому коду (0 = без триала)
+        }
       }
 
       const generatedId = `email_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -94,6 +99,21 @@ export async function POST(request: NextRequest) {
         },
       });
       needsOnboarding = true;
+
+      // Пробный период по промокоду. Отдельным шагом после создания: сбой выдачи
+      // триала НЕ должен ломать регистрацию/логин — в худшем случае юзер остаётся
+      // FREE, и это чинится вручную. Валидируем срок, чтобы битое значение из БД
+      // не выдало абсурдный премиум.
+      if (referralCode && Number.isInteger(trialDays) && trialDays > 0 && trialDays <= 365) {
+        try {
+          await grantPremiumDays(user.id, trialDays, {
+            note: `Пробный период ${trialDays} дн. по промокоду ${referralCode}`,
+          });
+          logger.info('trial granted on signup', { userId: user.id, referralCode, trialDays });
+        } catch (e) {
+          logger.error('trial grant failed on signup', { userId: user.id, referralCode, error: String(e) });
+        }
+      }
     } else {
       if (!user.emailVerified) {
         user = await prisma.user.update({
