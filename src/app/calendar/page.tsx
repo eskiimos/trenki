@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, RefreshCw } from 'lucide-react';
 import BottomNavigation from '@/components/BottomNavigation';
 import SwipeableWorkoutItem from '@/components/SwipeableWorkoutItem';
 import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay';
@@ -454,76 +454,24 @@ export default function CalendarPage() {
       </header>
 
       <div className="px-4">
-        {/* Кнопка ручной сборки недели (микроцикл). Видна всегда, чтобы быть
-            точкой входа и якорем тура (data-tour). Идемпотентна. */}
-        <button
-          type="button"
-          data-tour="microcycle-button"
-          onClick={handleGenerateMicrocycle}
-          disabled={generatingCycle}
-          className="w-full mb-4 rounded-2xl flex items-center gap-3 p-4 transition-transform active:scale-[0.98]"
-          style={{
-            background:
-              'linear-gradient(135deg, rgba(161, 255, 74, 0.18) 0%, rgba(68, 92, 255, 0.22) 100%)',
-            border: '1px solid rgba(161, 255, 74, 0.35)',
-            cursor: generatingCycle ? 'wait' : 'pointer',
-            opacity: generatingCycle ? 0.7 : 1,
-          }}
-        >
-          <div
+        {/* Большая кнопка сборки недели — ТОЛЬКО когда микроцикла ещё нет
+            (пустое состояние + точка входа + якорь онбординг-тура). Когда неделя
+            собрана, пересборка живёт компактной ссылкой внутри календаря ниже —
+            большую кнопку сверху не показываем, чтобы не провоцировать случайную
+            замену всего плана. */}
+        {!microcycle && (
+          <button
+            type="button"
+            data-tour="microcycle-button"
+            onClick={handleGenerateMicrocycle}
+            disabled={generatingCycle}
+            className="w-full mb-4 rounded-2xl flex items-center gap-3 p-4 transition-transform active:scale-[0.98]"
             style={{
-              width: 40,
-              height: 40,
-              borderRadius: 999,
-              background: 'rgba(161, 255, 74, 0.2)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 20,
-              flexShrink: 0,
-            }}
-          >
-            ⚡️
-          </div>
-          <div className="flex-1 min-w-0 text-left">
-            <div
-              style={{
-                color: '#A1FF4A',
-                fontSize: 11,
-                fontFamily: 'Overpass',
-                fontWeight: 800,
-                textTransform: 'uppercase',
-                letterSpacing: 0.5,
-                marginBottom: 2,
-              }}
-            >
-              ИИ-тренер
-            </div>
-            <div className="text-white text-sm font-semibold leading-tight">
-              {generatingCycle
-                ? 'Собираю неделю…'
-                : microcycle
-                ? 'Пересобрать неделю'
-                : 'Собрать неделю — 5 тренировок'}
-            </div>
-          </div>
-          <ChevronRight size={20} className="text-[#A1FF4A] shrink-0" />
-        </button>
-        {cycleError && (
-          <div className="text-[#FF8C4A] text-xs text-center mb-3 font-medium">{cycleError}</div>
-        )}
-
-        {/* Баннер микроцикла — если активный есть. Прячем, пока крутится
-            экран сборки (generatingCycle): иначе в туре баннер (его якорь
-            data-tour) появляется в DOM под оверлеем подготовки, и спотлайт
-            подсвечивает пустую область. Показываем только когда оверлей ушёл. */}
-        {microcycle && !generatingCycle && (
-          <div
-            data-tour="microcycle-banner"
-            className="mb-4 p-4 rounded-2xl flex items-center gap-3"
-            style={{
-              background: 'var(--grad-accent)',
-              border: '1px solid var(--border-lime)',
+              background:
+                'linear-gradient(135deg, rgba(161, 255, 74, 0.18) 0%, rgba(68, 92, 255, 0.22) 100%)',
+              border: '1px solid rgba(161, 255, 74, 0.35)',
+              cursor: generatingCycle ? 'wait' : 'pointer',
+              opacity: generatingCycle ? 0.7 : 1,
             }}
           >
             <div
@@ -531,7 +479,7 @@ export default function CalendarPage() {
                 width: 40,
                 height: 40,
                 borderRadius: 999,
-                background: 'rgba(161, 255, 74, 0.15)',
+                background: 'rgba(161, 255, 74, 0.2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -539,32 +487,84 @@ export default function CalendarPage() {
                 flexShrink: 0,
               }}
             >
-              🔋
+              ⚡️
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 text-left">
               <div
                 style={{
                   color: '#A1FF4A',
                   fontSize: 11,
                   fontFamily: 'Overpass',
-                  fontWeight: 700,
+                  fontWeight: 800,
                   textTransform: 'uppercase',
                   letterSpacing: 0.5,
                   marginBottom: 2,
                 }}
               >
-                {microcycle.cycleNumber === 1 ? 'Твой первый микроцикл' : `Микроцикл №${microcycle.cycleNumber}`}
+                ИИ-тренер
               </div>
               <div className="text-white text-sm font-semibold leading-tight">
-                ИИ-тренер собрал тебе неделю · {getCycleRangeLabel()}
+                {generatingCycle ? 'Собираю неделю…' : 'Собрать неделю — 5 тренировок'}
               </div>
             </div>
-          </div>
+            <ChevronRight size={20} className="text-[#A1FF4A] shrink-0" />
+          </button>
+        )}
+        {cycleError && (
+          <div className="text-[#FF8C4A] text-xs text-center mb-3 font-medium">{cycleError}</div>
         )}
 
         {/* Calendar Widget */}
         <div className="bg-[#101530] rounded-3xl mb-8">
           <div className="bg-[#445CFF]/20 rounded-2xl p-4">
+            {/* Компактный блок микроцикла ВНУТРИ календаря. Заменяет прежний
+                полноширинный баннер; несёт якорь тура data-tour="microcycle-banner".
+                Прячем на время сборки (generatingCycle) — как и старый баннер,
+                чтобы спотлайт тура не подсвечивал пустоту под оверлеем. */}
+            {microcycle && !generatingCycle && (
+              <div
+                data-tour="microcycle-banner"
+                className="flex items-center gap-2 mb-4 pb-3"
+                style={{ borderBottom: '1px solid rgba(255,255,255,0.10)' }}
+              >
+                <span style={{ fontSize: 16, flexShrink: 0 }}>🔋</span>
+                <div className="flex-1 min-w-0 leading-tight">
+                  <span
+                    style={{
+                      color: '#A1FF4A',
+                      fontSize: 10,
+                      fontFamily: 'Overpass',
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    {microcycle.cycleNumber === 1 ? 'Первый микроцикл' : `Микроцикл №${microcycle.cycleNumber}`}
+                  </span>
+                  <span className="text-[#AEABBB] text-[11px]"> · {getCycleRangeLabel()}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleGenerateMicrocycle}
+                  disabled={generatingCycle}
+                  className="flex items-center gap-1 shrink-0 transition-transform active:scale-95"
+                  style={{
+                    color: '#A1FF4A',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    background: 'rgba(161, 255, 74, 0.12)',
+                    border: '1px solid rgba(161, 255, 74, 0.3)',
+                    borderRadius: 999,
+                    padding: '5px 10px',
+                    cursor: generatingCycle ? 'wait' : 'pointer',
+                  }}
+                >
+                  <RefreshCw size={12} />
+                  пересобрать
+                </button>
+              </div>
+            )}
+
             {/* Month Navigation */}
             <div className="flex items-center justify-between mb-6 text-white">
               <button onClick={handlePrevMonth} className="p-2 hover:bg-white/10 rounded-full">
