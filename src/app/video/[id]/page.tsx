@@ -4,7 +4,11 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Heart, MessageCircle, Share, Download, CheckCircle } from 'lucide-react';
+import {
+  Heart, Download, CheckCircle, ChevronLeft, Play, Pause, RotateCcw, RotateCw,
+  Volume2, VolumeX, Maximize, Minimize, Smartphone, CalendarPlus, Share2,
+  Camera, Zap, WifiOff, Check, X, Loader2,
+} from 'lucide-react';
 import dynamic from 'next/dynamic';
 import TagsSection from '@/components/TagsSection';
 import BottomNavigation from '@/components/BottomNavigation';
@@ -64,6 +68,11 @@ interface VideoData {
 const POS_PREFIX = 'video_pos_';
 const posKey = (id: string) => POS_PREFIX + id;
 
+// Подсказка «поверни телефон» — показываем один раз НА УСТРОЙСТВО, а не при
+// каждом запуске видео. Ключ в localStorage; при недоступном localStorage
+// (Safari private mode) деградируем до показа раз за сессию.
+const ROTATE_HINT_KEY = 'trenki_rotate_hint_shown';
+
 function saveVideoPosition(id: string, t: number, d: number, endEpsilonSec: number) {
   try {
     if (!id || !d || isNaN(d) || isNaN(t)) return;
@@ -107,7 +116,6 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
-  const [showComments, setShowComments] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [buffered, setBuffered] = useState(0); // Прогресс загрузки видео
@@ -124,7 +132,6 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [userProfile, setUserProfile] = useState<any>(null);
   
   // Для рекомендации следующего видео в конце просмотра (без автоплея)
-  const [allVideos, setAllVideos] = useState<VideoData[]>([]);
   const [nextVideo, setNextVideo] = useState<VideoData | null>(null);
   const [showNextVideoPreview, setShowNextVideoPreview] = useState(false);
 
@@ -174,9 +181,21 @@ export default function VideoPage({ params }: VideoPageProps) {
   // Состояние для Toast уведомлений
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
   
-  // Состояние для попытки полноэкранного режима на PWA
+  // Пилюля «поверни телефон» (бывшая полноэкранная подсказка PWA)
   const [showFullscreenHint, setShowFullscreenHint] = useState(false);
-  
+  // Таймер автоскрытия пилюли — чтобы повторные показы не накладывались
+  const rotateHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Показывает ненавязчивую пилюлю «поверни телефон» на 3 секунды.
+  // НЕ блокирует контролы (в отличие от старого полноэкранного оверлея).
+  const showRotateHint = useCallback(() => {
+    setShowFullscreenHint(true);
+    if (rotateHintTimerRef.current) clearTimeout(rotateHintTimerRef.current);
+    rotateHintTimerRef.current = setTimeout(() => {
+      rotateHintTimerRef.current = null;
+      setShowFullscreenHint(false);
+    }, 3000);
+  }, []);
+
   // Состояние для управления качеством видео
   const [availableQualities, setAvailableQualities] = useState<Record<string, string>>({});
   const [selectedQuality, setSelectedQuality] = useState<string>('');
@@ -187,8 +206,6 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [seekFlash, setSeekFlash] = useState<'left' | 'right' | null>(null);
   const seekFlashTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Состояние для скрытия/показа плеера
-  const [isPlayerMinimized, setIsPlayerMinimized] = useState(false);
   const playerContainerRef = useRef<HTMLDivElement>(null);
 
   // Получаем params асинхронно и загружаем данные видео
@@ -234,8 +251,6 @@ export default function VideoPage({ params }: VideoPageProps) {
           if (!listRes.ok) return;
           const listData = await listRes.json();
           const videos: VideoData[] = listData.videos || [];
-          setAllVideos(videos);
-
           const idx = videos.findIndex((v) => v.id === resolvedParams.id);
           if (idx !== -1 && idx < videos.length - 1) {
             setNextVideo(videos[idx + 1]);
@@ -774,48 +789,6 @@ export default function VideoPage({ params }: VideoPageProps) {
     }
   };
 
-  // Функция завершения одиночного модуля
-  const handleCompleteModule = async () => {
-    if (isCompletingModule || !videoId) return;
-
-    try {
-      setIsCompletingModule(true);
-      
-      const response = await fetch('/api/training/complete-module', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          videoId: videoId,
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok && data.success) {
-        // Проверяем, есть ли прирост характеристик
-        if (data.gains && data.newCharacteristics) {
-          setCharacteristicsGains(data.gains);
-          setNewCharacteristics(data.newCharacteristics);
-          setShowGainsModal(true);
-        } else {
-          setToast({ message: '✅ Модуль завершен!', type: 'success' });
-        }
-      } else if (data.limitReached) {
-        setToast({
-          message: data.error || 'Достигнут дневной лимит модулей (4). Приходи завтра! 💪',
-          type: 'warning'
-        });
-      } else {
-        setToast({ message: 'Ошибка при завершении модуля', type: 'error' });
-      }
-    } catch (error) {
-      console.error('Error completing module:', error);
-      setToast({ message: 'Ошибка при завершении модуля', type: 'error' });
-    } finally {
-      setIsCompletingModule(false);
-    }
-  };
-  
   // Закрытие модалки прироста
   const handleGainsModalClose = () => {
     setShowGainsModal(false);
@@ -942,14 +915,26 @@ export default function VideoPage({ params }: VideoPageProps) {
         videoRef.current.pause();
       } else {
         videoRef.current.play();
-        
-        // Показываем подсказку о полноэкранном режиме на 3 секунды при первом запуске
+
+        // Подсказка «поверни телефон» — один раз НА УСТРОЙСТВО (localStorage),
+        // а не при каждом запуске видео. Фолбэк при недоступном Fullscreen API
+        // (toggleFullscreen) показывает её всегда, независимо от этого флага.
         if (!hasShownHintRef.current) {
           hasShownHintRef.current = true;
-          setShowFullscreenHint(true);
-          setTimeout(() => {
-            setShowFullscreenHint(false);
-          }, 3000);
+          let alreadySeen = false;
+          try {
+            alreadySeen = localStorage.getItem(ROTATE_HINT_KEY) === '1';
+          } catch {
+            // localStorage недоступен (Safari private mode) — покажем раз за сессию
+          }
+          if (!alreadySeen) {
+            try {
+              localStorage.setItem(ROTATE_HINT_KEY, '1');
+            } catch {
+              // no-op
+            }
+            showRotateHint();
+          }
         }
       }
       setIsPlaying(!isPlaying);
@@ -1005,7 +990,7 @@ export default function VideoPage({ params }: VideoPageProps) {
     
     if (!supported) {
       // Если fullscreen не поддерживается, показываем сообщение о повороте телефона
-      setShowFullscreenHint(true);
+      showRotateHint();
       console.warn('Fullscreen API не поддерживается, показываем подсказку');
       return;
     }
@@ -1030,7 +1015,7 @@ export default function VideoPage({ params }: VideoPageProps) {
           return;
         } catch (err) {
           console.error('iOS fullscreen failed:', err);
-          setShowFullscreenHint(true);
+          showRotateHint();
         }
       }
 
@@ -1039,7 +1024,7 @@ export default function VideoPage({ params }: VideoPageProps) {
       if (!element) return;
 
       if (element.requestFullscreen) {
-        element.requestFullscreen().catch(() => setShowFullscreenHint(true));
+        element.requestFullscreen().catch(() => showRotateHint());
       } else if ((element as any).webkitRequestFullscreen) {
         (element as any).webkitRequestFullscreen();
       } else if ((element as any).mozRequestFullScreen) {
@@ -1047,7 +1032,7 @@ export default function VideoPage({ params }: VideoPageProps) {
       } else if ((element as any).msRequestFullscreen) {
         (element as any).msRequestFullscreen();
       } else {
-        setShowFullscreenHint(true);
+        showRotateHint();
       }
     }
     showControlsTemporarily();
@@ -1069,14 +1054,6 @@ export default function VideoPage({ params }: VideoPageProps) {
 
   const handleVideoInteraction = () => {
     showControlsTemporarily();
-  };
-  
-  // Обработчик клика по свободной области для скрытия/показа плеера
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Проверяем что клик был именно по backdrop, а не по дочерним элементам
-    if (e.target === e.currentTarget) {
-      setIsPlayerMinimized(prev => !prev);
-    }
   };
 
   // Все обработчики событий видео (timeupdate, progress, canplay и т.д.) теперь inline на video элементе
@@ -1177,6 +1154,9 @@ export default function VideoPage({ params }: VideoPageProps) {
       }
       if (seekFlashTimerRef.current) {
         clearTimeout(seekFlashTimerRef.current);
+      }
+      if (rotateHintTimerRef.current) {
+        clearTimeout(rotateHintTimerRef.current);
       }
     };
   }, []);
@@ -1336,55 +1316,71 @@ export default function VideoPage({ params }: VideoPageProps) {
     <div className={containerClass}>{/* pb-20 для отступа под таб-бар */}
       {/* Header */}
   <header className={`flex items-center justify-between p-4 bg-[#101530] shadow-sm border-b border-gray-700 ${isLandscape ? 'hidden' : ''}`} style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
-        <div className="flex items-center space-x-2">
-          <button 
+        <div className="flex items-center space-x-2 flex-1 min-w-0">
+          <button
             onClick={() => {
               if (fromWorkout) {
                 router.push('/training/workout');
               } else {
                 router.back();
               }
-            }} 
-            className="text-white hover:text-gray-300"
-          >
-            <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
-          </button>
-          <h1 
-            className="text-white uppercase"
-            style={{
-              fontFamily: 'Overpass',
-              fontWeight: 700,
-              fontSize: '12px',
-              lineHeight: '120%',
-              letterSpacing: '0.5px',
-              verticalAlign: 'middle',
-              textTransform: 'uppercase'
             }}
+            className="text-white hover:text-gray-300 flex-shrink-0"
+            aria-label="Назад"
           >
-            ТРЕНИРОВКА
-          </h1>
+            <ChevronLeft size={24} />
+          </button>
+          <div className="flex-1 min-w-0">
+            {/* В тренировке — маленький оверлайн над названием видео */}
+            {fromWorkout && (
+              <div
+                className="uppercase"
+                style={{
+                  fontFamily: 'Overpass',
+                  fontWeight: 700,
+                  fontSize: '11px',
+                  lineHeight: '120%',
+                  letterSpacing: '0.5px',
+                  color: '#A1FF4A',
+                }}
+              >
+                Тренировка
+              </div>
+            )}
+            {/* Реальное название видео вместо статичной надписи «ТРЕНИРОВКА» */}
+            <h1
+              className="text-white uppercase truncate"
+              style={{
+                fontFamily: 'Overpass',
+                fontWeight: 700,
+                fontSize: '12px',
+                lineHeight: '120%',
+                letterSpacing: '0.5px',
+              }}
+            >
+              {videoData?.title || 'Видео'}
+            </h1>
+          </div>
         </div>
       </header>
 
       {isOffline && !isDownloaded && !isLandscape && (
         <div
-          className="px-4 py-3 text-center text-sm font-semibold"
+          className="px-4 py-3 flex items-center justify-center gap-2 text-sm font-semibold"
           style={{
             background: 'rgba(161, 255, 74, 0.10)',
             borderBottom: '1px solid rgba(161, 255, 74, 0.30)',
             color: '#A1FF4A',
           }}
         >
-          📡 Нет сети — это видео не скачано для офлайн-просмотра
+          <WifiOff size={16} className="flex-shrink-0" />
+          Нет сети — это видео не скачано для офлайн-просмотра
         </div>
       )}
 
-      {/* Video Player - обёртка с возможностью скрытия */}
-      <div 
-        className={`${isLandscape ? 'fixed inset-0 z-50' : 'relative'} transition-all duration-300 ${isPlayerMinimized && !isLandscape ? 'h-0 overflow-hidden' : ''}`}
-        onClick={handleBackdropClick}
-      >
-        <div 
+      {/* Video Player */}
+      <div className={isLandscape ? 'fixed inset-0 z-50' : 'relative'}>
+        <div
           className={`${isLandscape ? 'w-full h-full bg-black flex items-center justify-center' : 'bg-black'}`}
         >
           <div
@@ -1395,7 +1391,6 @@ export default function VideoPage({ params }: VideoPageProps) {
             // он показывал контролы, а tap-toggle через 250мс их прятал →
             // контролы «мигали» на каждое касание. Гейтим по pointerType.
             onPointerMove={(e) => { if (e.pointerType === 'mouse') handleVideoInteraction(); }}
-            onClick={(e) => e.stopPropagation()}
           >
           {isLoading || isKinescopeLoading ? (
             // Пока резолвится URL — показываем превью видео, чтобы пользователь
@@ -1414,7 +1409,7 @@ export default function VideoPage({ params }: VideoPageProps) {
               {/* Лёгкое затемнение, чтобы spinner был виден на светлом превью */}
               <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/10 to-black/30 pointer-events-none" />
               <div className="absolute bottom-4 right-4">
-                <div className="w-8 h-8 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                <Loader2 size={32} className="animate-spin text-white/80" />
               </div>
             </div>
           ) : (
@@ -1564,33 +1559,24 @@ export default function VideoPage({ params }: VideoPageProps) {
                 onEnded={handleVideoEnded}
               />
               
-              {/* Fullscreen Hint Overlay - Подсказка для PWA */}
+              {/* Пилюля «поверни телефон» — ненавязчивая подсказка над нижней
+                  панелью. Не блокирует контролы и тапы по видео. */}
               {showFullscreenHint && (
-                <div 
-                  className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-50"
-                  onClick={() => setShowFullscreenHint(false)}
-                >
-                  {/* Иконка поворота */}
-                  <Image
-                    src="/icons/video/player/icon-park-solid_rotate.svg"
-                    alt="Повернуть телефон"
-                    width={40}
-                    height={40}
-                    className="mb-6"
-                  />
-                  
-                  {/* Заголовок */}
-                  <h2 className="text-white text-[14px] font-bold uppercase text-center max-w-xs px-4 leading-tight">
-                    переверни телефон для выхода в полноэкранный режим
-                  </h2>
+                <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
+                  <div className="flex items-center gap-2 bg-black/70 backdrop-blur-sm rounded-full px-4 py-2">
+                    <Smartphone size={16} className="text-[#A1FF4A] rotate-90 flex-shrink-0" />
+                    <span className="text-white text-xs font-semibold whitespace-nowrap">
+                      Поверни телефон для полного экрана
+                    </span>
+                  </div>
                 </div>
               )}
-              
+
               {/* Спиннер буферизации — когда видео подгружается во время
                   воспроизведения (#4). pointer-events:none, чтобы не мешать тапам. */}
-              {isBuffering && isPlaying && !showFullscreenHint && !isLoading && !isKinescopeLoading && (
+              {isBuffering && isPlaying && !isLoading && !isKinescopeLoading && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
-                  <div className="w-12 h-12 border-[3px] border-white/30 border-t-white rounded-full animate-spin" />
+                  <Loader2 size={48} className="animate-spin text-white" />
                 </div>
               )}
 
@@ -1598,11 +1584,11 @@ export default function VideoPage({ params }: VideoPageProps) {
                   Единый onClick обрабатывает и одиночный тап (показать/скрыть
                   контролы), и двойной (перемотка) — без onTouchEnd, чтобы на
                   мобилке тач+click не дёргались дважды (#1). touchAction:
-                  manipulation убирает 300ms-задержку click на iOS. */}
-              {!showFullscreenHint && (
-                <div
+                  manipulation убирает 300ms-задержку click на iOS.
+                  Скрим убран — единственный градиент остался на нижней панели. */}
+              <div
                   style={{ touchAction: 'manipulation' }}
-                  className={`absolute inset-0 bg-gradient-to-b from-transparent to-black/50 flex items-center justify-center transition-opacity duration-300 ${
+                  className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${
                     showControls ? 'opacity-100' : 'opacity-0'
                   }`}
                   onClick={(e) => {
@@ -1669,56 +1655,44 @@ export default function VideoPage({ params }: VideoPageProps) {
                     {canSeek && (
                     <button
                       onClick={(e) => { e.stopPropagation(); skipBackward(); }}
-                      className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
+                      className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity text-white"
                       title="Назад на 10 секунд"
                     >
-                      <Image
-                        src="/icons/video/player/carbon_rewind-10-l.svg"
-                        alt="Назад на 10 секунд"
-                        width={20}
-                        height={20}
-                      />
+                      <span className="relative flex items-center justify-center">
+                        <RotateCcw size={22} />
+                        <span className="absolute text-[7px] font-bold leading-none mt-0.5">10</span>
+                      </span>
                     </button>
                     )}
 
                     {/* Play/Pause Button — крупный хитбокс 64px, чтобы легко попасть (#2) */}
                     <button
                       onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                      className="w-16 h-16 bg-white/25 backdrop-blur-sm rounded-full flex items-center justify-center opacity-90 hover:opacity-100 transition-opacity"
+                      className="w-16 h-16 bg-white/25 backdrop-blur-sm rounded-full flex items-center justify-center opacity-90 hover:opacity-100 transition-opacity text-white"
                       title={isPlaying ? 'Пауза' : 'Воспроизвести'}
                     >
-                      <Image
-                        src={isPlaying
-                          ? '/icons/video/player/pause.svg'
-                          : '/icons/video/player/Play.svg'
-                        }
-                        alt={isPlaying ? 'Пауза' : 'Воспроизвести'}
-                        width={30}
-                        height={30}
-                      />
+                      {isPlaying
+                        ? <Pause size={30} fill="currentColor" />
+                        : <Play size={30} fill="currentColor" className="ml-1" />}
                     </button>
 
                     {/* Skip Forward 10s — только в тестовом режиме (перемотка) */}
                     {canSeek && (
                     <button
                       onClick={(e) => { e.stopPropagation(); skipForward(); }}
-                      className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity"
+                      className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-opacity text-white"
                       title="Вперед на 10 секунд"
                     >
-                      <Image
-                        src="/icons/video/player/carbon_rewind-10-r.svg"
-                        alt="Вперед на 10 секунд"
-                        width={20}
-                        height={20}
-                      />
+                      <span className="relative flex items-center justify-center">
+                        <RotateCw size={22} />
+                        <span className="absolute text-[7px] font-bold leading-none mt-0.5">10</span>
+                      </span>
                     </button>
                     )}
                   </div>
-                </div>
-              )}
-              
+              </div>
+
               {/* Video Controls - для всех видео */}
-              {!showFullscreenHint && (
             <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pt-8 ${isLandscape ? 'pb-6 px-5' : 'pb-2 px-3'} transition-opacity duration-300 ${
             showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}>
@@ -1740,12 +1714,12 @@ export default function VideoPage({ params }: VideoPageProps) {
                   style={{ width: `${buffered}%` }}
                 />
                 <div
-                  className="absolute left-0 top-0 h-full bg-blue-500 rounded-full"
+                  className="absolute left-0 top-0 h-full bg-[#445CFF] rounded-full"
                   style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
                 />
                 {/* Кружок — на том же проценте, что и полоса (#3) */}
                 <div
-                  className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white border-2 border-blue-500 shadow pointer-events-none"
+                  className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white border-2 border-[#445CFF] shadow pointer-events-none"
                   style={{
                     left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%`,
                     width: isLandscape ? 16 : 14,
@@ -1775,50 +1749,26 @@ export default function VideoPage({ params }: VideoPageProps) {
               />
             </div>
             
-            {/* Control Buttons */}
+            {/* Control Buttons: [время — spacer — звук — режим — качество — fullscreen].
+                Дублирующий play/pause убран — есть большая центральная кнопка. */}
             <div className="flex items-center justify-between">
+              {/* Time Display */}
+              <span className={`text-white font-medium ${isLandscape ? 'text-sm' : 'text-xs'}`}>
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </span>
+
               <div className={`flex items-center space-x-2 ${isLandscape ? 'space-x-3' : ''}`}>
-                {/* Play/Pause Button */}
-                <button 
-                  onClick={togglePlay}
-                  className="transition-opacity hover:opacity-80 p-2"
-                  title={isPlaying ? 'Пауза' : 'Воспроизвести'}
-                >
-                  <Image
-                    src={isPlaying 
-                      ? '/icons/video/player/pause.svg'
-                      : '/icons/video/player/Play.svg'
-                    }
-                    alt={isPlaying ? 'Пауза' : 'Воспроизвести'}
-                    width={isLandscape ? 24 : 18}
-                    height={isLandscape ? 24 : 18}
-                  />
-                </button>
-                
                 {/* Volume Control */}
-                <button 
-                  onClick={toggleMute} 
-                  className="transition-opacity hover:opacity-80 p-2"
+                <button
+                  onClick={toggleMute}
+                  className="transition-opacity hover:opacity-80 p-2 text-white"
                   title={isMuted ? 'Включить звук' : 'Выключить звук'}
                 >
-                  <Image
-                    src={isMuted 
-                      ? '/icons/video/player/Volume=No.svg'
-                      : '/icons/video/player/Volume=Yes.svg'
-                    }
-                    alt={isMuted ? 'Включить звук' : 'Выключить звук'}
-                    width={isLandscape ? 24 : 18}
-                    height={isLandscape ? 24 : 18}
-                  />
+                  {isMuted
+                    ? <VolumeX size={isLandscape ? 24 : 18} />
+                    : <Volume2 size={isLandscape ? 24 : 18} />}
                 </button>
-                
-                {/* Time Display */}
-                <span className={`text-white font-medium ${isLandscape ? 'text-sm' : 'text-xs'}`}>
-                  {formatTime(currentTime)} / {formatTime(duration)}
-                </span>
-              </div>
-              
-              <div className={`flex items-center space-x-2 ${isLandscape ? 'space-x-3' : ''}`}>
+
                 {/* Кнопка «Режим» с двумя пунктами и пояснением. В тренировке
                     скрыта — там всегда режим «Тренировка» (без перемотки). */}
                 {!fromWorkout && (
@@ -1871,9 +1821,7 @@ export default function VideoPage({ params }: VideoPageProps) {
                                 {m.title}
                               </span>
                               {watchMode === m.key && (
-                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                  <path d="M2 6L5 9L10 3" stroke="#A1FF4A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
+                                <Check size={12} className="text-[#A1FF4A]" strokeWidth={2.5} />
                               )}
                             </div>
                             <div className="text-[11px] leading-snug text-white/60 mt-0.5">{m.hint}</div>
@@ -1923,9 +1871,7 @@ export default function VideoPage({ params }: VideoPageProps) {
                               >
                                 <span>{quality}</span>
                                 {selectedQuality === quality && (
-                                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                    <path d="M2 6L5 9L10 3" stroke="#A1FF4A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                  </svg>
+                                  <Check size={12} className="text-[#A1FF4A]" strokeWidth={2.5} />
                                 )}
                               </button>
                             ))}
@@ -1936,25 +1882,18 @@ export default function VideoPage({ params }: VideoPageProps) {
                 )}
                 
                 {/* Fullscreen Button */}
-                <button 
+                <button
                   onClick={toggleFullscreen}
-                  className="transition-opacity hover:opacity-80 p-2"
+                  className="transition-opacity hover:opacity-80 p-2 text-white"
                   title={isFullscreen ? 'Выход из полноэкранного режима' : 'Полноэкранный режим'}
                 >
-                  <Image
-                    src={isFullscreen 
-                      ? '/icons/video/player/Fulscreen=Yes.svg'
-                      : '/icons/video/player/Fulscreen=No.svg'
-                    }
-                    alt="Понноэкранный режим"
-                    width={isLandscape ? 24 : 18}
-                    height={isLandscape ? 24 : 18}
-                  />
+                  {isFullscreen
+                    ? <Minimize size={isLandscape ? 24 : 18} />
+                    : <Maximize size={isLandscape ? 24 : 18} />}
                 </button>
               </div>
             </div>
           </div>
-          )}
             </>
           )}
 
@@ -1971,10 +1910,7 @@ export default function VideoPage({ params }: VideoPageProps) {
                   className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center text-white hover:text-gray-300 transition-colors"
                   aria-label="Закрыть"
                 >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="md:w-7 md:h-7">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
+                  <X size={20} strokeWidth={2.5} className="md:w-7 md:h-7" />
                 </button>
               </div>
 
@@ -2044,66 +1980,6 @@ export default function VideoPage({ params }: VideoPageProps) {
         </div>
       </div>
 
-      {/* Кнопка для восстановления плеера когда он скрыт */}
-      {isPlayerMinimized && !isLandscape && (
-        <div 
-          className="sticky top-0 z-40 bg-[#0A0E1A] border-b border-[#A1FF4A]/20 px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-[#0A0E1A]/80 transition-all group"
-          onClick={() => setIsPlayerMinimized(false)}
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-16 h-12 rounded overflow-hidden bg-gray-800 flex-shrink-0">
-              {videoData?.thumbnail && (
-                <Image
-                  src={videoData.thumbnail}
-                  alt={videoData.title || 'Video'}
-                  width={64}
-                  height={48}
-                  className="w-full h-full object-cover"
-                />
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-white text-sm font-medium truncate">
-                {videoData?.title || 'Видео'}
-              </h3>
-              <p className="text-[#A1FF4A]/70 text-xs font-medium">
-                Нажмите чтобы развернуть ↓
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                togglePlay();
-              }}
-              className="w-10 h-10 rounded-full bg-[#A1FF4A]/10 hover:bg-[#A1FF4A]/20 flex items-center justify-center transition-colors"
-            >
-              <Image
-                src={isPlaying 
-                  ? '/icons/video/player/material-symbols_pause.svg'
-                  : '/icons/video/player/material-symbols_play-arrow.svg'
-                }
-                alt={isPlaying ? 'Пауза' : 'Играть'}
-                width={20}
-                height={20}
-              />
-            </button>
-            <div className="flex flex-col items-center">
-              <svg 
-                className="w-6 h-6 text-[#A1FF4A] group-hover:translate-y-0.5 transition-transform"
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-              </svg>
-              <span className="text-[10px] text-[#A1FF4A]/60 uppercase font-bold tracking-wider">Развернуть</span>
-            </div>
-          </div>
-        </div>
-      )}
-
   {/* Action Icons (скрываем в ландшафтном режиме на мобилках) */}
   <div className={`bg-[#101530] ${isLandscape ? 'hidden' : ''}`}>
         <div className="overflow-x-auto scrollbar-hide">
@@ -2113,11 +1989,10 @@ export default function VideoPage({ params }: VideoPageProps) {
               onClick={toggleLike}
               className="bg-[#AEABBB33] rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0 transition-opacity hover:opacity-80"
             >
-              <Image 
-                src={isLiked ? '/icons/video/Active=Yes.svg' : '/icons/video/Active=No.svg'} 
-                alt="Лайк" 
-                width={20} 
-                height={20} 
+              <Heart
+                size={20}
+                className={isLiked ? 'text-[#A1FF4A]' : 'text-[#AEABBB]'}
+                fill={isLiked ? 'currentColor' : 'none'}
               />
               <span className="text-[#AEABBB] text-xs whitespace-nowrap">
                 {likesCount >= 1000 
@@ -2131,7 +2006,7 @@ export default function VideoPage({ params }: VideoPageProps) {
               onClick={() => setShowScheduleModal(true)}
               className="bg-[#AEABBB33] rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0 hover:opacity-80 transition-opacity"
             >
-              <Image src="/icons/video/Type_calendar_No.svg" alt="Календарь" width={20} height={20} />
+              <CalendarPlus size={20} className="text-[#AEABBB]" />
               <span className="text-[#AEABBB] text-xs whitespace-nowrap">Календарь</span>
             </button>
             
@@ -2147,7 +2022,7 @@ export default function VideoPage({ params }: VideoPageProps) {
             >
               {isDownloading ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                  <Loader2 size={20} className="animate-spin text-[#445CFF]" />
                   <span className="text-[#AEABBB] text-xs whitespace-nowrap">
                     {Math.round(downloadProgress)}%
                   </span>
@@ -2167,7 +2042,7 @@ export default function VideoPage({ params }: VideoPageProps) {
             
             {/* Share */}
             <div className="bg-[#AEABBB33] rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0">
-              <Image src="/icons/video/action-share.svg" alt="Поделиться" width={20} height={20} />
+              <Share2 size={20} className="text-[#AEABBB]" />
               <span className="text-[#AEABBB] text-xs whitespace-nowrap">Поделиться</span>
             </div>
 
@@ -2179,8 +2054,9 @@ export default function VideoPage({ params }: VideoPageProps) {
               }`}
               aria-label="Включить камеру"
             >
+              <Camera size={20} style={{ color: poseTrackerOpen ? '#101530' : '#AEABBB' }} />
               <span className="text-xs whitespace-nowrap" style={{ color: poseTrackerOpen ? '#101530' : '#AEABBB', fontWeight: 700 }}>
-                {poseTrackerOpen ? '● Камера' : 'Камера'}
+                Камера
               </span>
             </button>
           </div>
@@ -2216,12 +2092,7 @@ export default function VideoPage({ params }: VideoPageProps) {
               color: '#FFFFFF',
             }}
           >
-            <Image
-              src="/icons/video/energy-active.svg"
-              alt="Energy"
-              width={12}
-              height={12}
-            />
+            <Zap size={12} className="text-[#A1FF4A]" fill="currentColor" />
             {calculateVideoGain()}
           </div>
         )}
