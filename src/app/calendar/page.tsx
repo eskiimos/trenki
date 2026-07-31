@@ -709,7 +709,11 @@ export default function CalendarPage() {
                     {d.modules.map((m, i) => (
                       <Link
                         key={m.id ?? i}
-                        href={`/video/${m.id}`}
+                        // fromWorkout+sessionId → видео открывается ТОЛЬКО в режиме
+                        // «Тренировка»: без перемотки, переключатель режима скрыт,
+                        // прогресс идёт в зачёт сессии (тот же флоу, что на
+                        // /training/workout).
+                        href={`/video/${m.id}?fromWorkout=true&sessionId=${ws.id}`}
                         className="flex items-center gap-3 rounded-2xl p-2 transition-transform active:scale-[0.99]"
                         style={{ background: 'rgba(174,171,187,0.06)' }}
                       >
