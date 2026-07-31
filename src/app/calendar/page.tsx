@@ -422,9 +422,15 @@ export default function CalendarPage() {
   };
 
   return (
-    <div 
-      className="min-h-screen pb-24"
-      style={{ background: 'linear-gradient(182.77deg, #101530 69.24%, #060919 97.69%)' }}
+    <div
+      className="min-h-screen"
+      style={{
+        background: 'linear-gradient(182.77deg, #101530 69.24%, #060919 97.69%)',
+        // Нижний отступ = высота фиксированного тапбара + safe-area (home-indicator)
+        // + запас, иначе последние карточки прячутся под тапбаром и страница не
+        // всегда доскролливается до конца.
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 128px)',
+      }}
     >
       {/* Header */}
       <header className="flex items-center p-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
