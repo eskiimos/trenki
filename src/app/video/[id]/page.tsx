@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Heart, Download, CheckCircle, ChevronLeft, Play, Pause, RotateCcw, RotateCw,
   Volume2, VolumeX, Maximize, Minimize, Smartphone, CalendarPlus, Share2,
-  Camera, Zap, WifiOff, Check, X, Loader2,
+  Camera, Zap, WifiOff, Check, X, Loader2, Settings2,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import TagsSection from '@/components/TagsSection';
@@ -140,7 +140,9 @@ export default function VideoPage({ params }: VideoPageProps) {
   // пишется в историю). Переключается кнопкой «Режим» в плеере.
   // В тренировке (fromWorkout) — всегда «Тренировка», перемотка запрещена.
   const [watchMode, setWatchMode] = useState<'training' | 'view'>('training');
-  const [showModeMenu, setShowModeMenu] = useState(false);
+  // Единый шит настроек (Режим + Качество) — вместо двух отдельных меню в панели
+  const [showSettings, setShowSettings] = useState(false);
+  const showSettingsRef = useRef(false); // зеркало для таймера автоскрытия контролов
   const canSeek = !fromWorkout && watchMode === 'view';
   const canSeekRef = useRef(false); // зеркало canSeek для хоткеев без stale-стейта
   // Завершение/зачёт — по РЕАЛЬНОМУ концу ролика: когда до конца осталось ≤ этого.
@@ -153,6 +155,10 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [isDownloaded, setIsDownloaded] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  // Inline-подтверждение удаления офлайн-видео (вместо native confirm):
+  // первый тап переводит кнопку в «Точно удалить?» на 3с, второй — удаляет.
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const confirmDeleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Online/offline для баннера «нет сети, видео не скачано»
   const [isOffline, setIsOffline] = useState(false);
@@ -199,8 +205,10 @@ export default function VideoPage({ params }: VideoPageProps) {
   // Состояние для управления качеством видео
   const [availableQualities, setAvailableQualities] = useState<Record<string, string>>({});
   const [selectedQuality, setSelectedQuality] = useState<string>('');
-  const [showQualityMenu, setShowQualityMenu] = useState(false);
-  
+
+  // Тач/драг по скрабберу — кружок показываем только пока пользователь его держит
+  const [isScrubbing, setIsScrubbing] = useState(false);
+
   // Double-tap seek
   const doubleTapTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [seekFlash, setSeekFlash] = useState<'left' | 'right' | null>(null);
@@ -532,7 +540,7 @@ export default function VideoPage({ params }: VideoPageProps) {
     // эффект, владеющий videoId (там же, где шлётся start-POST).
     seekedInPlaythroughRef.current = false;
     setWatchMode('training'); // каждое новое видео стартует в режиме «Тренировка»
-    setShowModeMenu(false);
+    setShowSettings(false);
 
     const loadKinescopeUrl = async () => {
       if (videoData?.videoUrl && isKinescopeUrl(videoData.videoUrl)) {
@@ -716,31 +724,32 @@ export default function VideoPage({ params }: VideoPageProps) {
     };
   }, []);
 
-  // Закрытие меню «Режим» при клике вне его (как у меню качества) — иначе оно
-  // оставалось открытым внутри скрытой панели контролов.
+  // Закрытие шита настроек при клике вне его. Небольшая задержка — чтобы клик
+  // открытия не закрыл шит сразу.
   useEffect(() => {
-    if (!showModeMenu) return;
-    const close = () => setShowModeMenu(false);
+    if (!showSettings) return;
+    const close = () => setShowSettings(false);
     const t = setTimeout(() => document.addEventListener('click', close), 0);
     return () => {
       clearTimeout(t);
       document.removeEventListener('click', close);
     };
-  }, [showModeMenu]);
+  }, [showSettings]);
 
-  // Закрытие меню качества при клике вне его
+  // Пока шит настроек открыт — пиним контролы видимыми (таймер автоскрытия в
+  // showControlsTemporarily проверяет showSettingsRef и не прячет их). После
+  // закрытия — перезапускаем автоскрытие, но только если видео играет (на паузе
+  // контролы и так пинятся отдельным эффектом).
   useEffect(() => {
-    if (!showQualityMenu) return;
-    const handleClickOutside = () => setShowQualityMenu(false);
-    // Небольшая задержка чтобы клик открытия не закрыл меню сразу
-    const timeout = setTimeout(() => {
-      document.addEventListener('click', handleClickOutside);
-    }, 0);
-    return () => {
-      clearTimeout(timeout);
-      document.removeEventListener('click', handleClickOutside);
-    };
-  }, [showQualityMenu]);
+    showSettingsRef.current = showSettings;
+    if (showSettings) {
+      setShowControls(true);
+      if (hideControlsTimeoutRef.current) clearTimeout(hideControlsTimeoutRef.current);
+    } else if (videoRef.current && !videoRef.current.paused) {
+      showControlsTemporarily();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSettings]);
 
   // Загружаем статус лайка при открытии видео
   useEffect(() => {
@@ -799,28 +808,41 @@ export default function VideoPage({ params }: VideoPageProps) {
     if (isDownloading) return;
 
     if (isDownloaded) {
-      // Если уже скачано - удаляем
-      if (confirm('Удалить это видео из офлайн-хранилища?')) {
-        try {
-          await deleteVideo(videoId);
-          setIsDownloaded(false);
-          alert('Видео удалено из офлайн-хранилища');
-        } catch (error) {
-          console.error('Error deleting video:', error);
-          alert('Ошибка при удалении видео');
-        }
+      // Если уже скачано — удаляем через inline-подтверждение (вместо native
+      // confirm): первый тап взводит «Точно удалить?» на 3с, второй — удаляет.
+      if (!confirmDelete) {
+        setConfirmDelete(true);
+        if (confirmDeleteTimerRef.current) clearTimeout(confirmDeleteTimerRef.current);
+        confirmDeleteTimerRef.current = setTimeout(() => {
+          confirmDeleteTimerRef.current = null;
+          setConfirmDelete(false);
+        }, 3000);
+        return;
+      }
+      if (confirmDeleteTimerRef.current) {
+        clearTimeout(confirmDeleteTimerRef.current);
+        confirmDeleteTimerRef.current = null;
+      }
+      setConfirmDelete(false);
+      try {
+        await deleteVideo(videoId);
+        setIsDownloaded(false);
+        setToast({ message: 'Видео удалено из офлайн-хранилища', type: 'success' });
+      } catch (error) {
+        console.error('Error deleting video:', error);
+        setToast({ message: 'Ошибка при удалении видео', type: 'error' });
       }
       return;
     }
 
     // Проверяем поддержку
     if (!('serviceWorker' in navigator) || !('caches' in window)) {
-      alert('Ваш браузер не поддерживает офлайн-режим');
+      setToast({ message: 'Ваш браузер не поддерживает офлайн-режим', type: 'warning' });
       return;
     }
 
     if (!videoData) {
-      alert('Данные видео не загружены');
+      setToast({ message: 'Данные видео не загружены', type: 'error' });
       return;
     }
 
@@ -851,13 +873,34 @@ export default function VideoPage({ params }: VideoPageProps) {
       });
 
       setIsDownloaded(true);
-      alert('Видео успешно скачано! Доступно в разделе "Офлайн-видео"');
+      setToast({ message: 'Видео скачано! Доступно в разделе «Офлайн-видео»', type: 'success' });
     } catch (error) {
       console.error('Error downloading video:', error);
-      alert('Ошибка при скачивании видео. Попробуйте еще раз.');
+      setToast({ message: 'Ошибка при скачивании видео. Попробуйте ещё раз.', type: 'error' });
     } finally {
       setIsDownloading(false);
       setDownloadProgress(0);
+    }
+  };
+
+  // Поделиться видео: нативный share-шит, фолбэк — копирование ссылки в буфер.
+  // Ссылка чистая (без fromWorkout/sessionId) — получатель откроет обычный просмотр.
+  const handleShare = async () => {
+    const url = `${window.location.origin}/video/${videoId}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: videoData?.title || 'Треньки', url });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        setToast({ message: 'Ссылка скопирована', type: 'success' });
+      } else {
+        setToast({ message: 'Не удалось поделиться ссылкой', type: 'error' });
+      }
+    } catch (error) {
+      // Отмена нативного share-шита пользователем — не ошибка
+      if ((error as DOMException)?.name !== 'AbortError') {
+        setToast({ message: 'Не удалось поделиться ссылкой', type: 'error' });
+      }
     }
   };
 
@@ -1046,8 +1089,9 @@ export default function VideoPage({ params }: VideoPageProps) {
       clearTimeout(hideControlsTimeoutRef.current);
     }
 
-    // Скрываем через 3 секунды
+    // Скрываем через 3 секунды. Пока открыт шит настроек — не прячем.
     hideControlsTimeoutRef.current = setTimeout(() => {
+      if (showSettingsRef.current) return;
       setShowControls(false);
     }, 3000);
   }, []);
@@ -1106,7 +1150,7 @@ export default function VideoPage({ params }: VideoPageProps) {
 
     setSelectedQuality(quality);
     setKinescopeDirectUrl(availableQualities[quality]);
-    setShowQualityMenu(false);
+    setShowSettings(false);
   };
 
   const formatTime = (time: number) => {
@@ -1157,6 +1201,9 @@ export default function VideoPage({ params }: VideoPageProps) {
       }
       if (rotateHintTimerRef.current) {
         clearTimeout(rotateHintTimerRef.current);
+      }
+      if (confirmDeleteTimerRef.current) {
+        clearTimeout(confirmDeleteTimerRef.current);
       }
     };
   }, []);
@@ -1308,9 +1355,94 @@ export default function VideoPage({ params }: VideoPageProps) {
     const totalGain = Object.values(gains).reduce((sum, val) => sum + val, 0);
     
     if (totalGain === 0) return null;
-    
+
     return `+${totalGain.toFixed(2)}`;
   };
+
+  // Сколько качеств реально доступно — определяет, есть ли секция «Качество»
+  const hasQualityChoice = Object.keys(availableQualities).length > 1;
+
+  // Содержимое единого шита настроек: секции «Режим» (не в тренировке) и
+  // «Качество» (если есть выбор). Пояснения режимов сохранены — они объясняют
+  // правила перемотки и начисления потенциала. Рендерится и в нижнем шите
+  // (портрет), и в компактном поповере (ландшафт).
+  const settingsSections = (
+    <>
+      {!fromWorkout && (
+        <div className="py-1">
+          <div
+            className="px-4 pt-2 pb-1 text-[10px] font-bold uppercase text-white/40"
+            style={{ fontFamily: 'Overpass', letterSpacing: '0.5px' }}
+          >
+            Режим
+          </div>
+          {([
+            {
+              key: 'training' as const,
+              title: 'Тренировка',
+              hint: 'Без перемотки. Занятие идёт в зачёт роста потенциала.',
+            },
+            {
+              key: 'view' as const,
+              title: 'Просмотр',
+              hint: 'Можно перематывать, но очки потенциала не начисляются.',
+            },
+          ]).map((m) => (
+            <button
+              key={m.key}
+              onClick={() => {
+                setWatchMode(m.key);
+                setShowSettings(false);
+                showControlsTemporarily();
+              }}
+              className={`w-full text-left px-4 py-2.5 transition-colors ${
+                watchMode === m.key ? 'bg-white/10' : 'hover:bg-white/10'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className={`text-sm font-semibold ${watchMode === m.key ? 'text-[#A1FF4A]' : 'text-white'}`}>
+                  {m.title}
+                </span>
+                {watchMode === m.key && (
+                  <Check size={12} className="text-[#A1FF4A]" strokeWidth={2.5} />
+                )}
+              </div>
+              <div className="text-[11px] leading-snug text-white/60 mt-0.5">{m.hint}</div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {hasQualityChoice && (
+        <div className={`py-1 ${!fromWorkout ? 'border-t border-white/10' : ''}`}>
+          <div
+            className="px-4 pt-2 pb-1 text-[10px] font-bold uppercase text-white/40"
+            style={{ fontFamily: 'Overpass', letterSpacing: '0.5px' }}
+          >
+            Качество
+          </div>
+          {(['1080p', '720p', '480p', '360p'] as const)
+            .filter(q => availableQualities[q])
+            .map((quality) => (
+              <button
+                key={quality}
+                onClick={() => handleQualityChange(quality)}
+                className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                  selectedQuality === quality
+                    ? 'text-[#A1FF4A] bg-white/10 font-semibold'
+                    : 'text-white/80 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                <span>{quality}</span>
+                {selectedQuality === quality && (
+                  <Check size={12} className="text-[#A1FF4A]" strokeWidth={2.5} />
+                )}
+              </button>
+            ))}
+        </div>
+      )}
+    </>
+  );
 
   return (
     <div className={containerClass}>{/* pb-20 для отступа под таб-бар */}
@@ -1665,15 +1797,16 @@ export default function VideoPage({ params }: VideoPageProps) {
                     </button>
                     )}
 
-                    {/* Play/Pause Button — крупный хитбокс 64px, чтобы легко попасть (#2) */}
+                    {/* Play/Pause Button — крупный хитбокс 64px, чтобы легко попасть (#2).
+                        В тренировке — 80px: тапают с расстояния, глядя с пола. */}
                     <button
                       onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-                      className="w-16 h-16 bg-white/25 backdrop-blur-sm rounded-full flex items-center justify-center opacity-90 hover:opacity-100 transition-opacity text-white"
+                      className={`${fromWorkout ? 'w-20 h-20' : 'w-16 h-16'} bg-white/25 backdrop-blur-sm rounded-full flex items-center justify-center opacity-90 hover:opacity-100 transition-opacity text-white`}
                       title={isPlaying ? 'Пауза' : 'Воспроизвести'}
                     >
                       {isPlaying
-                        ? <Pause size={30} fill="currentColor" />
-                        : <Play size={30} fill="currentColor" className="ml-1" />}
+                        ? <Pause size={fromWorkout ? 38 : 30} fill="currentColor" />
+                        : <Play size={fromWorkout ? 38 : 30} fill="currentColor" className="ml-1" />}
                     </button>
 
                     {/* Skip Forward 10s — только в тестовом режиме (перемотка) */}
@@ -1696,8 +1829,12 @@ export default function VideoPage({ params }: VideoPageProps) {
             <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pt-8 ${isLandscape ? 'pb-6 px-5' : 'pb-2 px-3'} transition-opacity duration-300 ${
             showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}>
-            {/* Scrubber: цветная полоса + прозрачный input range поверх с круглым thumb.
-                Полоса отрисовывается div'ами (buffered + current), input ловит drag/touch. */}
+            {/* Scrubber — только когда перемотка разрешена. Когда запрещена
+                (тренировочный режим), input НЕ рендерим вовсе (нечего «включать»
+                из devtools): в свободном просмотре вместо него — тонкая лаймовая
+                полоса прогресса; в тренировке полоса прибита к нижней кромке
+                плеера (всегда видима) и здесь не дублируется. */}
+            {canSeek ? (
             <div
               className="relative mb-2 select-none"
               onMouseDown={(e) => e.stopPropagation()}
@@ -1717,7 +1854,9 @@ export default function VideoPage({ params }: VideoPageProps) {
                   className="absolute left-0 top-0 h-full bg-[#445CFF] rounded-full"
                   style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
                 />
-                {/* Кружок — на том же проценте, что и полоса (#3) */}
+                {/* Кружок — на том же проценте, что и полоса (#3). Показываем
+                    только пока палец/мышь держит скраббер — в покое линия чище. */}
+                {isScrubbing && (
                 <div
                   className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white border-2 border-[#445CFF] shadow pointer-events-none"
                   style={{
@@ -1726,6 +1865,7 @@ export default function VideoPage({ params }: VideoPageProps) {
                     height: isLandscape ? 16 : 14,
                   }}
                 />
+                )}
               </div>
               {/* Реальный input: drag, клавиатура, accessibility */}
               <input
@@ -1735,9 +1875,11 @@ export default function VideoPage({ params }: VideoPageProps) {
                 step={0.1}
                 value={currentTime}
                 aria-label="Перемотка видео"
-                disabled={!canSeek}
+                onPointerDown={() => setIsScrubbing(true)}
+                onPointerUp={() => setIsScrubbing(false)}
+                onPointerCancel={() => setIsScrubbing(false)}
                 onChange={(e) => {
-                  if (!canSeek) return; // тренировочный режим — перемотка запрещена
+                  if (!canSeek) return; // страховка: без перемотки input не рендерится
                   const t = Number(e.target.value);
                   setCurrentTime(t);
                   if (videoRef.current) {
@@ -1745,17 +1887,51 @@ export default function VideoPage({ params }: VideoPageProps) {
                   }
                   showControlsTemporarily();
                 }}
-                className={`video-scrubber relative w-full ${canSeek ? '' : 'pointer-events-none opacity-70'}`}
+                className="video-scrubber relative w-full"
               />
             </div>
+            ) : !fromWorkout ? (
+              /* Свободный просмотр в режиме «Тренировка»: честный индикатор
+                 прогресса без возможности перемотки */
+              <div
+                className="relative mb-2 h-[3px] rounded-full bg-white/25 overflow-hidden"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={Math.round(duration) || 0}
+                aria-valuenow={Math.round(Math.min(currentTime, duration))}
+                aria-label="Прогресс видео"
+              >
+                <div
+                  className="h-full bg-[#A1FF4A] rounded-full"
+                  style={{ width: `${duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0}%` }}
+                />
+              </div>
+            ) : null}
             
-            {/* Control Buttons: [время — spacer — звук — режим — качество — fullscreen].
+            {/* Control Buttons: [время (+пилюля режима) — spacer — звук — настройки — fullscreen].
                 Дублирующий play/pause убран — есть большая центральная кнопка. */}
             <div className="flex items-center justify-between">
-              {/* Time Display */}
-              <span className={`text-white font-medium ${isLandscape ? 'text-sm' : 'text-xs'}`}>
-                {formatTime(currentTime)} / {formatTime(duration)}
-              </span>
+              {/* Time Display + индикатор нестандартного режима */}
+              <div className="flex items-center gap-2 min-w-0">
+                <span className={`text-white font-medium whitespace-nowrap ${isLandscape ? 'text-sm' : 'text-xs'}`}>
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </span>
+                {/* Лаймовая пилюля «Просмотр» — чтобы не-дефолтный режим был
+                    виден с одного взгляда, без открытия настроек */}
+                {!fromWorkout && watchMode === 'view' && (
+                  <span
+                    className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase whitespace-nowrap"
+                    style={{
+                      fontFamily: 'Overpass',
+                      letterSpacing: '0.5px',
+                      backgroundColor: 'rgba(161, 255, 74, 0.2)',
+                      color: '#A1FF4A',
+                    }}
+                  >
+                    Просмотр
+                  </span>
+                )}
+              </div>
 
               <div className={`flex items-center space-x-2 ${isLandscape ? 'space-x-3' : ''}`}>
                 {/* Volume Control */}
@@ -1769,118 +1945,35 @@ export default function VideoPage({ params }: VideoPageProps) {
                     : <Volume2 size={isLandscape ? 24 : 18} />}
                 </button>
 
-                {/* Кнопка «Режим» с двумя пунктами и пояснением. В тренировке
-                    скрыта — там всегда режим «Тренировка» (без перемотки). */}
-                {!fromWorkout && (
+                {/* Единая кнопка настроек (Режим + Качество). Скрыта, когда обе
+                    секции пусты: в тренировке режим не переключается, а качество
+                    без выбора. */}
+                {(!fromWorkout || hasQualityChoice) && (
                   <div className="relative" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => {
-                        setShowModeMenu(prev => !prev);
+                        setShowSettings(prev => !prev);
                         showControlsTemporarily();
                       }}
-                      className={`px-2 py-0.5 rounded border text-xs font-semibold transition-all ${
-                        showModeMenu || watchMode === 'view'
-                          ? 'border-[#A1FF4A] text-[#A1FF4A] bg-white/10'
-                          : 'border-white/40 text-white hover:border-white/70 hover:bg-white/10'
-                      }`}
-                      title="Режим просмотра"
+                      className={`transition-opacity hover:opacity-80 p-2 ${showSettings ? 'text-[#A1FF4A]' : 'text-white'}`}
+                      title="Настройки плеера"
+                      aria-label="Настройки плеера"
                     >
-                      Режим: {watchMode === 'training' ? 'тренировка' : 'просмотр'}
+                      <Settings2 size={isLandscape ? 24 : 18} />
                     </button>
 
-                    {showModeMenu && (
+                    {/* Ландшафт: компактный поповер над кнопкой */}
+                    {showSettings && isLandscape && (
                       <div
-                        className="absolute bottom-full mb-2 right-0 bg-black/90 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden shadow-2xl w-64 z-50"
+                        className="absolute bottom-full mb-2 right-0 bg-black/90 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden shadow-2xl w-64 max-h-[60vh] overflow-y-auto z-50"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {([
-                          {
-                            key: 'training' as const,
-                            title: 'Тренировка',
-                            hint: 'Без перемотки. Занятие идёт в зачёт роста потенциала.',
-                          },
-                          {
-                            key: 'view' as const,
-                            title: 'Просмотр',
-                            hint: 'Можно перематывать, но очки потенциала не начисляются.',
-                          },
-                        ]).map((m) => (
-                          <button
-                            key={m.key}
-                            onClick={() => {
-                              setWatchMode(m.key);
-                              setShowModeMenu(false);
-                              showControlsTemporarily();
-                            }}
-                            className={`w-full text-left px-4 py-2.5 transition-colors ${
-                              watchMode === m.key ? 'bg-white/10' : 'hover:bg-white/10'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className={`text-sm font-semibold ${watchMode === m.key ? 'text-[#A1FF4A]' : 'text-white'}`}>
-                                {m.title}
-                              </span>
-                              {watchMode === m.key && (
-                                <Check size={12} className="text-[#A1FF4A]" strokeWidth={2.5} />
-                              )}
-                            </div>
-                            <div className="text-[11px] leading-snug text-white/60 mt-0.5">{m.hint}</div>
-                          </button>
-                        ))}
+                        {settingsSections}
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Quality Selector — только если доступно несколько качеств */}
-                {Object.keys(availableQualities).length > 1 && (
-                  <div className="relative" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => {
-                        setShowQualityMenu(prev => !prev);
-                        showControlsTemporarily();
-                      }}
-                      className={`flex items-center gap-1 px-2 py-0.5 rounded border text-xs font-semibold transition-all ${
-                        showQualityMenu
-                          ? 'border-[#A1FF4A] text-[#A1FF4A] bg-white/10'
-                          : 'border-white/40 text-white hover:border-white/70 hover:bg-white/10'
-                      }`}
-                      title="Выбрать качество"
-                    >
-                      {selectedQuality || 'HD'}
-                    </button>
-
-                    {/* Popup меню качества */}
-                    {showQualityMenu && (
-                      <div
-                        className="absolute bottom-full mb-2 right-0 bg-black/90 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden shadow-2xl min-w-22.5 z-50"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="py-1">
-                          {(['1080p', '720p', '480p', '360p'] as const)
-                            .filter(q => availableQualities[q])
-                            .map((quality) => (
-                              <button
-                                key={quality}
-                                onClick={() => handleQualityChange(quality)}
-                                className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors ${
-                                  selectedQuality === quality
-                                    ? 'text-[#A1FF4A] bg-white/10 font-semibold'
-                                    : 'text-white/80 hover:bg-white/10 hover:text-white'
-                                }`}
-                              >
-                                <span>{quality}</span>
-                                {selectedQuality === quality && (
-                                  <Check size={12} className="text-[#A1FF4A]" strokeWidth={2.5} />
-                                )}
-                              </button>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
                 {/* Fullscreen Button */}
                 <button
                   onClick={toggleFullscreen}
@@ -1894,6 +1987,44 @@ export default function VideoPage({ params }: VideoPageProps) {
               </div>
             </div>
           </div>
+
+              {/* В тренировке прогресс виден ВСЕГДА: тонкая лаймовая линия у
+                  нижней кромки плеера, вне автоскрываемой панели контролов —
+                  ребёнок видит прогресс с пола даже при спрятанных контролах.
+                  В панели контролов линия не дублируется. */}
+              {fromWorkout && (
+                <div
+                  className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/20 z-30 pointer-events-none"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={Math.round(duration) || 0}
+                  aria-valuenow={Math.round(Math.min(currentTime, duration))}
+                  aria-label="Прогресс видео"
+                >
+                  <div
+                    className="h-full bg-[#A1FF4A]"
+                    style={{ width: `${duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0}%` }}
+                  />
+                </div>
+              )}
+
+              {/* Портрет: настройки открываются нижним шитом (в ландшафте —
+                  компактный поповер у кнопки). Клик внутри не закрывает шит. */}
+              {showSettings && !isLandscape && (
+                <div
+                  className="fixed inset-x-0 bottom-0 z-[60]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div
+                    className="bg-[#101530] border-t border-white/10 rounded-t-2xl shadow-2xl"
+                    style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }}
+                  >
+                    {/* Граббер шита */}
+                    <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mt-2 mb-1" />
+                    {settingsSections}
+                  </div>
+                </div>
+              )}
             </>
           )}
 
@@ -1980,86 +2111,100 @@ export default function VideoPage({ params }: VideoPageProps) {
         </div>
       </div>
 
-  {/* Action Icons (скрываем в ландшафтном режиме на мобилках) */}
+  {/* Пилюли действий (скрываем в ландшафтном режиме на мобилках). Компактные,
+      без горизонтального скролла: на узких экранах переносятся на вторую строку.
+      В тренировке остаётся только «Камера» — остальное отвлекает от занятия. */}
   <div className={`bg-[#101530] ${isLandscape ? 'hidden' : ''}`}>
-        <div className="overflow-x-auto scrollbar-hide">
-          <div className="flex items-center gap-3 p-4 min-w-max">
-            {/* Like */}
-            <button 
-              onClick={toggleLike}
-              className="bg-[#AEABBB33] rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0 transition-opacity hover:opacity-80"
-            >
-              <Heart
-                size={20}
-                className={isLiked ? 'text-[#A1FF4A]' : 'text-[#AEABBB]'}
-                fill={isLiked ? 'currentColor' : 'none'}
-              />
-              <span className="text-[#AEABBB] text-xs whitespace-nowrap">
-                {likesCount >= 1000 
-                  ? `${(likesCount / 1000).toFixed(1)} тыс.` 
-                  : likesCount}
-              </span>
-            </button>
-            
-            {/* Calendar */}
-            <button 
-              onClick={() => setShowScheduleModal(true)}
-              className="bg-[#AEABBB33] rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0 hover:opacity-80 transition-opacity"
-            >
-              <CalendarPlus size={20} className="text-[#AEABBB]" />
-              <span className="text-[#AEABBB] text-xs whitespace-nowrap">Календарь</span>
-            </button>
-            
-            {/* Download */}
-            <button
-              onClick={handleDownload}
-              disabled={isDownloading}
-              className={`rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0 transition-all ${
-                isDownloaded 
-                  ? 'bg-green-500/20 hover:bg-green-500/30' 
-                  : 'bg-[#AEABBB33] hover:opacity-80'
-              } ${isDownloading ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {isDownloading ? (
-                <>
-                  <Loader2 size={20} className="animate-spin text-[#445CFF]" />
-                  <span className="text-[#AEABBB] text-xs whitespace-nowrap">
-                    {Math.round(downloadProgress)}%
-                  </span>
-                </>
-              ) : isDownloaded ? (
-                <>
-                  <CheckCircle size={20} className="text-green-400" />
-                  <span className="text-green-400 text-xs whitespace-nowrap">Скачано</span>
-                </>
-              ) : (
-                <>
-                  <Download size={20} className="text-[#AEABBB]" />
-                  <span className="text-[#AEABBB] text-xs whitespace-nowrap">Скачать</span>
-                </>
-              )}
-            </button>
-            
-            {/* Share */}
-            <div className="bg-[#AEABBB33] rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0">
-              <Share2 size={20} className="text-[#AEABBB]" />
-              <span className="text-[#AEABBB] text-xs whitespace-nowrap">Поделиться</span>
-            </div>
+        <div className="flex flex-wrap items-center gap-2 p-4">
+          {!fromWorkout && (
+            <>
+              {/* Like */}
+              <button
+                onClick={toggleLike}
+                className="bg-[#AEABBB33] rounded-full px-3 py-2 flex items-center gap-1.5 transition-opacity hover:opacity-80"
+              >
+                <Heart
+                  size={18}
+                  className={isLiked ? 'text-[#A1FF4A]' : 'text-[#AEABBB]'}
+                  fill={isLiked ? 'currentColor' : 'none'}
+                />
+                <span className="text-[#AEABBB] text-[11px] whitespace-nowrap">
+                  {likesCount >= 1000
+                    ? `${(likesCount / 1000).toFixed(1)} тыс.`
+                    : likesCount}
+                </span>
+              </button>
 
-            {/* Pose tracker */}
-            <button
-              onClick={() => setPoseTrackerOpen((v) => !v)}
-              className={`rounded-full px-4 py-2 flex items-center gap-2 flex-shrink-0 transition-all ${
-                poseTrackerOpen ? 'bg-[#A1FF4A] text-[#101530]' : 'bg-[#AEABBB33] hover:opacity-80'
-              }`}
-              aria-label="Включить камеру"
-            >
-              <Camera size={20} style={{ color: poseTrackerOpen ? '#101530' : '#AEABBB' }} />
-              <span className="text-xs whitespace-nowrap" style={{ color: poseTrackerOpen ? '#101530' : '#AEABBB', fontWeight: 700 }}>
-                Камера
-              </span>
-            </button>
-          </div>
+              {/* Calendar */}
+              <button
+                onClick={() => setShowScheduleModal(true)}
+                className="bg-[#AEABBB33] rounded-full px-3 py-2 flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+              >
+                <CalendarPlus size={18} className="text-[#AEABBB]" />
+                <span className="text-[#AEABBB] text-[11px] whitespace-nowrap">Календарь</span>
+              </button>
+
+              {/* Download / inline-подтверждение удаления (вместо native confirm) */}
+              <button
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className={`rounded-full px-3 py-2 flex items-center gap-1.5 transition-all ${
+                  confirmDelete
+                    ? 'bg-red-500/20 hover:bg-red-500/30'
+                    : isDownloaded
+                      ? 'bg-green-500/20 hover:bg-green-500/30'
+                      : 'bg-[#AEABBB33] hover:opacity-80'
+                } ${isDownloading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {isDownloading ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin text-[#445CFF]" />
+                    <span className="text-[#AEABBB] text-[11px] whitespace-nowrap">
+                      {Math.round(downloadProgress)}%
+                    </span>
+                  </>
+                ) : confirmDelete ? (
+                  <>
+                    <X size={18} className="text-red-400" />
+                    <span className="text-red-400 text-[11px] whitespace-nowrap font-bold">Точно удалить?</span>
+                  </>
+                ) : isDownloaded ? (
+                  <>
+                    <CheckCircle size={18} className="text-green-400" />
+                    <span className="text-green-400 text-[11px] whitespace-nowrap">Скачано</span>
+                  </>
+                ) : (
+                  <>
+                    <Download size={18} className="text-[#AEABBB]" />
+                    <span className="text-[#AEABBB] text-[11px] whitespace-nowrap">Скачать</span>
+                  </>
+                )}
+              </button>
+
+              {/* Share — нативный share-шит или копирование ссылки */}
+              <button
+                onClick={handleShare}
+                className="bg-[#AEABBB33] rounded-full px-3 py-2 flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+              >
+                <Share2 size={18} className="text-[#AEABBB]" />
+                <span className="text-[#AEABBB] text-[11px] whitespace-nowrap">Поделиться</span>
+              </button>
+            </>
+          )}
+
+          {/* Pose tracker — тренировочная фича, доступна и в fromWorkout */}
+          <button
+            onClick={() => setPoseTrackerOpen((v) => !v)}
+            className={`rounded-full px-3 py-2 flex items-center gap-1.5 transition-all ${
+              poseTrackerOpen ? 'bg-[#A1FF4A] text-[#101530]' : 'bg-[#AEABBB33] hover:opacity-80'
+            }`}
+            aria-label="Включить камеру"
+          >
+            <Camera size={18} style={{ color: poseTrackerOpen ? '#101530' : '#AEABBB' }} />
+            <span className="text-[11px] whitespace-nowrap" style={{ color: poseTrackerOpen ? '#101530' : '#AEABBB', fontWeight: 700 }}>
+              Камера
+            </span>
+          </button>
         </div>
       </div>
 

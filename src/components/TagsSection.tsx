@@ -272,7 +272,9 @@ const TagsSection: React.FC<TagsSectionProps> = ({
               : rpeMin != null ? `RPE ${rpeMin}+` : `RPE ≤${rpeMax}`,
           },
         ].filter(Boolean) as { label: string }[];
-        const hasBubbles = infoBubbles.length > 0 || !!gainTag;
+        // Инфо-баблы, свободные теги и пилюля прироста — в ОДНОЙ flex-wrap
+        // строке, чтобы не плодить этажи под плеером.
+        const hasBubbles = infoBubbles.length > 0 || !!gainTag || allTags.length > 0;
         if (!hasBubbles) return null;
 
         return (
@@ -287,30 +289,24 @@ const TagsSection: React.FC<TagsSectionProps> = ({
                 {b.label}
               </div>
             ))}
+            {allTags.map((tag, index) => (
+              <SimpleTag key={`tag-${index}`} text={tag} />
+            ))}
           </div>
         );
       })()}
 
-      {/* Tags */}
-      {allTags.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {allTags.map((tag, index) => (
-            <SimpleTag key={index} text={tag} />
-          ))}
-        </div>
-      )}
-      
-      {/* Equipment Section */}
-      <div className="bg-[#AEABBB33] rounded-lg p-4 mb-4">
-        <h3 className="text-white text-sm font-medium mb-3">ОБОРУДОВАНИЕ</h3>
-        {equipment.length > 0 && (
+      {/* Equipment Section — только когда список непустой (пустая карточка не нужна) */}
+      {equipment.length > 0 && (
+        <div className="bg-[#AEABBB33] rounded-lg p-4 mb-4">
+          <h3 className="text-white text-sm font-medium mb-3">ОБОРУДОВАНИЕ</h3>
           <div className="flex flex-wrap gap-2">
             {equipment.map((item, index) => (
               <SimpleTag key={index} text={item} />
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
       
       {/* Description */}
       {description && (
