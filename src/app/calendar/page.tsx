@@ -45,7 +45,12 @@ interface MicrocycleDay {
   dayOfWeek: number; // порядковый день цикла 1..N от weekStartDate (НЕ календарный)
   intent: MicrocycleIntent;
   goal: string | null; // направленность/цель дня
-  modules: string[]; // названия модулей тренировки дня
+  modules: {
+    id: string;
+    title: string;
+    thumbnail: string | null;
+    duration: number;
+  }[]; // модули тренировки дня с превью (как в /video)
   workoutSession: {
     id: string;
     status: string;
@@ -700,12 +705,34 @@ export default function CalendarPage() {
                   >
                     Что в тренировке
                   </div>
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-2">
                     {d.modules.map((m, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        <span className="text-[#A1FF4A] text-xs font-bold mt-[1px]">{i + 1}</span>
-                        <span className="text-white text-xs leading-snug">{m}</span>
-                      </div>
+                      <Link
+                        key={m.id ?? i}
+                        href={`/video/${m.id}`}
+                        className="flex items-center gap-3 rounded-xl overflow-hidden transition-transform active:scale-[0.99]"
+                        style={{ background: 'rgba(174,171,187,0.06)' }}
+                      >
+                        <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-[#0d1228] shrink-0">
+                          {m.thumbnail ? (
+                            <Image src={m.thumbnail} alt={m.title} fill className="object-cover" />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center text-[#AEABBB] text-lg">🏒</div>
+                          )}
+                          <span
+                            className="absolute top-1 left-1 text-[#A1FF4A] text-[10px] font-bold px-1.5 py-0.5 rounded"
+                            style={{ background: 'rgba(6,9,25,0.72)' }}
+                          >
+                            {i + 1}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0 pr-3">
+                          <div className="text-white text-xs font-semibold leading-snug line-clamp-2">{m.title}</div>
+                          {m.duration > 0 && (
+                            <div className="text-[#AEABBB] text-[11px] mt-1">{formatDuration(m.duration)}</div>
+                          )}
+                        </div>
+                      </Link>
                     ))}
                   </div>
                 </div>

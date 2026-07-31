@@ -45,7 +45,10 @@ export async function GET(request: NextRequest) {
               targetDuration: true,
               totalVideos: true,
               currentVideoIndex: true,
-              videos: { orderBy: { order: 'asc' }, select: { video: { select: { title: true } } } },
+              videos: {
+                orderBy: { order: 'asc' },
+                select: { video: { select: { id: true, title: true, thumbnail: true, duration: true } } },
+              },
             },
           },
         },
@@ -96,7 +99,15 @@ export async function GET(request: NextRequest) {
         dayOfWeek: d.dayOfWeek,
         intent: d.intent,
         goal: goalByDay.get(d.dayOfWeek) ?? null, // направленность/цель дня
-        modules: d.workoutSession?.videos.map((v) => v.video.title) ?? [], // названия модулей
+        // Модули тренировки дня с превью (id/название/картинка/длительность) —
+        // чтобы календарь рисовал карточки, как в /video, а не голый список.
+        modules:
+          d.workoutSession?.videos.map((v) => ({
+            id: v.video.id,
+            title: v.video.title,
+            thumbnail: v.video.thumbnail,
+            duration: v.video.duration,
+          })) ?? [],
         workoutSession: d.workoutSession
           ? {
               id: d.workoutSession.id,
