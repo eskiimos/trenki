@@ -309,6 +309,8 @@ export default function CalendarPage() {
 
     const today = new Date();
     const isCurrentMonth = today.getMonth() === month && today.getFullYear() === year;
+    // Полночь сегодня (сравнение по дате, без времени) — чтобы определить «прошлые» дни.
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
 
     for (let i = 1; i <= daysInMonth; i++) {
       const date = new Date(year, month, i);
@@ -321,8 +323,11 @@ export default function CalendarPage() {
       
       const isDone = hasCompletedEventOnDay(year, month, i);
       const hasWorkouts = hasAnyEventOnDay(year, month, i) || isDone;
-      // Выполненный день — лайм, запланированный (без выполнения) — синий.
-      const markColor = isDone ? '#A1FF4A' : '#445CFF';
+      // Пропущенный день: был запланирован, уже прошёл и не выполнен. Сегодня и
+      // будущее не «пропущены» — их ещё можно сделать.
+      const isMissed = hasWorkouts && !isDone && date.getTime() < todayMidnight;
+      // Выполнено — лайм, пропущено — серый, запланировано (сегодня/будущее) — синий.
+      const markColor = isDone ? '#A1FF4A' : isMissed ? '#AEABBB' : '#445CFF';
 
       days.push(
         <button
@@ -593,12 +598,15 @@ export default function CalendarPage() {
             </div>
 
             {/* Легенда индикаторов */}
-            <div className="flex items-center justify-center gap-4 mt-3 text-[11px] text-[#AEABBB]">
+            <div className="flex items-center justify-center gap-3 mt-3 text-[11px] text-[#AEABBB]">
               <span className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#A1FF4A' }}></span>выполнено
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#445CFF' }}></span>запланировано
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#AEABBB' }}></span>пропущено
               </span>
             </div>
           </div>
