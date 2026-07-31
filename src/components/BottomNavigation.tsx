@@ -2,11 +2,17 @@
 
 import React from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { House, SquarePlay, Swords, Calendar, CircleUserRound } from 'lucide-react';
 
 interface BottomNavigationProps {
   activeTab?: 'home' | 'video' | 'shorts' | 'hockey' | 'calendar' | 'profile';
 }
+
+// Цвета иконок таббара: активная — лаймовый акцент, неактивная — приглушённый серый
+const ACTIVE_COLOR = '#A1FF4A';
+const INACTIVE_COLOR = '#AEABBB';
+
+const iconColor = (isActive: boolean) => (isActive ? ACTIVE_COLOR : INACTIVE_COLOR);
 
 const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' }) => {
   return (
@@ -15,59 +21,24 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' 
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)', paddingTop: 12 }}
     >
       <div className="flex justify-between items-center max-w-md mx-auto">
-        <Link href="/" className="flex items-center justify-center p-2">
-          <Image
-            src={activeTab === 'home'
-              ? '/icons/tapbar/new_active/Type_home.svg'
-              : '/icons/tapbar/icon-type-home-active-no.svg'}
-            alt="Главная"
-            width={32}
-            height={32}
-          />
+        <Link href="/" className="flex items-center justify-center p-2" aria-label="Главная">
+          <House size={32} color={iconColor(activeTab === 'home')} aria-hidden="true" />
         </Link>
 
-        <Link href="/shorts-catalog" className="flex items-center justify-center p-2">
-          <Image
-            src={activeTab === 'shorts'
-              ? '/icons/tapbar/new_active/Type_play.svg'
-              : '/icons/tapbar/icon-type-play-active-no.svg'}
-            alt="Треньки"
-            width={32}
-            height={32}
-          />
+        <Link href="/shorts-catalog" className="flex items-center justify-center p-2" aria-label="Треньки">
+          <SquarePlay size={32} color={iconColor(activeTab === 'shorts')} aria-hidden="true" />
         </Link>
 
-        <Link href="/video" className="flex items-center justify-center p-2">
-          <Image
-            src={activeTab === 'video'
-              ? '/icons/tapbar/new_active/Type_hockey.svg'
-              : '/icons/tapbar/icon-type-hockey-active-no.svg'}
-            alt="Видео"
-            width={32}
-            height={32}
-          />
+        <Link href="/video" className="flex items-center justify-center p-2" aria-label="Видео">
+          <Swords size={32} color={iconColor(activeTab === 'video')} aria-hidden="true" />
         </Link>
 
-        <Link href="/calendar" className="flex items-center justify-center p-2">
-          <Image
-            src={activeTab === 'calendar'
-              ? '/icons/tapbar/new_active/Type_calendar.svg'
-              : '/icons/tapbar/icon-type-calendar-active-no.svg'}
-            alt="Расписание"
-            width={32}
-            height={32}
-          />
+        <Link href="/calendar" className="flex items-center justify-center p-2" aria-label="Расписание">
+          <Calendar size={32} color={iconColor(activeTab === 'calendar')} aria-hidden="true" />
         </Link>
 
-        <Link href="/profile" className="flex items-center justify-center p-2">
-          <Image
-            src={activeTab === 'profile'
-              ? '/icons/tapbar/new_active/Type_hockey-mask.svg'
-              : '/icons/tapbar/icon-type-hockey-mask-active-no.svg'}
-            alt="Профиль"
-            width={32}
-            height={32}
-          />
+        <Link href="/profile" className="flex items-center justify-center p-2" aria-label="Профиль">
+          <CircleUserRound size={32} color={iconColor(activeTab === 'profile')} aria-hidden="true" />
         </Link>
       </div>
     </nav>

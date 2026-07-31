@@ -2,11 +2,17 @@
 
 import React from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { House, SquarePlay, Swords, Calendar, CircleUserRound } from 'lucide-react';
 
 interface BottomNavigationCoachProps {
   activeTab?: 'team' | 'assignments' | 'profile';
 }
+
+// Цвета иконок таббара: активная — лаймовый акцент, неактивная — приглушённый серый
+const ACTIVE_COLOR = '#A1FF4A';
+const INACTIVE_COLOR = '#AEABBB';
+
+const iconColor = (isActive: boolean) => (isActive ? ACTIVE_COLOR : INACTIVE_COLOR);
 
 /**
  * Таббар для тренерского кабинета.
@@ -20,57 +26,26 @@ const BottomNavigationCoach: React.FC<BottomNavigationCoachProps> = ({ activeTab
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)', paddingTop: 12 }}
     >
       <div className="flex justify-between items-center max-w-md mx-auto md:max-w-2xl">
-        <Link href="/coach/team" className="flex items-center justify-center p-2">
-          <Image
-            src={activeTab === 'team'
-              ? '/icons/tapbar/new_active/Type_hockey.svg'
-              : '/icons/tapbar/icon-type-hockey-active-no.svg'}
-            alt="Команда"
-            width={32}
-            height={32}
-          />
+        <Link href="/coach/team" className="flex items-center justify-center p-2" aria-label="Команда">
+          <Swords size={32} color={iconColor(activeTab === 'team')} aria-hidden="true" />
         </Link>
 
-        <Link href="/coach/assignments" className="flex items-center justify-center p-2">
-          <Image
-            src={activeTab === 'assignments'
-              ? '/icons/tapbar/new_active/Type_calendar.svg'
-              : '/icons/tapbar/icon-type-calendar-active-no.svg'}
-            alt="Задания"
-            width={32}
-            height={32}
-          />
+        <Link href="/coach/assignments" className="flex items-center justify-center p-2" aria-label="Задания">
+          <Calendar size={32} color={iconColor(activeTab === 'assignments')} aria-hidden="true" />
         </Link>
 
         {/* Заглушка: Статистика — скоро */}
         <div className="flex items-center justify-center p-2 opacity-30 cursor-not-allowed" title="Скоро">
-          <Image
-            src="/icons/tapbar/icon-type-play-active-no.svg"
-            alt="Статистика (скоро)"
-            width={32}
-            height={32}
-          />
+          <SquarePlay size={32} color={INACTIVE_COLOR} aria-label="Статистика (скоро)" />
         </div>
 
         {/* Заглушка: Доска — скоро */}
         <div className="flex items-center justify-center p-2 opacity-30 cursor-not-allowed" title="Скоро">
-          <Image
-            src="/icons/tapbar/icon-type-home-active-no.svg"
-            alt="Доска (скоро)"
-            width={32}
-            height={32}
-          />
+          <House size={32} color={INACTIVE_COLOR} aria-label="Доска (скоро)" />
         </div>
 
-        <Link href="/coach/profile" className="flex items-center justify-center p-2">
-          <Image
-            src={activeTab === 'profile'
-              ? '/icons/tapbar/new_active/Type_hockey-mask.svg'
-              : '/icons/tapbar/icon-type-hockey-mask-active-no.svg'}
-            alt="Профиль"
-            width={32}
-            height={32}
-          />
+        <Link href="/coach/profile" className="flex items-center justify-center p-2" aria-label="Профиль">
+          <CircleUserRound size={32} color={iconColor(activeTab === 'profile')} aria-hidden="true" />
         </Link>
       </div>
     </nav>
