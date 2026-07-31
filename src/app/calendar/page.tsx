@@ -698,7 +698,7 @@ export default function CalendarPage() {
                 </div>
               </Link>
               {d.modules.length > 0 && (
-                <div className="mt-2 rounded-2xl p-3" style={{ background: 'rgba(174,171,187,0.06)' }}>
+                <div className="mt-2">
                   <div
                     className="font-overpass"
                     style={{ color: '#AEABBB', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}
@@ -710,7 +710,7 @@ export default function CalendarPage() {
                       <Link
                         key={m.id ?? i}
                         href={`/video/${m.id}`}
-                        className="flex items-center gap-3 rounded-xl overflow-hidden transition-transform active:scale-[0.99]"
+                        className="flex items-center gap-3 rounded-2xl p-2 transition-transform active:scale-[0.99]"
                         style={{ background: 'rgba(174,171,187,0.06)' }}
                       >
                         <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-[#0d1228] shrink-0">
@@ -720,16 +720,16 @@ export default function CalendarPage() {
                             <div className="absolute inset-0 flex items-center justify-center text-[#AEABBB] text-lg">🏒</div>
                           )}
                           <span
-                            className="absolute top-1 left-1 text-[#A1FF4A] text-[10px] font-bold px-1.5 py-0.5 rounded"
+                            className="absolute top-1 left-1 text-[#A1FF4A] text-[10px] font-bold px-1.5 py-0.5 rounded-md"
                             style={{ background: 'rgba(6,9,25,0.72)' }}
                           >
                             {i + 1}
                           </span>
                         </div>
-                        <div className="flex-1 min-w-0 pr-3">
-                          <div className="text-white text-xs font-semibold leading-snug line-clamp-2">{m.title}</div>
+                        <div className="flex-1 min-w-0 pr-2">
+                          <div className="text-white text-sm font-semibold leading-tight line-clamp-2">{m.title}</div>
                           {m.duration > 0 && (
-                            <div className="text-[#AEABBB] text-[11px] mt-1">{formatDuration(m.duration)}</div>
+                            <div className="text-[#AEABBB] text-xs mt-1">{formatDuration(m.duration)}</div>
                           )}
                         </div>
                       </Link>
