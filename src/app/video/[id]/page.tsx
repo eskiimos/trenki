@@ -5,11 +5,10 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  Heart, Download, CheckCircle, ChevronLeft, Play, Pause, RotateCcw, RotateCw,
+  Heart, ChevronLeft, Play, Pause, RotateCcw, RotateCw,
   Volume2, VolumeX, Maximize, Minimize, Smartphone, CalendarPlus, Share2,
-  Camera, Zap, WifiOff, Check, X, Loader2, Settings2,
+  Zap, WifiOff, Check, X, Loader2, Settings2,
 } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import TagsSection from '@/components/TagsSection';
 import BottomNavigation from '@/components/BottomNavigation';
 import CharacteristicsGainModal from '@/components/CharacteristicsGainModal';
@@ -18,16 +17,10 @@ import Toast from '@/components/Toast';
 import { isKinescopeUrl, getKinescopeDirectUrl } from '@/lib/videoQuality';
 import { calculateWorkoutGains, CharacteristicType } from '@/lib/characteristics';
 import { openSubscriptionModal } from '@/lib/subscription-modal';
-import {
-  downloadVideo,
-  isVideoDownloaded,
-  deleteVideo,
-  getOfflineVideo,
-  type OfflineVideo
-} from '@/lib/offlineVideos';
-
-// Pose-трекер грузим только в браузере: модель MediaPipe из CDN — нет смысла на SSR
-const PoseTracker = dynamic(() => import('@/components/PoseTracker'), { ssr: false });
+// Кнопки «Скачать» и «Камера» (PoseTracker) убраны 2026-07-31 — функционал пока
+// не используется. isVideoDownloaded/getOfflineVideo остаются: уже скачанные
+// видео продолжают играть офлайн.
+import { isVideoDownloaded, getOfflineVideo } from '@/lib/offlineVideos';
 
 interface VideoPageProps {
   params: Promise<{
@@ -151,14 +144,9 @@ export default function VideoPage({ params }: VideoPageProps) {
   // обрывалось за ~10% до конца (баг «правой отпрыгали, а левая 5 секунд и вылетает»).
   const END_EPSILON_SEC = 0.5;
 
-  // Состояние для скачивания видео
+  // Скачано ли видео в офлайн (питает офлайн-баннер и выбор источника
+  // воспроизведения; сама кнопка «Скачать» убрана — см. комментарий ниже).
   const [isDownloaded, setIsDownloaded] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
-  // Inline-подтверждение удаления офлайн-видео (вместо native confirm):
-  // первый тап переводит кнопку в «Точно удалить?» на 3с, второй — удаляет.
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const confirmDeleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Online/offline для баннера «нет сети, видео не скачано»
   const [isOffline, setIsOffline] = useState(false);
@@ -174,8 +162,6 @@ export default function VideoPage({ params }: VideoPageProps) {
     };
   }, []);
 
-  // Pose-трекер (камера + отслеживание суставов)
-  const [poseTrackerOpen, setPoseTrackerOpen] = useState(false);
 
   // Состояние для модалки прироста характеристик
   const [showGainsModal, setShowGainsModal] = useState(false);
@@ -803,85 +789,9 @@ export default function VideoPage({ params }: VideoPageProps) {
     setShowGainsModal(false);
   };
 
-  // Функция скачивания видео
-  const handleDownload = async () => {
-    if (isDownloading) return;
-
-    if (isDownloaded) {
-      // Если уже скачано — удаляем через inline-подтверждение (вместо native
-      // confirm): первый тап взводит «Точно удалить?» на 3с, второй — удаляет.
-      if (!confirmDelete) {
-        setConfirmDelete(true);
-        if (confirmDeleteTimerRef.current) clearTimeout(confirmDeleteTimerRef.current);
-        confirmDeleteTimerRef.current = setTimeout(() => {
-          confirmDeleteTimerRef.current = null;
-          setConfirmDelete(false);
-        }, 3000);
-        return;
-      }
-      if (confirmDeleteTimerRef.current) {
-        clearTimeout(confirmDeleteTimerRef.current);
-        confirmDeleteTimerRef.current = null;
-      }
-      setConfirmDelete(false);
-      try {
-        await deleteVideo(videoId);
-        setIsDownloaded(false);
-        setToast({ message: 'Видео удалено из офлайн-хранилища', type: 'success' });
-      } catch (error) {
-        console.error('Error deleting video:', error);
-        setToast({ message: 'Ошибка при удалении видео', type: 'error' });
-      }
-      return;
-    }
-
-    // Проверяем поддержку
-    if (!('serviceWorker' in navigator) || !('caches' in window)) {
-      setToast({ message: 'Ваш браузер не поддерживает офлайн-режим', type: 'warning' });
-      return;
-    }
-
-    if (!videoData) {
-      setToast({ message: 'Данные видео не загружены', type: 'error' });
-      return;
-    }
-
-    try {
-      setIsDownloading(true);
-      setDownloadProgress(0);
-
-      const offlineVideo: OfflineVideo = {
-        id: videoData.id,
-        title: videoData.title,
-        description: videoData.description,
-        duration: videoData.duration,
-        thumbnail: videoData.thumbnail,
-        videoUrl: kinescopeDirectUrl || videoData.videoUrl,
-        category: videoData.category,
-        difficulty: videoData.difficulty,
-        trainerId: videoData.trainer?.id,
-        trainer: videoData.trainer ? {
-          name: videoData.trainer.name,
-          lastName: videoData.trainer.lastName,
-          avatar: videoData.trainer.avatar || undefined,
-        } : undefined,
-        downloadedAt: Date.now(),
-      };
-
-      await downloadVideo(offlineVideo, (progress) => {
-        setDownloadProgress(progress);
-      });
-
-      setIsDownloaded(true);
-      setToast({ message: 'Видео скачано! Доступно в разделе «Офлайн-видео»', type: 'success' });
-    } catch (error) {
-      console.error('Error downloading video:', error);
-      setToast({ message: 'Ошибка при скачивании видео. Попробуйте ещё раз.', type: 'error' });
-    } finally {
-      setIsDownloading(false);
-      setDownloadProgress(0);
-    }
-  };
+  // Кнопка «Скачать» убрана 2026-07-31 (функционал пока не используется).
+  // Оффлайн-инфраструктура (offline-video lib, isDownloaded, SW-кэш) сохранена —
+  // уже скачанные видео продолжают играть офлайн. Вернуть скачивание: git history.
 
   // Поделиться видео: нативный share-шит, фолбэк — копирование ссылки в буфер.
   // Ссылка чистая (без fromWorkout/sessionId) — получатель откроет обычный просмотр.
@@ -1201,9 +1111,6 @@ export default function VideoPage({ params }: VideoPageProps) {
       }
       if (rotateHintTimerRef.current) {
         clearTimeout(rotateHintTimerRef.current);
-      }
-      if (confirmDeleteTimerRef.current) {
-        clearTimeout(confirmDeleteTimerRef.current);
       }
     };
   }, []);
@@ -2111,12 +2018,13 @@ export default function VideoPage({ params }: VideoPageProps) {
         </div>
       </div>
 
-  {/* Пилюли действий (скрываем в ландшафтном режиме на мобилках). Компактные,
-      без горизонтального скролла: на узких экранах переносятся на вторую строку.
-      В тренировке остаётся только «Камера» — остальное отвлекает от занятия. */}
+  {/* Пилюли действий (скрываем в ландшафтном режиме на мобилках и в тренировке —
+      там ряд пуст). «Скачать» и «Камера» убраны по решению владельца 2026-07-31:
+      функционал пока не используется (логика скачивания/PoseTracker сохранена —
+      вернуть можно, восстановив кнопки). */}
+  {!fromWorkout && (
   <div className={`bg-[#101530] ${isLandscape ? 'hidden' : ''}`}>
         <div className="flex flex-wrap items-center gap-2 p-4">
-          {!fromWorkout && (
             <>
               {/* Like */}
               <button
@@ -2144,43 +2052,6 @@ export default function VideoPage({ params }: VideoPageProps) {
                 <span className="text-[#AEABBB] text-[11px] whitespace-nowrap">Календарь</span>
               </button>
 
-              {/* Download / inline-подтверждение удаления (вместо native confirm) */}
-              <button
-                onClick={handleDownload}
-                disabled={isDownloading}
-                className={`rounded-full px-3 py-2 flex items-center gap-1.5 transition-all ${
-                  confirmDelete
-                    ? 'bg-red-500/20 hover:bg-red-500/30'
-                    : isDownloaded
-                      ? 'bg-green-500/20 hover:bg-green-500/30'
-                      : 'bg-[#AEABBB33] hover:opacity-80'
-                } ${isDownloading ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                {isDownloading ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin text-[#445CFF]" />
-                    <span className="text-[#AEABBB] text-[11px] whitespace-nowrap">
-                      {Math.round(downloadProgress)}%
-                    </span>
-                  </>
-                ) : confirmDelete ? (
-                  <>
-                    <X size={18} className="text-red-400" />
-                    <span className="text-red-400 text-[11px] whitespace-nowrap font-bold">Точно удалить?</span>
-                  </>
-                ) : isDownloaded ? (
-                  <>
-                    <CheckCircle size={18} className="text-green-400" />
-                    <span className="text-green-400 text-[11px] whitespace-nowrap">Скачано</span>
-                  </>
-                ) : (
-                  <>
-                    <Download size={18} className="text-[#AEABBB]" />
-                    <span className="text-[#AEABBB] text-[11px] whitespace-nowrap">Скачать</span>
-                  </>
-                )}
-              </button>
-
               {/* Share — нативный share-шит или копирование ссылки */}
               <button
                 onClick={handleShare}
@@ -2190,23 +2061,9 @@ export default function VideoPage({ params }: VideoPageProps) {
                 <span className="text-[#AEABBB] text-[11px] whitespace-nowrap">Поделиться</span>
               </button>
             </>
-          )}
-
-          {/* Pose tracker — тренировочная фича, доступна и в fromWorkout */}
-          <button
-            onClick={() => setPoseTrackerOpen((v) => !v)}
-            className={`rounded-full px-3 py-2 flex items-center gap-1.5 transition-all ${
-              poseTrackerOpen ? 'bg-[#A1FF4A] text-[#101530]' : 'bg-[#AEABBB33] hover:opacity-80'
-            }`}
-            aria-label="Включить камеру"
-          >
-            <Camera size={18} style={{ color: poseTrackerOpen ? '#101530' : '#AEABBB' }} />
-            <span className="text-[11px] whitespace-nowrap" style={{ color: poseTrackerOpen ? '#101530' : '#AEABBB', fontWeight: 700 }}>
-              Камера
-            </span>
-          </button>
         </div>
       </div>
+  )}
 
       {/* Tags / Description / Trainer - скрываем при ландшафте на мобилке */}
       <div className={`${isLandscape ? 'hidden' : ''}`}>
@@ -2247,11 +2104,6 @@ export default function VideoPage({ params }: VideoPageProps) {
       {/* Скрываем BottomNavigation в горизонтальном режиме */}
       {!isLandscape && <BottomNavigation activeTab="video" />}
 
-      {/* Виджет камеры с отслеживанием суставов */}
-      {poseTrackerOpen && videoId && (
-        <PoseTracker videoId={videoId} onClose={() => setPoseTrackerOpen(false)} />
-      )}
-      
       {/* Модалка прироста характеристик */}
       {showGainsModal && characteristicsGains && newCharacteristics && (
         <CharacteristicsGainModal
