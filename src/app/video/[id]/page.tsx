@@ -136,6 +136,21 @@ export default function VideoPage({ params }: VideoPageProps) {
   // Единый шит настроек (Режим + Качество) — вместо двух отдельных меню в панели
   const [showSettings, setShowSettings] = useState(false);
   const showSettingsRef = useRef(false); // зеркало для таймера автоскрытия контролов
+  // Микроанимация закрытия шита/поповера настроек: на время exit-анимации шит
+  // остаётся смонтированным с классом slideDown/fadeOut, размонтируется по таймеру.
+  const [settingsClosing, setSettingsClosing] = useState(false);
+  const settingsCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const SETTINGS_ANIM_MS = 300; // = длительность .animate-slideDown/.animate-fadeOut
+
+  const closeSettings = useCallback(() => {
+    if (!showSettingsRef.current || settingsCloseTimerRef.current) return; // уже закрыто/закрывается
+    setSettingsClosing(true);
+    settingsCloseTimerRef.current = setTimeout(() => {
+      settingsCloseTimerRef.current = null;
+      setShowSettings(false);
+      setSettingsClosing(false);
+    }, SETTINGS_ANIM_MS);
+  }, []);
   const canSeek = !fromWorkout && watchMode === 'view';
   const canSeekRef = useRef(false); // зеркало canSeek для хоткеев без stale-стейта
   // Завершение/зачёт — по РЕАЛЬНОМУ концу ролика: когда до конца осталось ≤ этого.
@@ -714,13 +729,13 @@ export default function VideoPage({ params }: VideoPageProps) {
   // открытия не закрыл шит сразу.
   useEffect(() => {
     if (!showSettings) return;
-    const close = () => setShowSettings(false);
+    const close = () => closeSettings();
     const t = setTimeout(() => document.addEventListener('click', close), 0);
     return () => {
       clearTimeout(t);
       document.removeEventListener('click', close);
     };
-  }, [showSettings]);
+  }, [showSettings, closeSettings]);
 
   // Пока шит настроек открыт — пиним контролы видимыми (таймер автоскрытия в
   // showControlsTemporarily проверяет showSettingsRef и не прячет их). После
@@ -1060,7 +1075,7 @@ export default function VideoPage({ params }: VideoPageProps) {
 
     setSelectedQuality(quality);
     setKinescopeDirectUrl(availableQualities[quality]);
-    setShowSettings(false);
+    closeSettings();
   };
 
   const formatTime = (time: number) => {
@@ -1111,6 +1126,9 @@ export default function VideoPage({ params }: VideoPageProps) {
       }
       if (rotateHintTimerRef.current) {
         clearTimeout(rotateHintTimerRef.current);
+      }
+      if (settingsCloseTimerRef.current) {
+        clearTimeout(settingsCloseTimerRef.current);
       }
     };
   }, []);
@@ -1299,7 +1317,7 @@ export default function VideoPage({ params }: VideoPageProps) {
               key={m.key}
               onClick={() => {
                 setWatchMode(m.key);
-                setShowSettings(false);
+                closeSettings();
                 showControlsTemporarily();
               }}
               className={`w-full text-left px-4 py-2.5 transition-colors ${
@@ -1859,7 +1877,8 @@ export default function VideoPage({ params }: VideoPageProps) {
                   <div className="relative" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => {
-                        setShowSettings(prev => !prev);
+                        if (showSettings) closeSettings();
+                        else setShowSettings(true);
                         showControlsTemporarily();
                       }}
                       className={`transition-opacity hover:opacity-80 p-2 ${showSettings ? 'text-[#A1FF4A]' : 'text-white'}`}
@@ -1872,7 +1891,9 @@ export default function VideoPage({ params }: VideoPageProps) {
                     {/* Ландшафт: компактный поповер над кнопкой */}
                     {showSettings && isLandscape && (
                       <div
-                        className="absolute bottom-full mb-2 right-0 bg-black/90 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden shadow-2xl w-64 max-h-[60vh] overflow-y-auto z-50"
+                        className={`absolute bottom-full mb-2 right-0 bg-black/90 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden shadow-2xl w-64 max-h-[60vh] overflow-y-auto z-50 origin-bottom-right ${
+                          settingsClosing ? 'animate-fadeOut' : 'animate-popIn'
+                        }`}
                         onClick={(e) => e.stopPropagation()}
                       >
                         {settingsSections}
@@ -1923,7 +1944,9 @@ export default function VideoPage({ params }: VideoPageProps) {
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div
-                    className="bg-[#101530] border-t border-white/10 rounded-t-2xl shadow-2xl"
+                    className={`bg-[#101530] border-t border-white/10 rounded-t-2xl shadow-2xl ${
+                      settingsClosing ? 'animate-slideDown' : 'animate-slideUp'
+                    }`}
                     style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }}
                   >
                     {/* Граббер шита */}
