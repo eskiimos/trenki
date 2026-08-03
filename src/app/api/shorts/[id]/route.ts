@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminAsync } from '@/lib/admin-session';
 import { getSessionUserId } from '@/lib/auth-server';
+import { rateLimit } from '@/lib/coach/rate-limit';
 
 // GET - получить short по ID (публичное, isLiked при наличии сессии)
 export async function GET(
@@ -119,6 +120,19 @@ export async function PATCH(
     const body = await request.json();
 
     if (body.action === 'incrementViews') {
+      // Дедуп накрутки: один «просмотр» шортса на зрителя (сессия или IP) в
+      // 6 часов. In-memory limiter обнуляется при деплое — для счётчика
+      // просмотров это приемлемо. При превышении отвечаем success без
+      // инкремента: клиенту не нужно знать/падать.
+      const viewerId =
+        (await getSessionUserId(request)) ||
+        request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+        'unknown';
+      const rl = rateLimit(`short-view:${viewerId}:${id}`, 1, 6 * 60 * 60 * 1000);
+      if (!rl.ok) {
+        return NextResponse.json({ success: true, deduped: true });
+      }
+
       const short = await prisma.short.update({
         where: { id },
         data: {
@@ -128,9 +142,9 @@ export async function PATCH(
         },
       });
 
-      return NextResponse.json({ 
+      return NextResponse.json({
         success: true,
-        viewsCount: short.viewsCount 
+        viewsCount: short.viewsCount
       });
     }
 

@@ -3,8 +3,8 @@
 import React, { useState, useEffect, Suspense, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getTelegramId } from '@/lib/auth';
 import { ShortsPlayer } from '@/components/ShortsPlayer';
+import Toast from '@/components/Toast';
 
 // Swiper
 import { Swiper, SwiperSlide } from 'swiper/react';
@@ -46,20 +46,18 @@ const ShortsContent = () => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const swiperRef = useRef<SwiperType | null>(null);
-  
-  const userId = getTelegramId();
+
+  // userId в query больше не передаём: сервер берёт пользователя из httpOnly-
+  // cookie сессии (isLiked и т.п.), query-параметр он игнорировал.
 
   // Загрузка начальных shorts
   useEffect(() => {
     const loadShorts = async () => {
       try {
         setIsLoading(true);
-        const url = userId 
-          ? `/api/shorts?userId=${userId}`
-          : '/api/shorts';
-        
-        const response = await fetch(url);
+        const response = await fetch('/api/shorts');
         if (response.ok) {
           const data = await response.json();
           const loadedShorts = data.shorts || [];
@@ -79,7 +77,7 @@ const ShortsContent = () => {
       }
     };
     loadShorts();
-  }, [userId, startIndex]);
+  }, [startIndex]);
 
   // Загрузка рекомендаций при приближении к концу
   const loadRecommendations = useCallback(async () => {
@@ -92,10 +90,6 @@ const ShortsContent = () => {
         limit: '10',
         offset: '0'
       });
-
-      if (userId) {
-        params.append('userId', userId);
-      }
 
       excludeIds.forEach(id => {
         params.append('exclude', id);
@@ -116,7 +110,7 @@ const ShortsContent = () => {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [userId, watchedIds, isLoadingMore, shorts.length]);
+  }, [watchedIds, isLoadingMore, shorts.length]);
 
   // Текущий short
   const currentShort = shorts[currentIndex];
@@ -202,10 +196,13 @@ const ShortsContent = () => {
         });
       } else if (navigator.clipboard) {
         await navigator.clipboard.writeText(shareUrl);
-        alert('Ссылка скопирована!');
+        setToast({ message: 'Ссылка скопирована', type: 'success' });
       }
     } catch (error) {
-      console.log('Share error:', error);
+      // Отмена share-шита пользователем — не ошибка
+      if ((error as Error)?.name !== 'AbortError') {
+        console.log('Share error:', error);
+      }
     }
   };
 
@@ -306,6 +303,10 @@ const ShortsContent = () => {
           «Загрузка рекомендаций») убраны по UI-ревью 2026-07-31: лента бесконечная,
           знаменатель рос при подгрузке и счётчики врали; подгрузка бесшовная и не
           требует индикации. */}
+
+      {toast && (
+        <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
+      )}
     </div>
   );
 };

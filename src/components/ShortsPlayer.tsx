@@ -36,6 +36,14 @@ interface ShortsPlayerProps {
   isActive?: boolean;
 }
 
+// Выбор звука на сессию ленты (модульные переменные переживают смену слайдов,
+// сбрасываются при перезагрузке страницы — когда жеста ещё нет и unmute всё
+// равно запрещён браузером).
+// feedSoundEnabled — включать ли звук автоматически на новых слайдах.
+// feedSoundTouched — трогал ли пользователь звук вообще (убирает плашку-приглашение).
+let feedSoundEnabled = false;
+let feedSoundTouched = false;
+
 export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
   short,
   onLike,
@@ -84,8 +92,10 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
     if (!video) return;
 
     if (isActive) {
-      // Слайд стал активным - запускаем воспроизведение
-      // Сначала с muted (для надёжного autoplay), потом включаем звук
+      // Слайд стал активным — запускаем воспроизведение с muted (надёжный
+      // autoplay). Звук включаем ТОЛЬКО если пользователь уже включал его в
+      // этой сессии ленты: программный unmute без жеста iOS Safari может
+      // остановить воспроизведение («видео само встало на паузу»).
       video.muted = true;
       const playPromise = video.play();
       if (playPromise) {
@@ -93,8 +103,10 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
           // Проверяем ещё раз — пока промис resolve, слайд мог стать неактивным
           if (!isActiveRef.current) return;
           setIsPlaying(true);
-          video.muted = false;
-          setIsMuted(false);
+          if (feedSoundEnabled) {
+            video.muted = false;
+            setIsMuted(false);
+          }
         }).catch(() => {
           // Autoplay заблокирован — оставляем muted
           setIsPlaying(false);
@@ -164,7 +176,8 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
         return;
       }
       
-      // Сначала запускаем с muted для гарантированного автовоспроизведения
+      // Сначала запускаем с muted для гарантированного автовоспроизведения.
+      // Unmute — только если звук уже включали в этой сессии (см. коммент выше).
       video.muted = true;
       video.play().then(() => {
         // Проверяем что слайд всё ещё активен
@@ -174,8 +187,10 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
           return;
         }
         setIsPlaying(true);
-        video.muted = false;
-        setIsMuted(false);
+        if (feedSoundEnabled) {
+          video.muted = false;
+          setIsMuted(false);
+        }
       }).catch(err => {
         console.log('Autoplay blocked:', err);
         setIsPlaying(false);
@@ -242,14 +257,19 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
     }
   };
 
-  // Включить/выключить звук
+  // Включить/выключить звук. Запоминаем выбор на сессию ленты: следующие
+  // слайды стартуют сразу с этим звуком (unmute после жеста браузеры позволяют).
+  const [soundTouched, setSoundTouched] = useState(feedSoundTouched);
   const toggleMute = (e: React.MouseEvent) => {
     e.stopPropagation();
     const video = videoRef.current;
     if (!video) return;
-    
+
     video.muted = !video.muted;
     setIsMuted(video.muted);
+    feedSoundEnabled = !video.muted;
+    feedSoundTouched = true;
+    setSoundTouched(true);
   };
 
   return (
@@ -261,9 +281,15 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
       <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center justify-between"
         style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
       >
-        <button 
-          onClick={() => router.back()}
+        <button
+          onClick={() => {
+            // Прямой заход по шаренной ссылке: истории нет — back() молча не
+            // сработал бы. Уводим в каталог треньков.
+            if (window.history.length > 1) router.back();
+            else router.push('/shorts-catalog');
+          }}
           className="w-10 h-10 flex items-center justify-center bg-black/30 rounded-full"
+          aria-label="Назад"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M15 18L9 12L15 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -291,6 +317,23 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
           <div className="absolute inset-0 flex items-center justify-center bg-black/50">
             <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
           </div>
+        )}
+
+        {/* Приглашение включить звук: лента стартует muted (браузерная политика
+            автоплея), и без подсказки пользователь не понимает, что звук есть.
+            Показываем, пока звук ни разу не трогали в этой сессии ленты. */}
+        {isActive && isMuted && !soundTouched && !isLoading && (
+          <button
+            onClick={toggleMute}
+            className="absolute left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-full px-4 py-2 active:scale-95 transition-transform"
+            style={{ top: 'calc(max(1rem, env(safe-area-inset-top)) + 56px)' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </svg>
+            <span className="text-white text-xs font-bold">Смотреть со звуком</span>
+          </button>
         )}
 
         {/* Play/Pause Icon */}
