@@ -302,33 +302,10 @@ const ShortsContent = () => {
         ))}
       </Swiper>
 
-      {/* Полоска прогресса */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-white/20 z-50 pointer-events-none">
-        <div 
-          className="h-full bg-white transition-all duration-300"
-          style={{ width: `${((currentIndex + 1) / shorts.length) * 100}%` }}
-        />
-      </div>
-
-      {/* Индикатор позиции */}
-      <div className="absolute bottom-4 right-4 z-40 text-white text-xs bg-black/50 px-3 py-1.5 rounded-full pointer-events-none">
-        <div className="flex items-center gap-2">
-          <span>{currentIndex + 1} / {shorts.length}</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 5V19M19 12L12 5M5 12L12 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </div>
-      </div>
-
-      {/* Индикатор загрузки рекомендаций */}
-      {isLoadingMore && (
-        <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-40 pointer-events-none">
-          <div className="flex items-center gap-2 text-white text-xs bg-black/50 px-3 py-2 rounded-full">
-            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-            <span>Загрузка рекомендаций...</span>
-          </div>
-        </div>
-      )}
+      {/* Служебные индикаторы (позиция «N / M», полоса прогресса ленты, плашка
+          «Загрузка рекомендаций») убраны по UI-ревью 2026-07-31: лента бесконечная,
+          знаменатель рос при подгрузке и счётчики врали; подгрузка бесшовная и не
+          требует индикации. */}
     </div>
   );
 };
