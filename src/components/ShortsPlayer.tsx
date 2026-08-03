@@ -30,11 +30,16 @@ interface ShortData {
 interface ShortsPlayerProps {
   short: ShortData;
   onLike: () => void;
-  onComment: () => void;
+  /** Страница /shorts/[id]: своя модалка комментариев (fallback, если нет onOpenSheet) */
+  onComment?: () => void;
+  /** Лента /shorts: единый шит «описание + комментарии» (кнопка комментариев и тап по описанию) */
+  onOpenSheet?: () => void;
   onShare: () => void;
   canSwipeUp?: boolean;
   canSwipeDown?: boolean;
   isActive?: boolean;
+  /** Свёрнутая карточка над шитом: скрыть рейл, инфо-блок, кнопку «Назад» и плашку звука */
+  compact?: boolean;
 }
 
 // Выбор звука на сессию ленты (модульные переменные переживают смену слайдов,
@@ -49,22 +54,27 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
   short,
   onLike,
   onComment,
+  onOpenSheet,
   onShare,
   canSwipeUp = false,
   canSwipeDown = false,
   isActive = true,
+  compact = false,
 }) => {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // Ref для актуального значения isActive в обработчиках событий (избегаем stale closure)
   const isActiveRef = useRef(isActive);
-  
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true); // Начинаем с muted для автовоспроизведения
-  const [showDescription, setShowDescription] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [videoUrl, setVideoUrl] = useState<string>('');
+
+  // Комментарии/описание: в ленте открывают шит (onOpenSheet), на странице
+  // /shorts/[id] — старую модалку комментариев (onComment).
+  const openComments = onOpenSheet ?? onComment;
 
   // Оптимистичный лайк: сердце/счётчик реагируют на тап МГНОВЕННО, не завися от
   // virtual-кэша Swiper и от того, успел ли родитель обновить массив. Ресид при
@@ -323,22 +333,24 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
       className="relative w-full h-full bg-black flex flex-col"
     >
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center justify-between"
-        style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
-      >
-        <button
-          onClick={() => {
-            // Прямой заход по шаренной ссылке: истории нет — back() молча не
-            // сработал бы. Уводим в каталог треньков.
-            if (window.history.length > 1) router.back();
-            else router.push('/shorts-catalog');
-          }}
-          className="w-10 h-10 flex items-center justify-center bg-black/30 rounded-full"
-          aria-label="Назад"
+      {!compact && (
+        <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center justify-between"
+          style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
         >
-          <ChevronLeft size={24} className="text-white" />
-        </button>
-      </div>
+          <button
+            onClick={() => {
+              // Прямой заход по шаренной ссылке: истории нет — back() молча не
+              // сработал бы. Уводим в каталог треньков.
+              if (window.history.length > 1) router.back();
+              else router.push('/shorts-catalog');
+            }}
+            className="w-10 h-10 flex items-center justify-center bg-black/30 rounded-full"
+            aria-label="Назад"
+          >
+            <ChevronLeft size={24} className="text-white" />
+          </button>
+        </div>
+      )}
 
       {/* Video Container - полноэкранный */}
       <div
@@ -365,7 +377,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
         {/* Приглашение включить звук: лента стартует muted (браузерная политика
             автоплея), и без подсказки пользователь не понимает, что звук есть.
             Показываем, пока звук ни разу не трогали в этой сессии ленты. */}
-        {isActive && isMuted && !soundTouched && !isLoading && (
+        {isActive && isMuted && !soundTouched && !isLoading && !compact && (
           <button
             onClick={toggleMute}
             className="absolute left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-full px-4 py-2 active:scale-95 transition-transform"
@@ -393,6 +405,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
         )}
 
         {/* Right Side Actions */}
+        {!compact && (
         <div className="absolute right-4 bottom-32 flex flex-col items-center space-y-4 z-10">
           {/* Mute/Unmute */}
           <button onClick={toggleMute} className="flex flex-col items-center" aria-label={isMuted ? 'Включить звук' : 'Выключить звук'}>
@@ -416,7 +429,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
           </button>
 
           {/* Comments */}
-          <button onClick={(e) => { e.stopPropagation(); onComment(); }} className="flex flex-col items-center" aria-label="Комментарии">
+          <button onClick={(e) => { e.stopPropagation(); openComments?.(); }} className="flex flex-col items-center" aria-label="Комментарии">
             <div className="w-12 h-12 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center active:scale-90 transition-transform">
               <MessageCircle size={24} className="text-white" />
             </div>
@@ -430,8 +443,10 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
             </div>
           </button>
         </div>
+        )}
 
         {/* Bottom Info */}
+        {!compact && (
         <div className="absolute bottom-4 left-4 right-20 z-10">
           {/* Trainer */}
           {short.trainer && (
@@ -458,23 +473,28 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
           {/* Title */}
           <p className="text-white text-sm font-medium mb-1 drop-shadow-lg">{short.title}</p>
 
-          {/* Description */}
+          {/* Description — тап открывает шит с полным описанием и комментариями
+              (вместо прежнего инлайн-разворачивания) */}
           {short.description && (
             <div>
-              <p className={`text-white/80 text-xs drop-shadow-lg ${showDescription ? '' : 'line-clamp-2'}`}>
+              <p
+                onClick={(e) => { e.stopPropagation(); openComments?.(); }}
+                className="text-white/80 text-xs drop-shadow-lg line-clamp-2 cursor-pointer"
+              >
                 {short.description}
               </p>
               {short.description.length > 80 && (
-                <button 
-                  onClick={(e) => { e.stopPropagation(); setShowDescription(!showDescription); }}
+                <button
+                  onClick={(e) => { e.stopPropagation(); openComments?.(); }}
                   className="text-white/60 text-xs mt-1"
                 >
-                  {showDescription ? 'Свернуть' : 'Ещё'}
+                  Ещё
                 </button>
               )}
             </div>
           )}
         </div>
+        )}
 
         {/* Прогресс текущего видео — тонкая линия у нижней кромки (вместо
             убранных «прогресса ленты» и счётчика N/M: показывает реально
