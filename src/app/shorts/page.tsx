@@ -234,7 +234,7 @@ const ShortsContent = () => {
     return (
       <div className="fixed inset-0 bg-black flex items-center justify-center">
         <div className="text-white text-center">
-          <p className="text-xl mb-4">Shorts пока нет</p>
+          <p className="text-xl mb-4">Треньков пока нет</p>
           <Link href="/" className="text-blue-400 hover:text-blue-300">
             Вернуться на главную
           </Link>

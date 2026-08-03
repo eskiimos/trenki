@@ -3,7 +3,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { ChevronLeft, Play } from 'lucide-react';
 import BottomNavigation from '@/components/BottomNavigation';
+
+// «12 400 → 12,4 тыс.» — компактный счётчик просмотров на тайле
+const formatViews = (n: number): string =>
+  n >= 1000 ? `${(n / 1000).toFixed(1).replace('.', ',').replace(',0', '')} тыс.` : String(n);
 
 interface ShortData {
   id: string;
@@ -117,27 +122,20 @@ export default function ShortsCatalogPage() {
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
       >
         <div className="flex items-center gap-2">
-          <Link href="/" className="inline-block">
+          <Link href="/" className="inline-block" aria-label="Назад">
             <div className="w-10 h-10 flex items-center justify-center">
-              <Image 
-                src="/icons/icon-action-back.svg" 
-                alt="Назад" 
-                width={24} 
-                height={24}
-              />
+              <ChevronLeft size={24} className="text-white" />
             </div>
           </Link>
-          <h1 
+          <h1
             className="text-white font-bold uppercase"
-            style={{ 
-              fontFamily: 'Overpass', 
-              fontSize: '13px', 
-              letterSpacing: '0.5px' 
+            style={{
+              fontFamily: 'Overpass',
+              fontSize: '13px',
+              letterSpacing: '0.5px'
             }}
           >
-            Треньки {!isLoading && allShorts.length > 0 && (
-              <span className="text-white/60 font-normal ml-1">({allShorts.length})</span>
-            )}
+            Треньки
           </h1>
         </div>
       </div>
@@ -172,7 +170,7 @@ export default function ShortsCatalogPage() {
                   <div className="relative aspect-[9/16] bg-gray-800 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity">
                     {/* Thumbnail */}
                     {short.thumbnail ? (
-                      <Image 
+                      <Image
                         src={short.thumbnail}
                         alt={short.title}
                         fill
@@ -183,6 +181,14 @@ export default function ShortsCatalogPage() {
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-[#445CFF] to-[#2d3e8f]" />
                     )}
+                    {/* Просмотры поверх превью — градиент снизу для читаемости */}
+                    <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/70 to-transparent pointer-events-none" />
+                    <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 pointer-events-none">
+                      <Play size={11} className="text-white" fill="currentColor" />
+                      <span className="text-white text-[11px] font-medium drop-shadow">
+                        {formatViews(short.viewsCount)}
+                      </span>
+                    </div>
                   </div>
                 </Link>
               ))}

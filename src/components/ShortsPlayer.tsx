@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { ChevronLeft, Play, Heart, MessageCircle, Share2, Volume2, VolumeX } from 'lucide-react';
 import { isKinescopeUrl, getKinescopeDirectUrl } from '@/lib/videoQuality';
 
 interface ShortData {
@@ -80,6 +81,40 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
     setLikesLocal((c) => c + (likedLocal ? -1 : 1));
     onLike();
   };
+
+  // Double-tap по видео = лайк (привычка TikTok/Instagram). Всегда только
+  // СТАВИТ лайк (снять — кнопкой), плюс сердце по центру. Одиночный тап —
+  // пауза, с задержкой для развода жестов.
+  const [heartBurst, setHeartBurst] = useState(false);
+  const heartBurstTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const singleTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const doubleTapLike = () => {
+    if (!likedLocal) {
+      setLikedLocal(true);
+      setLikesLocal((c) => c + 1);
+      onLike();
+    }
+    setHeartBurst(true);
+    if (heartBurstTimerRef.current) clearTimeout(heartBurstTimerRef.current);
+    heartBurstTimerRef.current = setTimeout(() => setHeartBurst(false), 600);
+  };
+  const handleVideoTap = () => {
+    if (singleTapTimerRef.current) {
+      // Второй тап в окне — это double-tap: лайк, паузу не трогаем
+      clearTimeout(singleTapTimerRef.current);
+      singleTapTimerRef.current = null;
+      doubleTapLike();
+      return;
+    }
+    singleTapTimerRef.current = setTimeout(() => {
+      singleTapTimerRef.current = null;
+      togglePlay();
+    }, 260);
+  };
+  useEffect(() => () => {
+    if (heartBurstTimerRef.current) clearTimeout(heartBurstTimerRef.current);
+    if (singleTapTimerRef.current) clearTimeout(singleTapTimerRef.current);
+  }, []);
 
   // Синхронизируем ref с актуальным значением
   useEffect(() => {
@@ -159,12 +194,17 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
   }, [short.videoUrl, short.id]);
 
   // Воспроизведение видео когда URL готов
+  // Прогресс текущего видео (0..1) — питает тонкую линию у нижней кромки.
+  // timeupdate стреляет ~4 раза/с — для 2px-линии этого достаточно.
+  const [progress, setProgress] = useState(0);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !videoUrl) return;
 
     setIsLoading(true);
     setIsPlaying(false);
+    setProgress(0);
 
     const handleCanPlay = () => {
       setIsLoading(false);
@@ -219,6 +259,10 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
       console.error('Video error:', e, 'URL:', videoUrl);
       setIsLoading(false);
     };
+    const handleTimeUpdate = () => {
+      if (video.duration > 0) setProgress(video.currentTime / video.duration);
+    };
+    video.addEventListener('timeupdate', handleTimeUpdate);
 
     video.addEventListener('canplay', handleCanPlay);
     video.addEventListener('waiting', handleWaiting);
@@ -232,6 +276,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
     video.load();
 
     return () => {
+      video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('canplay', handleCanPlay);
       video.removeEventListener('waiting', handleWaiting);
       video.removeEventListener('playing', handlePlaying);
@@ -291,16 +336,14 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
           className="w-10 h-10 flex items-center justify-center bg-black/30 rounded-full"
           aria-label="Назад"
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M15 18L9 12L15 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <ChevronLeft size={24} className="text-white" />
         </button>
       </div>
 
       {/* Video Container - полноэкранный */}
-      <div 
+      <div
         className="absolute inset-0"
-        onClick={togglePlay}
+        onClick={handleVideoTap}
       >
         <video
           ref={videoRef}
@@ -328,10 +371,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
             className="absolute left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-full px-4 py-2 active:scale-95 transition-transform"
             style={{ top: 'calc(max(1rem, env(safe-area-inset-top)) + 56px)' }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
-            </svg>
+            <Volume2 size={16} className="text-white" />
             <span className="text-white text-xs font-bold">Смотреть со звуком</span>
           </button>
         )}
@@ -340,63 +380,53 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
         {!isPlaying && !isLoading && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="w-16 h-16 bg-black/50 rounded-full flex items-center justify-center">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
-                <path d="M8 5v14l11-7z"/>
-              </svg>
+              <Play size={32} className="text-white ml-1" fill="currentColor" />
             </div>
+          </div>
+        )}
+
+        {/* Сердце double-tap лайка */}
+        {heartBurst && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+            <Heart size={88} className="text-[#ff2d55] animate-popIn drop-shadow-lg" fill="currentColor" />
           </div>
         )}
 
         {/* Right Side Actions */}
         <div className="absolute right-4 bottom-32 flex flex-col items-center space-y-4 z-10">
           {/* Mute/Unmute */}
-          <button onClick={toggleMute} className="flex flex-col items-center">
+          <button onClick={toggleMute} className="flex flex-col items-center" aria-label={isMuted ? 'Включить звук' : 'Выключить звук'}>
             <div className="w-12 h-12 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center active:scale-90 transition-transform">
-              {isMuted ? (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                  <line x1="23" y1="9" x2="17" y2="15"/>
-                  <line x1="17" y1="9" x2="23" y2="15"/>
-                </svg>
-              ) : (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
-                </svg>
-              )}
+              {isMuted
+                ? <VolumeX size={24} className="text-white" />
+                : <Volume2 size={24} className="text-white" />}
             </div>
           </button>
 
           {/* Like */}
-          <button onClick={handleLikeTap} className="flex flex-col items-center">
+          <button onClick={handleLikeTap} className="flex flex-col items-center" aria-label="Лайк">
             <div className="w-12 h-12 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center active:scale-90 transition-transform">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill={likedLocal ? "#ff2d55" : "none"} stroke={likedLocal ? "#ff2d55" : "white"} strokeWidth="2">
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-              </svg>
+              <Heart
+                size={24}
+                className={likedLocal ? 'text-[#ff2d55]' : 'text-white'}
+                fill={likedLocal ? 'currentColor' : 'none'}
+              />
             </div>
             <span className="text-white text-xs mt-1">{likesLocal}</span>
           </button>
 
           {/* Comments */}
-          <button onClick={(e) => { e.stopPropagation(); onComment(); }} className="flex flex-col items-center">
+          <button onClick={(e) => { e.stopPropagation(); onComment(); }} className="flex flex-col items-center" aria-label="Комментарии">
             <div className="w-12 h-12 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center active:scale-90 transition-transform">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-              </svg>
+              <MessageCircle size={24} className="text-white" />
             </div>
             <span className="text-white text-xs mt-1">{short.commentsCount || 0}</span>
           </button>
 
           {/* Share */}
-          <button onClick={(e) => { e.stopPropagation(); onShare(); }} className="flex flex-col items-center">
+          <button onClick={(e) => { e.stopPropagation(); onShare(); }} className="flex flex-col items-center" aria-label="Поделиться">
             <div className="w-12 h-12 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center active:scale-90 transition-transform">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                <circle cx="18" cy="5" r="3"/>
-                <circle cx="6" cy="12" r="3"/>
-                <circle cx="18" cy="19" r="3"/>
-                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-              </svg>
+              <Share2 size={24} className="text-white" />
             </div>
           </button>
         </div>
@@ -444,6 +474,16 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
               )}
             </div>
           )}
+        </div>
+
+        {/* Прогресс текущего видео — тонкая линия у нижней кромки (вместо
+            убранных «прогресса ленты» и счётчика N/M: показывает реально
+            полезное — сколько осталось в этом ролике). */}
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/15 z-10 pointer-events-none">
+          <div
+            className="h-full bg-white/80"
+            style={{ width: `${Math.min(100, progress * 100)}%` }}
+          />
         </div>
       </div>
     </div>
