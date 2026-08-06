@@ -377,6 +377,12 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
           preload={isActive ? 'auto' : 'metadata'}
         />
 
+        {/* Градиенты-виньетки для читаемости поверх видео (как в TikTok/
+            Instagram): снизу повыше — под инфо-блок и рейл, сверху пониже —
+            под кнопку «Назад» и статусбар. */}
+        <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-black/45 to-transparent pointer-events-none" />
+        <div className="absolute bottom-0 left-0 right-0 h-44 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
+
         {/* Loading Spinner */}
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/50">
