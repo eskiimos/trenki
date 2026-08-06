@@ -457,3 +457,11 @@ body:has(.admin-layout) .mobile-container {
 .video-scrubber:focus {
   outline: none;
 }
+
+/* Свёрнутая карточка шортса над Instagram-шитом: прячем хром плеера (рейл,
+   хедер, инфо, плашку звука) CSS-ом от родителя. Проп compact ненадёжен —
+   Swiper Virtual кэширует слайды и пропсы могут не доехать (та же причина,
+   по которой лайк в ShortsPlayer живёт на локальном стейте). */
+.shorts-compact .shorts-chrome {
+  display: none !important;
+}

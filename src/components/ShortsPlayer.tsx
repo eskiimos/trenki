@@ -334,7 +334,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
     >
       {/* Header */}
       {!compact && (
-        <div className="absolute top-0 left-0 right-0 z-20 p-4 flex items-center justify-between"
+        <div className="shorts-chrome absolute top-0 left-0 right-0 z-20 p-4 flex items-center justify-between"
           style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
         >
           <button
@@ -380,7 +380,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
         {isActive && isMuted && !soundTouched && !isLoading && !compact && (
           <button
             onClick={toggleMute}
-            className="absolute left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-full px-4 py-2 active:scale-95 transition-transform"
+            className="shorts-chrome absolute left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-full px-4 py-2 active:scale-95 transition-transform"
             style={{ top: 'calc(max(1rem, env(safe-area-inset-top)) + 56px)' }}
           >
             <Volume2 size={16} className="text-white" />
@@ -406,7 +406,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
 
         {/* Right Side Actions */}
         {!compact && (
-        <div className="absolute right-4 bottom-32 flex flex-col items-center space-y-4 z-10">
+        <div className="shorts-chrome absolute right-4 bottom-32 flex flex-col items-center space-y-4 z-10">
           {/* Mute/Unmute */}
           <button onClick={toggleMute} className="flex flex-col items-center" aria-label={isMuted ? 'Включить звук' : 'Выключить звук'}>
             <div className="w-12 h-12 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center active:scale-90 transition-transform">
@@ -447,7 +447,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
 
         {/* Bottom Info */}
         {!compact && (
-        <div className="absolute bottom-4 left-4 right-20 z-10">
+        <div className="shorts-chrome absolute bottom-4 left-4 right-20 z-10">
           {/* Trainer */}
           {short.trainer && (
             <Link 

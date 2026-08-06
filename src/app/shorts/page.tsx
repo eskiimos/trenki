@@ -342,7 +342,7 @@ const ShortsContent = () => {
             (видео продолжает играть), при закрытии так же плавно растягивается
             обратно — transition по top/width/height/border-radius. */}
         <div
-          className="absolute overflow-hidden transition-all duration-300 ease-out"
+          className={`absolute overflow-hidden transition-all duration-300 ease-out ${sheetOpenVisual ? 'shorts-compact' : ''}`}
           style={sheetOpenVisual ? {
             top: 'calc(env(safe-area-inset-top, 0px) + 8px)',
             left: '50%',
