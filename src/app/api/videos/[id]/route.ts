@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireAdminAsync } from '@/lib/admin-session';
 import { gatePaidContent } from '@/lib/coach/guards';
 import { getFreeLessonVideoId } from '@/lib/settings';
+import { resolveVideoUrl } from '@/lib/s3';
 
 export async function GET(
   request: NextRequest,
@@ -61,7 +62,9 @@ export async function GET(
       return NextResponse.json({ error: 'Video not found' }, { status: 404 });
     }
 
-    return NextResponse.json(video);
+    // Файлы из собственного S3 хранятся как s3://<key> — резолвим в presigned
+    // GET (6 ч) только здесь, ПОСЛЕ paywall-гейта выше. Kinescope-URL — как есть.
+    return NextResponse.json({ ...video, videoUrl: await resolveVideoUrl(video.videoUrl) });
   } catch (error: any) {
     console.error('Error fetching video:', error);
     return NextResponse.json({ 

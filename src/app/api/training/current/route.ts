@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { WorkoutStatus, MicrocycleStatus } from '@/generated/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
 import { goalsFromStoredDays } from '@/lib/microcycle/week-plan';
+import { resolveVideoUrl } from '@/lib/s3';
 
 /**
  * GET /api/training/current[?workoutId=xxx]
@@ -129,7 +130,9 @@ export async function GET(request: NextRequest) {
         createdAt: workout.createdAt,
         trainingGoal,
         dayLabel,
-        modules: workout.videos.map((wsVideo) => ({
+        // s3://-видео резолвим в presigned GET (auth уже проверен requireAuthUser
+        // + ownership выше); Kinescope и прочие URL проходят как есть.
+        modules: await Promise.all(workout.videos.map(async (wsVideo) => ({
           id: wsVideo.video.id,
           sessionVideoId: wsVideo.id,
           title: wsVideo.video.title,
@@ -138,7 +141,7 @@ export async function GET(request: NextRequest) {
           loadType: wsVideo.video.loadType || null,
           duration: wsVideo.video.duration,
           rpeRange: `${wsVideo.video.rpeMin}-${wsVideo.video.rpeMax}`,
-          videoUrl: wsVideo.video.videoUrl,
+          videoUrl: await resolveVideoUrl(wsVideo.video.videoUrl),
           thumbnail: wsVideo.video.thumbnail,
           equipment: wsVideo.video.equipment || [],
           trainer: {
@@ -151,7 +154,7 @@ export async function GET(request: NextRequest) {
           startedAt: wsVideo.startedAt,
           completedAt: wsVideo.completedAt,
           watchedDuration: wsVideo.watchedDuration,
-        })),
+        }))),
       },
     });
   } catch (error) {

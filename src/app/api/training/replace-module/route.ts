@@ -21,6 +21,7 @@ import {
   createSearchCriteria,
 } from '@/lib/module-selection-v3';
 import { requireAuthUser } from '@/lib/coach/guards';
+import { resolveVideoUrl } from '@/lib/s3';
 
 // C-8: направление растяжки → группы мышц для подбора заминки (cooldown).
 // null → направление не задано, подбираем по цели (прежнее поведение/рандом).
@@ -320,7 +321,8 @@ export async function POST(request: NextRequest) {
           title: newModule.title,
           description: newModule.description,
           duration: newModule.duration,
-          videoUrl: newModule.videoUrl,
+          // s3://-видео → presigned GET (auth уже проверен requireAuthUser выше)
+          videoUrl: await resolveVideoUrl(newModule.videoUrl),
           thumbnail: newModule.thumbnail,
           moduleType: newModule.moduleType,
           trainer: newModule.trainer ? {

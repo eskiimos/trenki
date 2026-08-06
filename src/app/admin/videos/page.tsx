@@ -73,6 +73,7 @@ const AdminVideosPage = () => {
   const [activeTab, setActiveTab] = useState<'basic' | 'algorithm'>('basic');
   const [algorithmSubTab, setAlgorithmSubTab] = useState<'classification' | 'targeting'>('classification');
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [s3UploadProgress, setS3UploadProgress] = useState<number | null>(null);
 
   const getMissingAlgorithmFields = (video: Video) => {
     const missing: string[] = [];
@@ -464,6 +465,68 @@ const AdminVideosPage = () => {
       console.error('Video upload error:', error);
       alert(`Ошибка загрузки: ${error.message}`);
       setUploadProgress(null);
+    }
+
+    // Сбрасываем input
+    e.target.value = '';
+  };
+
+  // Загрузка видеофайла в собственное S3-хранилище (reg.ru): получаем presigned
+  // PUT у нашего сервера и грузим файл напрямую в бакет через XHR (с прогрессом).
+  // В поле videoUrl пишется внутренний URL вида s3://videos/<id>.mp4 — плеер
+  // получит подписанную ссылку от API при просмотре.
+  const handleS3FileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const contentType = file.type || 'video/mp4';
+
+    try {
+      setS3UploadProgress(0);
+
+      // Шаг 1: presigned PUT от нашего сервера
+      const initRes = await fetch('/api/admin/s3/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name, contentType }),
+      });
+      const init = await initRes.json().catch(() => ({}));
+      if (!initRes.ok) {
+        alert(`Ошибка подготовки загрузки: ${init.error || `HTTP ${initRes.status}`}`);
+        setS3UploadProgress(null);
+        return;
+      }
+      const { uploadUrl, videoUrl } = init;
+
+      // Шаг 2: PUT напрямую в S3. Content-Type обязан совпадать с подписанным.
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', uploadUrl);
+        xhr.setRequestHeader('Content-Type', contentType);
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setS3UploadProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error(`Upload failed: ${xhr.status} ${xhr.responseText}`));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Network error during upload'));
+        xhr.send(file);
+      });
+
+      // Шаг 3: записываем s3:// URL в форму
+      setFormData(prev => ({ ...prev, videoUrl }));
+      setS3UploadProgress(null);
+      alert('Файл загружен в хранилище');
+    } catch (error: any) {
+      console.error('S3 upload error:', error);
+      alert(`Ошибка загрузки в хранилище: ${error.message}`);
+      setS3UploadProgress(null);
     }
 
     // Сбрасываем input
@@ -1219,6 +1282,38 @@ const AdminVideosPage = () => {
                           </div>
                         </div>
                       )}
+                    </div>
+
+                    {/* Загрузка файла в собственное S3-хранилище (reg.ru) */}
+                    <div className="mt-2">
+                      <label
+                        htmlFor="s3FileUpload"
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${s3UploadProgress !== null ? 'bg-gray-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                      >
+                        ☁️ Загрузить файл в хранилище
+                      </label>
+                      <input
+                        id="s3FileUpload"
+                        type="file"
+                        accept="video/*"
+                        onChange={handleS3FileUpload}
+                        disabled={s3UploadProgress !== null}
+                        className="hidden"
+                      />
+                      {s3UploadProgress !== null && (
+                        <div className="mt-2">
+                          <div className="text-sm text-gray-400 mb-1">Загрузка в хранилище: {s3UploadProgress}%</div>
+                          <div className="w-full bg-gray-700 rounded-full h-2">
+                            <div
+                              className="bg-blue-500 h-2 rounded-full transition-all"
+                              style={{ width: `${s3UploadProgress}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                      <p className="text-xs text-gray-400 mt-1">
+                        💡 Файл зальётся в собственное S3, в поле URL запишется s3://-ссылка
+                      </p>
                     </div>
                   </div>
 
