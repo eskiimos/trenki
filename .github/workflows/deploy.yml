@@ -16,7 +16,11 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Тот же flock, что у серверного auto-deploy.sh (поллинг-крон):
+            # деплоеры не должны собирать образ одновременно.
             cd /home/trenki
+            exec 9>/tmp/trenki-deploy.lock
+            flock 9
             git pull origin main
             docker-compose -f docker-compose.production.yml --env-file .env.production up -d --build app
             docker image prune -f
