@@ -214,33 +214,39 @@ export default function AdminShortsPage() {
     }
   };
 
+  // Загрузка файла тренька в НАШЕ S3-хранилище (раньше лился в Kinescope, но
+  // ключ Kinescope не даёт прав на загрузку — 401). Шортсы — бесплатный контент,
+  // объект публичный, в videoUrl пишется прямой https-URL (плеер играет как есть).
+  // Вставка Kinescope-ссылки в поле URL по-прежнему работает.
   const handleVideoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const videoName = file.name.replace(/\.[^/.]+$/, '');
+    const contentType = file.type || 'video/mp4';
 
     try {
       setUploadProgress(0);
 
-      const initRes = await fetch('/api/kinescope/upload-init', {
+      const initRes = await fetch('/api/admin/s3/upload-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: videoName, filesize: file.size, filename: file.name }),
+        body: JSON.stringify({ fileName: file.name, contentType, kind: 'short' }),
       });
-
+      const init = await initRes.json().catch(() => ({}));
       if (!initRes.ok) {
-        const err = await initRes.json();
-        alert(`Ошибка инициализации загрузки: ${err.error}`);
+        alert(`Ошибка инициализации загрузки: ${init.error || `HTTP ${initRes.status}`}`);
         setUploadProgress(null);
         return;
       }
+      const { uploadUrl, videoUrl: publicUrl, acl } = init;
 
-      const { videoId, uploadUrl } = await initRes.json();
-
+      // PUT напрямую в S3: Content-Type и x-amz-acl обязаны совпадать с подписью
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', uploadUrl);
+        xhr.open('PUT', uploadUrl);
+        xhr.setRequestHeader('Content-Type', contentType);
+        if (acl) xhr.setRequestHeader('x-amz-acl', acl);
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
             setUploadProgress(Math.round((event.loaded / event.total) * 100));
@@ -254,25 +260,9 @@ export default function AdminShortsPage() {
         xhr.send(file);
       });
 
-      const kinescopeUrl = `https://kinescope.io/${videoId}`;
-      setVideoUrl(kinescopeUrl);
+      setVideoUrl(publicUrl);
+      if (!title) setTitle(videoName);
       setUploadProgress(null);
-
-      // Авто-загрузка метаданных
-      try {
-        const metaRes = await fetch('/api/kinescope/metadata', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ videoUrl: kinescopeUrl }),
-        });
-        if (metaRes.ok) {
-          const meta = await metaRes.json();
-          if (!title) setTitle(meta.title || videoName);
-          if (!thumbnail) setThumbnail(meta.thumbnail || '');
-        }
-      } catch {
-        // метаданные ещё могут не быть готовы сразу
-      }
 
       alert('Тренька успешно загружена');
     } catch (error: any) {

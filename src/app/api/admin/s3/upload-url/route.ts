@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const fileName = String(body?.fileName || '').trim();
     const contentType = String(body?.contentType || '').trim();
-    const kind = body?.kind === 'thumbnail' ? 'thumbnail' : 'video';
+    const kind = body?.kind === 'thumbnail' ? 'thumbnail' : body?.kind === 'short' ? 'short' : 'video';
 
     const expectedPrefix = kind === 'thumbnail' ? 'image/' : 'video/';
     if (!contentType.startsWith(expectedPrefix)) {
@@ -57,10 +57,13 @@ export async function POST(request: NextRequest) {
 
     // Ключ — случайный id (UUID), не имя файла: без коллизий и без утечки названий.
     const config = getS3Config()!;
-    if (kind === 'thumbnail') {
-      const key = `thumbnails/${crypto.randomUUID()}.${ext}`;
+    // Публичные объекты (прямой https-URL без TTL): превью — видны всем в
+    // каталоге; шортсы — бесплатный контент по продукту (paywall их не гейтит),
+    // а presigned-ссылки протухали бы в ленте.
+    if (kind === 'thumbnail' || kind === 'short') {
+      const prefix = kind === 'thumbnail' ? 'thumbnails' : 'shorts';
+      const key = `${prefix}/${crypto.randomUUID()}.${ext}`;
       const uploadUrl = await presignPutUrl(key, contentType, undefined, { acl: 'public-read' });
-      // Прямой публичный URL (path-style эндпоинта) — сразу в Video.thumbnail
       const publicUrl = `${config.endpoint.replace(/\/+$/, '')}/${config.bucket}/${key}`;
       return NextResponse.json({ uploadUrl, videoUrl: publicUrl, acl: 'public-read' });
     }
