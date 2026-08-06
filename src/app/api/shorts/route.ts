@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
     const shorts = await prisma.short.findMany({
       where: whereClause,
       orderBy: [
+        { isPinned: 'desc' }, // закреплённый тренёк — первым
         { order: 'asc' },
         { createdAt: 'desc' }
       ]

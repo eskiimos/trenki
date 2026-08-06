@@ -318,9 +318,11 @@ export default function WorkoutPage() {
           });
           setTimeout(() => router.push('/'), 3000);
         } else {
-          // Просто перенаправляем
           setToast({ message: '✨ Тренировка завершена!', type: 'success' });
-          setTimeout(() => router.push('/'), 2000);
+          // Сначала — предложение собрать цикл (если уместно), редирект только
+          // без него
+          const shown = await maybeOfferCycle();
+          if (!shown) setTimeout(() => router.push('/'), 2000);
         }
       } else {
         const errorData = await response.json();
@@ -342,9 +344,30 @@ export default function WorkoutPage() {
   };
   
   // Закрытие модалки прироста и переход на главную
+  // После первой быстрой тренировки предлагаем собрать микроцикл (август-
+  // правки). Раз на устройство (localStorage) и только если активного цикла
+  // нет — обладателю цикла напоминание не нужно.
+  const [showCycleOffer, setShowCycleOffer] = useState(false);
+  const maybeOfferCycle = async (): Promise<boolean> => {
+    try {
+      const KEY = 'trenki_cycle_offer_shown';
+      if (localStorage.getItem(KEY)) return false;
+      const res = await fetch('/api/microcycle/current');
+      const d = await res.json().catch(() => null);
+      if (d?.microcycle) return false; // цикл уже есть — не предлагаем
+      localStorage.setItem(KEY, '1');
+      setShowCycleOffer(true);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const handleGainsModalClose = () => {
     setShowGainsModal(false);
-    router.push('/');
+    maybeOfferCycle().then((shown) => {
+      if (!shown) router.push('/');
+    });
   };
 
   if (isLoading) {
@@ -1216,6 +1239,37 @@ export default function WorkoutPage() {
         />
       )}
       
+      {/* Предложение собрать микроцикл после первой быстрой тренировки */}
+      {showCycleOffer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/60" />
+          <div className="relative w-full max-w-sm rounded-xl bg-[#0B0F2A] p-5 text-left shadow-lg border border-[rgba(68,92,255,0.35)]">
+            <div className="text-white text-base font-semibold">Отличная работа! 💪</div>
+            <div className="mt-2 text-white/80 text-sm">
+              Ты всегда можешь собрать себе цикл на неделю во вкладке{' '}
+              <span className="text-[#A1FF4A] font-semibold">«Календарь»</span> — ИИ-тренер
+              распланирует 5 тренировок под тебя.
+            </div>
+            <div className="mt-4 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => router.push('/calendar')}
+                className="w-full rounded-lg bg-[#A1FF4A] px-3 py-2.5 text-sm font-semibold text-[#0B0F2A]"
+              >
+                Собрать неделю
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowCycleOffer(false); router.push('/'); }}
+                className="w-full rounded-lg border border-white/20 px-3 py-2.5 text-sm font-semibold text-white"
+              >
+                Окей
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast уведомления */}
       {toast && (
         <Toast

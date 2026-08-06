@@ -13,6 +13,7 @@ interface Short {
   trainerId?: string | null;
   tags: string[];
   isPublished: boolean;
+  isPinned?: boolean;
   viewsCount: number;
   order: number;
   createdAt: string;
@@ -130,6 +131,29 @@ export default function AdminShortsPage() {
     setAudience((short as any).audience || 'HOCKEY');
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Закрепить/открепить тренёк: точечный PUT { isPinned }, остальные поля
+  // роут не трогает. Закреплённый показывается первым в ленте /shorts.
+  // Поддерживается один закреплённый: перед закреплением нового старый
+  // открепляем вручную этим же тумблером.
+  const handleTogglePin = async (short: Short) => {
+    try {
+      const response = await fetch(`/api/shorts/${short.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPinned: !short.isPinned }),
+      });
+      if (response.ok) {
+        fetchShorts();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        alert(`Ошибка: ${errorData.error || 'Не удалось изменить закрепление'}`);
+      }
+    } catch (error) {
+      console.error('Error toggling pin:', error);
+      alert('Ошибка при закреплении');
+    }
   };
 
   const handleDeleteShort = async (id: string) => {
@@ -530,6 +554,11 @@ export default function AdminShortsPage() {
                       {/* Заголовок + статус */}
                       <div className="flex items-start justify-between gap-2">
                         <h3 className="font-semibold text-sm sm:text-base flex-1 min-w-0 truncate">{short.title}</h3>
+                        {short.isPinned && (
+                          <span className="px-1.5 py-0.5 rounded text-xs flex-shrink-0 bg-yellow-600" title="Закреплён первым в ленте">
+                            📌
+                          </span>
+                        )}
                         <span className={`px-1.5 py-0.5 rounded text-xs flex-shrink-0 ${short.isPublished ? 'bg-green-600' : 'bg-gray-600'}`}>
                           {short.isPublished ? 'Опубл.' : 'Черн.'}
                         </span>
@@ -557,6 +586,12 @@ export default function AdminShortsPage() {
                           className="flex-1 sm:flex-none px-2 sm:px-3 py-1 bg-blue-600 rounded hover:bg-blue-700 text-xs"
                         >
                           Редактировать
+                        </button>
+                        <button
+                          onClick={() => handleTogglePin(short)}
+                          className={`flex-1 sm:flex-none px-2 sm:px-3 py-1 rounded text-xs ${short.isPinned ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-gray-600 hover:bg-gray-500'}`}
+                        >
+                          {short.isPinned ? '📌 Открепить' : '📌 Закрепить'}
                         </button>
                         <button
                           onClick={() => handleDeleteShort(short.id)}

@@ -63,6 +63,9 @@ export async function PUT(
     const { id } = await context.params;
     const body = await request.json();
 
+    // Частичное обновление: отсутствующие поля не трогаем (undefined для Prisma
+    // = «оставить как есть»). Это позволяет админке слать точечные правки,
+    // например { isPinned } из тумблера закрепления, не затирая теги/тренера.
     const short = await prisma.short.update({
       where: { id },
       data: {
@@ -70,10 +73,11 @@ export async function PUT(
         description: body.description,
         videoUrl: body.videoUrl,
         thumbnail: body.thumbnail,
-        trainerId: body.trainerId || null,
-        tags: body.tags || [],
-        isPublished: body.isPublished,
-        order: body.order,
+        trainerId: body.trainerId !== undefined ? (body.trainerId || null) : undefined,
+        tags: Array.isArray(body.tags) ? body.tags : undefined,
+        isPublished: typeof body.isPublished === 'boolean' ? body.isPublished : undefined,
+        isPinned: typeof body.isPinned === 'boolean' ? body.isPinned : undefined,
+        order: typeof body.order === 'number' ? body.order : undefined,
         audience: body.audience || undefined,
       },
     });
