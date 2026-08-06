@@ -19,13 +19,10 @@ interface FormData {
   gameDifficulty: string;
 }
 
-type TrainingGoal = 'power' | 'speed' | 'endurance' | 'technique' | 'flexibility' | 'all';
-
 export default function CharacteristicsOnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedGoals, setSelectedGoals] = useState<TrainingGoal[]>([]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   
   const [formData, setFormData] = useState<FormData>({
@@ -48,24 +45,6 @@ export default function CharacteristicsOnboardingPage() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const toggleGoal = (goal: TrainingGoal) => {
-    if (goal === 'all') {
-      // Если выбрано "все и сразу", очищаем остальные и добавляем только 'all'
-      setSelectedGoals(['all']);
-    } else {
-      setSelectedGoals(prev => {
-        // Убираем 'all' если он был выбран
-        const withoutAll = prev.filter(g => g !== 'all');
-        // Переключаем выбранную цель
-        if (withoutAll.includes(goal)) {
-          return withoutAll.filter(g => g !== goal);
-        } else {
-          return [...withoutAll, goal];
-        }
-      });
-    }
-  };
-
   const handleSubmit = async () => {
     setIsSubmitting(true);
 
@@ -73,10 +52,10 @@ export default function CharacteristicsOnboardingPage() {
       const response = await fetch('/api/profile/characteristics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          trainingGoals: selectedGoals,
-        }),
+        // Шаг «куда направим щелчок» убран (август-правки): его ответ
+        // (trainingGoals) сервер и раньше игнорировал — цель юзер выбирает
+        // перед каждой тренировкой в assessment.
+        body: JSON.stringify(formData),
       });
 
       const data = await response.json();
@@ -102,7 +81,7 @@ export default function CharacteristicsOnboardingPage() {
   };
 
   const nextStep = () => {
-    if (step < 3) setStep(step + 1);
+    if (step < 2) setStep(step + 1);
   };
 
   const prevStep = () => {
@@ -400,52 +379,10 @@ export default function CharacteristicsOnboardingPage() {
         )}
 
         {/* Шаг 3: Выбор целей */}
-        {step === 3 && (
-          <>
-            <div className="pb-3 flex flex-col gap-2 mb-6">
-              <h1 className="text-center text-slate-50 text-base font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
-                куда направим наш "щелчок"?
-              </h1>
-              <p className="text-center text-gray-400 text-xs font-medium font-['Overpass'] leading-3 tracking-wide">
-                Выбери, что хочешь прокачать в первую очередь. Не можешь выбрать — жми «Всё и сразу»!
-              </p>
-            </div>
-
-            <div className="px-4 py-6 flex flex-col gap-8">
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { value: 'power' as TrainingGoal, label: 'стать сильнее и мощнее' },
-                  { value: 'speed' as TrainingGoal, label: 'добавить скорости и резкости' },
-                  { value: 'endurance' as TrainingGoal, label: 'повысить выносливость' },
-                  { value: 'technique' as TrainingGoal, label: 'улучшить технику владения' },
-                  { value: 'flexibility' as TrainingGoal, label: 'стать гибче и избежать травм' },
-                  { value: 'all' as TrainingGoal, label: 'все и сразу!' },
-                ].map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => toggleGoal(option.value)}
-                    className={`h-11 px-4 py-3 rounded-[32px] flex justify-center items-center transition ${
-                      selectedGoals.includes(option.value)
-                        ? option.value === 'all'
-                          ? 'bg-indigo-500 text-slate-50'
-                          : 'bg-[#A1FF4A] text-slate-950'
-                        : 'bg-gray-400/20 text-slate-50'
-                    }`}
-                  >
-                    <div className="text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
-                      {option.label}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-
       </div>
 
       {/* Нижняя панель */}
-      <div className={`w-full px-4 py-6 bg-slate-900 flex flex-col gap-6 ${step === 3 ? 'mt-auto' : ''}`}>
+      <div className="w-full px-4 py-6 bg-slate-900 flex flex-col gap-6">
         {step === 1 && (
           <>
             <button
@@ -457,43 +394,23 @@ export default function CharacteristicsOnboardingPage() {
               </div>
             </button>
             <div className="text-center text-gray-400 text-xs font-medium font-['Overpass'] leading-3 tracking-wide">
-              1/3
+              1/2
             </div>
           </>
         )}
         {step === 2 && (
           <>
             <button
-              onClick={nextStep}
-              disabled={!formData.yearsInHockey || !formData.trainingFrequency || !formData.matchFrequency || !formData.gameDifficulty}
+              onClick={handleSubmit}
+              disabled={!formData.yearsInHockey || !formData.trainingFrequency || !formData.matchFrequency || !formData.gameDifficulty || isSubmitting}
               className="w-full h-12 px-6 py-3 bg-[#A1FF4A] rounded-[32px] flex justify-center items-center hover:bg-[#90E841] transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div className="text-slate-950 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
-                ДАЛЕЕ
-              </div>
-            </button>
-            <div className="text-center text-gray-400 text-xs font-medium font-['Overpass'] leading-3 tracking-wide">
-              2/3
-            </div>
-          </>
-        )}
-        {step === 3 && (
-          <>
-            <button
-              onClick={handleSubmit}
-              disabled={selectedGoals.length === 0 || isSubmitting}
-              className={`w-full h-12 px-6 py-3 rounded-[32px] flex justify-center items-center transition ${
-                selectedGoals.length > 0 && !isSubmitting
-                  ? 'bg-[#A1FF4A] text-slate-950 hover:bg-[#90E841]'
-                  : 'bg-[#A1FF4A]/20 text-slate-950'
-              } disabled:cursor-not-allowed`}
-            >
-              <div className="text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
                 {isSubmitting ? 'СОХРАНЕНИЕ...' : 'поехали тренироваться!'}
               </div>
             </button>
             <div className="text-center text-gray-400 text-xs font-medium font-['Overpass'] leading-3 tracking-wide">
-              3/3
+              2/2
             </div>
           </>
         )}

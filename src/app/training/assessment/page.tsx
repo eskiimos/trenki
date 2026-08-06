@@ -219,25 +219,27 @@ export default function TrainingAssessmentPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/60" />
           <div className="relative w-full max-w-sm rounded-xl bg-[#0B0F2A] p-5 text-left shadow-lg border border-[rgba(68,92,255,0.35)]">
-            <div className="text-white text-base font-semibold">У тебя активен цикл</div>
+            <div className="text-white text-base font-semibold">У тебя уже простроен цикл</div>
             <div className="mt-2 text-white/80 text-sm">
-              По плану цикла есть невыполненная тренировка —{' '}
-              <span className="text-[#A1FF4A] font-semibold">{cycleOffer.label}</span>. Сделать её вместо быстрой?
+              По плану есть невыполненная тренировка —{' '}
+              <span className="text-[#A1FF4A] font-semibold">{cycleOffer.label}</span>. Всё равно сделать быструю тренировку?
             </div>
+            {/* «Да, хочу быструю» — зелёная и первая (решение владельца, август-правки):
+                быстрая тренировка — то, зачем юзер сюда пришёл; цикл — второй вариант. */}
             <div className="mt-4 flex flex-col gap-2">
               <button
                 type="button"
-                onClick={acceptCycleOffer}
+                onClick={declineCycleOffer}
                 className="w-full rounded-lg bg-[#A1FF4A] px-3 py-2.5 text-sm font-semibold text-[#0B0F2A]"
               >
-                Да, из цикла
+                Да, хочу быструю
               </button>
               <button
                 type="button"
-                onClick={declineCycleOffer}
+                onClick={acceptCycleOffer}
                 className="w-full rounded-lg border border-white/20 px-3 py-2.5 text-sm font-semibold text-white"
               >
-                Нет, быструю
+                Сделать тренировку из цикла
               </button>
             </div>
           </div>

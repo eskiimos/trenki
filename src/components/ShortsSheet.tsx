@@ -65,6 +65,9 @@ export const ShortsSheet: React.FC<ShortsSheetProps> = ({
   const [isLoadingComments, setIsLoadingComments] = useState(true);
   const [text, setText] = useState('');
   const [isSending, setIsSending] = useState(false);
+  // Описание свёрнуто по умолчанию; сбрасываем при смене шортса
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  useEffect(() => { setDescriptionExpanded(false); }, [short.id]);
 
   // Загрузка комментариев при открытии
   useEffect(() => {
@@ -170,10 +173,24 @@ export const ShortsSheet: React.FC<ShortsSheetProps> = ({
           </Link>
         )}
 
-        {/* Полное описание */}
+        {/* Описание свёрнуто (август-правки): комментарии должны быть видны
+            сразу, без скролла через длинный текст. Раскрытие — по «ещё». */}
         <p className="text-white text-sm font-semibold mb-1">{short.title}</p>
         {short.description && (
-          <p className="text-white/80 text-sm whitespace-pre-wrap">{short.description}</p>
+          <div>
+            <p className={`text-white/80 text-sm whitespace-pre-wrap ${descriptionExpanded ? '' : 'line-clamp-2'}`}>
+              {short.description}
+            </p>
+            {short.description.length > 80 && (
+              <button
+                type="button"
+                onClick={() => setDescriptionExpanded((v) => !v)}
+                className="text-white/50 text-xs mt-1"
+              >
+                {descriptionExpanded ? 'Свернуть' : 'Ещё'}
+              </button>
+            )}
+          </div>
         )}
 
         <div className="border-t border-white/10 my-4" />
