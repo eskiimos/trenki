@@ -203,10 +203,24 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
     return () => { cancelled = true; };
   }, [short.videoUrl, short.id]);
 
-  // Воспроизведение видео когда URL готов
-  // Прогресс текущего видео (0..1) — питает тонкую линию у нижней кромки.
-  // timeupdate стреляет ~4 раза/с — для 2px-линии этого достаточно.
-  const [progress, setProgress] = useState(0);
+  // Прогресс — прямым обновлением DOM через rAF, минуя setState: timeupdate
+  // стреляет всего ~4 раза/с и линия дёргалась ступеньками, а 60 рендеров/с
+  // ради 2px-полосы не нужны. Цикл живёт только у активного слайда.
+  const progressFillRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isActive) return;
+    let raf = 0;
+    const tick = () => {
+      const v = videoRef.current;
+      const fill = progressFillRef.current;
+      if (v && fill && v.duration > 0) {
+        fill.style.width = `${Math.min(100, (v.currentTime / v.duration) * 100)}%`;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isActive]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -214,7 +228,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
 
     setIsLoading(true);
     setIsPlaying(false);
-    setProgress(0);
+    if (progressFillRef.current) progressFillRef.current.style.width = '0%';
 
     const handleCanPlay = () => {
       setIsLoading(false);
@@ -269,11 +283,6 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
       console.error('Video error:', e, 'URL:', videoUrl);
       setIsLoading(false);
     };
-    const handleTimeUpdate = () => {
-      if (video.duration > 0) setProgress(video.currentTime / video.duration);
-    };
-    video.addEventListener('timeupdate', handleTimeUpdate);
-
     video.addEventListener('canplay', handleCanPlay);
     video.addEventListener('waiting', handleWaiting);
     video.addEventListener('playing', handlePlaying);
@@ -286,7 +295,6 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
     video.load();
 
     return () => {
-      video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('canplay', handleCanPlay);
       video.removeEventListener('waiting', handleWaiting);
       video.removeEventListener('playing', handlePlaying);
@@ -359,7 +367,9 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
       >
         <video
           ref={videoRef}
-          className="w-full h-full object-contain"
+          // object-cover: видео заполняет всю область без чёрных полос сверху/
+          // снизу (лёгкая обрезка краёв — стандарт TikTok/Instagram)
+          className="w-full h-full object-cover"
           poster={short.thumbnail}
           playsInline
           loop
@@ -501,8 +511,9 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
             полезное — сколько осталось в этом ролике). */}
         <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/15 z-10 pointer-events-none">
           <div
+            ref={progressFillRef}
             className="h-full bg-white/80"
-            style={{ width: `${Math.min(100, progress * 100)}%` }}
+            style={{ width: '0%' }}
           />
         </div>
       </div>
