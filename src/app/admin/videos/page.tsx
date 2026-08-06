@@ -475,11 +475,10 @@ const AdminVideosPage = () => {
   // PUT у нашего сервера и грузим файл напрямую в бакет через XHR (с прогрессом).
   // В поле videoUrl пишется внутренний URL вида s3://videos/<id>.mp4 — плеер
   // получит подписанную ссылку от API при просмотре.
-  const handleS3FileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const contentType = file.type || 'video/mp4';
+  // Общая загрузка в S3: kind=video → приватный файл, s3:// в поле videoUrl;
+  // kind=thumbnail → публичное превью (x-amz-acl из подписи), https в thumbnail.
+  const uploadToS3 = async (file: File, kind: 'video' | 'thumbnail') => {
+    const contentType = file.type || (kind === 'thumbnail' ? 'image/jpeg' : 'video/mp4');
 
     try {
       setS3UploadProgress(0);
@@ -488,7 +487,7 @@ const AdminVideosPage = () => {
       const initRes = await fetch('/api/admin/s3/upload-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName: file.name, contentType }),
+        body: JSON.stringify({ fileName: file.name, contentType, kind }),
       });
       const init = await initRes.json().catch(() => ({}));
       if (!initRes.ok) {
@@ -496,13 +495,15 @@ const AdminVideosPage = () => {
         setS3UploadProgress(null);
         return;
       }
-      const { uploadUrl, videoUrl } = init;
+      const { uploadUrl, videoUrl, acl } = init;
 
-      // Шаг 2: PUT напрямую в S3. Content-Type обязан совпадать с подписанным.
+      // Шаг 2: PUT напрямую в S3. Content-Type (и x-amz-acl для превью) обязаны
+      // совпадать с подписанными, иначе S3 ответит 403.
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('PUT', uploadUrl);
         xhr.setRequestHeader('Content-Type', contentType);
+        if (acl) xhr.setRequestHeader('x-amz-acl', acl);
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
             setS3UploadProgress(Math.round((event.loaded / event.total) * 100));
@@ -519,17 +520,30 @@ const AdminVideosPage = () => {
         xhr.send(file);
       });
 
-      // Шаг 3: записываем s3:// URL в форму
-      setFormData(prev => ({ ...prev, videoUrl }));
+      // Шаг 3: записываем URL в нужное поле формы
+      if (kind === 'thumbnail') {
+        setFormData(prev => ({ ...prev, thumbnail: videoUrl }));
+      } else {
+        setFormData(prev => ({ ...prev, videoUrl }));
+      }
       setS3UploadProgress(null);
-      alert('Файл загружен в хранилище');
+      alert(kind === 'thumbnail' ? 'Превью загружено в хранилище' : 'Файл загружен в хранилище');
     } catch (error: any) {
       console.error('S3 upload error:', error);
       alert(`Ошибка загрузки в хранилище: ${error.message}`);
       setS3UploadProgress(null);
     }
+  };
 
-    // Сбрасываем input
+  const handleS3FileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) await uploadToS3(file, 'video');
+    e.target.value = '';
+  };
+
+  const handleS3ThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) await uploadToS3(file, 'thumbnail');
     e.target.value = '';
   };
 
@@ -1351,11 +1365,26 @@ const AdminVideosPage = () => {
                           className="hidden"
                           id="thumbnail-upload"
                         />
-                        <label 
+                        <label
                           htmlFor="thumbnail-upload"
                           className="cursor-pointer bg-[#3d4759] hover:bg-[#4d5769] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                         >
                           📁 Загрузить с устройства
+                        </label>
+                        {/* Превью в S3: публичный объект, прямая ссылка без TTL */}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleS3ThumbnailUpload}
+                          className="hidden"
+                          id="thumbnail-s3-upload"
+                          disabled={s3UploadProgress !== null}
+                        />
+                        <label
+                          htmlFor="thumbnail-s3-upload"
+                          className={`cursor-pointer text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors ${s3UploadProgress !== null ? 'bg-gray-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                        >
+                          ☁️ В хранилище S3
                         </label>
                         <span className="text-xs text-gray-400">
                           Опционально: загрузите своё превью

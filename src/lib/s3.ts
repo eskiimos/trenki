@@ -89,10 +89,18 @@ export async function presignPutUrl(
   key: string,
   contentType: string,
   expiresSec: number = DEFAULT_PUT_TTL_SEC,
+  opts?: { acl?: 'public-read' },
 ): Promise<string> {
   const config = getS3Config();
   if (!config) throw new Error('S3 не сконфигурирован (нет S3_* переменных окружения)');
-  const command = new PutObjectCommand({ Bucket: config.bucket, Key: key, ContentType: contentType });
+  // ACL public-read — для превью (публичные объекты, прямые ссылки без TTL).
+  // ACL участвует в подписи: загружающий обязан слать x-amz-acl: public-read.
+  const command = new PutObjectCommand({
+    Bucket: config.bucket,
+    Key: key,
+    ContentType: contentType,
+    ...(opts?.acl ? { ACL: opts.acl } : {}),
+  });
   return getSignedUrl(getClient(config), command, { expiresIn: expiresSec });
 }
 
