@@ -372,7 +372,7 @@ export default function TrainerPage() {
             {shorts.map((short) => (
                 <Link
                   key={short.id}
-                  href={`/shorts/${short.id}?trainerId=${trainerId}`}
+                  href={`/shorts?id=${short.id}&trainerId=${trainerId}`}
                   className="flex-shrink-0"
                 >
                   <div className="w-[120px] h-[213px] bg-gray-800 rounded-lg overflow-hidden relative">

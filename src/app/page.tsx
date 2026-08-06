@@ -65,7 +65,7 @@ interface ShortVideoPlayerProps {
 
 const ShortVideoPlayer = ({ shortId, poster, title, trainer }: ShortVideoPlayerProps) => {
   return (
-    <Link href={`/shorts/${shortId}`}>
+    <Link href={`/shorts?id=${shortId}`}>
       <div className="flex-shrink-0 w-36 cursor-pointer">
         <div className="bg-gray-200 rounded overflow-hidden relative aspect-[9/16]" style={{ borderRadius: '4px' }}>
           <Image

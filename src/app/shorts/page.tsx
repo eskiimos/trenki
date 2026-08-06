@@ -42,11 +42,19 @@ const ShortsContent = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const startIndex = parseInt(searchParams.get('index') || '0');
+  // Единая точка входа в шортсы: ?id= — открыть конкретный тренёк (главная,
+  // профиль тренера, диплинки «Поделиться» через редирект /shorts/[id]),
+  // ?trainerId= — лента только этого тренера (без подмешивания рекомендаций).
+  const startId = searchParams.get('id');
+  const trainerScope = searchParams.get('trainerId');
   
   const [shorts, setShorts] = useState<ShortData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  // Слайд, с которого стартует Swiper. Раньше туда шёл сырой ?index= без
+  // клампа; с ?id= индекс известен только после загрузки списка.
+  const [initialIndex, setInitialIndex] = useState(0);
   const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const swiperRef = useRef<SwiperType | null>(null);
@@ -113,18 +121,40 @@ const ShortsContent = () => {
     const loadShorts = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch('/api/shorts');
+        const url = trainerScope
+          ? `/api/shorts?trainerId=${encodeURIComponent(trainerScope)}`
+          : '/api/shorts';
+        const response = await fetch(url);
         if (response.ok) {
           const data = await response.json();
-          const loadedShorts = data.shorts || [];
+          let loadedShorts: ShortData[] = data.shorts || [];
+
+          // Начальный слайд: по ?id= (вход с главной/тренера/диплинка) либо по
+          // ?index= (каталог). Если тренёк не в списке (снят с публикации из
+          // общей выдачи, но ссылка жива) — подтягиваем его отдельно в начало.
+          let idx = 0;
+          if (startId) {
+            idx = loadedShorts.findIndex((s) => s.id === startId);
+            if (idx === -1) {
+              try {
+                const one = await fetch(`/api/shorts/${startId}`);
+                if (one.ok) {
+                  const oneData = await one.json();
+                  if (oneData.short) {
+                    loadedShorts = [oneData.short, ...loadedShorts];
+                  }
+                }
+              } catch { /* не нашли — стартуем с начала */ }
+              idx = 0;
+            }
+          } else if (loadedShorts.length > 0) {
+            idx = Math.max(0, Math.min(startIndex, loadedShorts.length - 1));
+          }
+
           setShorts(loadedShorts);
           setWatchedIds(new Set(loadedShorts.map((s: ShortData) => s.id)));
-          
-          // Устанавливаем начальный индекс
-          if (loadedShorts.length > 0) {
-            const idx = Math.min(startIndex, loadedShorts.length - 1);
-            setCurrentIndex(Math.max(0, idx));
-          }
+          setCurrentIndex(idx);
+          setInitialIndex(idx);
         }
       } catch (error) {
         console.error('Error loading shorts:', error);
@@ -133,10 +163,12 @@ const ShortsContent = () => {
       }
     };
     loadShorts();
-  }, [startIndex]);
+  }, [startIndex, startId, trainerScope]);
 
   // Загрузка рекомендаций при приближении к концу
   const loadRecommendations = useCallback(async () => {
+    // В ленте тренера рекомендации не подмешиваем — она скоупнута его шортсами
+    if (trainerScope) return;
     if (isLoadingMore || shorts.length < 3) return;
 
     try {
@@ -166,7 +198,7 @@ const ShortsContent = () => {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [watchedIds, isLoadingMore, shorts.length]);
+  }, [watchedIds, isLoadingMore, shorts.length, trainerScope]);
 
   // Текущий short
   const currentShort = shorts[currentIndex];
@@ -332,7 +364,7 @@ const ShortsContent = () => {
             direction="vertical"
             slidesPerView={1}
             spaceBetween={0}
-            initialSlide={startIndex}
+            initialSlide={initialIndex}
             virtual={{
               enabled: true,
               addSlidesAfter: 1,
