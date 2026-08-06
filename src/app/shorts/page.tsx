@@ -134,8 +134,15 @@ const ShortsContent = () => {
           // общей выдачи, но ссылка жива) — подтягиваем его отдельно в начало.
           let idx = 0;
           if (startId) {
-            idx = loadedShorts.findIndex((s) => s.id === startId);
-            if (idx === -1) {
+            // Целевой тренёк ставим ПЕРВЫМ и стартуем со слайда 0: Swiper с
+            // virtual-слайдами при initialSlide>0 «доскролливается» до цели на
+            // маунте — видимая странная анимация при открытии. Порядок остальных
+            // сохраняется, лента продолжается как обычно.
+            const found = loadedShorts.findIndex((s) => s.id === startId);
+            if (found > 0) {
+              const [target] = loadedShorts.splice(found, 1);
+              loadedShorts = [target, ...loadedShorts];
+            } else if (found === -1) {
               try {
                 const one = await fetch(`/api/shorts/${startId}`);
                 if (one.ok) {
@@ -145,8 +152,8 @@ const ShortsContent = () => {
                   }
                 }
               } catch { /* не нашли — стартуем с начала */ }
-              idx = 0;
             }
+            idx = 0;
           } else if (loadedShorts.length > 0) {
             idx = Math.max(0, Math.min(startIndex, loadedShorts.length - 1));
           }
@@ -342,7 +349,11 @@ const ShortsContent = () => {
             (видео продолжает играть), при закрытии так же плавно растягивается
             обратно — transition по top/width/height/border-radius. */}
         <div
-          className={`absolute overflow-hidden transition-all duration-300 ease-out ${sheetOpenVisual ? 'shorts-compact' : ''}`}
+          // transition только в фазах шита (открыт/закрывается): постоянный
+          // transition-all анимировал бы и сторонние изменения раскладки
+          // (сворачивание адресной строки iOS при открытии страницы) — видео
+          // «растягивалось» странной анимацией.
+          className={`absolute overflow-hidden ${sheetShortId !== null ? 'transition-all duration-300 ease-out' : ''} ${sheetOpenVisual ? 'shorts-compact' : ''}`}
           style={sheetOpenVisual ? {
             top: 'calc(env(safe-area-inset-top, 0px) + 8px)',
             left: '50%',
