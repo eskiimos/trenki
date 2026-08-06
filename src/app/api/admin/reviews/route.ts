@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
         user: {
           select: {
             id: true,
-            telegramId: true,
+            email: true,
             firstName: true,
             lastName: true,
             profile: {
@@ -41,9 +41,11 @@ export async function GET(request: NextRequest) {
           }
         }
       },
-      orderBy: {
-        createdAt: 'desc'
-      }
+      // Неодобренные (на модерации) — первыми, внутри группы — свежие сверху
+      orderBy: [
+        { isApproved: 'asc' },
+        { createdAt: 'desc' }
+      ]
     });
 
     return NextResponse.json({ reviews });

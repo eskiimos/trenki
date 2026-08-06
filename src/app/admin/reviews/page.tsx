@@ -18,7 +18,7 @@ interface Review {
   };
   user: {
     id: string;
-    telegramId: string;
+    email: string | null;
     firstName: string | null;
     lastName: string | null;
     profile: {
@@ -53,7 +53,8 @@ export default function AdminReviewsPage() {
     }
   };
 
-  const handleApprove = async (reviewId: string) => {
+  // isApproved: true — одобрить, false — скрыть (снять с публикации)
+  const handleSetApproved = async (reviewId: string, isApproved: boolean) => {
     setProcessingId(reviewId);
     try {
       const response = await fetch(`/api/admin/reviews/${reviewId}`, {
@@ -61,14 +62,14 @@ export default function AdminReviewsPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ isApproved: true }),
+        body: JSON.stringify({ isApproved }),
       });
 
       if (response.ok) {
         fetchReviews();
       }
     } catch (error) {
-      console.error('Error approving review:', error);
+      console.error('Error updating review:', error);
     } finally {
       setProcessingId(null);
     }
@@ -167,7 +168,12 @@ export default function AdminReviewsPage() {
         ) : (
           <div className="space-y-4">
             {reviews.map((review) => (
-              <div key={review.id} className="bg-white rounded-lg shadow p-6">
+              <div
+                key={review.id}
+                className={`bg-white rounded-lg shadow p-6 ${
+                  !review.isApproved ? 'border-l-4 border-yellow-400' : ''
+                }`}
+              >
                 <div className="flex items-start justify-between mb-4">
                   {/* Информация о тренере */}
                   <div className="flex items-center gap-4">
@@ -231,7 +237,7 @@ export default function AdminReviewsPage() {
                         {review.user.firstName || 'Пользователь'} {review.user.lastName || ''}
                       </p>
                       <p className="text-sm text-gray-500">
-                        ID: {review.user.telegramId}
+                        {review.user.email || `ID: ${review.user.id}`}
                       </p>
                     </div>
                   </div>
@@ -263,24 +269,32 @@ export default function AdminReviewsPage() {
                   )}
 
                   {/* Кнопки действий */}
-                  {!review.isApproved && (
-                    <div className="flex gap-3">
+                  <div className="flex gap-3">
+                    {!review.isApproved ? (
                       <button
-                        onClick={() => handleApprove(review.id)}
+                        onClick={() => handleSetApproved(review.id, true)}
                         disabled={processingId === review.id}
                         className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium"
                       >
                         {processingId === review.id ? 'Обработка...' : 'Одобрить'}
                       </button>
+                    ) : (
                       <button
-                        onClick={() => handleReject(review.id)}
+                        onClick={() => handleSetApproved(review.id, false)}
                         disabled={processingId === review.id}
-                        className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium"
+                        className="flex-1 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 font-medium"
                       >
-                        {processingId === review.id ? 'Обработка...' : 'Удалить'}
+                        {processingId === review.id ? 'Обработка...' : 'Скрыть'}
                       </button>
-                    </div>
-                  )}
+                    )}
+                    <button
+                      onClick={() => handleReject(review.id)}
+                      disabled={processingId === review.id}
+                      className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium"
+                    >
+                      {processingId === review.id ? 'Обработка...' : 'Удалить'}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

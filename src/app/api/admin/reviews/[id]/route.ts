@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminAsync } from '@/lib/admin-session';
+import { recalcTrainerRating } from '@/lib/trainer-rating';
 
-// PATCH - одобрить или отклонить отзыв
+// PATCH - одобрить или скрыть отзыв
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -40,24 +41,8 @@ export async function PATCH(
       }
     });
 
-    // Если отзыв одобрен, пересчитываем рейтинг тренера
-    if (isApproved) {
-      const allApprovedReviews = await prisma.trainerReview.findMany({
-        where: { 
-          trainerId: review.trainerId,
-          isApproved: true
-        }
-      });
-
-      if (allApprovedReviews.length > 0) {
-        const averageRating = allApprovedReviews.reduce((sum, r) => sum + r.rating, 0) / allApprovedReviews.length;
-
-        await prisma.trainer.update({
-          where: { id: review.trainerId },
-          data: { rating: Math.round(averageRating * 10) / 10 }
-        });
-      }
-    }
+    // Набор одобренных отзывов изменился (одобрение ИЛИ скрытие) — пересчитываем рейтинг
+    await recalcTrainerRating(review.trainerId);
 
     return NextResponse.json({ review });
   } catch (error: any) {
@@ -81,6 +66,9 @@ export async function DELETE(
     const review = await prisma.trainerReview.delete({
       where: { id }
     });
+
+    // Удалённый отзыв мог быть одобренным — пересчитываем рейтинг тренера
+    await recalcTrainerRating(review.trainerId);
 
     return NextResponse.json({ success: true, review });
   } catch (error: any) {
