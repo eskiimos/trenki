@@ -38,6 +38,8 @@ const ProfilePage = () => {
     xpForNext: number;
     status: { key: string; title: string; emoji: string };
     nextStatus: { title: string; minLevel: number } | null;
+    /** Серия дней подряд (для отсчёта в бейдже темпа) */
+    streak?: number;
     /** «Темп ×2»: серия ≥ 3 дней жива — весь XP дня удвоен */
     tempoActive?: boolean;
   } | null>(null);
@@ -375,7 +377,7 @@ const ProfilePage = () => {
               </button>
               <span className="inline-flex items-center gap-2">
                 {/* Бейдж темпа виден ВСЕГДА: активный ×2 или отсчёт до него */}
-                <TempoBadge streak={gamification.streak} tempoActive={gamification.tempoActive} />
+                <TempoBadge streak={gamification.streak ?? 0} tempoActive={!!gamification.tempoActive} />
                 <span className="text-white text-base font-bold font-overpass">
                   Уровень {gamification.level}
                 </span>
