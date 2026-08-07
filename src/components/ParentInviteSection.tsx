@@ -1,7 +1,8 @@
 'use client';
 
 // Секция «Родителям» в профиле ребёнка: список привязанных родителей
-// (с отвязкой) + генерация ссылки-приглашения (POST /api/parent/invite).
+// (с запросом на отвязку — рвёт связь родитель в кабинете) + генерация
+// ссылки-приглашения (POST /api/parent/invite).
 // Вынесена из profile/page.tsx, чтобы не раздувать страницу.
 
 import { useEffect, useState } from 'react';
@@ -12,6 +13,7 @@ interface LinkedParent {
   firstName: string | null;
   lastName: string | null;
   email: string | null;
+  unlinkRequestedAt: string | null;
 }
 
 interface ActiveInvite {
@@ -110,18 +112,49 @@ export default function ParentInviteSection() {
     handleCopy(); // fallback: просто копируем
   };
 
-  const handleUnlink = async (linkId: string) => {
-    if (!confirm('Отвязать родителя? Он перестанет видеть твой прогресс.')) return;
+  // Ребёнок не рвёт связь сам — только просит. Родитель подтверждает в кабинете.
+  const handleRequestUnlink = async (linkId: string) => {
+    if (
+      !confirm(
+        'Запросить отвязку? Родитель получит запрос и должен подтвердить его в своём кабинете.',
+      )
+    )
+      return;
     try {
-      const res = await fetch(`/api/parent/invite?linkId=${encodeURIComponent(linkId)}`, {
+      const res = await fetch('/api/parent/unlink-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ linkId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setParents((prev) =>
+          prev.map((p) =>
+            p.linkId === linkId
+              ? { ...p, unlinkRequestedAt: data.unlinkRequestedAt || new Date().toISOString() }
+              : p,
+          ),
+        );
+      }
+    } catch {
+      // тихо: состояние не изменится, юзер повторит
+    }
+  };
+
+  const handleCancelUnlinkRequest = async (linkId: string) => {
+    try {
+      const res = await fetch(`/api/parent/unlink-request?linkId=${encodeURIComponent(linkId)}`, {
         method: 'DELETE',
         credentials: 'include',
       });
       if (res.ok) {
-        setParents((prev) => prev.filter((p) => p.linkId !== linkId));
+        setParents((prev) =>
+          prev.map((p) => (p.linkId === linkId ? { ...p, unlinkRequestedAt: null } : p)),
+        );
       }
     } catch {
-      // тихо: список не изменится, юзер повторит
+      // тихо: состояние не изменится, юзер повторит
     }
   };
 
@@ -137,18 +170,37 @@ export default function ParentInviteSection() {
             {parents.map((p, i) => (
               <div key={p.linkId}>
                 {i > 0 && <div className="h-[1px] bg-white/5 my-1" />}
-                <div className="flex items-center justify-between py-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-white text-sm font-medium truncate">{parentName(p)}</div>
-                    {p.email && <div className="text-muted text-xs truncate">{p.email}</div>}
+                <div className="py-2">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-white text-sm font-medium truncate">{parentName(p)}</div>
+                      {p.email && <div className="text-muted text-xs truncate">{p.email}</div>}
+                    </div>
+                    {!p.unlinkRequestedAt && (
+                      <button
+                        type="button"
+                        onClick={() => handleRequestUnlink(p.linkId)}
+                        className="text-red-400 text-xs font-medium font-overpass uppercase tracking-wide shrink-0 ml-3 hover:text-red-300 transition-colors"
+                      >
+                        Запросить отвязку
+                      </button>
+                    )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleUnlink(p.linkId)}
-                    className="text-red-400 text-xs font-medium font-overpass uppercase tracking-wide shrink-0 ml-3 hover:text-red-300 transition-colors"
-                  >
-                    Отвязать
-                  </button>
+                  {p.unlinkRequestedAt && (
+                    <div className="flex items-center justify-between gap-3 mt-2">
+                      <span className="inline-flex items-center gap-1.5 bg-amber-400/10 text-amber-300 text-[11px] font-medium rounded-full px-2.5 py-1">
+                        <span aria-hidden>⏳</span>
+                        Запрос отправлен, ждёт родителя
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleCancelUnlinkRequest(p.linkId)}
+                        className="text-muted text-xs font-medium font-overpass uppercase tracking-wide shrink-0 hover:text-white transition-colors"
+                      >
+                        Отменить запрос
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

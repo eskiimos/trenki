@@ -1028,12 +1028,15 @@ model Payment {
 // ребёнка read-only (/parent, /api/parent/children).
 
 model ParentLink {
-  id        String   @id @default(cuid())
-  parentId  String
-  childId   String
-  createdAt DateTime @default(now())
-  parent    User     @relation("ParentLinks", fields: [parentId], references: [id], onDelete: Cascade)
-  child     User     @relation("ChildLinks", fields: [childId], references: [id], onDelete: Cascade)
+  id                String    @id @default(cuid())
+  parentId          String
+  childId           String
+  createdAt         DateTime  @default(now())
+  // Запрос ребёнка на отвязку: ребёнок сам связь не рвёт, только просит.
+  // null — запроса нет; дата — ждёт подтверждения родителя в кабинете.
+  unlinkRequestedAt DateTime?
+  parent            User      @relation("ParentLinks", fields: [parentId], references: [id], onDelete: Cascade)
+  child             User      @relation("ChildLinks", fields: [childId], references: [id], onDelete: Cascade)
 
   @@unique([parentId, childId])
   @@index([childId])

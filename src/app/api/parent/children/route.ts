@@ -21,6 +21,8 @@ export async function GET(request: NextRequest) {
       where: { parentId: userId },
       orderBy: { createdAt: 'asc' },
       select: {
+        id: true,
+        unlinkRequestedAt: true,
         child: {
           select: {
             id: true,
@@ -45,13 +47,17 @@ export async function GET(request: NextRequest) {
     });
 
     const children = await Promise.all(
-      links.map(async ({ child }) => {
+      links.map(async ({ id: linkId, unlinkRequestedAt, child }) => {
         const [gamification, week] = await Promise.all([
           getGamificationSummary(child.id),
           getWeekActivity(child.id),
         ]);
         return {
           id: child.id,
+          // Связь родитель↔ребёнок: для подтверждения/отклонения запроса на
+          // отвязку и самостоятельной отвязки (POST /api/parent/unlink)
+          linkId,
+          unlinkRequestedAt,
           firstName: child.firstName,
           lastName: child.lastName,
           avatarUrl: child.profile?.avatarUrl ?? null,

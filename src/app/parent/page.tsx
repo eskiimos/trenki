@@ -5,7 +5,7 @@
 // здесь нет намеренно: родителю нужен только обзор.
 
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { clearAuth } from '@/lib/auth';
 import { useSubscriptionPricing } from '@/hooks/useSubscriptionPricing';
@@ -14,6 +14,9 @@ import PotentialRing from '@/components/PotentialRing';
 
 interface ChildCard {
   id: string;
+  // Связь ParentLink: для подтверждения/отклонения запроса на отвязку и self-unlink
+  linkId: string;
+  unlinkRequestedAt: string | null;
   firstName: string | null;
   lastName: string | null;
   avatarUrl: string | null;
@@ -57,7 +60,14 @@ function formatUntil(iso: string): string {
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-const ChildCardView = ({ child }: { child: ChildCard }) => {
+const ChildCardView = ({
+  child,
+  onLinkChanged,
+}: {
+  child: ChildCard;
+  /** Рефетч списка после confirm/decline/unlink — карточка исчезает или баннер снимается */
+  onLinkChanged: () => void;
+}) => {
   const g = child.gamification;
   const xpPercent = Math.min(100, Math.round((g.xpIntoLevel / Math.max(1, g.xpForNext)) * 100));
   const pricing = useSubscriptionPricing();
@@ -65,6 +75,39 @@ const ChildCardView = ({ child }: { child: ChildCard }) => {
   const [payError, setPayError] = useState<string | null>(null);
   // Кольцо потенциала (как в профиле ребёнка) — раскрывается по тапу на карточку
   const [potentialOpen, setPotentialOpen] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
+  const [unlinkError, setUnlinkError] = useState<string | null>(null);
+
+  // confirm — подтвердить запрос ребёнка; decline — отклонить; unlink — отвязать самому
+  const handleUnlinkAction = async (action: 'confirm' | 'decline' | 'unlink') => {
+    if (unlinking) return;
+    if (action === 'confirm' && !confirm(`Подтвердить отвязку? ${childName(child)} исчезнет из вашего кабинета.`)) {
+      return;
+    }
+    if (action === 'unlink' && !confirm(`Отвязать ${childName(child)}? Вы перестанете видеть его прогресс.`)) {
+      return;
+    }
+    setUnlinking(true);
+    setUnlinkError(null);
+    try {
+      const res = await fetch('/api/parent/unlink', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ linkId: child.linkId, action }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setUnlinkError(data?.error || 'Не удалось выполнить действие');
+        return;
+      }
+      onLinkChanged();
+    } catch {
+      setUnlinkError('Сетевая ошибка. Проверь подключение.');
+    } finally {
+      setUnlinking(false);
+    }
+  };
 
   // Оплата подписки ребёнка родителем: T-Bank Init с childId → редирект на оплату
   const handleSubscribe = async () => {
@@ -92,6 +135,37 @@ const ChildCardView = ({ child }: { child: ChildCard }) => {
   };
   return (
     <div className="bg-surface rounded-2xl p-4 border border-white/5">
+      {/* Запрос ребёнка на отвязку — заметный баннер, связь рвётся только после подтверждения */}
+      {child.unlinkRequestedAt && (
+        <div className="rounded-xl bg-amber-400/10 border border-amber-400/30 p-3 mb-4">
+          <div className="text-amber-300 text-sm font-bold mb-2">
+            {childName(child)} просит отвязать вас
+          </div>
+          <p className="text-white/70 text-xs leading-relaxed mb-3">
+            После подтверждения вы перестанете видеть прогресс ребёнка, карточка исчезнет из
+            кабинета.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => handleUnlinkAction('confirm')}
+              disabled={unlinking}
+              className="bg-amber-400 text-night text-xs font-bold font-overpass uppercase tracking-wide rounded-full py-2.5 transition-transform active:scale-95 disabled:opacity-60"
+            >
+              Подтвердить отвязку
+            </button>
+            <button
+              type="button"
+              onClick={() => handleUnlinkAction('decline')}
+              disabled={unlinking}
+              className="bg-white/10 text-white text-xs font-bold font-overpass uppercase tracking-wide rounded-full py-2.5 hover:bg-white/15 transition-colors disabled:opacity-60"
+            >
+              Отклонить
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Шапка: аватар + имя + стрик */}
       <div className="flex items-center gap-3 mb-4">
         <div className="relative w-12 h-12 rounded-full overflow-hidden bg-white/10 shrink-0 flex items-center justify-center">
@@ -203,6 +277,19 @@ const ChildCardView = ({ child }: { child: ChildCard }) => {
 
       {/* Лига сверстников (по году рождения) — раскрывается по тапу */}
       <LeagueTable childId={child.id} />
+
+      {/* Self-unlink: родитель может отвязаться сам в любой момент */}
+      {unlinkError && <p className="text-red-400 text-xs text-center mt-3">{unlinkError}</p>}
+      <div className="text-center mt-3">
+        <button
+          type="button"
+          onClick={() => handleUnlinkAction('unlink')}
+          disabled={unlinking}
+          className="text-muted text-[11px] font-medium font-overpass uppercase tracking-wide hover:text-red-400 transition-colors disabled:opacity-60"
+        >
+          {unlinking ? 'Отвязываем…' : 'Отвязать'}
+        </button>
+      </div>
     </div>
   );
 };
@@ -212,6 +299,26 @@ export default function ParentPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [children, setChildren] = useState<ChildCard[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  // Рефетч списка детей — используется и при загрузке, и после
+  // подтверждения/отклонения запроса на отвязку (карточка исчезает/баннер снимается).
+  const loadChildren = useCallback(async () => {
+    try {
+      const res = await fetch('/api/parent/children', {
+        cache: 'no-store',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        setError('Не удалось загрузить данные. Потяни страницу вниз или зайди позже.');
+        return;
+      }
+      const data = await res.json();
+      setChildren(Array.isArray(data.children) ? data.children : []);
+      setError(null);
+    } catch {
+      setError('Сетевая ошибка. Проверь подключение.');
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -223,30 +330,17 @@ export default function ParentPage() {
           router.replace('/login');
           return;
         }
-        const res = await fetch('/api/parent/children', {
-          cache: 'no-store',
-          credentials: 'include',
-        });
-        if (cancelled) return;
-        if (!res.ok) {
-          setError('Не удалось загрузить данные. Потяни страницу вниз или зайди позже.');
-          setIsLoading(false);
-          return;
-        }
-        const data = await res.json();
-        setChildren(Array.isArray(data.children) ? data.children : []);
-        setIsLoading(false);
+        await loadChildren();
       } catch {
-        if (!cancelled) {
-          setError('Сетевая ошибка. Проверь подключение.');
-          setIsLoading(false);
-        }
+        if (!cancelled) setError('Сетевая ошибка. Проверь подключение.');
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, loadChildren]);
 
   const handleLogout = async () => {
     await clearAuth(); // POST /api/auth/logout + чистка локального кеша
@@ -297,7 +391,7 @@ export default function ParentPage() {
 
         <div className="flex flex-col gap-4">
           {children.map((child) => (
-            <ChildCardView key={child.id} child={child} />
+            <ChildCardView key={child.linkId} child={child} onLinkChanged={loadChildren} />
           ))}
         </div>
       </div>

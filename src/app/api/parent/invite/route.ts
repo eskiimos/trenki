@@ -1,7 +1,8 @@
 // Инвайты «пригласи родителя» (генерирует РЕБЁНОК-атлет из профиля):
 //   POST   — создать новый код (старые неиспользованные деактивируются);
-//   GET    — активный инвайт + список привязанных родителей;
-//   DELETE — отвязать родителя (?linkId=).
+//   GET    — активный инвайт + список привязанных родителей (с unlinkRequestedAt);
+//   DELETE — 410: мгновенная отвязка ребёнком убрана, теперь только запрос
+//            через POST /api/parent/unlink-request (родитель подтверждает).
 // Код одноразовый, живёт 48 часов. Погашение — POST /api/parent/join.
 
 import crypto from 'crypto';
@@ -70,6 +71,7 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: 'asc' },
         select: {
           id: true,
+          unlinkRequestedAt: true,
           parent: { select: { id: true, firstName: true, lastName: true, email: true } },
         },
       }),
@@ -85,6 +87,7 @@ export async function GET(request: NextRequest) {
         firstName: l.parent.firstName,
         lastName: l.parent.lastName,
         email: l.parent.email,
+        unlinkRequestedAt: l.unlinkRequestedAt,
       })),
     });
   } catch (error) {
@@ -93,28 +96,15 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function DELETE(request: NextRequest) {
-  const auth = await requireAuthUser(request);
-  if ('response' in auth) return auth.response;
-  const userId = auth.user.id;
-
-  const linkId = request.nextUrl.searchParams.get('linkId');
-  if (!linkId) {
-    return NextResponse.json({ error: 'linkId обязателен' }, { status: 400 });
-  }
-
-  try {
-    // deleteMany с childId=я: чужую связь удалить нельзя (не IDOR).
-    const result = await prisma.parentLink.deleteMany({
-      where: { id: linkId, childId: userId },
-    });
-    if (result.count === 0) {
-      return NextResponse.json({ error: 'Связь не найдена' }, { status: 404 });
-    }
-    logger.info('parent link removed by child', { userId, linkId });
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    logger.error('parent link delete failed', error);
-    return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
-  }
+// Мгновенная отвязка ребёнком УБРАНА (решение владельца): ребёнок только
+// запрашивает отвязку (POST /api/parent/unlink-request), связь рвёт родитель
+// в кабинете. Старым клиентам отвечаем 410, чтобы не молчать.
+export async function DELETE() {
+  return NextResponse.json(
+    {
+      error:
+        'Отвязка ребёнком отключена. Отправь запрос — родитель подтвердит его в своём кабинете.',
+    },
+    { status: 410 },
+  );
 }
