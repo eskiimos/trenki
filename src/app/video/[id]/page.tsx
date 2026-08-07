@@ -10,6 +10,7 @@ import {
   Zap, WifiOff, Check, X, Loader2, Settings2,
 } from 'lucide-react';
 import TagsSection from '@/components/TagsSection';
+import VideoComments from '@/components/VideoComments';
 import BottomNavigation from '@/components/BottomNavigation';
 import CharacteristicsGainModal from '@/components/CharacteristicsGainModal';
 import ScheduleModal from '@/components/ScheduleModal';
@@ -2122,8 +2123,10 @@ export default function VideoPage({ params }: VideoPageProps) {
           </div>
         )}
       />
+      {/* Комментарии — только в обычном просмотре: в тренировке отвлекают */}
+      {!fromWorkout && <VideoComments videoId={videoId} />}
       </div>
-      
+
       {/* Скрываем BottomNavigation в горизонтальном режиме */}
       {!isLandscape && <BottomNavigation activeTab="video" />}
 

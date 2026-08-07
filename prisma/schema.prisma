@@ -46,6 +46,7 @@ model User {
   shortLikes            ShortLike[]
   sessions              TrainingSession[]
   videoLikes            VideoLike[]
+  videoComments         VideoComment[]
   characteristicHistory CharacteristicHistory[]
   scheduledWorkouts     ScheduledWorkout[]
   trainerReviews        TrainerReview[]
@@ -204,6 +205,7 @@ model Video {
   trainingModules     TrainingModule[]
   sessions            TrainingSession[]
   likes               VideoLike[]
+  comments            VideoComment[]
   videoTags           VideoTag[]
   trainer             Trainer               @relation(fields: [trainerId], references: [id])
   workoutSessions     WorkoutSessionVideo[]
@@ -267,6 +269,19 @@ model VideoLike {
 
   @@unique([userId, videoId])
   @@map("video_likes")
+}
+
+model VideoComment {
+  id        String   @id @default(cuid())
+  userId    String
+  videoId   String
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("video_comments")
 }
 
 model Short {
