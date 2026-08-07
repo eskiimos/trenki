@@ -314,6 +314,12 @@ export default function AdminPage() {
                 title="Тренировочные модули"
                 desc="Модули и упражнения"
               />
+              <NavCard
+                href="/admin/gamification"
+                icon="🎮"
+                title="Геймификация"
+                desc="Песочница: уровни, звания, стрик"
+              />
             </div>
           </div>
 
