@@ -1,8 +1,9 @@
 // Серверная сборка лиги (когорта по году рождения + недельный XP) для
 // произвольного userId. Общий хелпер для /api/parent/league (родитель смотрит
 // ребёнка) и /api/league (спортсмен смотрит свою лигу) — запросы к БД живут
-// здесь ОДИН раз. Приватность: в результате НЕТ userId других детей и НЕТ
-// полных фамилий — чужие показываются как «Имя Ф.» (см. '@/lib/league').
+// здесь ОДИН раз. Приватность: в результате НЕТ userId других детей и НЕТ их
+// реальных имён — чужие показываются под сгенерированными правдоподобными
+// именами (см. '@/lib/league'); имена когорты из БД вообще не выбираются.
 // Чистая логика лиги — в '@/lib/league' (тестируется без БД).
 
 import { prisma } from '@/lib/prisma';
@@ -56,25 +57,20 @@ export async function buildLeagueForUser(userId: string): Promise<LeagueForUser>
   const demoEmails = (process.env.DEMO_BYPASS_EMAIL || '')
     .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
   demoEmails.push('demo.athlete@trenki.app');
+  // Имена когорты НЕ тянем: чужие показываются под сгенерированными
+  // правдоподобными именами (решение босса — обезличенные данные).
   const cohortProfiles = await prisma.profile.findMany({
     where: {
       birthDate: { gte: yearStart, lt: nextYearStart },
       user: { role: 'ATHLETE', email: { notIn: demoEmails } },
     },
-    select: {
-      userId: true,
-      user: { select: { firstName: true, lastName: true } },
-    },
+    select: { userId: true },
     take: COHORT_CAP,
   });
-  const namesBy = new Map(
-    cohortProfiles.map((p) => [p.userId, { firstName: p.user.firstName, lastName: p.user.lastName }]),
-  );
   const cohortIds = cohortProfiles.map((p) => p.userId);
   if (!cohortIds.includes(userId)) {
     // Страховка от капа: сам пользователь всегда в когорте
     cohortIds.push(userId);
-    namesBy.set(userId, { firstName: user?.firstName ?? null, lastName: user?.lastName ?? null });
   }
 
   // Недельный XP по всей когорте: тренировки ×100 + модули ×20
@@ -110,8 +106,6 @@ export async function buildLeagueForUser(userId: string): Promise<LeagueForUser>
     weeklyXp:
       (workoutsBy.get(id) ?? 0) * XP_PER_COMPLETED_WORKOUT +
       (modulesBy.get(id) ?? 0) * XP_PER_COMPLETED_MODULE,
-    firstName: namesBy.get(id)?.firstName ?? null,
-    lastName: namesBy.get(id)?.lastName ?? null,
   }));
 
   const weekLabel = isoWeekLabel();

@@ -1,18 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   nicknameFor,
-  displayNameFor,
+  plausibleNameFor,
   buildStandings,
   isoWeekLabel,
   type LeagueEntry,
 } from '../../src/lib/league';
 
-const e = (
-  userId: string,
-  weeklyXp: number,
-  firstName?: string | null,
-  lastName?: string | null,
-): LeagueEntry => ({ userId, weeklyXp, firstName, lastName });
+const e = (userId: string, weeklyXp: number): LeagueEntry => ({ userId, weeklyXp });
 
 describe('nicknameFor', () => {
   it('стабилен для одного userId и различен для разных', () => {
@@ -28,22 +23,13 @@ describe('nicknameFor', () => {
   });
 });
 
-describe('displayNameFor', () => {
-  it('имя + инициал фамилии с точкой', () => {
-    expect(displayNameFor({ firstName: 'Миша', lastName: 'Козлов', userId: 'u' })).toBe('Миша К.');
-  });
-  it('без фамилии — просто имя', () => {
-    expect(displayNameFor({ firstName: 'Миша', lastName: null, userId: 'u' })).toBe('Миша');
-    expect(displayNameFor({ firstName: 'Миша', lastName: '  ', userId: 'u' })).toBe('Миша');
-  });
-  it('без имени — fallback на сгенерированный ник', () => {
-    expect(displayNameFor({ firstName: null, lastName: 'Козлов', userId: 'u' })).toBe(
-      nicknameFor('u').name,
-    );
-    expect(displayNameFor({ userId: 'u' })).toBe(nicknameFor('u').name);
-  });
-  it('инициал приводится к верхнему регистру', () => {
-    expect(displayNameFor({ firstName: 'Миша', lastName: 'козлов', userId: 'u' })).toBe('Миша К.');
+describe('plausibleNameFor', () => {
+  it('формат «Имя И.», стабилен для одного сида, различен для разных', () => {
+    const a1 = plausibleNameFor('user-a');
+    expect(a1).toMatch(/^[А-ЯЁ][а-яё]+ [А-ЯЁ]\.$/);
+    expect(plausibleNameFor('user-a')).toBe(a1);
+    // при 256 комбинациях коллизии возможны, но конкретная пара сидов различима
+    expect(plausibleNameFor('user-b2')).not.toBe(a1);
   });
 });
 
@@ -54,42 +40,28 @@ describe('buildStandings', () => {
     expect(buildStandings([e('x', 10)], CHILD, 'Миша', 'w')).toBeNull();
   });
 
-  it('свой — полным именем и isOwn, чужие — «Имя И.»', () => {
-    const s = buildStandings(
-      [e(CHILD, 300, 'Миша', 'Козлов'), e('a', 500, 'Петя', 'Иванов'), e('b', 100, 'Артём', 'Соколов')],
-      CHILD,
-      'Миша',
-      'w',
-    )!;
+  it('свой — реальным именем и isOwn, чужие — обезличенные «Имя И.» от userId', () => {
+    const s = buildStandings([e(CHILD, 300), e('a', 500), e('b', 100)], CHILD, 'Миша', 'w')!;
     const own = s.rows.find((r) => r.isOwn)!;
     expect(own.name).toBe('Миша');
-    const others = s.rows.filter((r) => !r.isOwn && !r.isFake).map((r) => r.name);
-    expect(others).toContain('Петя И.');
-    expect(others).toContain('Артём С.');
+    const others = s.rows.filter((r) => !r.isOwn && !r.isFake);
+    for (const o of others) {
+      expect(o.name).toMatch(/^[А-ЯЁ][а-яё]+ [А-ЯЁ]\.$/);
+    }
+    // стабильность: имя чужого детерминировано его userId
+    expect(others.map((o) => o.name)).toContain(plausibleNameFor('a'));
   });
 
-  it('приватность: полной фамилии чужих в выдаче НЕТ', () => {
-    const s = buildStandings(
-      [e(CHILD, 300, 'Миша', 'Козлов'), e('a', 500, 'Петя', 'Кузнецов'), e('b', 100, 'Егор', 'Смирнов')],
-      CHILD,
-      'Миша',
-      'w',
-    )!;
-    const dump = JSON.stringify(s);
-    expect(dump).not.toContain('Кузнецов');
-    expect(dump).not.toContain('Смирнов');
+  it('приватность: реальные имена в LeagueEntry не передаются вообще (нет поля)', () => {
+    // Интерфейс не принимает имена — обезличивание by construction
+    const entry: LeagueEntry = { userId: 'x', weeklyXp: 1 };
+    expect(Object.keys(entry)).toEqual(['userId', 'weeklyXp']);
   });
 
-  it('чужой без имени — под стабильным ником, эмодзи из ника у всех', () => {
-    const s = buildStandings([e(CHILD, 300, 'Миша'), e('a', 500)], CHILD, 'Миша', 'w')!;
+  it('эмодзи чужого — стабильный, из ник-генератора', () => {
+    const s = buildStandings([e(CHILD, 300), e('a', 500)], CHILD, 'Миша', 'w')!;
     const other = s.rows.find((r) => !r.isOwn && !r.isFake)!;
-    expect(other.name).toBe(nicknameFor('a').name);
     expect(other.emoji).toBe(nicknameFor('a').emoji);
-  });
-
-  it('чужой с именем без фамилии — просто имя', () => {
-    const s = buildStandings([e(CHILD, 300, 'Миша'), e('a', 500, 'Петя')], CHILD, 'Миша', 'w')!;
-    expect(s.rows.find((r) => !r.isOwn && !r.isFake)!.name).toBe('Петя');
   });
 
   it('сортировка по XP, ранги корректны', () => {
