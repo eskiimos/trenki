@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
+import { signSession, setSessionCookie } from '@/lib/session';
 import { rateLimit } from '@/lib/coach/rate-limit';
 import { logger } from '@/lib/logger';
 
@@ -27,14 +28,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Некорректный email' }, { status: 400 });
     }
 
-    // Demo-bypass: для перечисленных email (через запятую — например демо-атлет
-    // и демо-родитель) письмо не отправляем, вход идёт по фиксированному коду
-    // DEMO_BYPASS_CODE (см. verify-code).
+    // Demo-bypass: перечисленные email (через запятую) логинятся СРАЗУ, без
+    // кода вообще — сессия ставится прямо здесь. Только для СУЩЕСТВУЮЩИХ
+    // аккаунтов (создать аккаунт через демо-механику нельзя). Компромисс
+    // осознанный (решение владельца): демо-аккаунты доступны любому, кто знает
+    // их email, — держим в них только витринные данные.
     const demoEmails = (process.env.DEMO_BYPASS_EMAIL || '')
       .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
-    if (demoEmails.includes(email) && process.env.DEMO_BYPASS_CODE) {
-      logger.info('demo bypass send-code', { email });
-      return NextResponse.json({ success: true });
+    if (demoEmails.includes(email)) {
+      const demoUser = await prisma.user.findUnique({ where: { email } });
+      if (demoUser) {
+        const profile = await prisma.profile.findUnique({ where: { userId: demoUser.id } });
+        const response = NextResponse.json({
+          success: true,
+          demoLoggedIn: true,
+          user: {
+            id: demoUser.id,
+            firstName: demoUser.firstName,
+            lastName: demoUser.lastName,
+            username: demoUser.username,
+          },
+          needsOnboarding: !profile && demoUser.role === 'ATHLETE',
+        });
+        const token = await signSession({ uid: demoUser.id, role: demoUser.role });
+        setSessionCookie(response, token);
+        logger.info('demo bypass direct login', { userId: demoUser.id });
+        return response;
+      }
+      // Демо-email без аккаунта — падаем в обычный OTP-флоу
     }
 
     // Лимит: не более 3 кодов на email за 10 минут И не более 10 кодов с одного IP за 10 минут

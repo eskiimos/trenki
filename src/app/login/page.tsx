@@ -47,6 +47,18 @@ function EmailLoginForm() {
         setError(data.error || 'Ошибка отправки');
         return;
       }
+      // Демо-аккаунт: сервер уже поставил сессию — сразу в приложение,
+      // экран кода не показываем (главная сама разрулит роль PARENT/COACH)
+      if (data.demoLoggedIn) {
+        saveAuth({
+          telegramId: data.user.id,
+          firstName: data.user.firstName,
+          lastName: data.user.lastName,
+          username: data.user.username,
+        });
+        window.location.href = data.needsOnboarding ? '/onboarding/role' : '/';
+        return;
+      }
       // DEV: сервер возвращает код напрямую (без Resend)
       if (data.devCode) {
         setCode(data.devCode);
