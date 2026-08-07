@@ -197,31 +197,15 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: true, workout, message: 'Тренировка начата' });
     }
 
-    if (action === 'completeVideo' && videoId) {
-      const workoutVideo = await prisma.workoutSessionVideo.updateMany({
-        where: { sessionId: workoutId, videoId },
-        data: { completed: true, completedAt: new Date(), actualRPE: actualRPE || null },
-      });
-      return NextResponse.json({ success: true, video: workoutVideo, message: 'Видео завершено' });
-    }
-
-    if (action === 'complete') {
-      const { actualDuration, actualRPE: workoutActualRPE } = body;
-      const workout = await prisma.workoutSession.update({
-        where: { id: workoutId },
-        data: {
-          status: WorkoutStatus.COMPLETED,
-          completedAt: new Date(),
-          actualDuration: actualDuration || null,
-          actualRPE: workoutActualRPE || null,
-        },
-        include: { videos: { include: { video: true } } },
-      });
-      return NextResponse.json({
-        success: true,
-        workout,
-        message: 'Тренировка завершена! Отличная работа! 💪',
-      });
+    // Античит-харднинг перед лигой (2026-08-07): мутирующие завершения в этом
+    // DEPRECATED-роуте закрыты — клиент их не вызывает (проверено grep'ом), а
+    // curl-фарм через них давал безлимитный XP в обход всех проверок и лимитов
+    // /api/training/update и /api/training/complete. 410, как generate/generate-v2.
+    if (action === 'completeVideo' || action === 'complete') {
+      return NextResponse.json(
+        { error: 'Этот способ завершения отключён. Используйте /api/training/update и /api/training/complete' },
+        { status: 410 },
+      );
     }
 
     if (action === 'skip') {

@@ -1,0 +1,131 @@
+'use client';
+
+// Лига в карточке ребёнка (родительский кабинет): свернутая по умолчанию
+// секция, при раскрытии тянет /api/parent/league?childId=. Чужие дети — под
+// никами (приватность), свой — по имени с lime-подсветкой строки.
+
+import { useState } from 'react';
+
+interface LeagueRow {
+  rank: number;
+  name: string;
+  emoji: string;
+  weeklyXp: number;
+  isOwn: boolean;
+  isFake: boolean;
+}
+
+interface LeagueResponse {
+  noBirthYear?: boolean;
+  league?: {
+    rows: LeagueRow[];
+    ownRank: number;
+    totalReal: number;
+    percentile: number;
+  } | null;
+  weekLabel?: string;
+  year?: number;
+}
+
+export default function LeagueTable({ childId }: { childId: string }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<LeagueResponse | null>(null);
+
+  const toggle = async () => {
+    const next = !open;
+    setOpen(next);
+    // Данные грузим один раз при первом раскрытии; после ошибки
+    // повторное раскрытие пробует снова (data остаётся null)
+    if (!next || data || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/parent/league?childId=${encodeURIComponent(childId)}`, {
+        cache: 'no-store',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('league fetch failed');
+      const json: LeagueResponse = await res.json();
+      setData(json);
+    } catch {
+      setError('Не удалось загрузить лигу. Раскрой ещё раз, чтобы повторить.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl bg-white/5 p-3 mt-2">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between text-left"
+      >
+        <span className="text-muted text-[11px] font-overpass uppercase tracking-wide">
+          🏆 Лига{data?.year ? ` ${data.year} года` : ''}
+        </span>
+        <span className="text-muted text-xs" aria-hidden>
+          {open ? '▲' : '▼'}
+        </span>
+      </button>
+
+      {open && (
+        <div className="mt-2">
+          {loading && <div className="text-muted text-xs py-2">Загружаем таблицу…</div>}
+
+          {error && <p className="text-red-400 text-xs py-1">{error}</p>}
+
+          {data?.noBirthYear && (
+            <p className="text-muted text-xs leading-relaxed py-1">
+              Укажи дату рождения в профиле ребёнка, чтобы участвовать в лиге.
+            </p>
+          )}
+
+          {data && !data.noBirthYear && !data.league && !loading && (
+            <p className="text-muted text-xs py-1">Таблица пока недоступна. Зайди позже.</p>
+          )}
+
+          {data?.league && (
+            <>
+              <div className="flex flex-col gap-0.5">
+                {data.league.rows.map((row) => (
+                  <div
+                    key={`${row.rank}-${row.name}`}
+                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${
+                      row.isOwn ? 'bg-brand/15 text-brand font-bold' : 'text-white'
+                    }`}
+                  >
+                    <span
+                      className={`w-6 shrink-0 text-right font-overpass tabular-nums ${
+                        row.isOwn ? 'text-brand' : 'text-muted'
+                      }`}
+                    >
+                      {row.rank}
+                    </span>
+                    <span className="shrink-0" aria-hidden>
+                      {row.emoji}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{row.name}</span>
+                    <span
+                      className={`shrink-0 font-overpass tabular-nums ${
+                        row.isOwn ? 'text-brand' : 'text-muted'
+                      }`}
+                    >
+                      {row.weeklyXp} XP
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="text-muted text-xs mt-2">
+                Сильнее {data.league.percentile}% сверстников · неделя {data.weekLabel}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

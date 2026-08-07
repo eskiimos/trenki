@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     const session = await prisma.workoutSession.findUnique({
       where: { id: sessionId },
-      include: { microcycleDay: true },
+      include: { microcycleDay: { include: { microcycle: { select: { weekStartDate: true } } } } },
     });
 
     if (!session) {
@@ -44,6 +44,18 @@ export async function POST(request: NextRequest) {
     // Идемпотентно: уже закрытую сессию повторно не трогаем.
     if (session.status === WorkoutStatus.COMPLETED || session.status === WorkoutStatus.SKIPPED) {
       return NextResponse.json({ success: true, alreadyClosed: true });
+    }
+
+    // Античит (лига): закрывать можно только НАСТУПИВШИЙ день цикла. Без этой
+    // проверки один curl-заход закрывал будущие дни недели разом (+100 XP каждый).
+    // Честный флоу всегда закрывает сегодняшний/прошедший день.
+    const dayDate = new Date(session.microcycleDay.microcycle.weekStartDate);
+    dayDate.setDate(dayDate.getDate() + (session.microcycleDay.dayOfWeek - 1));
+    dayDate.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    if (dayDate.getTime() > todayEnd.getTime()) {
+      return NextResponse.json({ error: 'Этот день цикла ещё не наступил' }, { status: 400 });
     }
 
     await prisma.workoutSession.update({

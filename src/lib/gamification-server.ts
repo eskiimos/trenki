@@ -26,7 +26,10 @@ export async function getGamificationSummary(userId: string): Promise<Gamificati
       where: { userId, status: WorkoutStatus.COMPLETED },
     }),
     prisma.workoutSessionVideo.count({
-      where: { completed: true, session: { userId } },
+      // Только модули ДОВЕДЁННЫХ до конца тренировок: модули брошенных/PENDING
+      // сессий в XP не идут (античит-ревью перед лигой — иначе фарм модулей
+      // без завершения обходил дневные лимиты).
+      where: { completed: true, session: { userId, status: 'COMPLETED' } },
     }),
     prisma.workoutSession.findMany({
       where: { userId, status: WorkoutStatus.COMPLETED, completedAt: { not: null } },
@@ -64,7 +67,7 @@ export async function getWeekActivity(
       where: { userId, status: WorkoutStatus.COMPLETED, completedAt: { gte: weekAgo } },
     }),
     prisma.workoutSessionVideo.count({
-      where: { completed: true, completedAt: { gte: weekAgo }, session: { userId } },
+      where: { completed: true, completedAt: { gte: weekAgo }, session: { userId, status: 'COMPLETED' } },
     }),
   ]);
   return { workouts, modules };

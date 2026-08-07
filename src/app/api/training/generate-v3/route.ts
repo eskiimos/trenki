@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
 import { getPaywallMode } from '@/lib/settings';
 import { isPaywalled } from '@/lib/paywall';
+import { rateLimit } from '@/lib/coach/rate-limit';
 import {
   TrainingGoal,
   EnergyState,
@@ -35,6 +36,19 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuthUser(request);
     if ('response' in auth) return auth.response;
+
+    // Античит-бэкстоп (лига): жёсткий cap генераций в сутки НЕЗАВИСИМО от
+    // paywall-режима — прежняя квота 1/нед живёт только при активном paywall и
+    // при mode=off была мёртвой, оставляя «принтер сессий» для XP-фарма.
+    // 10/день честному юзеру не мешает никогда. In-memory (сброс при деплое) —
+    // приемлемо: это backstop, а не бухгалтерия.
+    const genRl = rateLimit(`gen-v3:${auth.user.id}`, 10, 24 * 60 * 60 * 1000);
+    if (!genRl.ok) {
+      return NextResponse.json(
+        { error: 'Слишком много тренировок за день — продолжи завтра' },
+        { status: 429 },
+      );
+    }
 
     // Быстрая ИИ-тренировка (Трек A, п.6e): бесплатно 1 в неделю, дальше — подписка.
     // Гейтим только когда paywall активен для этого юзера (в 'off' — безлимит, как раньше;

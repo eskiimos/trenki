@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { clearAuth } from '@/lib/auth';
 import { useSubscriptionPricing } from '@/hooks/useSubscriptionPricing';
+import LeagueTable from '@/components/LeagueTable';
 
 interface ChildCard {
   id: string;
@@ -171,6 +172,9 @@ const ChildCardView = ({ child }: { child: ChildCard }) => {
           </>
         )}
       </div>
+
+      {/* Лига сверстников (по году рождения) — раскрывается по тапу */}
+      <LeagueTable childId={child.id} />
     </div>
   );
 };
