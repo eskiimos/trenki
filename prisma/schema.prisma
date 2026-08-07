@@ -36,6 +36,7 @@ model User {
   lastNudgeOn           String? // локальная дата YYYY-MM-DD последнего нуджа — не чаще раза в день
   nudgeStep             Int     @default(0) // шаг онбординг-дрипа (0 — ещё не слали)
   lastDustyNudgeAt      DateTime? // когда слали «гантели запылились» — интервал повтора
+  lastParentDigestAt    DateTime? // когда родителю (role=PARENT) ушёл еженедельный email-дайджест — дедуп крона
   tbankRebillId         String? // сохранённая карта T-Bank для автосписания подписки (рекуррент)
   payments              Payment[]
   favorites             FavoriteVideo[]

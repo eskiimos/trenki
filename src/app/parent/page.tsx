@@ -8,6 +8,7 @@ import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { clearAuth } from '@/lib/auth';
+import { useSubscriptionPricing } from '@/hooks/useSubscriptionPricing';
 
 interface ChildCard {
   id: string;
@@ -15,6 +16,7 @@ interface ChildCard {
   lastName: string | null;
   avatarUrl: string | null;
   potential: number | null;
+  premium: { active: boolean; until: string | null };
   gamification: {
     level: number;
     xpIntoLevel: number;
@@ -39,9 +41,44 @@ function childName(c: ChildCard): string {
   return [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Хоккеист';
 }
 
+/** «7 сентября 2026» для premiumUntil */
+function formatUntil(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
 const ChildCardView = ({ child }: { child: ChildCard }) => {
   const g = child.gamification;
   const xpPercent = Math.min(100, Math.round((g.xpIntoLevel / Math.max(1, g.xpForNext)) * 100));
+  const pricing = useSubscriptionPricing();
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
+
+  // Оплата подписки ребёнка родителем: T-Bank Init с childId → редирект на оплату
+  const handleSubscribe = async () => {
+    if (paying) return;
+    setPaying(true);
+    setPayError(null);
+    try {
+      const res = await fetch('/api/payments/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ childId: child.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.paymentURL) {
+        window.location.href = data.paymentURL;
+        return;
+      }
+      setPayError(data?.error || 'Не удалось перейти к оплате');
+    } catch {
+      setPayError('Сетевая ошибка. Проверь подключение.');
+    } finally {
+      setPaying(false);
+    }
+  };
   return (
     <div className="bg-surface rounded-2xl p-4 border border-white/5">
       {/* Шапка: аватар + имя + стрик */}
@@ -104,6 +141,35 @@ const ChildCardView = ({ child }: { child: ChildCard }) => {
             {child.potential != null ? Math.round(child.potential) : '—'}
           </div>
         </div>
+      </div>
+
+      {/* Подписка ребёнка */}
+      <div className="rounded-xl bg-white/5 p-3 mt-2">
+        <div className="text-muted text-[11px] font-overpass uppercase tracking-wide mb-1">
+          Подписка
+        </div>
+        {child.premium.active ? (
+          <div className="text-brand text-sm font-bold">
+            {child.premium.until
+              ? `Подписка до ${formatUntil(child.premium.until)}`
+              : 'Подписка активна'}
+          </div>
+        ) : (
+          <>
+            <div className="text-white text-sm font-bold mb-2">Подписки нет</div>
+            <button
+              type="button"
+              onClick={handleSubscribe}
+              disabled={paying}
+              className="w-full bg-brand text-night rounded-full py-2.5 px-4 text-sm font-bold font-overpass uppercase transition-transform active:scale-95 disabled:opacity-70"
+            >
+              {paying ? 'Переходим к оплате…' : `Оформить подписку — ${pricing.priceMonthlyRub} ₽/мес`}
+            </button>
+            {payError && (
+              <p className="text-red-400 text-xs text-center mt-2">{payError}</p>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

@@ -19,9 +19,16 @@ export async function GET(request: NextRequest) {
   if (!orderId) return NextResponse.json({ error: 'orderId required' }, { status: 400 });
 
   const payment = await prisma.payment.findUnique({ where: { orderId } });
-  // Доступ только к своему заказу (не доверяем orderId из query для чужого юзера).
-  if (!payment || payment.userId !== auth.user.id) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  // Доступ только к своему заказу (не доверяем orderId из query для чужого юзера)
+  // ЛИБО к заказу привязанного ребёнка — родитель оплачивает подписку ребёнка
+  // из кабинета и ждёт подтверждения на той же success-странице.
+  if (!payment) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (payment.userId !== auth.user.id) {
+    const link = await prisma.parentLink.findUnique({
+      where: { parentId_childId: { parentId: auth.user.id, childId: payment.userId } },
+      select: { id: true },
+    });
+    if (!link) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   let status = payment.status;
@@ -44,8 +51,10 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Премиум ПОЛУЧАТЕЛЯ платежа (при самооплате это сам auth-юзер, при оплате
+  // родителем — ребёнок; его статус родитель и так видит в /api/parent/children).
   const fresh = await prisma.user.findUnique({
-    where: { id: auth.user.id },
+    where: { id: payment.userId },
     select: { accessTier: true, premiumUntil: true },
   });
 

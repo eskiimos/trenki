@@ -23,6 +23,28 @@ export async function POST(request: NextRequest) {
   if ('response' in auth) return auth.response;
   const user = auth.user;
 
+  // Родитель может оплатить подписку СВОЕГО ребёнка: Payment.userId = childId,
+  // премиум через существующий вебхук уйдёт ребёнку (grant.ts выдаёт по
+  // payment.userId). Платит и получает чек (54-ФЗ) текущий юзер — родитель.
+  // Без childId (body может отсутствовать вовсе) — самооплата, как раньше.
+  const body = (await request.json().catch(() => null)) as { childId?: unknown } | null;
+  const childId =
+    body && typeof body.childId === 'string' && body.childId ? body.childId : null;
+  let childName: string | null = null;
+  if (childId) {
+    const link = await prisma.parentLink.findUnique({
+      where: { parentId_childId: { parentId: user.id, childId } },
+      select: { child: { select: { firstName: true, lastName: true } } },
+    });
+    if (!link) {
+      return NextResponse.json(
+        { error: 'Можно оплачивать только своих привязанных детей' },
+        { status: 403 },
+      );
+    }
+    childName = [link.child.firstName, link.child.lastName].filter(Boolean).join(' ') || null;
+  }
+
   const config = getTbankConfig();
   if (!config) {
     return NextResponse.json({ error: 'Оплата пока не настроена' }, { status: 503 });
@@ -39,7 +61,8 @@ export async function POST(request: NextRequest) {
   if (receiptSettings.enabled) {
     const built = buildReceipt({
       amountKopecks,
-      email: user.email,
+      email: user.email, // чек всегда ПЛАТЕЛЬЩИКУ — при оплате за ребёнка тоже
+
       name: `Доступ к сервису «Треньки», ${SUBSCRIPTION_PERIOD_DAYS} дней`,
       taxation: receiptSettings.taxation,
       vat: receiptSettings.vat,
@@ -59,22 +82,28 @@ export async function POST(request: NextRequest) {
   const origin = returnOrigin();
 
   // Запись заказа ДО обращения к банку (аудит + идемпотентность по orderId).
+  // userId — ПОЛУЧАТЕЛЬ премиума: сам плательщик или его ребёнок (childId).
   await prisma.payment.create({
-    data: { orderId, userId: user.id, amountKopecks, status: 'NEW', kind: 'init', isRecurrentInit: false },
+    data: { orderId, userId: childId ?? user.id, amountKopecks, status: 'NEW', kind: 'init', isRecurrentInit: false },
   });
+
+  // Родителя после оплаты возвращаем в родительский кабинет (back=parent).
+  const backParam = childId ? '&back=parent' : '';
 
   let res;
   try {
     res = await initPayment(config, {
       amountKopecks,
       orderId,
-      description: 'Доступ «Треньки» на 30 дней',
-      customerKey: user.id, // стабильный ключ клиента на стороне банка
+      description: childName
+        ? `Доступ «Треньки» на 30 дней — для ${childName}`
+        : 'Доступ «Треньки» на 30 дней',
+      customerKey: user.id, // стабильный ключ клиента на стороне банка (плательщик, не ребёнок)
       // Recurrent НЕ передаём: оплата разовая, автосписания нет. Это ещё и
       // требование тест-кейса №1 T-Bank («не передавайте Recurrent=Y»).
       notificationURL: `${origin}/api/webhook/tbank`,
-      successURL: `${origin}/subscription/success?orderId=${orderId}`,
-      failURL: `${origin}/subscription/fail?orderId=${orderId}`,
+      successURL: `${origin}/subscription/success?orderId=${orderId}${backParam}`,
+      failURL: `${origin}/subscription/fail?orderId=${orderId}${backParam}`,
       receipt, // не участвует в подписи Token (см. tbank.ts)
     });
   } catch (e) {

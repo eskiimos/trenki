@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
 import { getGamificationSummary, getWeekActivity } from '@/lib/gamification-server';
+import { hasPremium } from '@/lib/access';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,8 @@ export async function GET(request: NextRequest) {
             id: true,
             firstName: true,
             lastName: true,
+            accessTier: true,
+            premiumUntil: true,
             profile: { select: { avatarUrl: true, potential: true } },
           },
         },
@@ -43,6 +46,8 @@ export async function GET(request: NextRequest) {
           lastName: child.lastName,
           avatarUrl: child.profile?.avatarUrl ?? null,
           potential: child.profile?.potential ?? null,
+          // Подписка ребёнка — родитель видит статус и может оплатить из кабинета
+          premium: { active: hasPremium(child), until: child.premiumUntil },
           gamification,
           week,
         };

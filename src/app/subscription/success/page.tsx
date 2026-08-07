@@ -10,6 +10,9 @@ import { invalidateSubscription } from '@/hooks/useSubscription';
 function SuccessInner() {
   const params = useSearchParams();
   const orderId = params.get('orderId');
+  // back=parent ставит /api/payments/init при оплате родителем за ребёнка —
+  // родителя возвращаем в родительский кабинет, а не в атлетский профиль.
+  const backToParent = params.get('back') === 'parent';
   const [state, setState] = useState<'checking' | 'paid' | 'pending'>('checking');
 
   useEffect(() => {
@@ -81,7 +84,7 @@ function SuccessInner() {
           </>
         )}
         <Link
-          href="/profile"
+          href={backToParent ? '/parent' : '/profile'}
           className="font-overpass uppercase"
           style={{
             display: 'inline-block',
@@ -95,7 +98,7 @@ function SuccessInner() {
             textDecoration: 'none',
           }}
         >
-          В профиль
+          {backToParent ? 'Вернуться в кабинет' : 'В профиль'}
         </Link>
       </div>
     </div>
