@@ -15,6 +15,7 @@ import SubscriptionExpiryCard from '@/components/SubscriptionExpiryCard';
 import ParentInviteSection from '@/components/ParentInviteSection';
 import EvolutionModal from '@/components/EvolutionModal';
 import StatusPathModal from '@/components/StatusPathModal';
+import TempoBadge from '@/components/TempoBadge';
 import LeagueTable from '@/components/LeagueTable';
 import { useTour } from '@/components/tour/TourProvider';
 import { clearAuth, getTelegramId } from '@/lib/auth';
@@ -373,13 +374,8 @@ const ProfilePage = () => {
                 {gamification.status.title}
               </button>
               <span className="inline-flex items-center gap-2">
-                {/* Бейдж «Темп ×2»: серия ≥ 3 дней — весь XP дня удваивается */}
-                {gamification.tempoActive && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-brand/15 border border-brand/40 text-brand text-[11px] font-bold font-overpass px-2 py-0.5">
-                    <span aria-hidden>🔥</span>
-                    Темп ×2
-                  </span>
-                )}
+                {/* Бейдж темпа виден ВСЕГДА: активный ×2 или отсчёт до него */}
+                <TempoBadge streak={gamification.streak} tempoActive={gamification.tempoActive} />
                 <span className="text-white text-base font-bold font-overpass">
                   Уровень {gamification.level}
                 </span>
@@ -399,12 +395,6 @@ const ProfilePage = () => {
             {gamification.nextStatus && (
               <div className="text-muted/70 text-xs mt-1">
                 Следующее звание: {gamification.nextStatus.title} (ур. {gamification.nextStatus.minLevel})
-              </div>
-            )}
-            {/* Тизер множителя, пока темп не активен: игрок должен знать правило */}
-            {!gamification.tempoActive && (
-              <div className="text-muted/70 text-xs mt-1">
-                🔥 Тренируйся 3 дня подряд — весь опыт дня пойдёт ×2
               </div>
             )}
           </div>

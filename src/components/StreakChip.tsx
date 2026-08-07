@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { TEMPO_MIN_STREAK } from '@/lib/gamification';
+import TempoBadge from '@/components/TempoBadge';
 
 const StreakChip = () => {
   const [streak, setStreak] = useState(0);
@@ -32,11 +33,13 @@ const StreakChip = () => {
     <section className="px-4" style={{ paddingTop: 12 }}>
       <div className="bg-surface rounded-2xl px-4 py-3 flex items-center gap-3">
         <span className="text-xl" aria-hidden>🔥</span>
-        <span className="text-white text-sm font-medium">
+        <span className="text-white text-sm font-medium flex-1 min-w-0">
           {streak >= TEMPO_MIN_STREAK
-            ? `Серия: ${streak} дн. подряд — опыт ×2!`
-            : `Серия: ${streak} дн. Ещё ${TEMPO_MIN_STREAK - streak} — и опыт ×2!`}
+            ? `Серия: ${streak} дн. подряд — не потеряй!`
+            : `Серия: ${streak} дн. подряд`}
         </span>
+        {/* Бейдж темпа: активный ×2 или отсчёт — правило всегда на виду */}
+        <TempoBadge streak={streak} tempoActive={streak >= TEMPO_MIN_STREAK} />
       </div>
     </section>
   );

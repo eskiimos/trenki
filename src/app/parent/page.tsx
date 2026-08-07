@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { clearAuth } from '@/lib/auth';
 import { useSubscriptionPricing } from '@/hooks/useSubscriptionPricing';
 import LeagueTable from '@/components/LeagueTable';
+import TempoBadge from '@/components/TempoBadge';
 import PotentialRing from '@/components/PotentialRing';
 import StatusPathModal from '@/components/StatusPathModal';
 
@@ -184,17 +185,13 @@ const ChildCardView = ({
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-white text-base font-bold truncate">{childName(child)}</div>
-          {g.streak > 0 && (
-            <div className="text-muted text-xs mt-0.5 flex items-center gap-1.5 flex-wrap">
+          <div className="text-muted text-xs mt-0.5 flex items-center gap-1.5 flex-wrap">
+            {g.streak > 0 && (
               <span>🔥 Серия: {g.streak} {plural(g.streak, ['день', 'дня', 'дней'])}</span>
-              {/* Бейдж «Темп ×2» — серия ≥ 3 дней, весь XP дня удваивается */}
-              {g.tempoActive && (
-                <span className="inline-flex items-center rounded-full bg-brand/15 border border-brand/40 text-brand text-[10px] font-bold font-overpass px-1.5 py-px">
-                  Темп ×2
-                </span>
-              )}
-            </div>
-          )}
+            )}
+            {/* Бейдж темпа виден всегда: активный ×2 или отсчёт до него */}
+            <TempoBadge streak={g.streak} tempoActive={!!g.tempoActive} />
+          </div>
         </div>
       </div>
 
