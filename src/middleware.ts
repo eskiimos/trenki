@@ -12,6 +12,7 @@ const publicRoutes = [
   '/api/referral', // публичная валидация реф-кода (до входа)
   '/legal',
   '/join',
+  '/parent/join', // родительский инвайт: страница сама сохранит код и уведёт на /login
   '/admin/login',
   '/api/auth/email/send-code',
   '/api/auth/email/verify-code',

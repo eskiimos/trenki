@@ -10,7 +10,7 @@ const JWT_AUDIENCE = 'trenki-web';
 
 export interface SessionPayload {
   uid: string; // User.id (cuid)
-  role: 'ATHLETE' | 'COACH';
+  role: 'ATHLETE' | 'COACH' | 'PARENT';
 }
 
 function getSecretKey(): Uint8Array {
@@ -41,7 +41,9 @@ export async function verifySession(token: string): Promise<SessionPayload | nul
       algorithms: [JWT_ALG],
     });
     const uid = typeof payload.uid === 'string' ? payload.uid : null;
-    const role = payload.role === 'COACH' ? 'COACH' : 'ATHLETE';
+    // Неизвестные значения нормализуются в безопасный дефолт ATHLETE.
+    const role =
+      payload.role === 'COACH' ? 'COACH' : payload.role === 'PARENT' ? 'PARENT' : 'ATHLETE';
     if (!uid) return null;
     return { uid, role };
   } catch {

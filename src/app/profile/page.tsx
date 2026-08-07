@@ -12,6 +12,7 @@ import BottomNavigation from '@/components/BottomNavigation';
 import AccountSwitcher from '@/components/AccountSwitcher';
 import PotentialSection from '@/components/PotentialSection';
 import SubscriptionExpiryCard from '@/components/SubscriptionExpiryCard';
+import ParentInviteSection from '@/components/ParentInviteSection';
 import EvolutionModal from '@/components/EvolutionModal';
 import { useTour } from '@/components/tour/TourProvider';
 import { clearAuth, getTelegramId } from '@/lib/auth';
@@ -397,6 +398,9 @@ const ProfilePage = () => {
             emoji={gamification.status.emoji}
           />
         )}
+
+        {/* Секция «Родителям»: пригласить родителя / отвязать привязанных */}
+        <ParentInviteSection />
 
         {/* Баннер «подписка скоро закончится» (п.5) — для премиума за 3 дня до конца */}
         <SubscriptionExpiryCard />

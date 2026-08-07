@@ -97,6 +97,18 @@ function EmailLoginForm() {
         return;
       }
 
+      // Родительский инвайт: пришли по /parent/join без сессии — код лежит в
+      // localStorage, после входа возвращаем на страницу погашения. Ключ
+      // чистит сама /parent/join после успешной привязки.
+      let parentJoinCode: string | null = null;
+      try {
+        parentJoinCode = localStorage.getItem('trenki_parent_join_code');
+      } catch {}
+      if (parentJoinCode) {
+        window.location.href = `/parent/join?code=${encodeURIComponent(parentJoinCode)}`;
+        return;
+      }
+
       window.location.href = data.needsOnboarding ? '/onboarding/role' : '/';
     } catch {
       setError('Сетевая ошибка. Проверьте подключение.');

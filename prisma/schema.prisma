@@ -58,6 +58,9 @@ model User {
   coachPoseReviews      PoseSession[]           @relation("CoachPoseReviews")
   coachWorkoutSessions  WorkoutSession[]        @relation("CoachWorkoutSessions")
   microcycles           Microcycle[]
+  parentLinks           ParentLink[]            @relation("ParentLinks") // я — родитель этих связей
+  childLinks            ParentLink[]            @relation("ChildLinks") // я — ребёнок этих связей
+  parentInvites         ParentInvite[]
 
   @@index([referralCode])
   @@map("users")
@@ -782,6 +785,7 @@ model ReferralCode {
 enum UserRole {
   ATHLETE
   COACH
+  PARENT
 }
 
 // Тариф доступа пользователя (под монетизацию). Минимальный набор — расширяемо
@@ -1012,4 +1016,38 @@ model Payment {
   @@index([userId, createdAt])
   @@index([paymentId])
   @@map("payments")
+}
+
+// ======================================================================
+//                       РОДИТЕЛЬСКИЙ КАБИНЕТ
+// ======================================================================
+// Родитель — отдельный User (role=PARENT), входит тем же email-OTP.
+// Ребёнок генерирует одноразовый инвайт-код (48ч), родитель открывает ссылку
+// /parent/join?code=... — создаётся ParentLink. Родитель видит прогресс
+// ребёнка read-only (/parent, /api/parent/children).
+
+model ParentLink {
+  id        String   @id @default(cuid())
+  parentId  String
+  childId   String
+  createdAt DateTime @default(now())
+  parent    User     @relation("ParentLinks", fields: [parentId], references: [id], onDelete: Cascade)
+  child     User     @relation("ChildLinks", fields: [childId], references: [id], onDelete: Cascade)
+
+  @@unique([parentId, childId])
+  @@index([childId])
+  @@map("parent_links")
+}
+
+model ParentInvite {
+  id        String    @id @default(cuid())
+  code      String    @unique // 8 hex-символов (crypto.randomBytes(4))
+  childId   String
+  expiresAt DateTime // создание + 48ч; деактивация = expiresAt в прошлое
+  usedAt    DateTime? // одноразовый: после погашения родителем не работает
+  createdAt DateTime  @default(now())
+  child     User      @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@index([childId])
+  @@map("parent_invites")
 }

@@ -163,6 +163,10 @@ const HomePage = () => {
             router.replace('/coach/team');
             return;
           }
+          if (data?.role === 'PARENT') {
+            router.replace('/parent');
+            return;
+          }
         }
       } catch {
         // сетевая ошибка — пробуем показать страницу, чтобы не блокировать UI
