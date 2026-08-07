@@ -12,6 +12,7 @@ import BottomNavigation from '@/components/BottomNavigation';
 import AccountSwitcher from '@/components/AccountSwitcher';
 import PotentialSection from '@/components/PotentialSection';
 import SubscriptionExpiryCard from '@/components/SubscriptionExpiryCard';
+import EvolutionModal from '@/components/EvolutionModal';
 import { useTour } from '@/components/tour/TourProvider';
 import { clearAuth, getTelegramId } from '@/lib/auth';
 import { calculateAge } from '@/lib/age-utils';
@@ -26,7 +27,28 @@ const ProfilePage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [recentGains, setRecentGains] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  // Геймификация: уровень/статус/XP. null — ещё грузится или ошибка (карточку не показываем).
+  const [gamification, setGamification] = useState<{
+    level: number;
+    xpIntoLevel: number;
+    xpForNext: number;
+    status: { key: string; title: string; emoji: string };
+    nextStatus: { title: string; minLevel: number } | null;
+  } | null>(null);
   const { startTour } = useTour();
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/gamification/summary')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.status) setGamification(d);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Push-уведомления
   const { 
@@ -334,6 +356,47 @@ const ProfilePage = () => {
           </div>
         </div>
         </div>
+
+        {/* Карточка уровня (геймификация): статус-«эволюция», уровень, XP-прогресс.
+            Пока сводка не загрузилась — ничего не показываем (без скелетона). */}
+        {gamification && (
+          <div className="bg-surface rounded-2xl p-4 mb-6 border border-white/5">
+            <div className="flex items-center justify-between mb-3">
+              <span className="inline-flex items-center gap-1.5 bg-brand text-night text-xs font-bold font-overpass uppercase rounded-full px-3 py-1">
+                <span aria-hidden>{gamification.status.emoji}</span>
+                {gamification.status.title}
+              </span>
+              <span className="text-white text-base font-bold font-overpass">
+                Уровень {gamification.level}
+              </span>
+            </div>
+            <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-brand transition-all"
+                style={{
+                  width: `${Math.min(100, Math.round((gamification.xpIntoLevel / gamification.xpForNext) * 100))}%`,
+                }}
+              />
+            </div>
+            <div className="text-muted text-xs mt-2">
+              XP: {gamification.xpIntoLevel}/{gamification.xpForNext} · до следующего уровня
+            </div>
+            {gamification.nextStatus && (
+              <div className="text-muted/70 text-xs mt-1">
+                Следующее звание: {gamification.nextStatus.title} (ур. {gamification.nextStatus.minLevel})
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Модалка «Эволюция!» — при смене статуса с прошлого визита */}
+        {gamification && (
+          <EvolutionModal
+            statusKey={gamification.status.key}
+            title={gamification.status.title}
+            emoji={gamification.status.emoji}
+          />
+        )}
 
         {/* Баннер «подписка скоро закончится» (п.5) — для премиума за 3 дня до конца */}
         <SubscriptionExpiryCard />

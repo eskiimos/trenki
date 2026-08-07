@@ -4,10 +4,13 @@
  *   0 15 * * * curl -s -H "Authorization: Bearer $CRON_SECRET" \
  *     http://localhost:3000/api/cron/engagement-nudges
  *
- * Раз в сутки (днём). Два трека, приоритет у первого:
+ * Раз в сутки (днём). Три трека, приоритет сверху вниз:
  *  1) ОНБОРДИНГ-ДРИП — зарегистрировался, но НИ РАЗУ не тренировался: серия из
  *     3 сообщений на 1-й, 3-й и 7-й день. Шаг фиксируется в User.nudgeStep.
- *  2) «ГАНТЕЛИ ЗАПЫЛИЛИСЬ» — без активной подписки и не тренировался
+ *  2) «СЕРИЯ ПОД УГРОЗОЙ» — стрик ≥ 2 дней, последняя тренировка вчера:
+ *     сегодня последний шанс не обнулить серию. Без отдельного поля-интервала —
+ *     условие «вчера» само по себе одноразовое, плюс общий дедуп lastNudgeOn.
+ *  3) «ГАНТЕЛИ ЗАПЫЛИЛИСЬ» — без активной подписки и не тренировался
  *     DUSTY_AFTER_DAYS дней. Повторяется не чаще, чем раз в этот же интервал.
  *
  * Дедуп: User.lastNudgeOn (локальная дата) — не больше одного нуджа в день, плюс
@@ -21,6 +24,7 @@ import { prisma } from '@/lib/prisma';
 import { sendUserPush } from '@/lib/coach/push';
 import { hasPremium } from '@/lib/access';
 import { decideNudge, DUSTY_AFTER_DAYS } from '@/lib/notifications/nudges';
+import { computeStreak } from '@/lib/gamification';
 import { WorkoutStatus, UserRole } from '@/generated/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -88,17 +92,25 @@ export async function GET(request: NextRequest) {
     // Уже слали сегодня нудж — или сегодня ушло дневное напоминание.
     if (u.lastNudgeOn === today || u.lastReminderOn === today) { skipped++; continue; }
 
-    // Последняя ЗАВЕРШЁННАЯ тренировка — по ней считаем простой.
+    // Завершённые тренировки — по ним считаем и простой, и стрик.
     // ВАЖНО: по completedAt, а не createdAt — сессии микроцикла создаются пачкой
     // на всю неделю заранее, и по createdAt активный юзер выглядел бы «пропавшим».
-    const lastDone = await prisma.workoutSession.findFirst({
+    // N+1 приемлем: кандидатов ≤ MAX_BATCH и один запрос даёт сразу оба значения
+    // (последних 120 завершений хватает на любой реалистичный стрик).
+    const recentDone = await prisma.workoutSession.findMany({
       where: { userId: u.id, status: WorkoutStatus.COMPLETED, completedAt: { not: null } },
       orderBy: { completedAt: 'desc' },
       select: { completedAt: true },
+      take: 120,
     });
+    const lastDone = recentDone[0];
     const daysSince = lastDone?.completedAt
       ? Math.floor((now.getTime() - lastDone.completedAt.getTime()) / DAY_MS)
       : null;
+    const currentStreak = computeStreak(
+      recentDone.map((s) => s.completedAt!),
+      now,
+    );
 
     const decision = decideNudge(
       {
@@ -110,6 +122,7 @@ export async function GET(request: NextRequest) {
         daysSinceLastDusty: u.lastDustyNudgeAt
           ? Math.floor((now.getTime() - u.lastDustyNudgeAt.getTime()) / DAY_MS)
           : null,
+        currentStreak,
       },
       now,
     );

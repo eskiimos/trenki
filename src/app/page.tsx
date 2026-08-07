@@ -11,6 +11,7 @@ import { getTelegramId } from '@/lib/auth';
 import BottomNavigation from '@/components/BottomNavigation';
 import AddToHomeScreen from '@/components/AddToHomeScreen';
 import WorkoutReminder from '@/components/WorkoutReminder';
+import StreakChip from '@/components/StreakChip';
 import AssignmentsBanner from '@/components/AssignmentsBanner';
 import MicrocycleFeedbackModal from '@/components/MicrocycleFeedbackModal';
 import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay';
@@ -192,7 +193,10 @@ const HomePage = () => {
 
         {/* Напоминание о незавершенной тренировке */}
         <WorkoutReminder />
-        
+
+        {/* Стрик: показываем только при серии от 2 дней (геймификация, Фаза 1) */}
+        <StreakChip />
+
         {/* Секция с короткими видео (треньки) */}
         <TrenkiSection />
 

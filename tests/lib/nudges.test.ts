@@ -11,6 +11,7 @@ const base = {
   hasPremium: false,
   nudgeStep: 0,
   daysSinceLastDusty: null,
+  currentStreak: 0,
 };
 
 describe('онбординг-дрип (ни разу не тренировался)', () => {
@@ -57,6 +58,47 @@ describe('онбординг-дрип (ни разу не тренировалс
   it('новичку НЕ шлём «гантели запылились» (он ещё не начинал)', () => {
     const d = decideNudge({ ...base, createdAt: daysAgo(10), everTrained: false, daysSinceLastTraining: null }, NOW);
     expect(d?.kind).toBe('onboarding');
+  });
+});
+
+describe('нудж «серия под угрозой»', () => {
+  it('шлёт при стрике ≥ 2 и простое ровно 1 день', () => {
+    const d = decideNudge({ ...base, currentStreak: 3, daysSinceLastTraining: 1 }, NOW);
+    expect(d?.kind).toBe('streak');
+    expect(d?.text.title).toContain('Серия под угрозой');
+    expect(d?.text.body).toContain('3 дня подряд');
+  });
+
+  it('молчит, если тренировался сегодня (daysSince=0 — серия не под угрозой)', () => {
+    expect(decideNudge({ ...base, currentStreak: 3, daysSinceLastTraining: 0 }, NOW)).toBeNull();
+  });
+
+  it('молчит при стрике < 2 (один день — ещё не серия)', () => {
+    expect(decideNudge({ ...base, currentStreak: 1, daysSinceLastTraining: 1 }, NOW)).toBeNull();
+  });
+
+  it('шлёт и подписчику: стрик не про подписку', () => {
+    const d = decideNudge({ ...base, currentStreak: 2, daysSinceLastTraining: 1, hasPremium: true }, NOW);
+    expect(d?.kind).toBe('streak');
+  });
+
+  it('не пересекается с dusty: стрик — при простое 1 день, dusty — от 4', () => {
+    // Простой 1 день — стрик (dusty ещё не созрел).
+    const atOne = decideNudge({ ...base, currentStreak: 2, daysSinceLastTraining: 1 }, NOW);
+    expect(atOne?.kind).toBe('streak');
+    // Простой 4+ дней — стрик уже мёртв (computeStreak даст 0), работает dusty.
+    const atFour = decideNudge({ ...base, currentStreak: 0, daysSinceLastTraining: DUSTY_AFTER_DAYS }, NOW);
+    expect(atFour?.kind).toBe('dusty');
+  });
+
+  it('склоняет дни: 5 дней подряд', () => {
+    const d = decideNudge({ ...base, currentStreak: 5, daysSinceLastTraining: 1 }, NOW);
+    expect(d?.text.body).toContain('5 дней подряд');
+  });
+
+  it('не трогает nudgeStep дрипа', () => {
+    const d = decideNudge({ ...base, currentStreak: 2, daysSinceLastTraining: 1, nudgeStep: 2 }, NOW);
+    expect(d?.nextStep).toBe(2);
   });
 });
 
