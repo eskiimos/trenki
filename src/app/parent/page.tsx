@@ -11,6 +11,7 @@ import { clearAuth } from '@/lib/auth';
 import { useSubscriptionPricing } from '@/hooks/useSubscriptionPricing';
 import LeagueTable from '@/components/LeagueTable';
 import PotentialRing from '@/components/PotentialRing';
+import StatusPathModal from '@/components/StatusPathModal';
 
 interface ChildCard {
   id: string;
@@ -75,6 +76,8 @@ const ChildCardView = ({
   const [payError, setPayError] = useState<string | null>(null);
   // Кольцо потенциала (как в профиле ребёнка) — раскрывается по тапу на карточку
   const [potentialOpen, setPotentialOpen] = useState(false);
+  // Модалка «Путь хоккеиста» ребёнка — по тапу на бейдж звания
+  const [statusPathOpen, setStatusPathOpen] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
   const [unlinkError, setUnlinkError] = useState<string | null>(null);
 
@@ -189,10 +192,20 @@ const ChildCardView = ({
 
       {/* Звание + уровень + XP */}
       <div className="flex items-center justify-between mb-2">
-        <span className="inline-flex items-center gap-1.5 bg-brand text-night text-xs font-bold font-overpass uppercase rounded-full px-3 py-1">
+        <button
+          type="button"
+          onClick={() => setStatusPathOpen(true)}
+          aria-haspopup="dialog"
+          className="inline-flex items-center gap-1.5 bg-brand text-night text-xs font-bold font-overpass uppercase rounded-full px-3 py-1 cursor-pointer transition-transform active:scale-95"
+        >
           <span aria-hidden>{g.status.emoji}</span>
           {g.status.title}
-        </span>
+        </button>
+        <StatusPathModal
+          currentLevel={g.level}
+          open={statusPathOpen}
+          onClose={() => setStatusPathOpen(false)}
+        />
         <span className="text-white text-sm font-bold font-overpass">Уровень {g.level}</span>
       </div>
       <div className="h-2 rounded-full bg-white/10 overflow-hidden">

@@ -14,6 +14,7 @@ import PotentialRing from '@/components/PotentialRing';
 import SubscriptionExpiryCard from '@/components/SubscriptionExpiryCard';
 import ParentInviteSection from '@/components/ParentInviteSection';
 import EvolutionModal from '@/components/EvolutionModal';
+import StatusPathModal from '@/components/StatusPathModal';
 import { useTour } from '@/components/tour/TourProvider';
 import { clearAuth, getTelegramId } from '@/lib/auth';
 import { calculateAge } from '@/lib/age-utils';
@@ -36,6 +37,8 @@ const ProfilePage = () => {
     status: { key: string; title: string; emoji: string };
     nextStatus: { title: string; minLevel: number } | null;
   } | null>(null);
+  // Модалка «Путь хоккеиста» — открывается тапом по бейджу статуса
+  const [statusPathOpen, setStatusPathOpen] = useState(false);
   const { startTour } = useTour();
 
   useEffect(() => {
@@ -357,10 +360,15 @@ const ProfilePage = () => {
         {gamification && (
           <div className="bg-surface rounded-2xl p-4 mb-6 border border-white/5">
             <div className="flex items-center justify-between mb-3">
-              <span className="inline-flex items-center gap-1.5 bg-brand text-night text-xs font-bold font-overpass uppercase rounded-full px-3 py-1">
+              <button
+                type="button"
+                onClick={() => setStatusPathOpen(true)}
+                aria-haspopup="dialog"
+                className="inline-flex items-center gap-1.5 bg-brand text-night text-xs font-bold font-overpass uppercase rounded-full px-3 py-1 cursor-pointer transition-transform active:scale-95"
+              >
                 <span aria-hidden>{gamification.status.emoji}</span>
                 {gamification.status.title}
-              </span>
+              </button>
               <span className="text-white text-base font-bold font-overpass">
                 Уровень {gamification.level}
               </span>
@@ -382,6 +390,15 @@ const ProfilePage = () => {
               </div>
             )}
           </div>
+        )}
+
+        {/* Модалка «Путь хоккеиста» — вся лестница званий, по тапу на бейдж */}
+        {gamification && (
+          <StatusPathModal
+            currentLevel={gamification.level}
+            open={statusPathOpen}
+            onClose={() => setStatusPathOpen(false)}
+          />
         )}
 
         {/* Модалка «Эволюция!» — при смене статуса с прошлого визита */}
