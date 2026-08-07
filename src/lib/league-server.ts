@@ -49,8 +49,18 @@ export async function buildLeagueForUser(userId: string): Promise<LeagueForUser>
   const year = birthDate.getUTCFullYear();
   const yearStart = new Date(Date.UTC(year, 0, 1));
   const nextYearStart = new Date(Date.UTC(year + 1, 0, 1));
+  // Только СПОРТСМЕНЫ: без фильтра роли в когорту просачивались аккаунты
+  // родителей/тренеров с заполненным профилем (баг, пойманный владельцем).
+  // Демо-аккаунты (email из DEMO_BYPASS_EMAIL + посеянный демо-атлет) тоже
+  // исключаем — витрина не должна светиться в реальных лигах.
+  const demoEmails = (process.env.DEMO_BYPASS_EMAIL || '')
+    .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+  demoEmails.push('demo.athlete@trenki.app');
   const cohortProfiles = await prisma.profile.findMany({
-    where: { birthDate: { gte: yearStart, lt: nextYearStart } },
+    where: {
+      birthDate: { gte: yearStart, lt: nextYearStart },
+      user: { role: 'ATHLETE', email: { notIn: demoEmails } },
+    },
     select: {
       userId: true,
       user: { select: { firstName: true, lastName: true } },
