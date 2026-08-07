@@ -1,9 +1,11 @@
-// Лига (геймификация, Фаза 3). Решения босса 2026-08-07:
-// - Duolingo-модель: своего ребёнка родитель видит по-настоящему, остальных —
-//   под сгенерированными никами (анонимизация детских данных).
+// Лига (геймификация, Фаза 3). Решения босса 2026-08-07 (обновление):
+// - Вместо полной анонимизации — «примерно настоящие имена»: чужие реальные
+//   участники показываются как «Имя Ф.» (имя + инициал фамилии), полная
+//   фамилия НИКОГДА не попадает в выдачу. Свой ребёнок — полным именем.
+// - Эмодзи-аватар остаётся стабильным ником-генератором (nicknameFor).
 // - Внизу таблицы «фейковые» слабые участники, чтобы у нижних не падала
-//   мотивация. Фейки НЕ должны выглядеть как конкретные реальные дети:
-//   абстрактные ники + эмодзи, никаких фото/имён.
+//   мотивация. Фейки выглядят правдоподобно («Имя И.» из генератора), но
+//   это НЕ имена конкретных реальных детей — детерминированная генерация.
 // - Когорты по году рождения, счёт — недельный XP.
 // Чистая логика — тестируется без БД.
 
@@ -42,9 +44,47 @@ export function nicknameFor(userId: string): { name: string; emoji: string } {
   return { name: `${adj} ${noun} ${num}`, emoji };
 }
 
+/**
+ * Полуреальное имя участника: «Имя Ф.» (инициал фамилии вместо полной —
+ * приватность детских данных). Без фамилии — просто имя, без имени —
+ * fallback на стабильный сгенерированный ник.
+ */
+export function displayNameFor(p: {
+  firstName?: string | null;
+  lastName?: string | null;
+  userId: string;
+}): string {
+  const first = p.firstName?.trim();
+  if (!first) return nicknameFor(p.userId).name;
+  const initial = p.lastName?.trim().charAt(0);
+  return initial ? `${first} ${initial.toUpperCase()}.` : first;
+}
+
+// Правдоподобные имена для фейков: популярные русские мужские имена +
+// инициалы. Генерация детерминированная от сида — это НЕ имена конкретных
+// реальных детей.
+const FAKE_FIRST = [
+  'Артём', 'Миша', 'Даня', 'Кирилл', 'Матвей', 'Егор', 'Тимофей', 'Ваня',
+  'Саша', 'Лёва', 'Марк', 'Никита', 'Глеб', 'Максим', 'Дима', 'Рома',
+];
+const FAKE_INITIAL = [
+  'А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К', 'Л', 'М', 'Н', 'О', 'П', 'С',
+];
+
+/** Правдоподобное фейковое имя «Имя И.» — детерминированно от сида. */
+function fakeNameFor(seed: string): string {
+  const h = hash32(seed);
+  const first = FAKE_FIRST[h % FAKE_FIRST.length];
+  const initial = FAKE_INITIAL[(h >>> 4) % FAKE_INITIAL.length];
+  return `${first} ${initial}.`;
+}
+
 export interface LeagueEntry {
   userId: string;
   weeklyXp: number;
+  /** Реальное имя (для «Имя Ф.»); нет — участник показывается под ником */
+  firstName?: string | null;
+  lastName?: string | null;
 }
 
 export interface LeagueRow {
@@ -89,7 +129,9 @@ export function buildStandings(
     const nick = nicknameFor(e.userId);
     const own = e.userId === childUserId;
     return {
-      name: own ? childName : nick.name,
+      // Чужие — «Имя Ф.» (или ник-fallback без имени), свой — полное имя.
+      // Эмодзи всегда из ника — стабильный «аватар» участника.
+      name: own ? childName : displayNameFor(e),
       emoji: own ? '⭐' : nick.emoji,
       weeklyXp: e.weeklyXp,
       isOwn: own,
@@ -111,10 +153,12 @@ export function buildStandings(
   if (needFakes) {
     const ownXp = decorated[ownIdx].weeklyXp;
     for (let i = 0; i < FAKE_PAD; i++) {
-      const nick = nicknameFor(`${FAKE_NAMES_SEED}:${weekSeed}:${i}`);
+      const fakeSeed = `${FAKE_NAMES_SEED}:${weekSeed}:${i}`;
+      const name = fakeNameFor(fakeSeed);
+      const nick = nicknameFor(fakeSeed); // эмодзи как у остальных участников
       const factor = (FAKE_PAD - i) / (FAKE_PAD + 1); // 0.75, 0.5, 0.25 при PAD=3
       fakes.push({
-        name: nick.name,
+        name,
         emoji: nick.emoji,
         weeklyXp: Math.max(0, Math.floor(ownXp * factor)),
         isOwn: false,

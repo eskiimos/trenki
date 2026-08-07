@@ -1,7 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { nicknameFor, buildStandings, isoWeekLabel, type LeagueEntry } from '../../src/lib/league';
+import {
+  nicknameFor,
+  displayNameFor,
+  buildStandings,
+  isoWeekLabel,
+  type LeagueEntry,
+} from '../../src/lib/league';
 
-const e = (userId: string, weeklyXp: number): LeagueEntry => ({ userId, weeklyXp });
+const e = (
+  userId: string,
+  weeklyXp: number,
+  firstName?: string | null,
+  lastName?: string | null,
+): LeagueEntry => ({ userId, weeklyXp, firstName, lastName });
 
 describe('nicknameFor', () => {
   it('стабилен для одного userId и различен для разных', () => {
@@ -17,6 +28,25 @@ describe('nicknameFor', () => {
   });
 });
 
+describe('displayNameFor', () => {
+  it('имя + инициал фамилии с точкой', () => {
+    expect(displayNameFor({ firstName: 'Миша', lastName: 'Козлов', userId: 'u' })).toBe('Миша К.');
+  });
+  it('без фамилии — просто имя', () => {
+    expect(displayNameFor({ firstName: 'Миша', lastName: null, userId: 'u' })).toBe('Миша');
+    expect(displayNameFor({ firstName: 'Миша', lastName: '  ', userId: 'u' })).toBe('Миша');
+  });
+  it('без имени — fallback на сгенерированный ник', () => {
+    expect(displayNameFor({ firstName: null, lastName: 'Козлов', userId: 'u' })).toBe(
+      nicknameFor('u').name,
+    );
+    expect(displayNameFor({ userId: 'u' })).toBe(nicknameFor('u').name);
+  });
+  it('инициал приводится к верхнему регистру', () => {
+    expect(displayNameFor({ firstName: 'Миша', lastName: 'козлов', userId: 'u' })).toBe('Миша К.');
+  });
+});
+
 describe('buildStandings', () => {
   const CHILD = 'child-1';
 
@@ -24,12 +54,42 @@ describe('buildStandings', () => {
     expect(buildStandings([e('x', 10)], CHILD, 'Миша', 'w')).toBeNull();
   });
 
-  it('свой показан реальным именем и isOwn, остальные — никами', () => {
-    const s = buildStandings([e(CHILD, 300), e('a', 500), e('b', 100)], CHILD, 'Миша', 'w')!;
+  it('свой — полным именем и isOwn, чужие — «Имя И.»', () => {
+    const s = buildStandings(
+      [e(CHILD, 300, 'Миша', 'Козлов'), e('a', 500, 'Петя', 'Иванов'), e('b', 100, 'Артём', 'Соколов')],
+      CHILD,
+      'Миша',
+      'w',
+    )!;
     const own = s.rows.find((r) => r.isOwn)!;
     expect(own.name).toBe('Миша');
-    const others = s.rows.filter((r) => !r.isOwn && !r.isFake);
-    for (const o of others) expect(o.name).not.toBe('Миша');
+    const others = s.rows.filter((r) => !r.isOwn && !r.isFake).map((r) => r.name);
+    expect(others).toContain('Петя И.');
+    expect(others).toContain('Артём С.');
+  });
+
+  it('приватность: полной фамилии чужих в выдаче НЕТ', () => {
+    const s = buildStandings(
+      [e(CHILD, 300, 'Миша', 'Козлов'), e('a', 500, 'Петя', 'Кузнецов'), e('b', 100, 'Егор', 'Смирнов')],
+      CHILD,
+      'Миша',
+      'w',
+    )!;
+    const dump = JSON.stringify(s);
+    expect(dump).not.toContain('Кузнецов');
+    expect(dump).not.toContain('Смирнов');
+  });
+
+  it('чужой без имени — под стабильным ником, эмодзи из ника у всех', () => {
+    const s = buildStandings([e(CHILD, 300, 'Миша'), e('a', 500)], CHILD, 'Миша', 'w')!;
+    const other = s.rows.find((r) => !r.isOwn && !r.isFake)!;
+    expect(other.name).toBe(nicknameFor('a').name);
+    expect(other.emoji).toBe(nicknameFor('a').emoji);
+  });
+
+  it('чужой с именем без фамилии — просто имя', () => {
+    const s = buildStandings([e(CHILD, 300, 'Миша'), e('a', 500, 'Петя')], CHILD, 'Миша', 'w')!;
+    expect(s.rows.find((r) => !r.isOwn && !r.isFake)!.name).toBe('Петя');
   });
 
   it('сортировка по XP, ранги корректны', () => {
@@ -44,7 +104,7 @@ describe('buildStandings', () => {
     expect(s.rows.some((r) => r.isFake)).toBe(false);
   });
 
-  it('свой последний → снизу появляются более слабые фейки', () => {
+  it('свой последний → снизу появляются более слабые фейки в формате «Имя И.»', () => {
     const s = buildStandings([e(CHILD, 100), e('a', 500), e('b', 300)], CHILD, 'Миша', 'w')!;
     const fakes = s.rows.filter((r) => r.isFake);
     expect(fakes.length).toBeGreaterThan(0);
@@ -52,6 +112,8 @@ describe('buildStandings', () => {
     for (const f of fakes) {
       expect(f.weeklyXp).toBeLessThanOrEqual(own.weeklyXp);
       expect(f.rank).toBeGreaterThan(own.rank);
+      // Правдоподобное имя: «Имя И.» (генерация, не ник «Прилагательное Существительное 42»)
+      expect(f.name).toMatch(/^[А-ЯЁ][а-яё]+ [А-ЯЁ]\.$/);
     }
   });
 

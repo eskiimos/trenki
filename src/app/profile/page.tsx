@@ -15,6 +15,7 @@ import SubscriptionExpiryCard from '@/components/SubscriptionExpiryCard';
 import ParentInviteSection from '@/components/ParentInviteSection';
 import EvolutionModal from '@/components/EvolutionModal';
 import StatusPathModal from '@/components/StatusPathModal';
+import LeagueTable from '@/components/LeagueTable';
 import { useTour } from '@/components/tour/TourProvider';
 import { clearAuth, getTelegramId } from '@/lib/auth';
 import { calculateAge } from '@/lib/age-utils';
@@ -391,6 +392,15 @@ const ProfilePage = () => {
             )}
           </div>
         )}
+
+        {/* Лига сверстников (по году рождения) — свой рейтинг недели,
+            collapsible-паттерн как в родительском кабинете */}
+        <div className="mb-6">
+          <LeagueTable
+            endpoint="/api/league"
+            noBirthYearText="Укажи дату рождения в профиле, чтобы участвовать в лиге."
+          />
+        </div>
 
         {/* Модалка «Путь хоккеиста» — вся лестница званий, по тапу на бейдж */}
         {gamification && (

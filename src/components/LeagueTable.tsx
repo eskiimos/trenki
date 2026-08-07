@@ -1,8 +1,9 @@
 'use client';
 
-// Лига в карточке ребёнка (родительский кабинет): свернутая по умолчанию
-// секция, при раскрытии тянет /api/parent/league?childId=. Чужие дети — под
-// никами (приватность), свой — по имени с lime-подсветкой строки.
+// Лига: свернутая по умолчанию секция, при раскрытии тянет данные с endpoint.
+// Используется в родительском кабинете (/api/parent/league?childId=, default)
+// и в профиле спортсмена (endpoint='/api/league'). Чужие дети — «Имя Ф.»
+// (приватность, полной фамилии нет), свой — по имени с lime-подсветкой строки.
 
 import { useState } from 'react';
 
@@ -27,7 +28,21 @@ interface LeagueResponse {
   year?: number;
 }
 
-export default function LeagueTable({ childId }: { childId: string }) {
+interface LeagueTableProps {
+  /** Ребёнок в родительском кабинете; не нужен, если задан endpoint */
+  childId?: string;
+  /** URL источника данных; default — родительский эндпоинт с childId */
+  endpoint?: string;
+  /** Текст при отсутствии даты рождения (в профиле — без «ребёнка») */
+  noBirthYearText?: string;
+}
+
+export default function LeagueTable({
+  childId,
+  endpoint,
+  noBirthYearText = 'Укажи дату рождения в профиле ребёнка, чтобы участвовать в лиге.',
+}: LeagueTableProps) {
+  const url = endpoint ?? `/api/parent/league?childId=${encodeURIComponent(childId ?? '')}`;
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +57,7 @@ export default function LeagueTable({ childId }: { childId: string }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/parent/league?childId=${encodeURIComponent(childId)}`, {
+      const res = await fetch(url, {
         cache: 'no-store',
         credentials: 'include',
       });
@@ -79,9 +94,7 @@ export default function LeagueTable({ childId }: { childId: string }) {
           {error && <p className="text-red-400 text-xs py-1">{error}</p>}
 
           {data?.noBirthYear && (
-            <p className="text-muted text-xs leading-relaxed py-1">
-              Укажи дату рождения в профиле ребёнка, чтобы участвовать в лиге.
-            </p>
+            <p className="text-muted text-xs leading-relaxed py-1">{noBirthYearText}</p>
           )}
 
           {data && !data.noBirthYear && !data.league && !loading && (
