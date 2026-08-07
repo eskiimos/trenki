@@ -401,6 +401,12 @@ const ProfilePage = () => {
                 Следующее звание: {gamification.nextStatus.title} (ур. {gamification.nextStatus.minLevel})
               </div>
             )}
+            {/* Тизер множителя, пока темп не активен: игрок должен знать правило */}
+            {!gamification.tempoActive && (
+              <div className="text-muted/70 text-xs mt-1">
+                🔥 Тренируйся 3 дня подряд — весь опыт дня пойдёт ×2
+              </div>
+            )}
           </div>
         )}
 

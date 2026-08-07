@@ -133,7 +133,7 @@ export default function LeagueTable({
                 ))}
               </div>
               <div className="text-muted text-xs mt-2">
-                Сильнее {data.league.percentile}% сверстников · неделя {data.weekLabel}
+                Сильнее {data.league.percentile}% сверстников · неделя {data.weekLabel} · 🔥 серия 3+ дней = опыт ×2
               </div>
             </>
           )}

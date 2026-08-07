@@ -25,7 +25,8 @@ const StreakChip = () => {
     };
   }, []);
 
-  if (streak < 2) return null;
+  // Показываем уже с 1 дня — как тизер множителя: «ещё N дн. — и опыт ×2»
+  if (streak < 1) return null;
 
   return (
     <section className="px-4" style={{ paddingTop: 12 }}>
@@ -34,7 +35,7 @@ const StreakChip = () => {
         <span className="text-white text-sm font-medium">
           {streak >= TEMPO_MIN_STREAK
             ? `Серия: ${streak} дн. подряд — опыт ×2!`
-            : `Серия: ${streak} дн. подряд — не потеряй!`}
+            : `Серия: ${streak} дн. Ещё ${TEMPO_MIN_STREAK - streak} — и опыт ×2!`}
         </span>
       </div>
     </section>

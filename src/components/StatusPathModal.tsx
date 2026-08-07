@@ -107,7 +107,7 @@ const StatusPathModal = ({ currentLevel, open, onClose }: Props) => {
 
         <p className="text-muted/70 text-[11px] text-center leading-relaxed mb-4">
           Уровни растут за тренировки: тренировка +{XP_PER_COMPLETED_WORKOUT} XP, модуль +
-          {XP_PER_COMPLETED_MODULE}
+          {XP_PER_COMPLETED_MODULE}. 🔥 Серия от 3 дней подряд — весь опыт дня ×2!
         </p>
 
         <button
