@@ -37,6 +37,8 @@ const ProfilePage = () => {
     xpForNext: number;
     status: { key: string; title: string; emoji: string };
     nextStatus: { title: string; minLevel: number } | null;
+    /** «Темп ×2»: серия ≥ 3 дней жива — весь XP дня удвоен */
+    tempoActive?: boolean;
   } | null>(null);
   // Модалка «Путь хоккеиста» — открывается тапом по бейджу статуса
   const [statusPathOpen, setStatusPathOpen] = useState(false);
@@ -370,8 +372,17 @@ const ProfilePage = () => {
                 <span aria-hidden>{gamification.status.emoji}</span>
                 {gamification.status.title}
               </button>
-              <span className="text-white text-base font-bold font-overpass">
-                Уровень {gamification.level}
+              <span className="inline-flex items-center gap-2">
+                {/* Бейдж «Темп ×2»: серия ≥ 3 дней — весь XP дня удваивается */}
+                {gamification.tempoActive && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-brand/15 border border-brand/40 text-brand text-[11px] font-bold font-overpass px-2 py-0.5">
+                    <span aria-hidden>🔥</span>
+                    Темп ×2
+                  </span>
+                )}
+                <span className="text-white text-base font-bold font-overpass">
+                  Уровень {gamification.level}
+                </span>
               </span>
             </div>
             <div className="h-2 rounded-full bg-white/10 overflow-hidden">

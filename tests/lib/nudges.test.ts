@@ -96,6 +96,16 @@ describe('нудж «серия под угрозой»', () => {
     expect(d?.text.body).toContain('5 дней подряд');
   });
 
+  it('при стрике ≥ 3 предупреждает, что сгорит и «Темп ×2»', () => {
+    const d = decideNudge({ ...base, currentStreak: 3, daysSinceLastTraining: 1 }, NOW);
+    expect(d?.text.body).toContain('×2 к опыту');
+  });
+
+  it('при стрике 2 темп ещё не активен — про ×2 молчит', () => {
+    const d = decideNudge({ ...base, currentStreak: 2, daysSinceLastTraining: 1 }, NOW);
+    expect(d?.text.body).not.toContain('×2');
+  });
+
   it('не трогает nudgeStep дрипа', () => {
     const d = decideNudge({ ...base, currentStreak: 2, daysSinceLastTraining: 1, nudgeStep: 2 }, NOW);
     expect(d?.nextStep).toBe(2);

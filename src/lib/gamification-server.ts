@@ -4,7 +4,13 @@
 // Чистая математика (XP/уровни/стрик) — в '@/lib/gamification'.
 
 import { prisma } from '@/lib/prisma';
-import { computeXp, levelFromXp, statusFromLevel, computeStreak } from '@/lib/gamification';
+import {
+  computeXpFromHistory,
+  levelFromXp,
+  statusFromLevel,
+  computeStreak,
+  TEMPO_MULTIPLIER,
+} from '@/lib/gamification';
 import { WorkoutStatus } from '@/generated/prisma';
 
 export interface GamificationSummary {
@@ -15,34 +21,39 @@ export interface GamificationSummary {
   status: { key: string; title: string; emoji: string };
   nextStatus: { title: string; minLevel: number } | null;
   streak: number;
+  /** «Темп ×2» активен прямо сейчас (серия ≥ 3 дней жива). */
+  tempoActive: boolean;
+  /** Текущий множитель XP дня: 2 при активном темпе, иначе 1. */
+  tempoMultiplier: number;
 }
 
 export async function getGamificationSummary(userId: string): Promise<GamificationSummary> {
-  // Счётчики для XP + даты завершений для стрика — параллельно.
-  // Для стрика хватает последних ~120 завершений: больше 120 дней подряд
-  // физически означает 120+ тренировок в этой выборке.
-  const [completedWorkouts, completedModules, recentCompleted] = await Promise.all([
-    prisma.workoutSession.count({
-      where: { userId, status: WorkoutStatus.COMPLETED },
+  // Для «Темпа ×2» XP считается ретроактивно из ПОЛНОЙ истории дат завершений
+  // (XP в БД не хранится — инвариант). Тянем только completedAt — это дёшево:
+  // даже годы ежедневных тренировок — тысячи строк по одному timestamp.
+  const [workoutSessions, moduleVideos] = await Promise.all([
+    prisma.workoutSession.findMany({
+      where: { userId, status: WorkoutStatus.COMPLETED, completedAt: { not: null } },
+      select: { completedAt: true },
     }),
-    prisma.workoutSessionVideo.count({
+    prisma.workoutSessionVideo.findMany({
       // Только модули ДОВЕДЁННЫХ до конца тренировок: модули брошенных/PENDING
       // сессий в XP не идут (античит-ревью перед лигой — иначе фарм модулей
       // без завершения обходил дневные лимиты).
       where: { completed: true, session: { userId, status: 'COMPLETED' } },
-    }),
-    prisma.workoutSession.findMany({
-      where: { userId, status: WorkoutStatus.COMPLETED, completedAt: { not: null } },
-      orderBy: { completedAt: 'desc' },
       select: { completedAt: true },
-      take: 120,
     }),
   ]);
 
-  const xp = computeXp({ completedWorkouts, completedModules });
-  const levelInfo = levelFromXp(xp);
+  const workoutAts = workoutSessions.map((s) => s.completedAt!);
+  // Legacy-модули без completedAt не теряют свои 20 XP: эпоха гарантированно
+  // вне любой серии → множитель ×1, как и раньше.
+  const moduleAts = moduleVideos.map((m) => m.completedAt ?? new Date(0));
+
+  const { xpTotal, tempoActiveToday } = computeXpFromHistory(workoutAts, moduleAts);
+  const levelInfo = levelFromXp(xpTotal);
   const status = statusFromLevel(levelInfo.level);
-  const streak = computeStreak(recentCompleted.map((s) => s.completedAt!));
+  const streak = computeStreak(workoutAts);
 
   return {
     xp: levelInfo.xpTotal,
@@ -54,6 +65,8 @@ export async function getGamificationSummary(userId: string): Promise<Gamificati
       ? { title: status.nextStatus.title, minLevel: status.nextStatus.minLevel }
       : null,
     streak,
+    tempoActive: tempoActiveToday,
+    tempoMultiplier: tempoActiveToday ? TEMPO_MULTIPLIER : 1,
   };
 }
 

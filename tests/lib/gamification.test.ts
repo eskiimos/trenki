@@ -1,11 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
   computeXp,
+  computeXpFromHistory,
+  computeWeeklyXp,
   levelFromXp,
   xpForLevel,
   statusFromLevel,
   computeStreak,
   STATUSES,
+  TEMPO_MIN_STREAK,
+  TEMPO_MULTIPLIER,
 } from '../../src/lib/gamification';
 
 describe('computeXp', () => {
@@ -95,5 +99,114 @@ describe('computeStreak', () => {
   });
   it('несколько тренировок в один день считаются одним днём', () => {
     expect(computeStreak([d(0, 9), d(0, 20), d(1)], NOW)).toBe(2);
+  });
+});
+
+describe('computeXpFromHistory («Темп ×2»)', () => {
+  const NOW = new Date('2026-08-07T18:00:00');
+  const d = (daysAgo: number, hour = 10) => {
+    const x = new Date(NOW);
+    x.setDate(x.getDate() - daysAgo);
+    x.setHours(hour, 0, 0, 0);
+    return x;
+  };
+
+  it('константы механики: с 3-го дня серии всё ×2', () => {
+    expect(TEMPO_MIN_STREAK).toBe(3);
+    expect(TEMPO_MULTIPLIER).toBe(2);
+  });
+
+  it('дни 1-2 серии ×1, день 3 — ×2', () => {
+    const { xpTotal } = computeXpFromHistory([d(2), d(1), d(0)], [], NOW);
+    expect(xpTotal).toBe(100 + 100 + 200);
+  });
+
+  it('день 4+ тоже ×2', () => {
+    const { xpTotal } = computeXpFromHistory([d(3), d(2), d(1), d(0)], [], NOW);
+    expect(xpTotal).toBe(100 + 100 + 200 + 200);
+  });
+
+  it('разрыв сбрасывает серию — множитель начинается заново', () => {
+    // Дни: -4, -3, (разрыв), -1, 0 — обе серии короче 3, всё ×1
+    const { xpTotal } = computeXpFromHistory([d(4), d(3), d(1), d(0)], [], NOW);
+    expect(xpTotal).toBe(400);
+  });
+
+  it('модуль в день без тренировки — всегда ×1', () => {
+    // Тренировки: -3..-1 (день -1 уже ×2), модуль сегодня — тренировки сегодня нет
+    const { xpTotal } = computeXpFromHistory([d(3), d(2), d(1)], [d(0)], NOW);
+    expect(xpTotal).toBe(100 + 100 + 200 + 20);
+  });
+
+  it('модуль в ×2-день удваивается, в 1-й день серии — нет', () => {
+    const workouts = [d(2), d(1), d(0)];
+    const inTempo = computeXpFromHistory(workouts, [d(0)], NOW);
+    expect(inTempo.xpTotal).toBe(400 + 40);
+    const beforeTempo = computeXpFromHistory(workouts, [d(2)], NOW);
+    expect(beforeTempo.xpTotal).toBe(400 + 20);
+  });
+
+  it('детерминизм: порядок дат не влияет, повторный вызов даёт то же', () => {
+    const workouts = [d(0), d(3), d(1), d(2)];
+    const modules = [d(1), d(0), d(0)];
+    const a = computeXpFromHistory(workouts, modules, NOW);
+    const b = computeXpFromHistory([...workouts].reverse(), [...modules].reverse(), NOW);
+    expect(a).toEqual(b);
+  });
+
+  it('tempoActiveToday: серия из 3 с сегодняшним днём — активен', () => {
+    expect(computeXpFromHistory([d(2), d(1), d(0)], [], NOW).tempoActiveToday).toBe(true);
+  });
+
+  it('tempoActiveToday: серия из 3, последняя вчера — ещё активен (как computeStreak)', () => {
+    expect(computeXpFromHistory([d(3), d(2), d(1)], [], NOW).tempoActiveToday).toBe(true);
+  });
+
+  it('tempoActiveToday: серия из 2 — ещё не активен', () => {
+    expect(computeXpFromHistory([d(1), d(0)], [], NOW).tempoActiveToday).toBe(false);
+  });
+
+  it('tempoActiveToday: серия оборвалась позавчера — не активен, но XP той серии остаётся ×2', () => {
+    const r = computeXpFromHistory([d(4), d(3), d(2)], [], NOW);
+    expect(r.tempoActiveToday).toBe(false);
+    expect(r.xpTotal).toBe(100 + 100 + 200); // ретроактивный ×2 за 3-й день не сгорает
+  });
+});
+
+describe('computeWeeklyXp (недельная лига с «Темпом ×2»)', () => {
+  // Неделя с Пн 2026-08-03; lookback лиги — Сб 08-01 и Вс 08-02
+  const WEEK_START = new Date('2026-08-03T00:00:00');
+  const day = (iso: string) => new Date(`${iso}T00:00:00`);
+
+  it('понедельник продолжает серию Сб-Вс — ×2 сразу с понедельника, lookback в сумму не входит', () => {
+    const workouts = [
+      { day: day('2026-08-01'), count: 1 }, // Сб (lookback)
+      { day: day('2026-08-02'), count: 1 }, // Вс (lookback)
+      { day: day('2026-08-03'), count: 1 }, // Пн — 3-й день серии
+    ];
+    expect(computeWeeklyXp(workouts, [], WEEK_START)).toBe(200);
+  });
+
+  it('серия со среды — ×2 только с пятницы', () => {
+    const workouts = [
+      { day: day('2026-08-05'), count: 1 }, // Ср ×1
+      { day: day('2026-08-06'), count: 1 }, // Чт ×1
+      { day: day('2026-08-07'), count: 1 }, // Пт ×2
+    ];
+    expect(computeWeeklyXp(workouts, [], WEEK_START)).toBe(100 + 100 + 200);
+  });
+
+  it('модули: в ×2-день удваиваются, в день без тренировки ×1', () => {
+    const workouts = [
+      { day: day('2026-08-03'), count: 1 }, // Пн ×1
+      { day: day('2026-08-04'), count: 1 }, // Вт ×1
+      { day: day('2026-08-05'), count: 2 }, // Ср — 3-й день, 2 тренировки ×2
+    ];
+    const modules = [
+      { day: day('2026-08-05'), count: 2 }, // Ср: 2 модуля ×2
+      { day: day('2026-08-06'), count: 1 }, // Чт: тренировки нет — ×1
+    ];
+    // Пн 100 + Вт 100 + Ср 2×100×2 + модули Ср 2×20×2 + модуль Чт 20
+    expect(computeWeeklyXp(workouts, modules, WEEK_START)).toBe(100 + 100 + 400 + 80 + 20);
   });
 });

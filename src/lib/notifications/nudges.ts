@@ -3,6 +3,8 @@
 // и нудж «гантели запылились» (без подписки и давно не тренировался).
 // Чистая логика — решение «кому и что слать» тестируется без БД.
 
+import { TEMPO_MIN_STREAK } from '@/lib/gamification';
+
 export interface NudgeText {
   title: string;
   body: string;
@@ -56,9 +58,11 @@ function daysWord(n: number): string {
 
 /** Нудж «серия под угрозой» — текст зависит от длины стрика. */
 export function streakNudgeText(streak: number): NudgeText {
+  // При серии ≥ 3 у юзера активен «Темп ×2» — напоминаем, что сгорит и он
+  const tempoTail = streak >= TEMPO_MIN_STREAK ? ' — иначе сгорит и ×2 к опыту' : '';
   return {
     title: '🔥 Серия под угрозой!',
-    body: `У тебя ${streak} ${daysWord(streak)} подряд — потренируйся сегодня, чтобы не обнулить серию.`,
+    body: `У тебя ${streak} ${daysWord(streak)} подряд — потренируйся сегодня, чтобы не обнулить серию${tempoTail}.`,
     url: '/training/assessment',
   };
 }

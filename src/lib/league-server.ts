@@ -7,12 +7,9 @@
 // Чистая логика лиги — в '@/lib/league' (тестируется без БД).
 
 import { prisma } from '@/lib/prisma';
-import { Prisma, WorkoutStatus } from '@/generated/prisma';
+import { Prisma } from '@/generated/prisma';
 import { buildStandings, isoWeekLabel, type LeagueEntry, type LeagueStandings } from '@/lib/league';
-import {
-  XP_PER_COMPLETED_WORKOUT,
-  XP_PER_COMPLETED_MODULE,
-} from '@/lib/gamification';
+import { computeWeeklyXp, TEMPO_MIN_STREAK, type DayActivityCount } from '@/lib/gamification';
 
 /** Кап когорты: защита от гигантских выборок, для лиги хватает 300 сверстников. */
 const COHORT_CAP = 300;
@@ -73,39 +70,56 @@ export async function buildLeagueForUser(userId: string): Promise<LeagueForUser>
     cohortIds.push(userId);
   }
 
-  // Недельный XP по всей когорте: тренировки ×100 + модули ×20
+  // Недельный XP по всей когорте: тренировки ×100 + модули ×20, с учётом
+  // «Темпа ×2» (день серии ≥ 3 — весь XP дня удвоен). Для множителя нужны
+  // ПО-ДНЕВНЫЕ счётчики + lookback на (TEMPO_MIN_STREAK - 1) дня ДО старта
+  // недели: серия Пт-Сб-Вс должна давать ×2 уже с понедельника. Lookback-дни
+  // участвуют только в определении множителя, в сумму XP не входят
+  // (см. computeWeeklyXp).
   const weekStart = currentWeekStart();
-  const [sessionCounts, moduleCounts] = await Promise.all([
-    prisma.workoutSession.groupBy({
-      by: ['userId'],
-      where: {
-        userId: { in: cohortIds },
-        status: WorkoutStatus.COMPLETED,
-        completedAt: { gte: weekStart },
-      },
-      _count: { _all: true },
-    }),
+  const lookbackStart = new Date(
+    weekStart.getTime() - (TEMPO_MIN_STREAK - 1) * 24 * 60 * 60 * 1000,
+  );
+  const [sessionDayCounts, moduleDayCounts] = await Promise.all([
+    prisma.$queryRaw<{ userId: string; d: Date; cnt: number }[]>(Prisma.sql`
+      SELECT ws."userId", date_trunc('day', ws."completedAt") AS d, COUNT(*)::int AS cnt
+      FROM "workout_sessions" ws
+      WHERE ws.status = 'COMPLETED'
+        AND ws."completedAt" >= ${lookbackStart}
+        AND ws."userId" IN (${Prisma.join(cohortIds)})
+      GROUP BY 1, 2
+    `),
     // У workout_session_videos нет userId — JOIN к workout_sessions
-    prisma.$queryRaw<{ userId: string; cnt: number }[]>(Prisma.sql`
-      SELECT ws."userId", COUNT(*)::int AS cnt
+    prisma.$queryRaw<{ userId: string; d: Date; cnt: number }[]>(Prisma.sql`
+      SELECT ws."userId", date_trunc('day', wsv."completedAt") AS d, COUNT(*)::int AS cnt
       FROM "workout_session_videos" wsv
       JOIN "workout_sessions" ws ON ws.id = wsv."sessionId"
       WHERE wsv.completed = true
         AND ws.status = 'COMPLETED'
-        AND wsv."completedAt" >= ${weekStart}
+        AND wsv."completedAt" >= ${lookbackStart}
         AND ws."userId" IN (${Prisma.join(cohortIds)})
-      GROUP BY ws."userId"
+      GROUP BY 1, 2
     `),
   ]);
 
-  const workoutsBy = new Map(sessionCounts.map((s) => [s.userId, s._count._all]));
-  const modulesBy = new Map(moduleCounts.map((m) => [m.userId, m.cnt]));
+  const groupByUser = (rows: { userId: string; d: Date; cnt: number }[]) => {
+    const by = new Map<string, DayActivityCount[]>();
+    for (const r of rows) {
+      let list = by.get(r.userId);
+      if (!list) {
+        list = [];
+        by.set(r.userId, list);
+      }
+      list.push({ day: r.d, count: r.cnt });
+    }
+    return by;
+  };
+  const workoutsBy = groupByUser(sessionDayCounts);
+  const modulesBy = groupByUser(moduleDayCounts);
   // Нулевые тоже включаются — когорта целиком, ранги честные
   const entries: LeagueEntry[] = cohortIds.map((id) => ({
     userId: id,
-    weeklyXp:
-      (workoutsBy.get(id) ?? 0) * XP_PER_COMPLETED_WORKOUT +
-      (modulesBy.get(id) ?? 0) * XP_PER_COMPLETED_MODULE,
+    weeklyXp: computeWeeklyXp(workoutsBy.get(id) ?? [], modulesBy.get(id) ?? [], weekStart),
   }));
 
   const weekLabel = isoWeekLabel();

@@ -3,9 +3,11 @@
 // Компактная плашка стрика на главной: «🔥 Серия: N дн. подряд».
 // Сам грузит сводку геймификации; при стрике < 2, ошибке или пока грузится —
 // не рендерит ничего (плашка мотивирует беречь серию, а серия из 1 дня — ещё
-// не серия).
+// не серия). При серии ≥ 3 активен «Темп ×2» — говорим об этом вместо
+// абстрактного «не потеряй».
 
 import { useEffect, useState } from 'react';
+import { TEMPO_MIN_STREAK } from '@/lib/gamification';
 
 const StreakChip = () => {
   const [streak, setStreak] = useState(0);
@@ -30,7 +32,9 @@ const StreakChip = () => {
       <div className="bg-surface rounded-2xl px-4 py-3 flex items-center gap-3">
         <span className="text-xl" aria-hidden>🔥</span>
         <span className="text-white text-sm font-medium">
-          Серия: {streak} дн. подряд — не потеряй!
+          {streak >= TEMPO_MIN_STREAK
+            ? `Серия: ${streak} дн. подряд — опыт ×2!`
+            : `Серия: ${streak} дн. подряд — не потеряй!`}
         </span>
       </div>
     </section>
