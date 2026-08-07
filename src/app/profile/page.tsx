@@ -10,7 +10,7 @@ import { ProfileSkeleton } from '../../components/Skeleton';
 import { Button } from '@/components/ui';
 import BottomNavigation from '@/components/BottomNavigation';
 import AccountSwitcher from '@/components/AccountSwitcher';
-import PotentialSection from '@/components/PotentialSection';
+import PotentialRing from '@/components/PotentialRing';
 import SubscriptionExpiryCard from '@/components/SubscriptionExpiryCard';
 import ParentInviteSection from '@/components/ParentInviteSection';
 import EvolutionModal from '@/components/EvolutionModal';
@@ -292,31 +292,25 @@ const ProfilePage = () => {
         {/* Секция потенциала — pure CSS/SVG, повторяет дизайн из Figma */}
         <div className="mb-6 md:mb-0" data-tour="potential-ring">
           <div style={{ position: 'relative' }}>
-            {/* Для FREE/paywalled потенциал серый и цифры скрыты (п.2) */}
-            <div
-              style={
-                paywalled
-                  ? { filter: 'grayscale(1) blur(6px)', opacity: 0.5, pointerEvents: 'none', userSelect: 'none' }
-                  : undefined
-              }
-              aria-hidden={paywalled}
-            >
-              <PotentialSection
-                ratingEndurance={userProfile?.profile?.ratingEndurance}
-                ratingTechnique={userProfile?.profile?.ratingTechnique}
-                ratingPower={userProfile?.profile?.ratingPower}
-                ratingSpeed={userProfile?.profile?.ratingSpeed}
-                ratingFlexibility={userProfile?.profile?.ratingFlexibility}
-                potential={userProfile?.profile?.potential}
-                gains={{
-                  endurance: recentGains?.gainEndurance,
-                  technique: recentGains?.gainTechnique,
-                  power: recentGains?.gainPower,
-                  speed: recentGains?.gainSpeed,
-                  flexibility: recentGains?.gainFlexibility,
-                }}
-              />
-            </div>
+            {/* Для FREE/paywalled потенциал серый и цифры скрыты (п.2) — grayed внутри PotentialRing */}
+            <PotentialRing
+              ratings={{
+                power: userProfile?.profile?.ratingPower,
+                speed: userProfile?.profile?.ratingSpeed,
+                endurance: userProfile?.profile?.ratingEndurance,
+                technique: userProfile?.profile?.ratingTechnique,
+                flexibility: userProfile?.profile?.ratingFlexibility,
+              }}
+              potential={userProfile?.profile?.potential}
+              grayed={paywalled}
+              gains={{
+                endurance: recentGains?.gainEndurance,
+                technique: recentGains?.gainTechnique,
+                power: recentGains?.gainPower,
+                speed: recentGains?.gainSpeed,
+                flexibility: recentGains?.gainFlexibility,
+              }}
+            />
             {paywalled && (
               <div
                 style={{

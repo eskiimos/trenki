@@ -28,7 +28,17 @@ export async function GET(request: NextRequest) {
             lastName: true,
             accessTier: true,
             premiumUntil: true,
-            profile: { select: { avatarUrl: true, potential: true } },
+            profile: {
+              select: {
+                avatarUrl: true,
+                potential: true,
+                ratingPower: true,
+                ratingSpeed: true,
+                ratingEndurance: true,
+                ratingTechnique: true,
+                ratingFlexibility: true,
+              },
+            },
           },
         },
       },
@@ -46,6 +56,14 @@ export async function GET(request: NextRequest) {
           lastName: child.lastName,
           avatarUrl: child.profile?.avatarUrl ?? null,
           potential: child.profile?.potential ?? null,
+          // Характеристики для кольца потенциала в родительском кабинете
+          ratings: {
+            power: child.profile?.ratingPower ?? null,
+            speed: child.profile?.ratingSpeed ?? null,
+            endurance: child.profile?.ratingEndurance ?? null,
+            technique: child.profile?.ratingTechnique ?? null,
+            flexibility: child.profile?.ratingFlexibility ?? null,
+          },
           // Подписка ребёнка — родитель видит статус и может оплатить из кабинета
           premium: { active: hasPremium(child), until: child.premiumUntil },
           gamification,

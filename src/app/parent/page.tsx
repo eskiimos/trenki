@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { clearAuth } from '@/lib/auth';
 import { useSubscriptionPricing } from '@/hooks/useSubscriptionPricing';
 import LeagueTable from '@/components/LeagueTable';
+import PotentialRing from '@/components/PotentialRing';
 
 interface ChildCard {
   id: string;
@@ -17,6 +18,13 @@ interface ChildCard {
   lastName: string | null;
   avatarUrl: string | null;
   potential: number | null;
+  ratings: {
+    power: number | null;
+    speed: number | null;
+    endurance: number | null;
+    technique: number | null;
+    flexibility: number | null;
+  };
   premium: { active: boolean; until: string | null };
   gamification: {
     level: number;
@@ -55,6 +63,8 @@ const ChildCardView = ({ child }: { child: ChildCard }) => {
   const pricing = useSubscriptionPricing();
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+  // Кольцо потенциала (как в профиле ребёнка) — раскрывается по тапу на карточку
+  const [potentialOpen, setPotentialOpen] = useState(false);
 
   // Оплата подписки ребёнка родителем: T-Bank Init с childId → редирект на оплату
   const handleSubscribe = async () => {
@@ -134,15 +144,33 @@ const ChildCardView = ({ child }: { child: ChildCard }) => {
             {child.week.modules} {plural(child.week.modules, ['модуль', 'модуля', 'модулей'])}
           </div>
         </div>
-        <div className="rounded-xl bg-white/5 p-3">
-          <div className="text-muted text-[11px] font-overpass uppercase tracking-wide mb-1">
-            Потенциал
+        <button
+          type="button"
+          onClick={() => setPotentialOpen((v) => !v)}
+          aria-expanded={potentialOpen}
+          className="rounded-xl bg-white/5 p-3 text-left transition-colors hover:bg-white/10 active:bg-white/10"
+        >
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-muted text-[11px] font-overpass uppercase tracking-wide">
+              Потенциал
+            </span>
+            <span className="text-muted text-xs" aria-hidden>
+              {potentialOpen ? '▲' : '▼'}
+            </span>
           </div>
           <div className="text-brand text-xl font-bold">
             {child.potential != null ? Math.round(child.potential) : '—'}
           </div>
-        </div>
+        </button>
       </div>
+
+      {/* Полное кольцо потенциала — тот же визуал, что в профиле ребёнка.
+          Родитель видит всё без подписочного гейта (grayed=false). */}
+      {potentialOpen && (
+        <div className="mt-2">
+          <PotentialRing ratings={child.ratings} potential={child.potential} grayed={false} />
+        </div>
+      )}
 
       {/* Подписка ребёнка */}
       <div className="rounded-xl bg-white/5 p-3 mt-2">
