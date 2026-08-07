@@ -36,10 +36,11 @@ export async function POST(request: NextRequest) {
     // Demo-bypass: один заранее заведённый email заходит по фиксированному
     // коду из env, минуя проверку EmailOtp. Используется для demo/QA, чтобы
     // не зависеть от живого email-ящика.
-    const demoEmail = process.env.DEMO_BYPASS_EMAIL?.trim().toLowerCase();
+    // DEMO_BYPASS_EMAIL — список через запятую (демо-атлет, демо-родитель, ...)
+    const demoEmails = (process.env.DEMO_BYPASS_EMAIL || '')
+      .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
     const demoCode = process.env.DEMO_BYPASS_CODE;
-    const isDemoBypass =
-      !!demoEmail && !!demoCode && email === demoEmail && code === demoCode;
+    const isDemoBypass = !!demoCode && demoEmails.includes(email) && code === demoCode;
 
     if (!isDemoBypass) {
       const otp = await prisma.emailOtp.findFirst({

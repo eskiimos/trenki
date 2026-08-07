@@ -27,10 +27,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Некорректный email' }, { status: 400 });
     }
 
-    // Demo-bypass: для одного конкретного email письмо не отправляем,
-    // вход идёт по фиксированному коду DEMO_BYPASS_CODE (см. verify-code).
-    const demoEmail = process.env.DEMO_BYPASS_EMAIL?.trim().toLowerCase();
-    if (demoEmail && email === demoEmail && process.env.DEMO_BYPASS_CODE) {
+    // Demo-bypass: для перечисленных email (через запятую — например демо-атлет
+    // и демо-родитель) письмо не отправляем, вход идёт по фиксированному коду
+    // DEMO_BYPASS_CODE (см. verify-code).
+    const demoEmails = (process.env.DEMO_BYPASS_EMAIL || '')
+      .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+    if (demoEmails.includes(email) && process.env.DEMO_BYPASS_CODE) {
       logger.info('demo bypass send-code', { email });
       return NextResponse.json({ success: true });
     }
