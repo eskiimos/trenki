@@ -516,6 +516,7 @@ export default function TrainerPage() {
       {trainer && (
         <ReviewModal
           isOpen={isReviewModalOpen}
+          initialRating={userRating}
           onClose={() => {
             setIsReviewModalOpen(false);
             setUserRating(0);

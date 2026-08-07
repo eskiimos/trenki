@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import Image from 'next/image';
+import { useState, useEffect } from 'react';
+import { Star } from 'lucide-react';
 import { Button } from '@/components/ui';
 
 interface ReviewModalProps {
@@ -9,31 +9,45 @@ interface ReviewModalProps {
   onClose: () => void;
   trainerId: string;
   trainerName: string;
+  /** Звезда, выбранная на странице тренера до открытия модалки */
+  initialRating?: number;
   onSubmitSuccess: () => void;
 }
 
-export default function ReviewModal({ 
-  isOpen, 
-  onClose, 
-  trainerId, 
+export default function ReviewModal({
+  isOpen,
+  onClose,
+  trainerId,
   trainerName,
-  onSubmitSuccess 
+  initialRating = 0,
+  onSubmitSuccess
 }: ReviewModalProps) {
-  const [userRating, setUserRating] = useState<number>(0);
-  const [hoveredRating, setHoveredRating] = useState<number>(0);
+  const [userRating, setUserRating] = useState<number>(initialRating);
   const [comment, setComment] = useState<string>('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorText, setErrorText] = useState<string | null>(null);
+
+  // Раньше рейтинг жил только на странице тренера и в модалку НЕ попадал —
+  // внутренний userRating всегда был 0 и «Отправить» была вечно заблокирована.
+  // Теперь стартовая звезда приходит пропом, а внутри можно поправить оценку.
+  useEffect(() => {
+    if (isOpen) {
+      setUserRating(initialRating);
+      setErrorText(null);
+    }
+  }, [isOpen, initialRating]);
 
   if (!isOpen) return null;
 
   const handleSubmit = async () => {
     if (userRating === 0) {
-      alert('Пожалуйста, выберите оценку');
+      setErrorText('Пожалуйста, выберите оценку');
       return;
     }
 
     setIsSubmitting(true);
+    setErrorText(null);
 
     try {
       const response = await fetch(`/api/trainers/${trainerId}/reviews`, {
@@ -50,17 +64,20 @@ export default function ReviewModal({
       if (response.ok) {
         setIsSubmitted(true);
         onSubmitSuccess();
-        
+
         // Закрыть модал через 3 секунды
         setTimeout(() => {
           handleClose();
         }, 3000);
       } else {
-        alert('Ошибка при отправке отзыва');
+        // Показываем реальную причину (например, гейт «отзыв только после
+        // прохождения занятия тренера» — 403 с текстом от сервера)
+        const data = await response.json().catch(() => ({}));
+        setErrorText(data.error || 'Ошибка при отправке отзыва');
       }
     } catch (error) {
       console.error('Error submitting review:', error);
-      alert('Ошибка при отправке отзыва');
+      setErrorText('Ошибка сети — попробуйте ещё раз');
     } finally {
       setIsSubmitting(false);
     }
@@ -146,6 +163,25 @@ export default function ReviewModal({
                   твой отзыв
                 </h3>
 
+                {/* Оценка: приходит со страницы тренера, здесь можно поправить */}
+                <div className="flex items-center justify-center gap-3 mb-6">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setUserRating(star)}
+                      aria-label={`Оценка ${star}`}
+                      className="transition-transform active:scale-90"
+                    >
+                      <Star
+                        size={32}
+                        className={star <= userRating ? 'text-[#A1FF4A]' : 'text-[#AEABBB]/40'}
+                        fill={star <= userRating ? 'currentColor' : 'none'}
+                      />
+                    </button>
+                  ))}
+                </div>
+
                 {/* Счетчик символов */}
                 <div className="mb-4 text-right">
                   <span 
@@ -179,6 +215,12 @@ export default function ReviewModal({
                     border: 'none'
                   }}
                 />
+
+                {errorText && (
+                  <div className="text-[#FF8C4A] text-sm mb-4" style={{ fontFamily: 'Overpass' }}>
+                    {errorText}
+                  </div>
+                )}
 
                 {/* Кнопки */}
                 <div className="flex gap-3 mb-4">
