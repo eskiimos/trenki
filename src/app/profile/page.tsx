@@ -12,7 +12,6 @@ import BottomNavigation from '@/components/BottomNavigation';
 import AccountSwitcher from '@/components/AccountSwitcher';
 import PotentialRing from '@/components/PotentialRing';
 import SubscriptionExpiryCard from '@/components/SubscriptionExpiryCard';
-import ParentInviteSection from '@/components/ParentInviteSection';
 import EvolutionModal from '@/components/EvolutionModal';
 import StatusPathModal from '@/components/StatusPathModal';
 import TempoBadge from '@/components/TempoBadge';
@@ -440,9 +439,6 @@ const ProfilePage = () => {
           />
         )}
 
-        {/* Секция «Родителям»: пригласить родителя / отвязать привязанных */}
-        <ParentInviteSection />
-
         {/* Баннер «подписка скоро закончится» (п.5) — для премиума за 3 дня до конца */}
         <SubscriptionExpiryCard />
 
@@ -479,6 +475,14 @@ const ProfilePage = () => {
               <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">Задания от тренера</span>
               <Image src="/icons/arrow.svg" alt="" width={20} height={20} className="opacity-50" />
             </button>
+            <div className="h-[1px] bg-[#26252F]" />
+            {/* Секция «Родителям» вынесена на отдельную страницу (решение босса) */}
+            <Link href="/profile/parents">
+              <div className="flex justify-between items-center py-4 cursor-pointer hover:opacity-80 transition-opacity">
+                <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">Родителям</span>
+                <Image src="/icons/arrow.svg" alt="" width={20} height={20} className="opacity-50" />
+              </div>
+            </Link>
           </div>
         </div>
 
