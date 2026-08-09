@@ -19,14 +19,14 @@ const byKey = (list: ReturnType<typeof computeAchievements>, key: string) => {
 
 describe('набор ачивок', () => {
   it('14 штук, ключи уникальны, у всех есть описание и эмодзи', () => {
-    expect(ACHIEVEMENT_DEFS.length).toBe(14);
-    expect(new Set(ACHIEVEMENT_DEFS.map((d) => d.key)).size).toBe(14);
+    expect(ACHIEVEMENT_DEFS.length).toBe(16);
+    expect(new Set(ACHIEVEMENT_DEFS.map((d) => d.key)).size).toBe(16);
     for (const d of ACHIEVEMENT_DEFS) {
       expect(d.title.length).toBeGreaterThan(0);
       expect(d.description.length).toBeGreaterThan(0);
       expect(d.emoji.length).toBeGreaterThan(0);
     }
-    expect(computeAchievements([], 0).length).toBe(14);
+    expect(computeAchievements([], 0).length).toBe(16);
   });
 });
 
@@ -34,29 +34,29 @@ describe('пороги тренировок', () => {
   it('unlocked ровно на границе: 1 → «Первый лёд», 9 ≠ «Десятка», 10 = «Десятка»', () => {
     expect(byKey(computeAchievements([], 0), 'workouts_1').unlocked).toBe(false);
     expect(byKey(computeAchievements(workouts(1), 0), 'workouts_1').unlocked).toBe(true);
-    expect(byKey(computeAchievements(workouts(9), 0), 'workouts_10').unlocked).toBe(false);
-    expect(byKey(computeAchievements(workouts(10), 0), 'workouts_10').unlocked).toBe(true);
+    expect(byKey(computeAchievements(workouts(4), 0), 'workouts_5').unlocked).toBe(false);
+    expect(byKey(computeAchievements(workouts(5), 0), 'workouts_5').unlocked).toBe(true);
   });
 
   it('progress обрезан по target', () => {
-    const a = byKey(computeAchievements(workouts(37), 0), 'workouts_10');
-    expect(a.progress).toEqual({ current: 10, target: 10 });
-    const b = byKey(computeAchievements(workouts(37), 0), 'workouts_50');
-    expect(b.progress).toEqual({ current: 37, target: 50 });
+    const a = byKey(computeAchievements(workouts(37), 0), 'workouts_30');
+    expect(a.progress).toEqual({ current: 30, target: 30 });
+    const b = byKey(computeAchievements(workouts(37), 0), 'workouts_60');
+    expect(b.progress).toEqual({ current: 37, target: 60 });
   });
 });
 
 describe('пороги модулей (moduleCount)', () => {
   it('25/100/500 ровно на границе', () => {
-    const under = computeAchievements([], 24);
-    expect(byKey(under, 'modules_25').unlocked).toBe(false);
-    expect(byKey(under, 'modules_25').progress.current).toBe(24);
-    const exact = computeAchievements([], 25);
-    expect(byKey(exact, 'modules_25').unlocked).toBe(true);
+    const under = computeAchievements([], 9);
+    expect(byKey(under, 'modules_10').unlocked).toBe(false);
+    expect(byKey(under, 'modules_10').progress.current).toBe(9);
+    const exact = computeAchievements([], 10);
+    expect(byKey(exact, 'modules_10').unlocked).toBe(true);
     const many = computeAchievements([], 500);
-    expect(byKey(many, 'modules_100').unlocked).toBe(true);
-    expect(byKey(many, 'modules_500').unlocked).toBe(true);
-    expect(byKey(many, 'modules_500').progress).toEqual({ current: 500, target: 500 });
+    expect(byKey(many, 'modules_50').unlocked).toBe(true);
+    expect(byKey(many, 'modules_300').unlocked).toBe(true);
+    expect(byKey(many, 'modules_300').progress).toEqual({ current: 300, target: 300 });
   });
 });
 
@@ -92,7 +92,7 @@ describe('maxStreakEver — максимальная серия за истор�
     expect(byKey(seven, 'streak_7').unlocked).toBe(true);
     expect(byKey(seven, 'streak_7').progress).toEqual({ current: 7, target: 7 });
     expect(byKey(seven, 'streak_14').progress).toEqual({ current: 7, target: 14 });
-    expect(byKey(computeAchievements(run(30), 0), 'streak_30').unlocked).toBe(true);
+    expect(byKey(computeAchievements(run(30), 0), 'streak_14').unlocked).toBe(true);
   });
 });
 

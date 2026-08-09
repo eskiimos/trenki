@@ -8,8 +8,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  ChevronLeft, Snowflake, Medal, BicepsFlexed, Gem, TrainFront, Zap, Target,
-  Dumbbell, Flame, CalendarDays, Rocket, Trophy, Sunrise, Swords,
+  ChevronLeft, Snowflake, Hand, Music, BicepsFlexed, Shield, Gem, Zap, Target,
+  Puzzle, Dumbbell, Flame, Grab, CalendarDays, Rocket, Sunrise, Swords,
   type LucideIcon,
 } from 'lucide-react';
 import BottomNavigation from '@/components/BottomNavigation';
@@ -26,17 +26,19 @@ interface AchievementItem {
 // Иконки по ключам ачивок (UI-слой; чистая либа хранит только emoji-fallback)
 const ICONS: Record<string, LucideIcon> = {
   workouts_1: Snowflake,
-  workouts_10: Medal,
-  workouts_50: BicepsFlexed,
+  workouts_5: Hand,
+  workouts_15: Music,
+  workouts_30: BicepsFlexed,
+  workouts_60: Shield,
   workouts_100: Gem,
-  workouts_250: TrainFront,
-  modules_25: Zap,
-  modules_100: Target,
-  modules_500: Dumbbell,
+  modules_10: Zap,
+  modules_50: Target,
+  modules_150: Puzzle,
+  modules_300: Dumbbell,
   streak_3: Flame,
+  streak_5: Grab,
   streak_7: CalendarDays,
   streak_14: Rocket,
-  streak_30: Trophy,
   early_bird: Sunrise,
   weekend_warrior: Swords,
 };

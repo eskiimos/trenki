@@ -20,20 +20,27 @@ export interface AchievementState extends AchievementDef {
   progress: { current: number; target: number };
 }
 
+// Ребаланс 2026-08-09 (босс: «500 модулей звучит недостижимо»): чаще ранние
+// ступени, вершины достижимы за реалистичный сезон (~4-5 тренировок/нед ≈
+// 20 модулей/нед). «Серия 30 дней подряд» убрана сознательно: месяц без
+// единого дня отдыха — вредный стимул для детского спорта.
+
 /** Пороговые ачивки за количество завершённых тренировок. */
 const WORKOUT_COUNT_DEFS: Array<AchievementDef & { target: number }> = [
   { key: 'workouts_1', title: 'Первый лёд', description: '1 завершённая тренировка', emoji: '🧊', target: 1 },
-  { key: 'workouts_10', title: 'Десятка', description: '10 завершённых тренировок', emoji: '🔟', target: 10 },
-  { key: 'workouts_50', title: 'Полтинник', description: '50 завершённых тренировок', emoji: '💪', target: 50 },
+  { key: 'workouts_5', title: 'Пятёрка', description: '5 завершённых тренировок', emoji: '🖐️', target: 5 },
+  { key: 'workouts_15', title: 'В ритме', description: '15 завершённых тренировок', emoji: '🎵', target: 15 },
+  { key: 'workouts_30', title: 'Тридцатка', description: '30 завершённых тренировок', emoji: '💪', target: 30 },
+  { key: 'workouts_60', title: 'Закалка', description: '60 завершённых тренировок', emoji: '🛡️', target: 60 },
   { key: 'workouts_100', title: 'Сотня', description: '100 завершённых тренировок', emoji: '💯', target: 100 },
-  { key: 'workouts_250', title: 'Машина', description: '250 завершённых тренировок', emoji: '🚂', target: 250 },
 ];
 
 /** Пороговые ачивки за количество завершённых модулей. */
 const MODULE_COUNT_DEFS: Array<AchievementDef & { target: number }> = [
-  { key: 'modules_25', title: 'Разогрелся', description: '25 завершённых модулей', emoji: '⚡', target: 25 },
-  { key: 'modules_100', title: 'Комбо', description: '100 завершённых модулей', emoji: '🎯', target: 100 },
-  { key: 'modules_500', title: 'Строитель тела', description: '500 завершённых модулей', emoji: '🏗️', target: 500 },
+  { key: 'modules_10', title: 'Разогрелся', description: '10 завершённых модулей', emoji: '⚡', target: 10 },
+  { key: 'modules_50', title: 'Комбо', description: '50 завершённых модулей', emoji: '🎯', target: 50 },
+  { key: 'modules_150', title: 'Мастер модулей', description: '150 завершённых модулей', emoji: '🧩', target: 150 },
+  { key: 'modules_300', title: 'Строитель тела', description: '300 завершённых модулей', emoji: '🏗️', target: 300 },
 ];
 
 /** Ачивки за МАКСИМАЛЬНУЮ серию дней подряд за всю историю (не текущий стрик!). */
@@ -45,9 +52,9 @@ const STREAK_DEFS: Array<AchievementDef & { target: number }> = [
     emoji: '🔥',
     target: TEMPO_MIN_STREAK,
   },
+  { key: 'streak_5', title: 'Пять подряд', description: 'Серия 5 дней подряд', emoji: '✋', target: 5 },
   { key: 'streak_7', title: 'Неделя огня', description: 'Серия 7 дней подряд', emoji: '🗓️', target: 7 },
   { key: 'streak_14', title: 'Две недели подряд', description: 'Серия 14 дней подряд', emoji: '🚀', target: 14 },
-  { key: 'streak_30', title: 'Железный месяц', description: 'Серия 30 дней подряд', emoji: '🏆', target: 30 },
 ];
 
 const EARLY_BIRD_DEF: AchievementDef = {
