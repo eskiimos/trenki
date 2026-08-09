@@ -134,6 +134,18 @@ export default function VideoPage({ params }: VideoPageProps) {
   // пишется в историю). Переключается кнопкой «Режим» в плеере.
   // В тренировке (fromWorkout) — всегда «Тренировка», перемотка запрещена.
   const [watchMode, setWatchMode] = useState<'training' | 'view'>('training');
+  // Читер-режим админов (решение босса 2026-08-09): в свободном просмотре с
+  // перемоткой всё равно начисляем потенциал и XP — для тестирования
+  // геймификации. Только для isAdmin; статус по сессии (/api/user/is-admin).
+  const [isAdminCheat, setIsAdminCheat] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/user/is-admin')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled && d?.isAdmin) setIsAdminCheat(true); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
   // Единый шит настроек (Режим + Качество) — вместо двух отдельных меню в панели
   const [showSettings, setShowSettings] = useState(false);
   const showSettingsRef = useRef(false); // зеркало для таймера автоскрытия контролов
@@ -426,7 +438,9 @@ export default function VideoPage({ params }: VideoPageProps) {
     // (просмотр уже записан в историю на старте, record-watch). Флаг латчим
     // только когда реально пытались начислить, иначе test→training терял бы зачёт.
     else if (!fromWorkout && videoId) {
-      if (!gainsCreditedRef.current && watchMode === 'training' && !seekedInPlaythroughRef.current && currentTime >= duration - END_EPSILON_SEC) {
+      // Админам зачёт идёт и в «Просмотре», и после перемотки (читер-режим).
+      const antiCheatOk = isAdminCheat || (watchMode === 'training' && !seekedInPlaythroughRef.current);
+      if (!gainsCreditedRef.current && antiCheatOk && currentTime >= duration - END_EPSILON_SEC) {
         gainsCreditedRef.current = true; // оптимистично — против дублей
         const ok = await creditGainsForWatching();
         if (!ok) gainsCreditedRef.current = false; // при сбое — повтор на следующем тике
@@ -1050,7 +1064,7 @@ export default function VideoPage({ params }: VideoPageProps) {
 
     // Свободный просмотр: зачёт потенциала по РЕАЛЬНОМУ концу (страховка к near-end
     // тику в handleVideoProgress; латч gainsCreditedRef защищает от дубля).
-    if (!fromWorkout && videoId && !gainsCreditedRef.current && watchMode === 'training' && !seekedInPlaythroughRef.current) {
+    if (!fromWorkout && videoId && !gainsCreditedRef.current && (isAdminCheat || (watchMode === 'training' && !seekedInPlaythroughRef.current))) {
       gainsCreditedRef.current = true;
       const ok = await creditGainsForWatching();
       if (!ok) gainsCreditedRef.current = false;

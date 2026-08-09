@@ -122,8 +122,12 @@ export async function POST(request: NextRequest) {
       modulesToday = 0;
     }
 
-    // Проверяем лимит (4 модуля в день)
-    if (modulesToday >= 4) {
+    // Читер-режим для админов приложения: обходят дневной лимит модулей —
+    // чтобы свободно тестировать геймификацию (решение босса 2026-08-09).
+    const isAdminCheat = user.isAdmin === true;
+
+    // Проверяем лимит (4 модуля в день). Админам не мешаем.
+    if (!isAdminCheat && modulesToday >= 4) {
       return NextResponse.json({
         success: false,
         error: 'Достигнут дневной лимит модулей (4). Отдохни и возвращайся завтра! 💪',
@@ -189,6 +193,35 @@ export async function POST(request: NextRequest) {
         data: {
           completed: true,
           completedAt: new Date(),
+        },
+      });
+    } else if (isAdminCheat) {
+      // Читер-режим: свободный просмотр обычно НЕ даёт XP (XP считается только из
+      // завершённых тренировок/модулей). Для админа создаём синтетическую
+      // завершённую 1-модульную сессию — тогда просмотр даёт и XP тоже
+      // (тренировка +100, модуль +20). Только для isAdmin — обычных юзеров не
+      // касается, фарм-риск нулевой.
+      const now = new Date();
+      const cheatSession = await prisma.workoutSession.create({
+        data: {
+          userId: user.id,
+          status: 'COMPLETED',
+          completedAt: now,
+          startedAt: now,
+          targetDuration: video.duration ?? 0,
+          targetRPE: 5,
+          loadDirection: 'MEDIUM',
+          totalVideos: 1,
+          currentVideoIndex: 1,
+        },
+      });
+      await prisma.workoutSessionVideo.create({
+        data: {
+          sessionId: cheatSession.id,
+          videoId,
+          order: 0,
+          completed: true,
+          completedAt: now,
         },
       });
     }
