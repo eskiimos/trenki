@@ -15,7 +15,6 @@ import SubscriptionExpiryCard from '@/components/SubscriptionExpiryCard';
 import ParentInviteSection from '@/components/ParentInviteSection';
 import EvolutionModal from '@/components/EvolutionModal';
 import StatusPathModal from '@/components/StatusPathModal';
-import AchievementsModal from '@/components/AchievementsModal';
 import TempoBadge from '@/components/TempoBadge';
 import LeagueTable from '@/components/LeagueTable';
 import { useTour } from '@/components/tour/TourProvider';
@@ -46,7 +45,6 @@ const ProfilePage = () => {
   } | null>(null);
   // Модалка «Путь хоккеиста» — открывается тапом по бейджу статуса
   const [statusPathOpen, setStatusPathOpen] = useState(false);
-  const [achievementsOpen, setAchievementsOpen] = useState(false);
   const { startTour } = useTour();
 
   useEffect(() => {
@@ -387,14 +385,13 @@ const ProfilePage = () => {
                 отсчёт). Тап открывает ачивки — эндпоинт только для своего юзера,
                 поэтому кликабельно лишь в профиле (в родительском кабинете — статика). */}
             <div className="mb-3">
-              <button
-                type="button"
-                onClick={() => setAchievementsOpen(true)}
-                aria-haspopup="dialog"
+              {/* Тап по бейджу — страница ачивок (решение босса: страница, не модалка) */}
+              <Link
+                href="/achievements"
                 className="inline-flex cursor-pointer transition-transform active:scale-95"
               >
                 <TempoBadge streak={gamification.streak ?? 0} tempoActive={!!gamification.tempoActive} />
-              </button>
+              </Link>
             </div>
             <div className="h-2 rounded-full bg-white/10 overflow-hidden">
               <div
@@ -432,9 +429,6 @@ const ProfilePage = () => {
             onClose={() => setStatusPathOpen(false)}
           />
         )}
-
-        {/* Модалка «Ачивки» — по тапу на бейдж темпа; сама грузит свои данные */}
-        <AchievementsModal open={achievementsOpen} onClose={() => setAchievementsOpen(false)} />
 
 
         {/* Модалка «Эволюция!» — при смене статуса с прошлого визита */}
