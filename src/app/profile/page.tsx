@@ -15,6 +15,7 @@ import SubscriptionExpiryCard from '@/components/SubscriptionExpiryCard';
 import ParentInviteSection from '@/components/ParentInviteSection';
 import EvolutionModal from '@/components/EvolutionModal';
 import StatusPathModal from '@/components/StatusPathModal';
+import AchievementsModal from '@/components/AchievementsModal';
 import TempoBadge from '@/components/TempoBadge';
 import LeagueTable from '@/components/LeagueTable';
 import { useTour } from '@/components/tour/TourProvider';
@@ -45,6 +46,7 @@ const ProfilePage = () => {
   } | null>(null);
   // Модалка «Путь хоккеиста» — открывается тапом по бейджу статуса
   const [statusPathOpen, setStatusPathOpen] = useState(false);
+  const [achievementsOpen, setAchievementsOpen] = useState(false);
   const { startTour } = useTour();
 
   useEffect(() => {
@@ -365,7 +367,9 @@ const ProfilePage = () => {
             Пока сводка не загрузилась — ничего не показываем (без скелетона). */}
         {gamification && (
           <div className="bg-surface rounded-2xl p-4 mb-6 border border-white/5">
-            <div className="flex items-center justify-between mb-3">
+            {/* Ряд 1: звание слева, уровень справа — как до бейджа темпа,
+                чтобы на узких экранах (iPhone ~390) ничего не переносилось */}
+            <div className="flex items-center justify-between gap-2 mb-2">
               <button
                 type="button"
                 onClick={() => setStatusPathOpen(true)}
@@ -375,13 +379,22 @@ const ProfilePage = () => {
                 <span aria-hidden>{gamification.status.emoji}</span>
                 {gamification.status.title}
               </button>
-              <span className="inline-flex items-center gap-2">
-                {/* Бейдж темпа виден ВСЕГДА: активный ×2 или отсчёт до него */}
-                <TempoBadge streak={gamification.streak ?? 0} tempoActive={!!gamification.tempoActive} />
-                <span className="text-white text-base font-bold font-overpass">
-                  Уровень {gamification.level}
-                </span>
+              <span className="text-white text-base font-bold font-overpass whitespace-nowrap shrink-0">
+                Уровень {gamification.level}
               </span>
+            </div>
+            {/* Бейдж темпа — отдельной строкой, виден ВСЕГДА (активный ×2 или
+                отсчёт). Тап открывает ачивки — эндпоинт только для своего юзера,
+                поэтому кликабельно лишь в профиле (в родительском кабинете — статика). */}
+            <div className="mb-3">
+              <button
+                type="button"
+                onClick={() => setAchievementsOpen(true)}
+                aria-haspopup="dialog"
+                className="inline-flex cursor-pointer transition-transform active:scale-95"
+              >
+                <TempoBadge streak={gamification.streak ?? 0} tempoActive={!!gamification.tempoActive} />
+              </button>
             </div>
             <div className="h-2 rounded-full bg-white/10 overflow-hidden">
               <div
@@ -419,6 +432,10 @@ const ProfilePage = () => {
             onClose={() => setStatusPathOpen(false)}
           />
         )}
+
+        {/* Модалка «Ачивки» — по тапу на бейдж темпа; сама грузит свои данные */}
+        <AchievementsModal open={achievementsOpen} onClose={() => setAchievementsOpen(false)} />
+
 
         {/* Модалка «Эволюция!» — при смене статуса с прошлого визита */}
         {gamification && (

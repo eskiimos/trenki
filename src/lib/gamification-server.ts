@@ -27,10 +27,15 @@ export interface GamificationSummary {
   tempoMultiplier: number;
 }
 
-export async function getGamificationSummary(userId: string): Promise<GamificationSummary> {
-  // Для «Темпа ×2» XP считается ретроактивно из ПОЛНОЙ истории дат завершений
-  // (XP в БД не хранится — инвариант). Тянем только completedAt — это дёшево:
-  // даже годы ежедневных тренировок — тысячи строк по одному timestamp.
+/**
+ * Полная история дат завершений пользователя — общая выборка для XP/уровней
+ * (getGamificationSummary) и ачивок (/api/gamification/achievements).
+ * Тянем только completedAt — это дёшево: даже годы ежедневных тренировок —
+ * тысячи строк по одному timestamp.
+ */
+export async function fetchCompletionHistory(
+  userId: string,
+): Promise<{ workoutAts: Date[]; moduleAts: Date[] }> {
   const [workoutSessions, moduleVideos] = await Promise.all([
     prisma.workoutSession.findMany({
       where: { userId, status: WorkoutStatus.COMPLETED, completedAt: { not: null } },
@@ -45,10 +50,18 @@ export async function getGamificationSummary(userId: string): Promise<Gamificati
     }),
   ]);
 
-  const workoutAts = workoutSessions.map((s) => s.completedAt!);
-  // Legacy-модули без completedAt не теряют свои 20 XP: эпоха гарантированно
-  // вне любой серии → множитель ×1, как и раньше.
-  const moduleAts = moduleVideos.map((m) => m.completedAt ?? new Date(0));
+  return {
+    workoutAts: workoutSessions.map((s) => s.completedAt!),
+    // Legacy-модули без completedAt не теряют свои 20 XP: эпоха гарантированно
+    // вне любой серии → множитель ×1, как и раньше.
+    moduleAts: moduleVideos.map((m) => m.completedAt ?? new Date(0)),
+  };
+}
+
+export async function getGamificationSummary(userId: string): Promise<GamificationSummary> {
+  // Для «Темпа ×2» XP считается ретроактивно из ПОЛНОЙ истории дат завершений
+  // (XP в БД не хранится — инвариант).
+  const { workoutAts, moduleAts } = await fetchCompletionHistory(userId);
 
   const { xpTotal, tempoActiveToday } = computeXpFromHistory(workoutAts, moduleAts);
   const levelInfo = levelFromXp(xpTotal);

@@ -58,8 +58,9 @@ function daysWord(n: number): string {
 
 /** Нудж «серия под угрозой» — текст зависит от длины стрика. */
 export function streakNudgeText(streak: number): NudgeText {
-  // При серии ≥ 3 у юзера активен «Темп ×2» — напоминаем, что сгорит и он
-  const tempoTail = streak >= TEMPO_MIN_STREAK ? ' — иначе сгорит и ×2 к опыту' : '';
+  // При серии ≥ 3 у юзера активен «Ударный темп» — напоминаем, что сгорит и он
+  const tempoTail =
+    streak >= TEMPO_MIN_STREAK ? ' — иначе сгорит ударный темп (×2 к опыту)' : '';
   return {
     title: '🔥 Серия под угрозой!',
     body: `У тебя ${streak} ${daysWord(streak)} подряд — потренируйся сегодня, чтобы не обнулить серию${tempoTail}.`,

@@ -96,9 +96,9 @@ describe('нудж «серия под угрозой»', () => {
     expect(d?.text.body).toContain('5 дней подряд');
   });
 
-  it('при стрике ≥ 3 предупреждает, что сгорит и «Темп ×2»', () => {
+  it('при стрике ≥ 3 предупреждает, что сгорит «Ударный темп»', () => {
     const d = decideNudge({ ...base, currentStreak: 3, daysSinceLastTraining: 1 }, NOW);
-    expect(d?.text.body).toContain('×2 к опыту');
+    expect(d?.text.body).toContain('ударный темп (×2 к опыту)');
   });
 
   it('при стрике 2 темп ещё не активен — про ×2 молчит', () => {

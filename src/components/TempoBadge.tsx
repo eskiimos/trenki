@@ -4,10 +4,10 @@ import React from 'react';
 import { Flame } from 'lucide-react';
 import { TEMPO_MIN_STREAK, TEMPO_MULTIPLIER } from '@/lib/gamification';
 
-// Бейдж «Темп ×2» — всегда виден (решение босса: правило множителя должно
+// Бейдж «Ударный темп» — всегда виден (решение босса: правило множителя должно
 // бросаться в глаза). Два состояния:
-//  - активен (серия ≥ 3): лаймовый «Темп ×2»;
-//  - тизер: янтарный «До ×2: N дн.» — живой отсчёт до множителя.
+//  - активен (серия ≥ 3): лаймовый «Ударный темп ×2»;
+//  - тизер: янтарный «До ударного темпа: N дн.» — живой отсчёт до множителя.
 // Иконка lucide Flame вместо эмодзи: эмодзи ломали выравнивание строки
 // (свой line-height) и бейдж выглядел скомканным.
 const TempoBadge = ({ streak, tempoActive }: { streak: number; tempoActive: boolean }) => {
@@ -17,7 +17,7 @@ const TempoBadge = ({ streak, tempoActive }: { streak: number; tempoActive: bool
     return (
       <span className={`${base} bg-brand/15 border border-brand/40 text-brand`}>
         <Flame size={12} fill="currentColor" aria-hidden />
-        <span>Темп ×{TEMPO_MULTIPLIER}</span>
+        <span>Ударный темп ×{TEMPO_MULTIPLIER}</span>
       </span>
     );
   }
@@ -25,7 +25,7 @@ const TempoBadge = ({ streak, tempoActive }: { streak: number; tempoActive: bool
   return (
     <span className={`${base} bg-[#FF8C4A]/15 border border-[#FF8C4A]/40 text-[#FF8C4A]`}>
       <Flame size={12} aria-hidden />
-      <span>До ×{TEMPO_MULTIPLIER}: {daysLeft} дн.</span>
+      <span>До ударного темпа: {daysLeft} дн.</span>
     </span>
   );
 };
