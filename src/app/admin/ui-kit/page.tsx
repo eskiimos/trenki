@@ -25,6 +25,7 @@ import LeagueTable from '@/components/LeagueTable';
 // ── Наборы-справочники (документируем целиком, без живых данных юзера) ────────
 import { STATUSES } from '@/lib/gamification';
 import { ACHIEVEMENT_DEFS } from '@/lib/achievements';
+import { StatusIcon, AchievementIcon } from '@/components/gamification/icons';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Токены цвета — hex взяты 1:1 из @theme в src/app/globals.css.
@@ -365,7 +366,7 @@ export default function UiKitPage() {
             </div>
 
             <SubHeader>Модалки</SubHeader>
-            <Cell caption={`<StatusPathModal currentLevel open onClose /> · <EvolutionModal statusKey title emoji />`}>
+            <Cell caption={`<StatusPathModal currentLevel open onClose /> · <EvolutionModal statusKey title />`}>
               <Button variant="ghost" size="sm" onClick={() => setStatusPathOpen(true)}>
                 Открыть «Путь хоккеиста»
               </Button>
@@ -375,14 +376,16 @@ export default function UiKitPage() {
             </Cell>
             <StatusPathModal currentLevel={14} open={statusPathOpen} onClose={() => setStatusPathOpen(false)} />
             {evoMounted && (
-              <EvolutionModal key={evoNonce} statusKey="pro" title="Про" emoji="🏆" />
+              <EvolutionModal key={evoNonce} statusKey="pro" title="Про" />
             )}
 
             <SubHeader>Лестница статусов (STATUSES) — весь набор</SubHeader>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {STATUSES.map((s) => (
                 <div key={s.key} className="rounded-xl bg-[#1a1f3a] border border-white/5 p-4 text-center">
-                  <div className="text-3xl" aria-hidden>{s.emoji}</div>
+                  <div className="flex justify-center text-brand" aria-hidden>
+                    <StatusIcon statusKey={s.key} size={30} />
+                  </div>
                   <div className="text-sm font-bold text-white mt-2">{s.title}</div>
                   <div className="text-[11px] text-muted mt-0.5">
                     {s.minLevel === 1 ? 'старт' : `с ${s.minLevel} ур.`}
@@ -397,7 +400,9 @@ export default function UiKitPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {ACHIEVEMENT_DEFS.map((a) => (
                 <div key={a.key} className="rounded-xl bg-[#1a1f3a] border border-white/5 p-4 flex items-start gap-3">
-                  <span className="text-2xl leading-none mt-0.5" aria-hidden>{a.emoji}</span>
+                  <span className="text-brand leading-none mt-0.5 shrink-0" aria-hidden>
+                    <AchievementIcon achievementKey={a.key} size={22} />
+                  </span>
                   <div className="min-w-0">
                     <div className="text-sm font-bold text-white">{a.title}</div>
                     <div className="text-xs text-muted mt-0.5">{a.description}</div>

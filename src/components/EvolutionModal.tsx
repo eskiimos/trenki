@@ -7,16 +7,16 @@
 // «Новичка»). После показа (или первого визита) запоминаем новый ключ.
 
 import { useEffect, useState } from 'react';
+import { StatusIcon } from '@/components/gamification/icons';
 
 const SEEN_KEY = 'trenki_status_seen';
 
 interface Props {
   statusKey: string;
   title: string;
-  emoji: string;
 }
 
-const EvolutionModal = ({ statusKey, title, emoji }: Props) => {
+const EvolutionModal = ({ statusKey, title }: Props) => {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -48,7 +48,9 @@ const EvolutionModal = ({ statusKey, title, emoji }: Props) => {
       aria-label="Эволюция"
     >
       <div className="animate-popIn bg-surface rounded-2xl p-8 w-full max-w-sm text-center">
-        <div className="text-6xl mb-4" aria-hidden>{emoji}</div>
+        <div className="mb-4 flex justify-center text-brand" aria-hidden>
+          <StatusIcon statusKey={statusKey} size={72} />
+        </div>
         <div className="text-white text-xl font-bold mb-2">Эволюция!</div>
         <div className="text-muted text-base mb-6">
           Ты теперь <span className="text-brand font-bold">{title}</span>

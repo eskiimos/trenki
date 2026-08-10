@@ -7,41 +7,18 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import {
-  ChevronLeft, Snowflake, Hand, Music, BicepsFlexed, Shield, Gem, Zap, Target,
-  Puzzle, Dumbbell, Flame, Grab, CalendarDays, Rocket, Sunrise, Swords,
-  type LucideIcon,
-} from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import BottomNavigation from '@/components/BottomNavigation';
+import { AchievementIcon } from '@/components/gamification/icons';
 
 interface AchievementItem {
   key: string;
   title: string;
   description: string;
-  emoji: string; // fallback, если для ключа нет иконки
+  emoji: string; // хранится в API-ответе (нужен email-дайджесту), в UI не рендерится
   unlocked: boolean;
   progress: { current: number; target: number };
 }
-
-// Иконки по ключам ачивок (UI-слой; чистая либа хранит только emoji-fallback)
-const ICONS: Record<string, LucideIcon> = {
-  workouts_1: Snowflake,
-  workouts_5: Hand,
-  workouts_15: Music,
-  workouts_30: BicepsFlexed,
-  workouts_60: Shield,
-  workouts_100: Gem,
-  modules_10: Zap,
-  modules_50: Target,
-  modules_150: Puzzle,
-  modules_300: Dumbbell,
-  streak_3: Flame,
-  streak_5: Grab,
-  streak_7: CalendarDays,
-  streak_14: Rocket,
-  early_bird: Sunrise,
-  weekend_warrior: Swords,
-};
 
 const AchievementsPage = () => {
   const [items, setItems] = useState<AchievementItem[] | null>(null);
@@ -94,7 +71,6 @@ const AchievementsPage = () => {
         {items && (
           <div className="grid grid-cols-2 gap-3">
             {items.map((a) => {
-              const Icon = ICONS[a.key];
               const pct = Math.min(100, Math.round((a.progress.current / Math.max(1, a.progress.target)) * 100));
               return (
                 <div
@@ -110,11 +86,7 @@ const AchievementsPage = () => {
                       a.unlocked ? 'bg-brand/20 text-brand' : 'bg-white/10 text-muted'
                     }`}
                   >
-                    {Icon ? (
-                      <Icon size={28} aria-hidden />
-                    ) : (
-                      <span className="text-2xl" aria-hidden>{a.emoji}</span>
-                    )}
+                    <AchievementIcon achievementKey={a.key} size={28} />
                   </div>
                   <div className={`text-sm font-bold ${a.unlocked ? 'text-brand' : 'text-white'}`}>
                     {a.title}

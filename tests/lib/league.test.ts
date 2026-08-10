@@ -58,10 +58,14 @@ describe('buildStandings', () => {
     expect(Object.keys(entry)).toEqual(['userId', 'weeklyXp']);
   });
 
-  it('эмодзи чужого — стабильный, из ник-генератора', () => {
+  it('иконка чужого — стабильный ключ из ник-генератора; свой — own', () => {
     const s = buildStandings([e(CHILD, 300), e('a', 500)], CHILD, 'Миша', 'w')!;
     const other = s.rows.find((r) => !r.isOwn && !r.isFake)!;
-    expect(other.emoji).toBe(nicknameFor('a').emoji);
+    // Ключ иконки — строка (не эмодзи), детерминирован userId
+    expect(other.icon).toBe(nicknameFor('a').icon);
+    expect(typeof other.icon).toBe('string');
+    const own = s.rows.find((r) => r.isOwn)!;
+    expect(own.icon).toBe('own');
   });
 
   it('сортировка по XP, ранги корректны', () => {

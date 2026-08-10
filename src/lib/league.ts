@@ -29,20 +29,26 @@ const NICK_NOUN = [
   'Форвард', 'Защитник', 'Снайпер', 'Капитан', 'Бомбардир', 'Вратарь',
   'Плеймейкер', 'Центр', 'Крайний', 'Ветеран', 'Новобранец', 'Тафгай',
 ];
-const NICK_EMOJI = ['🏒', '⛸️', '🥅', '🧊', '🚀', '⚡', '🛡️', '🎯', '🔥', '🦾'];
+// Ключи иконок-аватаров (UI-рендер — в @/components/gamification/icons, по этим
+// же ключам). Раньше здесь были эмодзи; чистая либа хранит только стабильный
+// строковый ключ, а какую lucide-иконку показать — решает UI-слой.
+const NICK_ICON_KEYS = [
+  'flame', 'rocket', 'zap', 'shield', 'target',
+  'snowflake', 'swords', 'sparkles', 'trophy', 'medal',
+];
 
 /**
  * Стабильный ник по userId: один и тот же юзер всегда под одним ником, но
  * связать ник с реальным ребёнком извне нельзя. Номер добавляет уникальности
- * при коллизиях пар (10 эмодзи × 16 × 12 = 1920 комбинаций + число).
+ * при коллизиях пар (10 иконок × 16 × 12 = 1920 комбинаций + число).
  */
-export function nicknameFor(userId: string): { name: string; emoji: string } {
+export function nicknameFor(userId: string): { name: string; icon: string } {
   const h = hash32(userId);
   const adj = NICK_ADJ[h % NICK_ADJ.length];
   const noun = NICK_NOUN[(h >>> 4) % NICK_NOUN.length];
-  const emoji = NICK_EMOJI[(h >>> 8) % NICK_EMOJI.length];
+  const icon = NICK_ICON_KEYS[(h >>> 8) % NICK_ICON_KEYS.length];
   const num = (h >>> 12) % 90 + 10; // 10..99
-  return { name: `${adj} ${noun} ${num}`, emoji };
+  return { name: `${adj} ${noun} ${num}`, icon };
 }
 
 // Правдоподобные обезличенные имена: популярные русские мужские имена +
@@ -72,7 +78,8 @@ export interface LeagueEntry {
 export interface LeagueRow {
   rank: number;
   name: string;
-  emoji: string;
+  /** Стабильный ключ иконки-аватара (UI мапит его на lucide); 'own' — свой. */
+  icon: string;
   weeklyXp: number;
   isOwn: boolean;
   isFake: boolean;
@@ -112,9 +119,10 @@ export function buildStandings(
     const own = e.userId === childUserId;
     return {
       // Чужие — правдоподобное ФЕЙКОВОЕ имя от userId (стабильное, но без
-      // связи с реальным ребёнком), свой — реальное имя. Эмодзи из ника.
+      // связи с реальным ребёнком), свой — реальное имя. Иконка из ника,
+      // свой — ключ 'own' (UI рендерит Star).
       name: own ? childName : plausibleNameFor(e.userId),
-      emoji: own ? '⭐' : nick.emoji,
+      icon: own ? 'own' : nick.icon,
       weeklyXp: e.weeklyXp,
       isOwn: own,
       isFake: false,
@@ -137,11 +145,11 @@ export function buildStandings(
     for (let i = 0; i < FAKE_PAD; i++) {
       const fakeSeed = `${FAKE_NAMES_SEED}:${weekSeed}:${i}`;
       const name = plausibleNameFor(fakeSeed);
-      const nick = nicknameFor(fakeSeed); // эмодзи как у остальных участников
+      const nick = nicknameFor(fakeSeed); // иконка как у остальных участников
       const factor = (FAKE_PAD - i) / (FAKE_PAD + 1); // 0.75, 0.5, 0.25 при PAD=3
       fakes.push({
         name,
-        emoji: nick.emoji,
+        icon: nick.icon,
         weeklyXp: Math.max(0, Math.floor(ownXp * factor)),
         isOwn: false,
         isFake: true,
@@ -174,7 +182,7 @@ export function buildStandings(
   const ranked: LeagueRow[] = rows.map((r) => ({
     rank: all.indexOf(r) + 1,
     name: r.name,
-    emoji: r.emoji,
+    icon: r.icon,
     weeklyXp: r.weeklyXp,
     isOwn: r.isOwn,
     isFake: r.isFake,

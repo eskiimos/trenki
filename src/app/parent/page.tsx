@@ -7,12 +7,14 @@
 import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Flame } from 'lucide-react';
 import { clearAuth } from '@/lib/auth';
 import { useSubscriptionPricing } from '@/hooks/useSubscriptionPricing';
 import LeagueTable from '@/components/LeagueTable';
 import TempoBadge from '@/components/TempoBadge';
 import PotentialRing from '@/components/PotentialRing';
 import StatusPathModal from '@/components/StatusPathModal';
+import { StatusIcon } from '@/components/gamification/icons';
 
 interface ChildCard {
   id: string;
@@ -187,7 +189,10 @@ const ChildCardView = ({
           <div className="text-white text-base font-bold truncate">{childName(child)}</div>
           <div className="text-muted text-xs mt-0.5 flex items-center gap-1.5 flex-wrap">
             {g.streak > 0 && (
-              <span>🔥 Серия: {g.streak} {plural(g.streak, ['день', 'дня', 'дней'])}</span>
+              <span className="inline-flex items-center gap-1">
+                <Flame size={12} className="text-[#FF8C4A]" aria-hidden />
+                Серия: {g.streak} {plural(g.streak, ['день', 'дня', 'дней'])}
+              </span>
             )}
             {/* Бейдж темпа виден всегда: активный ×2 или отсчёт до него */}
             <TempoBadge streak={g.streak} tempoActive={!!g.tempoActive} />
@@ -203,7 +208,7 @@ const ChildCardView = ({
           aria-haspopup="dialog"
           className="inline-flex items-center gap-1.5 bg-brand text-night text-xs font-bold font-overpass uppercase rounded-full px-3 py-1 cursor-pointer transition-transform active:scale-95"
         >
-          <span aria-hidden>{g.status.emoji}</span>
+          <StatusIcon statusKey={g.status.key} size={14} />
           {g.status.title}
         </button>
         <StatusPathModal

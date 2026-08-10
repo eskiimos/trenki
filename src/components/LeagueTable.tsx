@@ -6,11 +6,14 @@
 // (приватность, полной фамилии нет), свой — по имени с lime-подсветкой строки.
 
 import { useState } from 'react';
+import { Trophy, Flame } from 'lucide-react';
+import { leagueIconKeyToIcon } from '@/components/gamification/icons';
 
 interface LeagueRow {
   rank: number;
   name: string;
-  emoji: string;
+  /** Ключ иконки-аватара (см. @/lib/league); UI мапит его на lucide */
+  icon: string;
   weeklyXp: number;
   isOwn: boolean;
   isFake: boolean;
@@ -79,8 +82,9 @@ export default function LeagueTable({
         aria-expanded={open}
         className="w-full flex items-center justify-between text-left"
       >
-        <span className="text-muted text-[11px] font-overpass uppercase tracking-wide">
-          🏆 Лига{data?.year ? ` ${data.year} года` : ''}
+        <span className="text-muted text-[11px] font-overpass uppercase tracking-wide inline-flex items-center gap-1.5">
+          <Trophy size={13} aria-hidden />
+          Лига{data?.year ? ` ${data.year} года` : ''}
         </span>
         <span className="text-muted text-xs" aria-hidden>
           {open ? '▲' : '▼'}
@@ -104,7 +108,9 @@ export default function LeagueTable({
           {data?.league && (
             <>
               <div className="flex flex-col gap-0.5">
-                {data.league.rows.map((row) => (
+                {data.league.rows.map((row) => {
+                  const RowIcon = leagueIconKeyToIcon(row.icon);
+                  return (
                   <div
                     key={`${row.rank}-${row.name}`}
                     className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${
@@ -118,9 +124,7 @@ export default function LeagueTable({
                     >
                       {row.rank}
                     </span>
-                    <span className="shrink-0" aria-hidden>
-                      {row.emoji}
-                    </span>
+                    <RowIcon size={16} className="shrink-0" aria-hidden />
                     <span className="min-w-0 flex-1 truncate">{row.name}</span>
                     <span
                       className={`shrink-0 font-overpass tabular-nums ${
@@ -130,10 +134,13 @@ export default function LeagueTable({
                       {row.weeklyXp} XP
                     </span>
                   </div>
-                ))}
+                  );
+                })}
               </div>
-              <div className="text-muted text-xs mt-2">
-                Сильнее {data.league.percentile}% сверстников · неделя {data.weekLabel} · 🔥 серия 3+ дней = опыт ×2
+              <div className="text-muted text-xs mt-2 flex items-center gap-1 flex-wrap">
+                <span>Сильнее {data.league.percentile}% сверстников · неделя {data.weekLabel} ·</span>
+                <Flame size={12} aria-hidden />
+                <span>серия 3+ дней = опыт ×2</span>
               </div>
             </>
           )}

@@ -6,6 +6,7 @@
 // этом прямо, вместо абстрактного «не потеряй».
 
 import { useEffect, useState } from 'react';
+import { Flame } from 'lucide-react';
 import { TEMPO_MIN_STREAK } from '@/lib/gamification';
 import TempoBadge from '@/components/TempoBadge';
 
@@ -31,7 +32,7 @@ const StreakChip = () => {
   return (
     <section className="px-4" style={{ paddingTop: 12 }}>
       <div className="bg-surface rounded-2xl px-4 py-3 flex items-center gap-3">
-        <span className="text-xl" aria-hidden>🔥</span>
+        <Flame size={20} className="text-[#FF8C4A] shrink-0" fill="currentColor" aria-hidden />
         <span className="text-white text-sm font-medium flex-1 min-w-0">
           {streak >= TEMPO_MIN_STREAK
             ? `Ударный темп! Серия ${streak} дн.`

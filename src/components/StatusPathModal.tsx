@@ -6,11 +6,13 @@
 // (следующее — с акцентом и счётчиком оставшихся уровней).
 
 import { useEffect } from 'react';
+import { Flame } from 'lucide-react';
 import {
   STATUSES,
   XP_PER_COMPLETED_MODULE,
   XP_PER_COMPLETED_WORKOUT,
 } from '@/lib/gamification';
+import { StatusIcon } from '@/components/gamification/icons';
 
 interface Props {
   currentLevel: number;
@@ -69,9 +71,11 @@ const StatusPathModal = ({ currentLevel, open, onClose }: Props) => {
                   current ? 'bg-brand/15 border border-brand/40' : ''
                 }${passed ? ' opacity-45' : ''}`}
               >
-                <span className="text-2xl shrink-0" aria-hidden>
-                  {s.emoji}
-                </span>
+                <StatusIcon
+                  statusKey={s.key}
+                  size={26}
+                  className={`shrink-0 ${current ? 'text-brand' : 'text-white'}`}
+                />
                 <div className="min-w-0 flex-1">
                   <div className={`text-sm font-bold ${current ? 'text-brand' : 'text-white'}`}>
                     {s.title}
@@ -107,7 +111,9 @@ const StatusPathModal = ({ currentLevel, open, onClose }: Props) => {
 
         <p className="text-muted/70 text-[11px] text-center leading-relaxed mb-4">
           Уровни растут за тренировки: тренировка +{XP_PER_COMPLETED_WORKOUT} XP, модуль +
-          {XP_PER_COMPLETED_MODULE}. 🔥 Серия от 3 дней подряд — ударный темп: весь опыт дня ×2
+          {XP_PER_COMPLETED_MODULE}.{' '}
+          <Flame size={12} className="inline align-[-1px]" aria-hidden /> Серия от 3 дней подряд —
+          ударный темп: весь опыт дня ×2
         </p>
 
         <button

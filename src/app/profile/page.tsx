@@ -15,6 +15,7 @@ import SubscriptionExpiryCard from '@/components/SubscriptionExpiryCard';
 import EvolutionModal from '@/components/EvolutionModal';
 import StatusPathModal from '@/components/StatusPathModal';
 import TempoBadge from '@/components/TempoBadge';
+import { StatusIcon } from '@/components/gamification/icons';
 import LeagueTable from '@/components/LeagueTable';
 import { useTour } from '@/components/tour/TourProvider';
 import { clearAuth, getTelegramId } from '@/lib/auth';
@@ -373,7 +374,7 @@ const ProfilePage = () => {
                 aria-haspopup="dialog"
                 className="inline-flex items-center gap-1.5 bg-brand text-night text-xs font-bold font-overpass uppercase rounded-full px-3 py-1 cursor-pointer transition-transform active:scale-95"
               >
-                <span aria-hidden>{gamification.status.emoji}</span>
+                <StatusIcon statusKey={gamification.status.key} size={14} />
                 {gamification.status.title}
               </button>
               <span className="text-white text-base font-bold font-overpass whitespace-nowrap shrink-0">
@@ -435,7 +436,6 @@ const ProfilePage = () => {
           <EvolutionModal
             statusKey={gamification.status.key}
             title={gamification.status.title}
-            emoji={gamification.status.emoji}
           />
         )}
 
