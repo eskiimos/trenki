@@ -1,14 +1,13 @@
 'use client';
 
-// Плашка стрика на главной. Использует общий <Banner> (grad-accent + лаймовая
-// рамка, иконка/заголовок/подзаголовок/action) — как GuideBanner и прочие блоки
-// главной, чтобы не выбиваться из стиля. Сам грузит сводку; при стрике < 1,
-// ошибке или пока грузится — не рендерит ничего.
+// Плашка стрика на главной: плоский surface-фон (без градиента), ОДНА строка
+// без переносов — иконка + короткий текст (обрезается при нехватке места) +
+// бейдж темпа справа целиком. Сам грузит сводку; при стрике < 1, ошибке или
+// пока грузится — не рендерит ничего.
 
 import { useEffect, useState } from 'react';
 import { Flame } from 'lucide-react';
 import { TEMPO_MIN_STREAK } from '@/lib/gamification';
-import { Banner } from '@/components/ui';
 import TempoBadge from '@/components/TempoBadge';
 
 /** «1 день / 2 дня / 5 дней» */
@@ -36,20 +35,22 @@ const StreakChip = () => {
     };
   }, []);
 
-  // Показываем уже с 1 дня — как тизер множителя
   if (streak < 1) return null;
 
   const active = streak >= TEMPO_MIN_STREAK;
-  const left = TEMPO_MIN_STREAK - streak;
 
   return (
     <section className="px-4" style={{ paddingTop: 12 }}>
-      <Banner
-        icon={<Flame size={22} className="text-[#FF8C4A]" fill="currentColor" aria-hidden />}
-        title={`Серия: ${streak} ${pluralDays(streak)} подряд`}
-        subtitle={active ? 'Опыт за тренировки идёт ×2' : `Ещё ${left} ${pluralDays(left)} — и опыт ×2`}
-        action={<TempoBadge streak={streak} tempoActive={active} />}
-      />
+      <div
+        className="flex items-center gap-3 rounded-2xl px-4 py-3"
+        style={{ background: '#101530', border: '1px solid rgba(255,255,255,0.06)' }}
+      >
+        <Flame size={20} className="text-[#FF8C4A] shrink-0" fill="currentColor" aria-hidden />
+        <span className="text-white text-sm font-medium font-overpass flex-1 min-w-0 truncate">
+          Серия: {streak} {pluralDays(streak)}
+        </span>
+        <TempoBadge streak={streak} tempoActive={active} />
+      </div>
     </section>
   );
 };
