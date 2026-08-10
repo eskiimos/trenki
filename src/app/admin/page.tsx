@@ -364,6 +364,12 @@ export default function AdminPage() {
                 title="Проверка контента"
                 desc="Целостность данных"
               />
+              <NavCard
+                href="/admin/ui-kit"
+                icon="🎨"
+                title="UI-кит"
+                desc="Токены и компоненты"
+              />
             </div>
           </div>
         </div>
