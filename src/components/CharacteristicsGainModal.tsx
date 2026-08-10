@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Dumbbell, Gauge, HeartPulse, Target, PersonStanding, Zap, PartyPopper, type LucideIcon } from 'lucide-react';
+import { Dumbbell, Gauge, HeartPulse, Target, PersonStanding, Zap, Star, PartyPopper, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui';
 
 interface CharacteristicsGainModalProps {
@@ -20,6 +20,10 @@ interface CharacteristicsGainModalProps {
     ratingFlexibility: number;
     potential: number;
   };
+  /** Заработанный за это действие XP (0 → строка XP не показывается) */
+  xpEarned?: number;
+  /** Множитель темпа, применённый к XP (2 при активном «Ударном темпе») */
+  tempoMultiplier?: number;
   onClose: () => void;
 }
 
@@ -44,6 +48,8 @@ const characteristics: CharacteristicItem[] = [
 export default function CharacteristicsGainModal({
   gains,
   newCharacteristics,
+  xpEarned = 0,
+  tempoMultiplier = 1,
   onClose,
 }: CharacteristicsGainModalProps) {
   const [animateIn, setAnimateIn] = useState(false);
@@ -139,6 +145,32 @@ export default function CharacteristicsGainModal({
             );
           })}
         </div>
+
+        {/* Заработанный XP — показываем только если реально начислен */}
+        {xpEarned > 0 && (
+          <div
+            className="rounded-2xl p-4 mb-3 flex items-center justify-between"
+            style={{ background: 'rgba(161,255,74,0.12)', border: '1px solid rgba(161,255,74,0.4)' }}
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center bg-brand/20 shrink-0">
+                <Star size={18} className="text-brand" fill="currentColor" />
+              </div>
+              <span className="text-white text-base font-semibold font-overpass">Опыт</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {tempoMultiplier > 1 && (
+                <span className="text-[#FF8C4A] text-[11px] font-bold font-overpass rounded-full px-2 py-0.5 border border-[#FF8C4A]/40">
+                  ×{tempoMultiplier}
+                </span>
+              )}
+              <span className="text-brand text-2xl font-black font-overpass tabular-nums">
+                +{xpEarned}
+              </span>
+              <span className="text-brand text-sm font-bold font-overpass">XP</span>
+            </div>
+          </div>
+        )}
 
         {/* Новый потенциал */}
         <div

@@ -80,6 +80,7 @@ export default function WorkoutPage() {
   const [showGainsModal, setShowGainsModal] = useState(false);
   const [characteristicsGains, setCharacteristicsGains] = useState<any>(null);
   const [newCharacteristics, setNewCharacteristics] = useState<any>(null);
+  const [gainXp, setGainXp] = useState<{ xp: number; mult: number }>({ xp: 0, mult: 1 });
   
   // Состояние для Toast уведомлений
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
@@ -309,6 +310,7 @@ export default function WorkoutPage() {
           // Показываем модалку прироста
           setCharacteristicsGains(data.gains);
           setNewCharacteristics(data.newCharacteristics);
+          setGainXp({ xp: data.xpEarned ?? 0, mult: data.tempoMultiplier ?? 1 });
           setShowGainsModal(true);
         } else if (data.limitReached) {
           // Показываем Toast о лимите
@@ -1235,6 +1237,8 @@ export default function WorkoutPage() {
         <CharacteristicsGainModal
           gains={characteristicsGains}
           newCharacteristics={newCharacteristics}
+          xpEarned={gainXp.xp}
+          tempoMultiplier={gainXp.mult}
           onClose={handleGainsModalClose}
         />
       )}

@@ -9,6 +9,7 @@ import {
 } from '@/lib/characteristics';
 import { markAssignmentsCompletedForVideos } from '@/lib/coach/auto-complete';
 import { requireAuthUser } from '@/lib/coach/guards';
+import { tempoMultiplierToday, XP_PER_COMPLETED_WORKOUT, XP_PER_COMPLETED_MODULE } from '@/lib/gamification';
 
 /**
  * POST /api/training/complete
@@ -231,6 +232,20 @@ export async function POST(request: NextRequest) {
       trainingsToday: newTrainingsToday,
     });
 
+    // XP за эту тренировку: 100 (сессия) + 20×модули, всё ×множитель темпа
+    // «на сегодня». Модули считаются только сейчас (XP берётся из COMPLETED-
+    // сессий, а до этого статус был не COMPLETED) — поэтому здесь весь XP
+    // тренировки приземляется разом. Считаем после установки COMPLETED, чтобы
+    // сегодняшний день уже был «тренировочным» для множителя.
+    const completedModuleCount = session.videos.filter((v) => v.completed).length;
+    const workoutDates = await prisma.workoutSession.findMany({
+      where: { userId: user.id, status: WorkoutStatus.COMPLETED, completedAt: { not: null } },
+      select: { completedAt: true },
+    });
+    const tempoMultiplier = tempoMultiplierToday(workoutDates.map((w) => w.completedAt!));
+    const xpEarned =
+      (XP_PER_COMPLETED_WORKOUT + completedModuleCount * XP_PER_COMPLETED_MODULE) * tempoMultiplier;
+
     // Автозакрытие тренерских заданий:
     //   1. Полноценное 4-модульное задание привязано к этой WorkoutSession
     //      через TrainingAssignment.workoutSessionId — закрываем по sessionId.
@@ -269,6 +284,8 @@ export async function POST(request: NextRequest) {
         ratingFlexibility: newCharacteristics.ratingFlexibility,
         potential: newPotential,
       },
+      xpEarned,
+      tempoMultiplier,
       trainingsToday: newTrainingsToday,
     });
 

@@ -195,6 +195,7 @@ export default function VideoPage({ params }: VideoPageProps) {
   const [showGainsModal, setShowGainsModal] = useState(false);
   const [characteristicsGains, setCharacteristicsGains] = useState<any>(null);
   const [newCharacteristics, setNewCharacteristics] = useState<any>(null);
+  const [gainXp, setGainXp] = useState<{ xp: number; mult: number }>({ xp: 0, mult: 1 });
   const [isCompletingModule, setIsCompletingModule] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   
@@ -508,6 +509,7 @@ export default function VideoPage({ params }: VideoPageProps) {
         // Показываем модалку с приростом характеристик
         setCharacteristicsGains(data.gains);
         setNewCharacteristics(data.newCharacteristics);
+        setGainXp({ xp: data.xpEarned ?? 0, mult: data.tempoMultiplier ?? 1 });
         setShowGainsModal(true);
 
         // Обновляем локальный профиль
@@ -2155,6 +2157,8 @@ export default function VideoPage({ params }: VideoPageProps) {
         <CharacteristicsGainModal
           gains={characteristicsGains}
           newCharacteristics={newCharacteristics}
+          xpEarned={gainXp.xp}
+          tempoMultiplier={gainXp.mult}
           onClose={handleGainsModalClose}
         />
       )}

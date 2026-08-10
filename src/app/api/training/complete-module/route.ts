@@ -8,6 +8,7 @@ import {
 } from '@/lib/characteristics';
 import { markAssignmentsCompletedForVideos } from '@/lib/coach/auto-complete';
 import { requireAuthUser } from '@/lib/coach/guards';
+import { tempoMultiplierToday, XP_PER_COMPLETED_WORKOUT, XP_PER_COMPLETED_MODULE } from '@/lib/gamification';
 
 /**
  * POST /api/training/complete-module
@@ -233,6 +234,21 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // XP за этот акт. Обычный свободный просмотр XP НЕ даёт (сессии нет —
+    // начисляется только потенциал), поэтому xpEarned=0 и в модалке строка XP
+    // не показывается. Читер-режим админа создаёт синтетическую сессию →
+    // тренировка(100) + модуль(20), ×множитель темпа на сегодня.
+    let xpEarned = 0;
+    let tempoMultiplier = 1;
+    if (isAdminCheat) {
+      const workoutDates = await prisma.workoutSession.findMany({
+        where: { userId: user.id, status: 'COMPLETED', completedAt: { not: null } },
+        select: { completedAt: true },
+      });
+      tempoMultiplier = tempoMultiplierToday(workoutDates.map((w) => w.completedAt!));
+      xpEarned = (XP_PER_COMPLETED_WORKOUT + XP_PER_COMPLETED_MODULE) * tempoMultiplier;
+    }
+
     return NextResponse.json({
       success: true,
       gains,
@@ -244,6 +260,8 @@ export async function POST(request: NextRequest) {
         ratingFlexibility: updatedProfile.ratingFlexibility,
         potential: updatedProfile.potential,
       },
+      xpEarned,
+      tempoMultiplier,
       modulesToday: updatedProfile.modulesToday,
     });
   } catch (error) {

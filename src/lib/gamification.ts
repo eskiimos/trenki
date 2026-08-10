@@ -55,6 +55,16 @@ function tempoMultiplierForDay(day: number, workoutDays: ReadonlySet<number>): n
   return TEMPO_MULTIPLIER;
 }
 
+/**
+ * Множитель «Темпа ×2» для СЕГОДНЯШНЕГО дня по датам завершённых тренировок.
+ * Нужен, чтобы показать реальный начисленный XP сразу после тренировки (тот же
+ * множитель, что применяет ретроактивный расчёт к сегодняшнему дню).
+ */
+export function tempoMultiplierToday(workoutCompletedAts: Date[], now: Date = new Date()): number {
+  const days = new Set(workoutCompletedAts.map(dayKey));
+  return tempoMultiplierForDay(dayKey(now), days);
+}
+
 export interface XpFromHistory {
   xpTotal: number;
   /** Активен ли «Темп ×2» прямо сейчас (серия жива — сегодня или вчера, как computeStreak). */
