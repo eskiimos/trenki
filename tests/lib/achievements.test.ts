@@ -1,15 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
   ACHIEVEMENT_DEFS,
+  SKILL_TREE,
+  EVO1_TARGET,
+  EVO2_TARGET,
   computeAchievements,
-  maxStreakEver,
 } from '../../src/lib/achievements';
-
-/** Локальная дата: год/месяц(1-12)/день/час. */
-const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h, 0, 0);
-
-/** n тренировок в разные дни (без серий: шаг 3 дня). */
-const workouts = (n: number) => Array.from({ length: n }, (_, i) => at(2025, 1, 1 + i * 3));
+import type { TrainingGoal } from '../../src/generated/prisma';
 
 const byKey = (list: ReturnType<typeof computeAchievements>, key: string) => {
   const a = list.find((x) => x.key === key);
@@ -17,114 +14,88 @@ const byKey = (list: ReturnType<typeof computeAchievements>, key: string) => {
   return a;
 };
 
-describe('набор ачивок', () => {
-  it('14 штук, ключи уникальны, у всех есть описание и эмодзи', () => {
-    expect(ACHIEVEMENT_DEFS.length).toBe(16);
-    expect(new Set(ACHIEVEMENT_DEFS.map((d) => d.key)).size).toBe(16);
+describe('набор «Древо навыков»', () => {
+  it('14 штук (7 целей × 2 эволюции), ключи уникальны, у всех title/описание/эмодзи', () => {
+    expect(ACHIEVEMENT_DEFS.length).toBe(14);
+    expect(SKILL_TREE.length).toBe(7);
+    expect(new Set(ACHIEVEMENT_DEFS.map((d) => d.key)).size).toBe(14);
     for (const d of ACHIEVEMENT_DEFS) {
       expect(d.title.length).toBeGreaterThan(0);
       expect(d.description.length).toBeGreaterThan(0);
       expect(d.emoji.length).toBeGreaterThan(0);
     }
-    expect(computeAchievements([], 0).length).toBe(16);
+    expect(computeAchievements({}).length).toBe(14);
+  });
+
+  it('порядок: по каждой цели SKILL_TREE идут evo1 (порог 5), затем evo2 (порог 10)', () => {
+    const expectedKeys = SKILL_TREE.flatMap((b) => [b.evo1.key, b.evo2.key]);
+    expect(ACHIEVEMENT_DEFS.map((d) => d.key)).toEqual(expectedKeys);
+    expect(computeAchievements({}).map((a) => a.key)).toEqual(expectedKeys);
+
+    for (const b of SKILL_TREE) {
+      const evo1 = ACHIEVEMENT_DEFS.find((d) => d.key === b.evo1.key)!;
+      const evo2 = ACHIEVEMENT_DEFS.find((d) => d.key === b.evo2.key)!;
+      expect(evo1.goal).toBe(b.goal);
+      expect(evo1.tier).toBe(1);
+      expect(evo1.target).toBe(EVO1_TARGET);
+      expect(evo2.goal).toBe(b.goal);
+      expect(evo2.tier).toBe(2);
+      expect(evo2.target).toBe(EVO2_TARGET);
+    }
+    expect(EVO1_TARGET).toBe(5);
+    expect(EVO2_TARGET).toBe(10);
   });
 });
 
-describe('пороги тренировок', () => {
-  it('unlocked ровно на границе: 1 → «Первый лёд», 9 ≠ «Десятка», 10 = «Десятка»', () => {
-    expect(byKey(computeAchievements([], 0), 'workouts_1').unlocked).toBe(false);
-    expect(byKey(computeAchievements(workouts(1), 0), 'workouts_1').unlocked).toBe(true);
-    expect(byKey(computeAchievements(workouts(4), 0), 'workouts_5').unlocked).toBe(false);
-    expect(byKey(computeAchievements(workouts(5), 0), 'workouts_5').unlocked).toBe(true);
+describe('пороги эволюций на границе', () => {
+  it('4 → evo1 закрыта, 5 → evo1 открыта', () => {
+    expect(byKey(computeAchievements({ AGILITY: 4 }), 'agility_evo1').unlocked).toBe(false);
+    expect(byKey(computeAchievements({ AGILITY: 5 }), 'agility_evo1').unlocked).toBe(true);
+  });
+
+  it('9 → evo2 закрыта, 10 → evo2 открыта', () => {
+    const nine = computeAchievements({ POWERFUL_SHOT: 9 });
+    expect(byKey(nine, 'shot_evo1').unlocked).toBe(true); // evo1 уже открыта на 5
+    expect(byKey(nine, 'shot_evo2').unlocked).toBe(false);
+    const ten = computeAchievements({ POWERFUL_SHOT: 10 });
+    expect(byKey(ten, 'shot_evo2').unlocked).toBe(true);
   });
 
   it('progress обрезан по target', () => {
-    const a = byKey(computeAchievements(workouts(37), 0), 'workouts_30');
-    expect(a.progress).toEqual({ current: 30, target: 30 });
-    const b = byKey(computeAchievements(workouts(37), 0), 'workouts_60');
-    expect(b.progress).toEqual({ current: 37, target: 60 });
+    // 7 завершённых по цели: evo1 (target 5) обрезана до 5, evo2 (target 10) — 7
+    const list = computeAchievements({ OUTRUN_OPPONENT: 7 });
+    expect(byKey(list, 'outrun_evo1').progress).toEqual({ current: 5, target: 5 });
+    expect(byKey(list, 'outrun_evo2').progress).toEqual({ current: 7, target: 10 });
+    // 100 завершённых: обе обрезаны по своему target
+    const many = computeAchievements({ OUTRUN_OPPONENT: 100 });
+    expect(byKey(many, 'outrun_evo1').progress).toEqual({ current: 5, target: 5 });
+    expect(byKey(many, 'outrun_evo2').progress).toEqual({ current: 10, target: 10 });
   });
 });
 
-describe('пороги модулей (moduleCount)', () => {
-  it('25/100/500 ровно на границе', () => {
-    const under = computeAchievements([], 9);
-    expect(byKey(under, 'modules_10').unlocked).toBe(false);
-    expect(byKey(under, 'modules_10').progress.current).toBe(9);
-    const exact = computeAchievements([], 10);
-    expect(byKey(exact, 'modules_10').unlocked).toBe(true);
-    const many = computeAchievements([], 500);
-    expect(byKey(many, 'modules_50').unlocked).toBe(true);
-    expect(byKey(many, 'modules_300').unlocked).toBe(true);
-    expect(byKey(many, 'modules_300').progress).toEqual({ current: 300, target: 300 });
-  });
-});
-
-describe('maxStreakEver — максимальная серия за историю', () => {
-  it('пусто → 0, один день → 1, дубли одного дня не раздувают серию', () => {
-    expect(maxStreakEver([])).toBe(0);
-    expect(maxStreakEver([at(2025, 3, 10)])).toBe(1);
-    expect(maxStreakEver([at(2025, 3, 10, 7), at(2025, 3, 10, 19), at(2025, 3, 10, 22)])).toBe(1);
+describe('цель без завершений и лишние ключи', () => {
+  it('цель с 0 (или отсутствующая в мапе) → обе ачивки закрыты, прогресс 0', () => {
+    const list = computeAchievements({ SPORT_LONGEVITY: 0 });
+    for (const key of ['longevity_evo1', 'longevity_evo2']) {
+      const a = byKey(list, key);
+      expect(a.unlocked).toBe(false);
+      expect(a.progress.current).toBe(0);
+    }
+    // Та же картина, если цели вообще нет во входной мапе
+    const empty = computeAchievements({});
+    expect(byKey(empty, 'longevity_evo1').progress.current).toBe(0);
+    expect(empty.every((a) => !a.unlocked)).toBe(true);
   });
 
-  it('находит самый длинный run, а не текущий стрик (серия давно в прошлом)', () => {
-    const ats = [
-      // Серия из 4 дней год назад
-      at(2024, 5, 1), at(2024, 5, 2), at(2024, 5, 3), at(2024, 5, 4),
-      // Разрыв, потом серия из 2
-      at(2024, 5, 10), at(2024, 5, 11),
-    ];
-    expect(maxStreakEver(ats)).toBe(4);
-    // «Ударный темп» (3 подряд) разблокирован ИСТОРИЧЕСКОЙ серией,
-    // хотя текущий стрик относительно сегодня равен 0.
-    const a = byKey(computeAchievements(ats, 0), 'streak_3');
-    expect(a.unlocked).toBe(true);
-  });
-
-  it('серия через границу месяца', () => {
-    expect(maxStreakEver([at(2025, 1, 30), at(2025, 1, 31), at(2025, 2, 1)])).toBe(3);
-  });
-
-  it('пороги серий ровно на границе: 7 дней = «Неделя огня», 6 — нет', () => {
-    const run = (n: number) => Array.from({ length: n }, (_, i) => at(2025, 6, 1 + i));
-    expect(byKey(computeAchievements(run(6), 0), 'streak_7').unlocked).toBe(false);
-    const seven = computeAchievements(run(7), 0);
-    expect(byKey(seven, 'streak_7').unlocked).toBe(true);
-    expect(byKey(seven, 'streak_7').progress).toEqual({ current: 7, target: 7 });
-    expect(byKey(seven, 'streak_14').progress).toEqual({ current: 7, target: 14 });
-    expect(byKey(computeAchievements(run(30), 0), 'streak_14').unlocked).toBe(true);
-  });
-});
-
-describe('«Ранняя пташка» — тренировка до 08:00 локального', () => {
-  it('07:59 даёт, 08:00 — нет', () => {
-    const early = computeAchievements([new Date(2025, 3, 10, 7, 59)], 0);
-    expect(byKey(early, 'early_bird').unlocked).toBe(true);
-    const late = computeAchievements([new Date(2025, 3, 10, 8, 0)], 0);
-    expect(byKey(late, 'early_bird').unlocked).toBe(false);
-    expect(byKey(late, 'early_bird').progress).toEqual({ current: 0, target: 1 });
-  });
-});
-
-describe('«Воин выходных» — сб и вс ОДНОЙ недели', () => {
-  // 2025-06-07 — суббота, 2025-06-08 — воскресенье
-  it('суббота + следующее воскресенье → разблокирована', () => {
-    const a = computeAchievements([at(2025, 6, 7), at(2025, 6, 8)], 0);
-    expect(byKey(a, 'weekend_warrior').unlocked).toBe(true);
-  });
-
-  it('суббота одной недели + воскресенье другой → НЕ разблокирована', () => {
-    // сб 2025-06-07 и вс 2025-06-15 (следующая неделя)
-    const a = computeAchievements([at(2025, 6, 7), at(2025, 6, 15)], 0);
-    expect(byKey(a, 'weekend_warrior').unlocked).toBe(false);
-    // и наоборот: вс 2025-06-08 + сб 2025-06-14 — тоже разные выходные
-    const b = computeAchievements([at(2025, 6, 8), at(2025, 6, 14)], 0);
-    expect(byKey(b, 'weekend_warrior').unlocked).toBe(false);
-  });
-
-  it('будние дни подряд не считаются выходными', () => {
-    // пн-вт 2025-06-09/10
-    const a = computeAchievements([at(2025, 6, 9), at(2025, 6, 10)], 0);
-    expect(byKey(a, 'weekend_warrior').unlocked).toBe(false);
+  it('неизвестные цели во входе игнорируются, не ломают расчёт', () => {
+    const input = {
+      STRENGTH_STABILITY: 5,
+      // намеренно несуществующая цель — должна быть проигнорирована
+      NOT_A_GOAL: 999,
+    } as unknown as Partial<Record<TrainingGoal, number>>;
+    const list = computeAchievements(input);
+    expect(list.length).toBe(14);
+    expect(byKey(list, 'strength_evo1').unlocked).toBe(true);
+    expect(byKey(list, 'strength_evo2').unlocked).toBe(false);
   });
 });

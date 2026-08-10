@@ -1,16 +1,97 @@
-// Ачивки — считаются РЕТРОАКТИВНО из уже существующей истории завершений
-// (та же выборка, что у XP/уровней: см. fetchCompletionHistory в
-// gamification-server.ts). В БД ничего не хранится — как и XP, ачивки
-// детерминированно выводятся из timestamps, поэтому появляются у всех сразу.
+// «Древо навыков» — цель-ориентированные ачивки. Считаются РЕТРОАКТИВНО из
+// уже существующей истории: для каждой из 7 целей тренировок берём число
+// ЗАВЕРШЁННЫХ WorkoutSession с этой целью (любая завершённая сессия, где goal
+// задан: быстрая ИИ-тренировка, дни микроцикла, тренер). В БД ничего не
+// хранится, миграций нет — как и XP, ачивки детерминированно выводятся из
+// истории и появляются у всех сразу.
+//
+// Механика на цель: 5 завершённых → Эволюция 1, 10 → Эволюция 2.
 // Чистая логика — тестируется без БД (tests/lib/achievements.test.ts).
 
-import { TEMPO_MIN_STREAK } from '@/lib/gamification';
+import type { TrainingGoal } from '@/generated/prisma';
+
+/** Пороги эволюций (число завершённых тренировок с данной целью). */
+export const EVO1_TARGET = 5;
+export const EVO2_TARGET = 10;
+
+/** Одна ветка дерева: цель + две её эволюции. */
+export interface SkillGoalDef {
+  goal: TrainingGoal;
+  /** Русское название цели (из комментария enum TrainingGoal). */
+  goalTitle: string;
+  /** Стабильный slug для ключей ачивок: `<slug>_evo1` / `<slug>_evo2`. */
+  slug: string;
+  evo1: { key: string; title: string };
+  evo2: { key: string; title: string };
+}
+
+/**
+ * Дерево навыков — 7 веток, порядок фиксирован (совпадает с UI и total).
+ * goalTitle — русские названия из enum TrainingGoal в schema.prisma.
+ */
+export const SKILL_TREE: SkillGoalDef[] = [
+  {
+    goal: 'OUTRUN_OPPONENT',
+    goalTitle: 'Убегаем от соперника',
+    slug: 'outrun',
+    evo1: { key: 'outrun_evo1', title: 'Ракета на льду' },
+    evo2: { key: 'outrun_evo2', title: 'Молния' },
+  },
+  {
+    goal: 'POWERFUL_SHOT',
+    goalTitle: 'Мощный бросок',
+    slug: 'shot',
+    evo1: { key: 'shot_evo1', title: 'Насквозь' },
+    evo2: { key: 'shot_evo2', title: 'Пушка страшная' },
+  },
+  {
+    goal: 'STRENGTH_STABILITY',
+    goalTitle: 'Силовая борьба и устойчивость',
+    slug: 'strength',
+    evo1: { key: 'strength_evo1', title: 'Питбуль' },
+    evo2: { key: 'strength_evo2', title: 'Викинг' },
+  },
+  {
+    goal: 'SOFT_HANDS',
+    goalTitle: 'Мягкие ручки',
+    slug: 'hands',
+    evo1: { key: 'hands_evo1', title: 'Финтёр' },
+    evo2: { key: 'hands_evo2', title: 'Фокусник' },
+  },
+  {
+    goal: 'FULL_GAME_ENDURANCE',
+    goalTitle: 'Выносливость на всю игру',
+    slug: 'endurance',
+    evo1: { key: 'endurance_evo1', title: 'Неутомимый' },
+    evo2: { key: 'endurance_evo2', title: 'Марафонец' },
+  },
+  {
+    goal: 'AGILITY',
+    goalTitle: 'Маневренность',
+    slug: 'agility',
+    evo1: { key: 'agility_evo1', title: 'Гепард' },
+    evo2: { key: 'agility_evo2', title: 'Вихрь' },
+  },
+  {
+    goal: 'SPORT_LONGEVITY',
+    goalTitle: 'Спортивное долголетие',
+    slug: 'longevity',
+    evo1: { key: 'longevity_evo1', title: 'Под защитой' },
+    evo2: { key: 'longevity_evo2', title: 'Терминатор' },
+  },
+];
 
 export interface AchievementDef {
   key: string;
   title: string;
   /** Условие получения по-русски — показывается под закрытой ачивкой. */
   description: string;
+  /** Цель тренировки, по которой считается прогресс. */
+  goal: TrainingGoal;
+  /** 1 — Эволюция 1 (порог 5), 2 — Эволюция 2 (порог 10). */
+  tier: 1 | 2;
+  target: number;
+  /** Простой emoji для back-compat формы API / fallback (UI рендерит иконку). */
   emoji: string;
 }
 
@@ -20,146 +101,57 @@ export interface AchievementState extends AchievementDef {
   progress: { current: number; target: number };
 }
 
-// Ребаланс 2026-08-09 (босс: «500 модулей звучит недостижимо»): чаще ранние
-// ступени, вершины достижимы за реалистичный сезон (~4-5 тренировок/нед ≈
-// 20 модулей/нед). «Серия 30 дней подряд» убрана сознательно: месяц без
-// единого дня отдыха — вредный стимул для детского спорта.
-
-/** Пороговые ачивки за количество завершённых тренировок. */
-const WORKOUT_COUNT_DEFS: Array<AchievementDef & { target: number }> = [
-  { key: 'workouts_1', title: 'Первый лёд', description: '1 завершённая тренировка', emoji: '🧊', target: 1 },
-  { key: 'workouts_5', title: 'Пятёрка', description: '5 завершённых тренировок', emoji: '🖐️', target: 5 },
-  { key: 'workouts_15', title: 'В ритме', description: '15 завершённых тренировок', emoji: '🎵', target: 15 },
-  { key: 'workouts_30', title: 'Тридцатка', description: '30 завершённых тренировок', emoji: '💪', target: 30 },
-  { key: 'workouts_60', title: 'Закалка', description: '60 завершённых тренировок', emoji: '🛡️', target: 60 },
-  { key: 'workouts_100', title: 'Сотня', description: '100 завершённых тренировок', emoji: '💯', target: 100 },
-];
-
-/** Пороговые ачивки за количество завершённых модулей. */
-const MODULE_COUNT_DEFS: Array<AchievementDef & { target: number }> = [
-  { key: 'modules_10', title: 'Разогрелся', description: '10 завершённых модулей', emoji: '⚡', target: 10 },
-  { key: 'modules_50', title: 'Комбо', description: '50 завершённых модулей', emoji: '🎯', target: 50 },
-  { key: 'modules_150', title: 'Мастер модулей', description: '150 завершённых модулей', emoji: '🧩', target: 150 },
-  { key: 'modules_300', title: 'Строитель тела', description: '300 завершённых модулей', emoji: '🏗️', target: 300 },
-];
-
-/** Ачивки за МАКСИМАЛЬНУЮ серию дней подряд за всю историю (не текущий стрик!). */
-const STREAK_DEFS: Array<AchievementDef & { target: number }> = [
-  {
-    key: 'streak_3',
-    title: 'Ударный темп',
-    description: `Серия ${TEMPO_MIN_STREAK} дня подряд`,
-    emoji: '🔥',
-    target: TEMPO_MIN_STREAK,
-  },
-  { key: 'streak_5', title: 'Пять подряд', description: 'Серия 5 дней подряд', emoji: '✋', target: 5 },
-  { key: 'streak_7', title: 'Неделя огня', description: 'Серия 7 дней подряд', emoji: '🗓️', target: 7 },
-  { key: 'streak_14', title: 'Две недели подряд', description: 'Серия 14 дней подряд', emoji: '🚀', target: 14 },
-];
-
-const EARLY_BIRD_DEF: AchievementDef = {
-  key: 'early_bird',
-  title: 'Ранняя пташка',
-  description: 'Заверши тренировку до 08:00',
-  emoji: '🌅',
+/** Emoji на ключ — свободный «весёлый» набор для fallback/дайджестов. */
+const EMOJI: Record<string, string> = {
+  outrun_evo1: '🚀', outrun_evo2: '⚡',
+  shot_evo1: '🎯', shot_evo2: '💣',
+  strength_evo1: '🐶', strength_evo2: '🪓',
+  hands_evo1: '🪄', hands_evo2: '🎭',
+  endurance_evo1: '💓', endurance_evo2: '👟',
+  agility_evo1: '🐆', agility_evo2: '🌪️',
+  longevity_evo1: '🛡️', longevity_evo2: '🤖',
 };
-
-const WEEKEND_WARRIOR_DEF: AchievementDef = {
-  key: 'weekend_warrior',
-  title: 'Воин выходных',
-  description: 'Тренировки в субботу и воскресенье одних выходных',
-  emoji: '⚔️',
-};
-
-/** Полный набор определений — для total в API и стабильного порядка в UI. */
-export const ACHIEVEMENT_DEFS: AchievementDef[] = [
-  ...WORKOUT_COUNT_DEFS,
-  ...MODULE_COUNT_DEFS,
-  ...STREAK_DEFS,
-  EARLY_BIRD_DEF,
-  WEEKEND_WARRIOR_DEF,
-];
-
-/** Локальная полночь дня — тот же ключ дня, что в computeStreak/computeXpFromHistory. */
-function dayStart(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-/** Следующий календарный день через setDate — переживает переводы часов (DST). */
-function nextDayKey(dayMs: number): number {
-  const d = new Date(dayMs);
-  d.setDate(d.getDate() + 1);
-  return d.getTime();
-}
 
 /**
- * Самая длинная серия календарных дней подряд за ВСЮ историю.
- * Это не computeStreak (тот считает только живую серию от сегодня/вчера) —
- * здесь ищем максимальный run по всем дням.
+ * Полный плоский набор из 14 определений (evo1, затем evo2 — по каждой цели
+ * в порядке SKILL_TREE). Стабильный порядок используют total в API и UI.
  */
-export function maxStreakEver(completedAts: Date[]): number {
-  if (completedAts.length === 0) return 0;
-  const days = [...new Set(completedAts.map((d) => dayStart(d).getTime()))].sort((a, b) => a - b);
-  let best = 1;
-  let run = 1;
-  for (let i = 1; i < days.length; i += 1) {
-    run = days[i] === nextDayKey(days[i - 1]!) ? run + 1 : 1;
-    if (run > best) best = run;
-  }
-  return best;
-}
-
-/** Была ли суббота и воскресенье ОДНИХ выходных (вс = следующий день после сб). */
-function hasWeekendPair(dayKeys: ReadonlySet<number>): boolean {
-  for (const key of dayKeys) {
-    if (new Date(key).getDay() === 6 && dayKeys.has(nextDayKey(key))) return true;
-  }
-  return false;
-}
-
-function counterState(
-  def: AchievementDef & { target: number },
-  count: number,
-): AchievementState {
-  const { target, ...rest } = def;
-  return {
-    ...rest,
-    unlocked: count >= target,
-    progress: { current: Math.min(count, target), target },
-  };
-}
-
-function booleanState(def: AchievementDef, achieved: boolean): AchievementState {
-  return { ...def, unlocked: achieved, progress: { current: achieved ? 1 : 0, target: 1 } };
-}
+export const ACHIEVEMENT_DEFS: AchievementDef[] = SKILL_TREE.flatMap((branch) => [
+  {
+    key: branch.evo1.key,
+    title: branch.evo1.title,
+    description: `${EVO1_TARGET} тренировок «${branch.goalTitle}»`,
+    goal: branch.goal,
+    tier: 1 as const,
+    target: EVO1_TARGET,
+    emoji: EMOJI[branch.evo1.key] ?? '🏒',
+  },
+  {
+    key: branch.evo2.key,
+    title: branch.evo2.title,
+    description: `${EVO2_TARGET} тренировок «${branch.goalTitle}»`,
+    goal: branch.goal,
+    tier: 2 as const,
+    target: EVO2_TARGET,
+    emoji: EMOJI[branch.evo2.key] ?? '🏒',
+  },
+]);
 
 /**
- * Полный расчёт ачивок из истории. workoutCompletedAts — timestamps завершённых
- * тренировок (любой порядок), moduleCount — число завершённых модулей (даты
- * модулей не нужны: у legacy-модулей их нет, а модульные ачивки — счётчиковые).
- * `_now` зарезервирован под будущие временные ачивки — текущий набор целиком
- * исторический и от «сейчас» не зависит.
+ * Расчёт состояния всех 14 ачивок из числа завершённых тренировок по каждой
+ * цели. goalCounts — Partial-мапа goal → count; неизвестные/лишние ключи в
+ * ней просто игнорируются (перебираем ACHIEVEMENT_DEFS, а не входные ключи).
+ * Порядок результата совпадает с ACHIEVEMENT_DEFS.
  */
 export function computeAchievements(
-  workoutCompletedAts: Date[],
-  moduleCount: number,
-  _now: Date = new Date(),
+  goalCounts: Partial<Record<TrainingGoal, number>>,
 ): AchievementState[] {
-  const workouts = workoutCompletedAts.length;
-  const modules = Math.max(0, Math.floor(moduleCount));
-  const bestStreak = maxStreakEver(workoutCompletedAts);
-  const dayKeys: ReadonlySet<number> = new Set(
-    workoutCompletedAts.map((d) => dayStart(d).getTime()),
-  );
-  const hasEarlyBird = workoutCompletedAts.some((d) => new Date(d).getHours() < 8);
-
-  return [
-    ...WORKOUT_COUNT_DEFS.map((def) => counterState(def, workouts)),
-    ...MODULE_COUNT_DEFS.map((def) => counterState(def, modules)),
-    ...STREAK_DEFS.map((def) => counterState(def, bestStreak)),
-    booleanState(EARLY_BIRD_DEF, hasEarlyBird),
-    booleanState(WEEKEND_WARRIOR_DEF, hasWeekendPair(dayKeys)),
-  ];
+  return ACHIEVEMENT_DEFS.map((def) => {
+    const count = Math.max(0, Math.floor(goalCounts[def.goal] ?? 0));
+    return {
+      ...def,
+      unlocked: count >= def.target,
+      progress: { current: Math.min(count, def.target), target: def.target },
+    };
+  });
 }

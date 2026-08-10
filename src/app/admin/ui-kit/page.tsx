@@ -396,7 +396,7 @@ export default function UiKitPage() {
             </div>
             <Caption>{`STATUSES из src/lib/gamification.ts`}</Caption>
 
-            <SubHeader>Достижения (ACHIEVEMENT_DEFS) — весь набор</SubHeader>
+            <SubHeader>Древо навыков (14) — весь набор</SubHeader>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {ACHIEVEMENT_DEFS.map((a) => (
                 <div key={a.key} className="rounded-xl bg-[#1a1f3a] border border-white/5 p-4 flex items-start gap-3">

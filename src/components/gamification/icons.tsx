@@ -6,8 +6,9 @@
 
 import {
   Snowflake, Sparkles, Shield, Trophy, Star, Crown, Award,
-  Hand, Music, BicepsFlexed, Gem, Zap, Target, Puzzle, Dumbbell,
-  Flame, Grab, CalendarDays, Rocket, Sunrise, Swords, Medal,
+  Zap, Target, Flame, Rocket, Swords, Medal,
+  Crosshair, Bomb, Dog, Axe, Wand2, Drama, HeartPulse, Footprints,
+  Cat, Wind, ShieldCheck, Bot,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -23,24 +24,23 @@ export const STATUS_ICONS: Record<string, LucideIcon> = {
   legend: Crown,
 };
 
-// ── Ачивки (все 16 ключей из ACHIEVEMENT_DEFS в @/lib/achievements) ──────────
+// ── «Древо навыков»: 14 ключей из ACHIEVEMENT_DEFS (@/lib/achievements) ───────
+// По каждой из 7 целей — evo1 и evo2 (эволюция 2 — «сильнее»).
 export const ACHIEVEMENT_ICONS: Record<string, LucideIcon> = {
-  workouts_1: Snowflake,
-  workouts_5: Hand,
-  workouts_15: Music,
-  workouts_30: BicepsFlexed,
-  workouts_60: Shield,
-  workouts_100: Gem,
-  modules_10: Zap,
-  modules_50: Target,
-  modules_150: Puzzle,
-  modules_300: Dumbbell,
-  streak_3: Flame,
-  streak_5: Grab,
-  streak_7: CalendarDays,
-  streak_14: Rocket,
-  early_bird: Sunrise,
-  weekend_warrior: Swords,
+  outrun_evo1: Rocket,      // Ракета на льду
+  outrun_evo2: Zap,         // Молния
+  shot_evo1: Crosshair,     // Насквозь
+  shot_evo2: Bomb,          // Пушка страшная
+  strength_evo1: Dog,       // Питбуль
+  strength_evo2: Axe,       // Викинг
+  hands_evo1: Wand2,        // Финтёр
+  hands_evo2: Drama,        // Фокусник
+  endurance_evo1: HeartPulse, // Неутомимый
+  endurance_evo2: Footprints, // Марафонец
+  agility_evo1: Cat,        // Гепард
+  agility_evo2: Wind,       // Вихрь
+  longevity_evo1: ShieldCheck, // Под защитой
+  longevity_evo2: Bot,      // Терминатор
 };
 
 // ── Аватары лиги ─────────────────────────────────────────────────────────────
