@@ -49,6 +49,17 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Русские доверенные CA (Минцифры): T-Bank мигрировал платёжный домен
+# securepay.tinkoff.ru на сертификат «Russian Trusted Sub CA», которого нет в
+# дефолтном хранилище — без этих корней fetch к банку падает
+# SELF_SIGNED_CERT_IN_CHAIN и оплата не работает. Ставим и в системный trust
+# (curl/OS), и в NODE_EXTRA_CA_CERTS (undici/fetch в Node).
+COPY certs/russian_trusted_root_ca.crt certs/russian_trusted_sub_ca.crt /usr/local/share/ca-certificates/
+RUN apk add --no-cache ca-certificates && update-ca-certificates
+COPY certs/russian_trusted_root_ca.crt certs/russian_trusted_sub_ca.crt /app/certs/
+RUN cat /app/certs/russian_trusted_root_ca.crt /app/certs/russian_trusted_sub_ca.crt > /app/certs/russian_trusted_bundle.pem
+ENV NODE_EXTRA_CA_CERTS=/app/certs/russian_trusted_bundle.pem
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
