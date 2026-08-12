@@ -16,7 +16,7 @@ import AssignmentsBanner from '@/components/AssignmentsBanner';
 import MicrocycleFeedbackModal from '@/components/MicrocycleFeedbackModal';
 import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay';
 import PotentialIslandBanner from '@/components/PotentialIslandBanner';
-import HowAiWorksModal from '@/components/HowAiWorksModal';
+// import HowAiWorksModal from '@/components/HowAiWorksModal'; // временно скрыто на главной
 import PushOptInBanner from '@/components/PushOptInBanner';
 import { Play, Zap, Lock, Compass } from 'lucide-react';
 import { openSubscriptionModal, handlePaywallResponse } from '@/lib/subscription-modal';
@@ -907,10 +907,13 @@ const TrainingsSection = () => {
         </button>
         {cycleError && <div style={{ color: '#FF8C4A', fontSize: 12, marginBottom: 8, textAlign: 'center' }}>{cycleError}</div>}
 
-        {/* Короткое объяснение логики подбора (Sprint 3) */}
+        {/* Короткое объяснение логики подбора (Sprint 3). Временно скрыто по
+            просьбе владельца — компонент HowAiWorksModal сохранён, вернуть можно
+            раскомментировав блок.
         <div style={{ textAlign: 'center', marginBottom: 10 }}>
           <HowAiWorksModal />
         </div>
+        */}
 
         <div className="grid grid-cols-2 gap-2">
             {/* Быстрая тренировка (ИИ) — при активном paywall ведёт в подписку */}
