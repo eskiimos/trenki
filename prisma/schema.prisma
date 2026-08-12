@@ -134,13 +134,15 @@ model Trainer {
   name        String
   lastName    String
   speciality  String
-  experience  Int
+  experience  Int // DEPRECATED: снимок «лет опыта». Источник истины — careerStartYear (опыт растёт +1 каждый 1 января). Оставлен для обратной совместимости.
+  careerStartYear Int? // год начала карьеры; опыт = текущий_год − careerStartYear (деривация на лету, как age-utils.calculateAge)
   rating      Float           @default(5.0)
   avatar      String?
   description String?
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
-  videos      Video[]
+  videos      Video[] // ведущий (primary) автор — Video.trainerId
+  videoLinks  VideoTrainer[] // все видео, где тренер соавтор (мульти-тренер)
   shorts      Short[]
   reviews     TrainerReview[]
 
@@ -212,7 +214,8 @@ model Video {
   likes               VideoLike[]
   comments            VideoComment[]
   videoTags           VideoTag[]
-  trainer             Trainer               @relation(fields: [trainerId], references: [id])
+  trainer             Trainer               @relation(fields: [trainerId], references: [id]) // ведущий автор (primary)
+  coauthors           VideoTrainer[]        // соавторы-тренеры (мульти-тренер, включая ведущего)
   workoutSessions     WorkoutSessionVideo[]
   scheduledWorkouts   ScheduledWorkout[]
   trainingAssignments TrainingAssignment[]
@@ -369,6 +372,22 @@ model VideoTag {
 
   @@unique([videoId, tagId])
   @@map("video_tags")
+}
+
+// Соавторы видео (мульти-тренер-коллаб). Ведущий автор остаётся в Video.trainerId
+// (primary, держит все существующие фильтры/чтения); эта таблица — полный набор
+// авторов, включая ведущего (order=0). Бэкфилл из videos.trainerId.
+model VideoTrainer {
+  id        String   @id @default(cuid())
+  videoId   String
+  trainerId String
+  order     Int      @default(0) // порядок показа; 0 — ведущий
+  createdAt DateTime @default(now())
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  trainer   Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, trainerId])
+  @@map("video_trainers")
 }
 
 model ShortTag {
