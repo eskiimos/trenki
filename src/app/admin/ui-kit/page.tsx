@@ -10,6 +10,8 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+// lucide — только для демо размеров иконок в секции «Иконки».
+import { Bell, Play, Home, Lock, type LucideIcon } from 'lucide-react';
 
 // ── Живые UI-примитивы (единственный источник правды по вариантам) ──────────
 import { Button, Card, Badge, Chip, Banner, Input } from '@/components/ui';
@@ -41,12 +43,39 @@ const COLOR_TOKENS: Array<{ name: string; varName: string; hex: string; note: st
   { name: 'danger', varName: '--color-danger', hex: '#FF8C4A', note: 'ошибки/валидация' },
 ];
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Шкала отступов — 4px-сетка (см. --space-* в globals.css). Показываем ролью,
+// а не только числом: где именно применять каждое значение.
+// ─────────────────────────────────────────────────────────────────────────────
+const SPACING_TOKENS: Array<{ v: number; px: number; role: string }> = [
+  { v: 1, px: 4, role: 'микро (иконка ↔ текст)' },
+  { v: 2, px: 8, role: 'gap чипов' },
+  { v: 3, px: 12, role: 'gap внутри карточки' },
+  { v: 4, px: 16, role: 'наружный отступ секции (px-4) + padding карточки' },
+  { v: 6, px: 24, role: 'крупный разрыв между блоками' },
+  { v: 8, px: 32, role: 'секционные блоки' },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Размеры иконок — фиксированы токенами --icon-* в globals.css. Демо-глифы
+// берём из lucide (единый источник иконок в UI), размер задаём по токену.
+// ─────────────────────────────────────────────────────────────────────────────
+const ICON_TOKENS: Array<{ v: string; px: number; token: string; Icon: LucideIcon; role: string }> = [
+  { v: 'sm', px: 16, token: '--icon-sm', Icon: Bell, role: 'inline в тексте / лейблах' },
+  { v: 'md', px: 20, token: '--icon-md', Icon: Play, role: 'кнопки / строки / баннеры' },
+  { v: 'lg', px: 24, token: '--icon-lg', Icon: Home, role: 'действия / хедеры / стрелки — дефолт' },
+  { v: 'nav', px: 28, token: '--icon-nav', Icon: Lock, role: 'таб-бар' },
+];
+
 // Разделы для якорной навигации (sticky-бар сверху).
 const NAV = [
   { id: 'colors', label: 'Цвета' },
   { id: 'type', label: 'Типографика' },
   { id: 'buttons', label: 'Кнопки' },
   { id: 'cards', label: 'Карточки' },
+  { id: 'spacing', label: 'Отступы' },
+  { id: 'icons', label: 'Иконки' },
+  { id: 'safe', label: 'Safe-area' },
   { id: 'badges', label: 'Бейджи/чипы' },
   { id: 'banner', label: 'Баннер' },
   { id: 'inputs', label: 'Поля' },
@@ -254,6 +283,115 @@ export default function UiKitPage() {
                   <Caption>{`radius="${r}"`}</Caption>
                 </div>
               ))}
+            </div>
+          </section>
+
+          {/* ═══════════ ОТСТУПЫ ═══════════ */}
+          <section>
+            <SectionHeader id="spacing">Отступы</SectionHeader>
+            <p className="text-[11px] text-muted mb-4">
+              Шкала кратна 4px и совпадает с Tailwind <code className="font-mono">px-1..8</code>.
+              Инлайновых <code className="font-mono">15px</code> / <code className="font-mono">13px</code> быть
+              не должно — только 4-сетка.
+            </p>
+            <div className="rounded-xl bg-[#1a1f3a] border border-white/5 p-4 space-y-3">
+              {SPACING_TOKENS.map((s) => (
+                <div key={s.v} className="flex items-center gap-4">
+                  {/* фиксированный 32px-столбец, чтобы подписи выстроились в колонку */}
+                  <div className="w-8 shrink-0 flex justify-start">
+                    <div className="bg-brand rounded-sm" style={{ width: s.px, height: s.px }} />
+                  </div>
+                  <div className="min-w-0 leading-tight">
+                    <span className="font-mono text-xs text-brand">--space-{s.v}</span>
+                    <span className="font-mono text-xs text-gray-500"> · {s.px}px</span>
+                    <span className="text-[11px] text-muted"> · {s.role}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Caption>{`gap-2 (8) · gap-3 (12) · p-4 (16) · style={{ padding: 'var(--space-6)' }}`}</Caption>
+          </section>
+
+          {/* ═══════════ ИКОНКИ ═══════════ */}
+          <section>
+            <SectionHeader id="icons">Иконки</SectionHeader>
+            <p className="text-[11px] text-muted mb-4">
+              Размеры lucide-иконок фиксированы токенами <code className="font-mono">--icon-*</code>.
+              Дефолт для самостоятельных действий / хедеров / стрелок — 24 (lg).
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {ICON_TOKENS.map(({ v, px, token, Icon, role }) => (
+                <div
+                  key={v}
+                  className="rounded-xl bg-[#1a1f3a] border border-white/5 p-4 flex flex-col items-center text-center"
+                >
+                  <div className="h-9 flex items-center justify-center text-brand" aria-hidden>
+                    <Icon size={px} />
+                  </div>
+                  <div className="text-sm font-bold text-white mt-2">{px}px</div>
+                  <div className="font-mono text-[10px] text-brand mt-0.5">{token}</div>
+                  <div className="text-[11px] text-muted mt-1">{role}</div>
+                </div>
+              ))}
+            </div>
+
+            <SubHeader>Тайл-контейнер иконки (карточки)</SubHeader>
+            <div className="rounded-xl bg-[#1a1f3a] border border-white/5 p-4 flex items-center gap-4">
+              <div
+                className="flex items-center justify-center bg-brand/15 text-brand shrink-0"
+                style={{ width: 40, height: 40, borderRadius: 999 }}
+                aria-hidden
+              >
+                <Bell size={20} />
+              </div>
+              <div className="text-[11px] text-muted min-w-0">
+                Иконку на карточке кладём в тайл <strong className="text-white">40×40</strong> (radius 999),
+                глиф внутри — <strong className="text-white">20</strong> (md). Крупнее (40 / 48 / 64) —
+                только декоративные тайлы и аватары, <strong className="text-white">НЕ</strong> UI-иконки.
+              </div>
+            </div>
+            <Caption>{`<div style={{ width:40, height:40, borderRadius:999 }}><Icon size={20} /></div>`}</Caption>
+          </section>
+
+          {/* ═══════════ SAFE-AREA ═══════════ */}
+          <section>
+            <SectionHeader id="safe">Safe-area</SectionHeader>
+            <p className="text-[11px] text-muted mb-4">
+              Не писать инлайновые <code className="font-mono">calc(env(safe-area-inset-*) + Npx)</code> вразнобой —
+              использовать переменные и утилиты-классы.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="rounded-xl bg-[#1a1f3a] border border-white/5 p-4">
+                <div className="text-sm font-bold text-white">Верх экрана · .safe-top</div>
+                <div className="text-[11px] text-muted mt-1">
+                  Хедеры получают отступ сверху ={' '}
+                  <code className="font-mono text-brand">--header-top</code> (safe-top + 16), чтобы не залезать
+                  под вырез / статус-бар.
+                </div>
+                <Caption>{`<header className="safe-top">…</header>`}</Caption>
+              </div>
+              <div className="rounded-xl bg-[#1a1f3a] border border-white/5 p-4">
+                <div className="text-sm font-bold text-white">Низ контента · .pb-nav</div>
+                <div className="text-[11px] text-muted mt-1">
+                  Контент над таб-баром получает отступ снизу ={' '}
+                  <code className="font-mono text-brand">--pb-nav</code> (safe-bottom + 96; высота таб-бара 72),
+                  чтобы таб-бар не перекрывал низ.
+                </div>
+                <Caption>{`<div className="pb-nav">…</div>`}</Caption>
+              </div>
+            </div>
+
+            {/* Схема экрана: три зоны — safe-top, контент, таб-бар + safe-bottom */}
+            <div className="mt-3 rounded-xl bg-[#1a1f3a] border border-white/5 p-4 flex justify-center">
+              <div className="w-40 rounded-2xl overflow-hidden border border-white/10 bg-night">
+                <div className="bg-brand/20 text-brand text-[10px] text-center py-2 border-b border-white/5">
+                  .safe-top · хедер
+                </div>
+                <div className="text-[10px] text-muted text-center py-10">контент</div>
+                <div className="bg-white/10 text-white text-[10px] text-center py-3 border-t border-white/5">
+                  таб-бар 72 · .pb-nav
+                </div>
+              </div>
             </div>
           </section>
 
