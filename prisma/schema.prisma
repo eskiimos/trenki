@@ -38,6 +38,11 @@ model User {
   nudgeStep             Int     @default(0) // шаг онбординг-дрипа (0 — ещё не слали)
   lastDustyNudgeAt      DateTime? // когда слали «гантели запылились» — интервал повтора
   lastParentDigestAt    DateTime? // когда родителю (role=PARENT) ушёл еженедельный email-дайджест — дедуп крона
+  // Email-кампании (Sprint 3): согласие/отписка + дедуп триггерных писем.
+  emailOptOut           Boolean   @default(false) // юзер отписался от не-транзакционных писем
+  welcomeEmailSentAt    DateTime? // письмо «после регистрации» отправлено (дедуп/аудит)
+  firstWorkoutEmailSentAt DateTime? // письмо «после первой тренировки» отправлено
+  lastInactivityEmailAt DateTime? // когда слали письмо про неактивность — интервал повтора (не чаще раза в N дней)
   tbankRebillId         String? // сохранённая карта T-Bank для автосписания подписки (рекуррент)
   payments              Payment[]
   favorites             FavoriteVideo[]
@@ -482,6 +487,7 @@ model WorkoutSession {
   currentVideoIndex     Int                     @default(0)
   startedAt             DateTime?
   totalVideos           Int                     @default(0)
+  synthetic             Boolean                 @default(false) // засеяна админом для теста геймификации (не показывать в лиге)
   // С какими параметрами собрана тренировка — для названия в истории и избранном
   // («Убегаем от соперника · Лёгкая нагрузка»).
   goal                  TrainingGoal?
