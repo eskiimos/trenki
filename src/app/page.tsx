@@ -16,6 +16,8 @@ import AssignmentsBanner from '@/components/AssignmentsBanner';
 import MicrocycleFeedbackModal from '@/components/MicrocycleFeedbackModal';
 import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay';
 import PotentialIslandBanner from '@/components/PotentialIslandBanner';
+import HowAiWorksModal from '@/components/HowAiWorksModal';
+import PushOptInBanner from '@/components/PushOptInBanner';
 import { openSubscriptionModal, handlePaywallResponse } from '@/lib/subscription-modal';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTour } from '@/components/tour/TourProvider';
@@ -197,6 +199,13 @@ const HomePage = () => {
 
         {/* Напоминание о незавершенной тренировке */}
         <WorkoutReminder />
+
+        {/* Проактивный промпт на push-уведомления (Sprint 3): единственная
+            причина «пуши приходят почти никому» — почти никто не подписан.
+            Закрываемый; сам скрывается, если уже подписан/отклонил/закрыл. */}
+        <div className="px-4" style={{ paddingTop: 12 }}>
+          <PushOptInBanner />
+        </div>
 
         {/* Островок «раскрой потенциал с подпиской» — поднят наверх (правки
             август-середина): поп-ап про подписку должен быть на виду сразу. */}
@@ -897,6 +906,11 @@ const TrainingsSection = () => {
             </div>
         </button>
         {cycleError && <div style={{ color: '#FF8C4A', fontSize: 12, marginBottom: 8, textAlign: 'center' }}>{cycleError}</div>}
+
+        {/* Короткое объяснение логики подбора (Sprint 3) */}
+        <div style={{ textAlign: 'center', marginBottom: 10 }}>
+          <HowAiWorksModal />
+        </div>
 
         <div className="grid grid-cols-2 gap-2">
             {/* Быстрая тренировка (ИИ) — при активном paywall ведёт в подписку */}

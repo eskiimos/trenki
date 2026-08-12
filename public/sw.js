@@ -228,6 +228,52 @@ self.addEventListener('push', (event) => {
   );
 });
 
+// Преобразование base64url VAPID-ключа в Uint8Array (копия логики из
+// usePushNotifications.ts — в SW нет доступа к модулям приложения).
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+// Пересоздание push-подписки. Браузер может ротировать endpoint (событие
+// pushsubscriptionchange) — без переподписки уведомления молча перестают приходить.
+// Ключ берём с сервера (в SW нет сборочных env Next), затем сохраняем новую подписку.
+async function resubscribe() {
+  try {
+    const res = await fetch('/api/push/vapid');
+    if (!res.ok) return;
+    const { key } = await res.json();
+    if (!key) return;
+
+    const subscription = await self.registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(key),
+    });
+
+    await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subscription: subscription.toJSON(),
+        userAgent: self.navigator ? self.navigator.userAgent : undefined,
+      }),
+    });
+  } catch (e) {
+    console.error('[SW] resubscribe failed:', e);
+  }
+}
+
+// Браузер ротировал endpoint — переподписываемся и досылаем новую подписку на сервер.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil(resubscribe());
+});
+
 // Обработка клика по уведомлению
 self.addEventListener('notificationclick', (event) => {
   console.log('[SW] Notification clicked');

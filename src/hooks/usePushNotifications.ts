@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
 
+type PushPermission = NotificationPermission | 'default';
+
 interface UsePushNotificationsReturn {
   isSupported: boolean;
   isSubscribed: boolean;
   isLoading: boolean;
+  /** Текущее значение Notification.permission ('default' | 'granted' | 'denied'). */
+  permission: PushPermission;
   error: string | null;
   subscribe: () => Promise<void>;
   unsubscribe: () => Promise<void>;
@@ -25,10 +29,34 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray as Uint8Array;
 }
 
+// Идемпотентная (и молчаливая при ошибке) отправка существующей подписки на сервер.
+// Нужна, чтобы восстановить строку в БД, потерянную из-за 410-прунинга или сброса
+// базы: без ре-синка в UI горит «зелёный тумблер», а на сервере подписки нет.
+async function resyncSubscription(subscription: PushSubscription): Promise<void> {
+  try {
+    await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subscription: subscription.toJSON(),
+        userAgent: navigator.userAgent,
+      }),
+    });
+  } catch {
+    // Молча — ре-синк не должен ломать UI.
+  }
+}
+
+function readPermission(): PushPermission {
+  if (typeof window === 'undefined' || !('Notification' in window)) return 'default';
+  return Notification.permission;
+}
+
 export function usePushNotifications(): UsePushNotificationsReturn {
   const [isSupported, setIsSupported] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [permission, setPermission] = useState<PushPermission>('default');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,9 +66,10 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         'serviceWorker' in navigator &&
         'PushManager' in window &&
         'Notification' in window;
-      
+
       setIsSupported(supported);
-      
+      setPermission(readPermission());
+
       if (!supported) {
         setIsLoading(false);
         return;
@@ -52,12 +81,20 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     checkSupport();
   }, []);
 
-  // Проверка текущей подписки
+  // Проверка текущей подписки + ре-синк локальной подписки на сервер
   const checkSubscription = async () => {
     try {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
       setIsSubscribed(!!subscription);
+      setPermission(readPermission());
+
+      // Локальная подписка есть — всегда переотправляем её на сервер (идемпотентно,
+      // молча). Так сверяем локальное состояние с БД и не оставляем «зелёный тумблер»
+      // без строки на сервере.
+      if (subscription) {
+        void resyncSubscription(subscription);
+      }
     } catch (err) {
       console.error('Ошибка при проверке подписки:', err);
       setError('Ошибка при проверке подписки');
@@ -78,9 +115,10 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
     try {
       // Запрашиваем разрешение на уведомления
-      const permission = await Notification.requestPermission();
-      
-      if (permission !== 'granted') {
+      const perm = await Notification.requestPermission();
+      setPermission(perm);
+
+      if (perm !== 'granted') {
         setError('Разрешение на уведомления не предоставлено');
         setIsLoading(false);
         return;
@@ -119,7 +157,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
       setIsSubscribed(true);
       console.log('✅ Подписка на push-уведомления успешна');
-      
+
     } catch (err: any) {
       console.error('Ошибка при подписке:', err);
       setError(err.message || 'Ошибка при подписке на уведомления');
@@ -171,6 +209,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     isSupported,
     isSubscribed,
     isLoading,
+    permission,
     error,
     subscribe,
     unsubscribe,
