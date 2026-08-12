@@ -2,6 +2,7 @@
 
 import { useSubscription } from '@/hooks/useSubscription';
 import { openSubscriptionModal } from '@/lib/subscription-modal';
+import { Zap } from 'lucide-react';
 
 // Голубой островок на главной (п.1): «раскрой свой потенциал с подпиской».
 // Показывается только когда paywall активен для юзера (режим obкатки уважается):
@@ -11,7 +12,7 @@ export default function PotentialIslandBanner() {
   if (loading || !paywalled) return null;
 
   return (
-    <section className="px-4" style={{ paddingTop: 4, paddingBottom: 15 }}>
+    <section className="px-4" style={{ paddingTop: 12, paddingBottom: 12 }}>
       <button
         type="button"
         onClick={() => openSubscriptionModal('generic')}
@@ -47,18 +48,17 @@ export default function PotentialIslandBanner() {
 
         <div
           style={{
-            width: 44,
-            height: 44,
-            borderRadius: 12,
+            width: 40,
+            height: 40,
+            borderRadius: 999,
             background: 'rgba(161,255,74,0.2)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 22,
             flexShrink: 0,
           }}
         >
-          ⚡️
+          <Zap size={20} color="#A1FF4A" fill="#A1FF4A" aria-hidden />
         </div>
         <div style={{ flex: 1, minWidth: 0, position: 'relative', zIndex: 1 }}>
           <div

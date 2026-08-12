@@ -80,7 +80,7 @@ export default function PushOptInBanner() {
       return (
         <section className="px-4" style={{ paddingTop: 12 }}>
           <div className="flex items-center gap-3 rounded-2xl px-4 py-3" style={SURFACE}>
-            <Share size={18} className="shrink-0 text-[#A1FF4A]" aria-hidden />
+            <Share size={20} className="shrink-0 text-[#A1FF4A]" aria-hidden />
             <span className="text-white text-sm font-medium font-overpass flex-1 min-w-0">
               Добавь Треньки на экран «Домой», чтобы включить напоминания
             </span>
@@ -106,7 +106,7 @@ export default function PushOptInBanner() {
   return (
     <section className="px-4" style={{ paddingTop: 12 }}>
       <div className="flex items-center gap-3 rounded-2xl px-4 py-3" style={SURFACE}>
-        <Bell size={18} className="shrink-0 text-[#A1FF4A]" aria-hidden />
+        <Bell size={20} className="shrink-0 text-[#A1FF4A]" aria-hidden />
         <span className="text-white text-sm font-medium font-overpass flex-1 min-w-0">
           Включи напоминания о тренировках
         </span>

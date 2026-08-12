@@ -18,7 +18,7 @@ import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay'
 import PotentialIslandBanner from '@/components/PotentialIslandBanner';
 import HowAiWorksModal from '@/components/HowAiWorksModal';
 import PushOptInBanner from '@/components/PushOptInBanner';
-import { Play, Zap, Lock } from 'lucide-react';
+import { Play, Zap, Lock, Compass } from 'lucide-react';
 import { openSubscriptionModal, handlePaywallResponse } from '@/lib/subscription-modal';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTour } from '@/components/tour/TourProvider';
@@ -41,7 +41,7 @@ const GuideBanner = () => {
   return (
     <section className="px-4" style={{ paddingTop: 12 }}>
       <Banner
-        icon={<div style={{ fontSize: 22 }}>🧭</div>}
+        icon={<Compass size={20} color="#A1FF4A" aria-hidden />}
         title="Первый раз тут?"
         subtitle="Пройди быстрый тур по приложению"
         action={
@@ -190,7 +190,7 @@ const HomePage = () => {
   }
   
   return (
-    <div className="bg-[#060919] min-h-screen text-white pb-32">
+    <div className="bg-[#060919] min-h-screen text-white pb-nav">
       <Header />
       
       {/* Контейнер с максимальной шириной для планшетов и десктопов */}
@@ -203,10 +203,9 @@ const HomePage = () => {
 
         {/* Проактивный промпт на push-уведомления (Sprint 3): единственная
             причина «пуши приходят почти никому» — почти никто не подписан.
-            Закрываемый; сам скрывается, если уже подписан/отклонил/закрыл. */}
-        <div className="px-4" style={{ paddingTop: 12 }}>
-          <PushOptInBanner />
-        </div>
+            Закрываемый; сам скрывается, если уже подписан/отклонил/закрыл.
+            Свой px-4 и paddingTop — внутри компонента (без двойной обёртки). */}
+        <PushOptInBanner />
 
         {/* Островок «раскрой потенциал с подпиской» — поднят наверх (правки
             август-середина): поп-ап про подписку должен быть на виду сразу. */}
@@ -766,7 +765,7 @@ const TrenkiSection = () => {
 
   if (isLoading) {
     return (
-      <section style={{ paddingTop: '15px', paddingBottom: '15px' }}>
+      <section style={{ paddingTop: '12px', paddingBottom: '12px' }}>
         <h2 className="px-4 text-white font-semibold mb-3" style={{ fontSize: '12px' }}>КОРОТКИЕ ВИДЕО</h2>
         <div className="flex space-x-4 overflow-x-auto pb-4 px-4">
           <ShortVideoSkeleton />
@@ -782,7 +781,7 @@ const TrenkiSection = () => {
   }
 
   return (
-    <section style={{ paddingTop: '15px', paddingBottom: '15px' }}>
+    <section style={{ paddingTop: '12px', paddingBottom: '12px' }}>
       <h2 className="px-4 text-white font-semibold mb-3" style={{ fontSize: '12px' }}>КОРОТКИЕ ВИДЕО</h2>
       <div className="flex space-x-4 overflow-x-auto pb-4 px-4">
         {shorts.map((short) => (
@@ -856,7 +855,7 @@ const TrainingsSection = () => {
     };
 
     return (
-    <section className="px-4" style={{ paddingBottom: '15px' }}>
+    <section className="px-4" style={{ paddingBottom: '12px' }}>
         {/* FREE (paywall активен для юзера): «Урок недели» — единственный открытый
             контент, остальные входы под замком → подписка (Sprint 4). */}
         {paywalled && (
@@ -923,7 +922,7 @@ const TrainingsSection = () => {
             >
                 <div style={{position: 'relative', width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex', cursor: 'pointer'}}>
                     <Image src="/icons/icon-cards.svg" alt="Быстрая тренировка" width={24} height={24} />
-                    {paywalled && <Lock size={15} color="#F9F8FE" style={{ position: 'absolute', top: 8, right: 10 }} aria-hidden />}
+                    {paywalled && <Lock size={16} color="#F9F8FE" style={{ position: 'absolute', top: 8, right: 10 }} aria-hidden />}
                     <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50}}>
                         <span style={{color: '#A1FF4A'}}>быстрая</span> тренировка
                     </div>
@@ -937,8 +936,8 @@ const TrainingsSection = () => {
                 onClick={(e) => { if (paywalled) { e.preventDefault(); openSubscriptionModal('potential'); } }}
             >
                 <div style={{position: 'relative', width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex'}}>
-                    <Image src="/icons/ant-design-thunderbolt-filled_f.svg" alt="Потенциал" width={16} height={16} />
-                    {paywalled && <Lock size={15} color="#F9F8FE" style={{ position: 'absolute', top: 8, right: 10 }} aria-hidden />}
+                    <Image src="/icons/ant-design-thunderbolt-filled_f.svg" alt="Потенциал" width={24} height={24} />
+                    {paywalled && <Lock size={16} color="#F9F8FE" style={{ position: 'absolute', top: 8, right: 10 }} aria-hidden />}
                     <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>повышение потенциала</div>
                 </div>
             </Link>
@@ -977,7 +976,7 @@ const TrainersSection = () => {
 
   if (isLoading) {
     return (
-      <section style={{ paddingBottom: '15px' }}>
+      <section style={{ paddingBottom: '12px' }}>
         <div style={{
           width: '100%',
           paddingTop: 24,
@@ -1444,7 +1443,7 @@ const AllVideosSection = () => {
 
   if (isLoading) {
     return (
-      <section className="px-4" style={{ paddingTop: '15px', paddingBottom: '15px' }}>
+      <section className="px-4" style={{ paddingTop: '12px', paddingBottom: '12px' }}>
         <div className="flex space-x-4 overflow-x-auto pb-4 snap-x snap-mandatory">
           {/* Показываем 5 skeleton loader */}
           <div className="snap-start">
@@ -1472,7 +1471,7 @@ const AllVideosSection = () => {
   }
 
   return (
-    <section className="px-4" style={{ paddingTop: '15px', paddingBottom: '15px' }}>
+    <section className="px-4" style={{ paddingTop: '12px', paddingBottom: '12px' }}>
       <div style={{
           display: 'flex',
           justifyContent: 'space-between',
