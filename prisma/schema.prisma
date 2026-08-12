@@ -25,6 +25,7 @@ model User {
   lastReminderOn        String? // локальная дата YYYY-MM-DD последнего отправленного напоминания (дедуп)
   ageConsentAt          DateTime? // Дата и время подтверждения возраста (18+ или законный представитель)
   isAdmin               Boolean                 @default(false) // Доступ к админ-панели
+  isTester              Boolean                 @default(false) // Тест-режим (чит-код): обход дневных лимитов + начисление XP на свободном просмотре; выдаётся из /admin/users
   role                  UserRole                @default(ATHLETE) // Роль: спортсмен или тренер
   // Тариф доступа (фундамент под платежи). Пока выдаётся вручную из админки;
   // когда подключим T-Bank — биллинг будет выставлять premiumUntil. См. hasPremium().
@@ -706,6 +707,7 @@ enum WorkoutStatus {
   PENDING
   IN_PROGRESS
   COMPLETED
+  PARTIAL // досрочный финиш: засчитаны пройденные модули, но без бонуса за полную тренировку
   SKIPPED
 }
 
