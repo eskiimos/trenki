@@ -50,29 +50,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Быстрая ИИ-тренировка (Трек A, п.6e): бесплатно 1 в неделю, дальше — подписка.
-    // Гейтим только когда paywall активен для этого юзера (в 'off' — безлимит, как раньше;
-    // премиум isPaywalled=false → безлимит). Квоту считаем по standalone-сессиям
-    // (не тренерским, не микроцикл-дням, не заданиям) за последние 7 дней.
+    // Генерация ИИ-тренировок — только по подписке (Sprint 4: «генерации только
+    // с подпиской»). Когда paywall активен для этого юзера (FREE без премиума) —
+    // генерация закрыта полностью, FREE-юзеру доступен только «урок недели».
+    // Премиум и триал (isPaywalled=false) генерят без ограничений; в mode='off'
+    // paywall выключен для всех, как раньше.
     const mode = await getPaywallMode();
     if (isPaywalled(auth.user, mode)) {
-      const FREE_PER_WEEK = 1;
-      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      const usedThisWeek = await prisma.workoutSession.count({
-        where: {
-          userId: auth.user.id,
-          createdAt: { gte: weekAgo },
-          coachId: null,
-          microcycleDay: { is: null },
-          assignment: { is: null },
-        },
-      });
-      if (usedThisWeek >= FREE_PER_WEEK) {
-        return NextResponse.json(
-          { error: 'Subscription required', code: 'SUBSCRIPTION_REQUIRED', reason: 'weekly_quota' },
-          { status: 402 },
-        );
-      }
+      return NextResponse.json(
+        { error: 'Subscription required', code: 'SUBSCRIPTION_REQUIRED', reason: 'premium_only' },
+        { status: 402 },
+      );
     }
 
     const { goal, energyState } = await request.json();

@@ -798,7 +798,7 @@ const TrainingsSection = () => {
     const [generatingCycle, setGeneratingCycle] = useState(false);
     const [cycleError, setCycleError] = useState<string | null>(null);
     const [hasActiveCycle, setHasActiveCycle] = useState(false);
-    const { paywalled } = useSubscription();
+    const { paywalled, freeLessonVideoId } = useSubscription();
 
     // Узнаём, есть ли уже собранный активный цикл. Если есть — кнопка НЕ
     // пересобирает неделю при каждом тапе (правка владельца), а ведёт в
@@ -847,6 +847,33 @@ const TrainingsSection = () => {
 
     return (
     <section className="px-4" style={{ paddingBottom: '15px' }}>
+        {/* FREE (paywall активен для юзера): «Урок недели» — единственный открытый
+            контент, остальные входы под замком → подписка (Sprint 4). */}
+        {paywalled && (
+          freeLessonVideoId ? (
+            <Link href={`/video/${freeLessonVideoId}`} style={{ textDecoration: 'none' }}>
+              <div
+                className="w-full mb-2 transition-transform active:scale-[0.99]"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
+                  background: 'var(--grad-accent)', border: '1px solid var(--border-lime)',
+                  borderRadius: 8, cursor: 'pointer',
+                }}
+              >
+                <div style={{ width: 40, height: 40, borderRadius: 999, background: 'rgba(161,255,74,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>▶️</div>
+                <div className="text-left flex-1 min-w-0">
+                  <div style={{ color: '#A1FF4A', fontSize: 11, fontFamily: 'Overpass', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Бесплатно</div>
+                  <div style={{ color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Урок недели</div>
+                </div>
+              </div>
+            </Link>
+          ) : (
+            <div className="w-full mb-2" style={{ padding: '14px 16px', background: '#101530', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, color: '#AEABBB', fontSize: 13, fontFamily: 'Overpass' }}>
+              Урок недели скоро появится
+            </div>
+          )
+        )}
+
         {/* Кнопка «Собрать микроцикл» — главная точка входа */}
         <button
             type="button"
@@ -872,20 +899,31 @@ const TrainingsSection = () => {
         {cycleError && <div style={{ color: '#FF8C4A', fontSize: 12, marginBottom: 8, textAlign: 'center' }}>{cycleError}</div>}
 
         <div className="grid grid-cols-2 gap-2">
-            {/* Быстрая тренировка (ИИ) */}
-            <Link href="/training/assessment" data-tour="ai-trainer-card" style={{textDecoration: 'none'}}>
-                <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex', cursor: 'pointer'}}>
+            {/* Быстрая тренировка (ИИ) — при активном paywall ведёт в подписку */}
+            <Link
+                href="/training/assessment"
+                data-tour="ai-trainer-card"
+                style={{textDecoration: 'none'}}
+                onClick={(e) => { if (paywalled) { e.preventDefault(); openSubscriptionModal('ai-workout'); } }}
+            >
+                <div style={{position: 'relative', width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex', cursor: 'pointer'}}>
                     <Image src="/icons/icon-cards.svg" alt="Быстрая тренировка" width={24} height={24} />
+                    {paywalled && <span style={{ position: 'absolute', top: 8, right: 10, fontSize: 14 }}>🔒</span>}
                     <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50}}>
                         <span style={{color: '#A1FF4A'}}>быстрая</span> тренировка
                     </div>
                 </div>
             </Link>
 
-            {/* Повышение потенциала */}
-            <Link href="/video" style={{textDecoration: 'none'}}>
-                <div style={{width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex'}}>
+            {/* Повышение потенциала — при активном paywall ведёт в подписку */}
+            <Link
+                href="/video"
+                style={{textDecoration: 'none'}}
+                onClick={(e) => { if (paywalled) { e.preventDefault(); openSubscriptionModal('potential'); } }}
+            >
+                <div style={{position: 'relative', width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex'}}>
                     <Image src="/icons/ant-design-thunderbolt-filled_f.svg" alt="Потенциал" width={16} height={16} />
+                    {paywalled && <span style={{ position: 'absolute', top: 8, right: 10, fontSize: 14 }}>🔒</span>}
                     <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>повышение потенциала</div>
                 </div>
             </Link>
@@ -1205,6 +1243,11 @@ interface VideoCardProps {
 }
 
 const VideoCard = ({ video, isNew }: VideoCardProps & { isNew?: boolean }) => {
+  const { paywalled, freeLessonVideoId } = useSubscription();
+  const isFreeLesson = !!freeLessonVideoId && video.id === freeLessonVideoId;
+  // Замок для FREE: всё, кроме урока недели, закрыто → тап открывает подписку.
+  const locked = paywalled && !isFreeLesson;
+
   // Форматируем длительность видео
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -1213,16 +1256,19 @@ const VideoCard = ({ video, isNew }: VideoCardProps & { isNew?: boolean }) => {
   };
 
   return (
-    <Link href={`/video/${video.id}`}>
+    <Link
+      href={`/video/${video.id}`}
+      onClick={(e) => { if (locked) { e.preventDefault(); openSubscriptionModal('video'); } }}
+    >
       {/* На мобиле карточка ~80% viewport, чтобы справа выглядывала
           следующая — визуальный hint что список горизонтально скроллится. */}
       <div className="flex-shrink-0 w-[80vw] sm:w-[calc(50vw-1rem)] cursor-pointer">
         {/* Video Thumbnail */}
         <div className="relative rounded overflow-hidden" style={{ width: '100%', height: 'auto', aspectRatio: '16/9', maxHeight: '280px' }}>
           {video.thumbnail && (
-            <Image 
-              src={video.thumbnail} 
-              alt={video.title} 
+            <Image
+              src={video.thumbnail}
+              alt={video.title}
               fill
               className="object-cover"
               sizes="(max-width: 768px) 100vw, 50vw"
@@ -1232,8 +1278,19 @@ const VideoCard = ({ video, isNew }: VideoCardProps & { isNew?: boolean }) => {
           <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm text-white text-sm font-medium px-2.5 py-1 rounded-lg">
             {formatDuration(video.duration)}
           </div>
+          {/* Урок недели — открыт для FREE (бейдж), остальное под замком */}
+          {isFreeLesson && paywalled && (
+            <div className="absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: '#A1FF4A', color: '#060919' }}>
+              Урок недели
+            </div>
+          )}
+          {locked && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/45 backdrop-blur-[1px]">
+              <span style={{ fontSize: 28 }}>🔒</span>
+            </div>
+          )}
           {/* "Новинка" badge */}
-          {isNew && (
+          {isNew && !locked && (
             <div className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: '#A1FF4A', color: '#060919' }}>
               Новинка
             </div>

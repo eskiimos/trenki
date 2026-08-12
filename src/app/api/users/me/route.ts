@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { getSessionUserId } from '@/lib/auth-server';
 import { hasPremium } from '@/lib/access';
 import { isPaywalled } from '@/lib/paywall';
-import { getPaywallMode } from '@/lib/settings';
+import { getPaywallMode, getFreeLessonVideoId } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,6 +44,9 @@ export async function GET(request: NextRequest) {
   // premiumUntil нужен клиенту для отсчёта «подписка кончается через N дней».
   const mode = await getPaywallMode();
   const premium = hasPremium(user);
+  // «Урок недели» — единственный контент, открытый FREE-юзеру, когда paywall
+  // активен. Клиент подставляет его в карточку на главной.
+  const freeLessonVideoId = await getFreeLessonVideoId();
 
   return NextResponse.json({
     id: user.id,
@@ -62,5 +65,6 @@ export async function GET(request: NextRequest) {
     paywalled: isPaywalled(user, mode),
     paywallActive: mode !== 'off', // включён ли paywall вообще (для premium-UI: баннер продления)
     referralCode: user.referralCode, // канал (для окна «Оформить» — поле промокода тренера)
+    freeLessonVideoId, // «урок недели» для FREE (id видео или null, если не назначен)
   });
 }

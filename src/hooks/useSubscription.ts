@@ -13,6 +13,7 @@ export interface SubscriptionStatus {
   premiumUntil: string | null;
   isAdmin: boolean;
   referralCode: string | null;
+  freeLessonVideoId: string | null; // «урок недели» для FREE (id видео или null)
 }
 
 type Snapshot = SubscriptionStatus & { loading: boolean; loaded: boolean };
@@ -24,6 +25,7 @@ const EMPTY: SubscriptionStatus = {
   premiumUntil: null,
   isAdmin: false,
   referralCode: null,
+  freeLessonVideoId: null,
 };
 
 let cache: SubscriptionStatus | null = null;
@@ -49,6 +51,7 @@ async function fetchStatus(): Promise<void> {
       premiumUntil: d.premiumUntil ?? null,
       isAdmin: Boolean(d.isAdmin),
       referralCode: d.referralCode ?? null,
+      freeLessonVideoId: d.freeLessonVideoId ?? null,
     };
   } catch {
     cache = { ...EMPTY };
