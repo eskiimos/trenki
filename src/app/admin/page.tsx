@@ -14,6 +14,7 @@ interface AdminStats {
     videos: { total: number; published: number };
     shorts: { total: number; published: number };
     trainers: number;
+    comments: { total: number; today: number };
   };
   training: { total: number; today: number; completionRate: string | number };
   reviews: { total: number; pending: number; avgRating: string | number };
@@ -241,6 +242,14 @@ export default function AdminPage() {
               href="/admin/reviews"
               accent={stats.reviews.pending > 0}
             />
+            <Kpi
+              icon="💬"
+              label="Комментарии"
+              value={num(stats.content.comments.today)}
+              hint="за сегодня"
+              href="/admin/comments"
+              accent={stats.content.comments.today > 0}
+            />
           </div>
         ) : null}
 
@@ -336,6 +345,13 @@ export default function AdminPage() {
                 title="Отзывы"
                 desc="Модерация отзывов о тренерах"
                 badge={stats?.reviews.pending || undefined}
+              />
+              <NavCard
+                href="/admin/comments"
+                icon="💬"
+                title="Комментарии"
+                desc="Модерация комментов к видео и тренькам"
+                badge={stats?.content.comments.today || undefined}
               />
             </div>
           </div>

@@ -13,15 +13,6 @@ export async function GET(request: NextRequest) {
         favorites: {
           select: { id: true }
         },
-        sessions: {
-          select: { 
-            id: true,
-            completed: true,
-            createdAt: true
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 10 // Последние 10 сессий
-        },
         videoLikes: {
           select: { id: true }
         },
@@ -35,6 +26,27 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' }
     });
 
+    // Реальные тренировки живут в WorkoutSession (модель TrainingSession — легаси и
+    // фактически пустая). Считаем всего и завершённых по каждому пользователю двумя
+    // groupBy-запросами, без N+1 count() в цикле.
+    const userIds = users.map((u) => u.id);
+    const [totalByUser, completedByUser] = await Promise.all([
+      prisma.workoutSession.groupBy({
+        by: ['userId'],
+        where: { userId: { in: userIds } },
+        _count: { _all: true },
+      }),
+      prisma.workoutSession.groupBy({
+        by: ['userId'],
+        where: { userId: { in: userIds }, status: 'COMPLETED' },
+        _count: { _all: true },
+      }),
+    ]);
+    const totalSessionsByUser = new Map(totalByUser.map((r) => [r.userId, r._count._all]));
+    const completedSessionsByUser = new Map(
+      completedByUser.map((r) => [r.userId, r._count._all]),
+    );
+
     // Для каждого пользователя получаем информацию о подписке на push
     const usersWithStats = await Promise.all(
       users.map(async (user) => {
@@ -43,9 +55,9 @@ export async function GET(request: NextRequest) {
           where: { userId: user.id }
         });
 
-        // Считаем активность
-        const completedSessions = user.sessions.filter(s => s.completed).length;
-        const totalSessions = user.sessions.length;
+        // Считаем активность по реальным тренировкам (WorkoutSession)
+        const completedSessions = completedSessionsByUser.get(user.id) ?? 0;
+        const totalSessions = totalSessionsByUser.get(user.id) ?? 0;
 
         return {
           id: user.id,

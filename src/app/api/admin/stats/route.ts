@@ -67,22 +67,30 @@ export async function GET(request: NextRequest) {
       _sum: { viewsCount: true, likesCount: true }
     });
 
-    // Комментарии
-    const totalComments = await prisma.shortComment.count();
-    const commentsToday = await prisma.shortComment.count({
-      where: { createdAt: { gte: today } }
-    });
+    // Комментарии — считаем обе ленты (видео + треньки), т.к. модерация общая
+    const [shortCommentsTotal, videoCommentsTotal, shortCommentsToday, videoCommentsToday] =
+      await Promise.all([
+        prisma.shortComment.count(),
+        prisma.videoComment.count(),
+        prisma.shortComment.count({ where: { createdAt: { gte: today } } }),
+        prisma.videoComment.count({ where: { createdAt: { gte: today } } }),
+      ]);
+    const totalComments = shortCommentsTotal + videoCommentsTotal;
+    const commentsToday = shortCommentsToday + videoCommentsToday;
 
     // ===== ТРЕНИРОВКИ =====
-    const totalSessions = await prisma.trainingSession.count();
-    const completedSessions = await prisma.trainingSession.count({
-      where: { completed: true }
+    // Считаем по WorkoutSession (реальные тренировки), а НЕ по legacy-пустой
+    // TrainingSession — иначе дашборд показывал 0. «Сегодня/неделя/график» —
+    // по фактически завершённым (completedAt).
+    const totalSessions = await prisma.workoutSession.count();
+    const completedSessions = await prisma.workoutSession.count({
+      where: { status: 'COMPLETED' }
     });
-    const sessionsToday = await prisma.trainingSession.count({
-      where: { createdAt: { gte: today } }
+    const sessionsToday = await prisma.workoutSession.count({
+      where: { status: 'COMPLETED', completedAt: { gte: today } }
     });
-    const sessionsThisWeek = await prisma.trainingSession.count({
-      where: { createdAt: { gte: weekAgo } }
+    const sessionsThisWeek = await prisma.workoutSession.count({
+      where: { status: 'COMPLETED', completedAt: { gte: weekAgo } }
     });
 
     // ===== ИЗБРАННОЕ =====
@@ -137,14 +145,16 @@ export async function GET(request: NextRequest) {
     }, {} as Record<number, number>);
 
     // ===== ТРЕНИРОВКИ ПО ДНЯМ (последние 30 дней) =====
-    const sessionsLastMonth = await prisma.trainingSession.findMany({
-      where: { createdAt: { gte: monthAgo } },
-      select: { createdAt: true },
-      orderBy: { createdAt: 'asc' }
+    // Завершённые тренировки по дню завершения (completedAt).
+    const sessionsLastMonth = await prisma.workoutSession.findMany({
+      where: { status: 'COMPLETED', completedAt: { gte: monthAgo } },
+      select: { completedAt: true },
+      orderBy: { completedAt: 'asc' }
     });
 
     const sessionsByDay = sessionsLastMonth.reduce((acc, session) => {
-      const dateStr = session.createdAt.toISOString().split('T')[0];
+      if (!session.completedAt) return acc;
+      const dateStr = session.completedAt.toISOString().split('T')[0];
       acc[dateStr] = (acc[dateStr] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
