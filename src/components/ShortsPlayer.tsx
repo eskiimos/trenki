@@ -489,25 +489,15 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
           {/* Title */}
           <p className="text-white text-sm font-medium mb-1 drop-shadow-lg">{short.title}</p>
 
-          {/* Description — тап открывает шит с полным описанием и комментариями
-              (вместо прежнего инлайн-разворачивания) */}
+          {/* В ленте показываем только название; описание скрыто за «Ещё» —
+              тап открывает шит с полным описанием и комментариями. */}
           {short.description && (
-            <div>
-              <p
-                onClick={(e) => { e.stopPropagation(); openComments?.(); }}
-                className="text-white/80 text-xs drop-shadow-lg line-clamp-2 cursor-pointer"
-              >
-                {short.description}
-              </p>
-              {short.description.length > 80 && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); openComments?.(); }}
-                  className="text-white/60 text-xs mt-1"
-                >
-                  Ещё
-                </button>
-              )}
-            </div>
+            <button
+              onClick={(e) => { e.stopPropagation(); openComments?.(); }}
+              className="text-white/70 text-xs drop-shadow-lg mt-0.5"
+            >
+              Ещё
+            </button>
           )}
         </div>
         )}

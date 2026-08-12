@@ -467,6 +467,15 @@ const ProfilePage = () => {
               </div>
             </Link>
             <div className="h-[1px] bg-[#26252F]" />
+            {/* Избранные тренировки — видимый вход (список живёт во вкладке
+                «Тренировки» истории; открываем сразу на ней) */}
+            <Link href="/profile/watch-history?tab=workouts">
+              <div className="flex justify-between items-center py-4 cursor-pointer hover:opacity-80 transition-opacity">
+                <span className="text-white text-sm font-medium font-overpass uppercase tracking-wide">Избранные тренировки</span>
+                <Image src="/icons/arrow.svg" alt="" width={20} height={20} className="opacity-50" />
+              </div>
+            </Link>
+            <div className="h-[1px] bg-[#26252F]" />
             <button
               type="button"
               onClick={() => router.push('/profile/assignments')}
