@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminAsync } from '@/lib/admin-session';
+import { careerStartYearFromExperience } from '@/lib/trainer';
 
 export async function GET(
   request: NextRequest,
@@ -40,13 +41,19 @@ export async function PUT(
     const body = await request.json();
     const { name, lastName, speciality, experience, rating, avatar, description } = body;
 
+    // Если пришёл стаж — обновляем и legacy-снимок experience, и источник истины
+    // careerStartYear (год начала карьеры), чтобы опыт продолжал деривироваться.
+    const expProvided = experience !== undefined && experience !== null;
+    const expYears = expProvided ? Number(experience) || 0 : undefined;
+
     const trainer = await prisma.trainer.update({
       where: { id },
       data: {
         name,
         lastName,
         speciality,
-        experience,
+        experience: expYears,
+        ...(expProvided ? { careerStartYear: careerStartYearFromExperience(expYears!) } : {}),
         rating,
         avatar,
         description

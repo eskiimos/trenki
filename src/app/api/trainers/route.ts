@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminAsync } from '@/lib/admin-session';
+import { trainerExperienceYears, careerStartYearFromExperience } from '@/lib/trainer';
 
 export async function GET() {
   try {
@@ -35,6 +36,7 @@ export async function GET() {
       return {
         ...trainer,
         videos: trainer.videos, // Возвращаем массив для совместимости
+        experience: trainerExperienceYears(trainer), // деривация из careerStartYear (растёт +1 каждый 1 января)
         shortVideosCount: shortVideos,
         longVideosCount: longVideos
       };
@@ -60,12 +62,14 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    const expYears = Number(experience) || 0;
     const trainer = await prisma.trainer.create({
       data: {
         name,
         lastName,
         speciality,
-        experience: experience || 0,
+        experience: expYears, // legacy-снимок
+        careerStartYear: careerStartYearFromExperience(expYears), // источник истины
         rating: typeof rating === 'number' ? rating : 5.0,
         avatar,
         description

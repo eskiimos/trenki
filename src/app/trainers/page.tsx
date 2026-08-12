@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { plural } from '@/lib/plural';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 
@@ -225,7 +226,7 @@ const TrainerCard = ({ trainer }: { trainer: Trainer }) => {
           <div className="flex items-center justify-between">
             <div className="text-center">
               <div className="text-[#A1FF4A] text-sm font-bold">{trainer.experience}</div>
-              <div className="text-white text-xs font-bold uppercase tracking-wide">ЛЕТ ОПЫТА</div>
+              <div className="text-white text-xs font-bold uppercase tracking-wide">{plural(trainer.experience, ['год', 'года', 'лет'])} опыта</div>
             </div>
             <div className="w-px h-8 bg-[#101530]"></div>
             <div className="text-center">

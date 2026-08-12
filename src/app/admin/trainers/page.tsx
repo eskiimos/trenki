@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { pluralYears } from '@/lib/plural';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -412,7 +413,7 @@ export default function AdminTrainersPage() {
                     <p className="text-sm text-gray-400">{trainer.speciality}</p>
                     <div className="flex gap-4 mt-2 text-xs text-gray-500">
                       <span>⭐ {trainer.rating.toFixed(1)}</span>
-                      <span>📅 Опыт: {trainer.experience} лет</span>
+                      <span>📅 Опыт: {pluralYears(trainer.experience)}</span>
                       {trainer.videos && trainer.videos.length > 0 && (
                         <span>🎥 Видео: {trainer.videos.length}</span>
                       )}

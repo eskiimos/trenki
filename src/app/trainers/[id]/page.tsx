@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { plural } from '@/lib/plural';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -248,18 +249,18 @@ export default function TrainerPage() {
               >
                 {trainer.experience}
               </div>
-              <div 
+              <div
                 className="text-[#f9f9f9] uppercase"
-                style={{ 
-                  fontFamily: 'Overpass', 
+                style={{
+                  fontFamily: 'Overpass',
                   fontWeight: 700,
-                  fontSize: '12px', 
-                  lineHeight: '100%', 
+                  fontSize: '12px',
+                  lineHeight: '100%',
                   letterSpacing: '0.5px',
                   verticalAlign: 'middle'
                 }}
               >
-                лет опыта
+                {plural(trainer.experience, ['год', 'года', 'лет'])} опыта
               </div>
             </div>
             
