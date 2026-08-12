@@ -73,17 +73,25 @@ export interface XpFromHistory {
 
 /**
  * Боевой расчёт XP из истории завершений (ретроактивно, XP в БД не хранится).
- * «Тренировочный день» — календарный день (локальная полночь) с ≥1 завершённой
- * тренировкой. Начиная с 3-го подряд тренировочного дня весь XP того дня
- * удваивается: тренировка 100→200, модуль 20→40. Модуль в день без тренировки
- * (в т.ч. legacy-модули без даты) — всегда ×1.
+ * «Тренировочный день» — календарный день (локальная полночь) с ≥1 завершением
+ * (полная COMPLETED или досрочная PARTIAL). Начиная с 3-го подряд тренировочного
+ * дня весь XP того дня удваивается: тренировка 100→200, модуль 20→40. Модуль в
+ * день без тренировки (в т.ч. legacy-модули без даты) — всегда ×1.
+ *
+ * `workoutCompletedAts` — даты ПОЛНЫХ тренировок (бонус +100 за каждую).
+ * `moduleCompletedAts` — даты пройденных модулей (COMPLETED и PARTIAL сессий).
+ * `trainingDayAts` — даты всех тренировочных дней для серии/темпа (COMPLETED ∪
+ * PARTIAL). По умолчанию = workoutCompletedAts (обратная совместимость: когда
+ * PARTIAL нет, поведение прежнее). Досрочная тренировка даёт день серии и темп,
+ * но НЕ даёт бонус +100 — именно его «недозарабатываешь».
  */
 export function computeXpFromHistory(
   workoutCompletedAts: Date[],
   moduleCompletedAts: Date[],
   now: Date = new Date(),
+  trainingDayAts: Date[] = workoutCompletedAts,
 ): XpFromHistory {
-  const workoutDays: ReadonlySet<number> = new Set(workoutCompletedAts.map(dayKey));
+  const workoutDays: ReadonlySet<number> = new Set(trainingDayAts.map(dayKey));
 
   let xpTotal = 0;
   for (const w of workoutCompletedAts) {
@@ -94,8 +102,9 @@ export function computeXpFromHistory(
   }
 
   // Для «активен ли темп» серию считаем честно через computeStreak (якорь —
-  // сегодня либо вчера: сегодня ещё можно успеть, темп не потерян).
-  const tempoActiveToday = computeStreak(workoutCompletedAts, now) >= TEMPO_MIN_STREAK;
+  // сегодня либо вчера: сегодня ещё можно успеть, темп не потерян). Серия — по
+  // всем тренировочным дням, включая досрочные.
+  const tempoActiveToday = computeStreak(trainingDayAts, now) >= TEMPO_MIN_STREAK;
 
   return { xpTotal, tempoActiveToday };
 }

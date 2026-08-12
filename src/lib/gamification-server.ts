@@ -35,38 +35,59 @@ export interface GamificationSummary {
  */
 export async function fetchCompletionHistory(
   userId: string,
-): Promise<{ workoutAts: Date[]; moduleAts: Date[] }> {
-  const [workoutSessions, moduleVideos] = await Promise.all([
+): Promise<{ workoutAts: Date[]; moduleAts: Date[]; trainingDayAts: Date[] }> {
+  const [trainingSessions, moduleVideos] = await Promise.all([
     prisma.workoutSession.findMany({
-      where: { userId, status: WorkoutStatus.COMPLETED, completedAt: { not: null } },
-      select: { completedAt: true },
+      // COMPLETED — полные тренировки (бонус +100). PARTIAL — досрочный финиш:
+      // даёт день серии/темпа, но без бонуса. Брошенные/PENDING не считаются.
+      where: {
+        userId,
+        status: { in: [WorkoutStatus.COMPLETED, WorkoutStatus.PARTIAL] },
+        completedAt: { not: null },
+      },
+      select: { completedAt: true, status: true },
     }),
     prisma.workoutSessionVideo.findMany({
-      // Только модули ДОВЕДЁННЫХ до конца тренировок: модули брошенных/PENDING
-      // сессий в XP не идут (античит-ревью перед лигой — иначе фарм модулей
-      // без завершения обходил дневные лимиты).
-      where: { completed: true, session: { userId, status: 'COMPLETED' } },
+      // Модули ЗАСЧИТАННЫХ тренировок: полностью завершённых (COMPLETED) и
+      // досрочно финишированных (PARTIAL — пройденные модули засчитываются).
+      // Модули брошенных/PENDING сессий в XP не идут (античит-ревью перед лигой —
+      // иначе фарм модулей без завершения обходил дневные лимиты).
+      where: {
+        completed: true,
+        session: { userId, status: { in: [WorkoutStatus.COMPLETED, WorkoutStatus.PARTIAL] } },
+      },
       select: { completedAt: true },
     }),
   ]);
 
   return {
-    workoutAts: workoutSessions.map((s) => s.completedAt!),
+    // Бонус +100 — только за полные тренировки.
+    workoutAts: trainingSessions
+      .filter((s) => s.status === WorkoutStatus.COMPLETED)
+      .map((s) => s.completedAt!),
     // Legacy-модули без completedAt не теряют свои 20 XP: эпоха гарантированно
     // вне любой серии → множитель ×1, как и раньше.
     moduleAts: moduleVideos.map((m) => m.completedAt ?? new Date(0)),
+    // Все тренировочные дни (полные + досрочные) — для серии и «Темпа ×2».
+    trainingDayAts: trainingSessions.map((s) => s.completedAt!),
   };
 }
 
 export async function getGamificationSummary(userId: string): Promise<GamificationSummary> {
   // Для «Темпа ×2» XP считается ретроактивно из ПОЛНОЙ истории дат завершений
   // (XP в БД не хранится — инвариант).
-  const { workoutAts, moduleAts } = await fetchCompletionHistory(userId);
+  const { workoutAts, moduleAts, trainingDayAts } = await fetchCompletionHistory(userId);
 
-  const { xpTotal, tempoActiveToday } = computeXpFromHistory(workoutAts, moduleAts);
+  const { xpTotal, tempoActiveToday } = computeXpFromHistory(
+    workoutAts,
+    moduleAts,
+    new Date(),
+    trainingDayAts,
+  );
   const levelInfo = levelFromXp(xpTotal);
   const status = statusFromLevel(levelInfo.level);
-  const streak = computeStreak(workoutAts);
+  // Серия — по всем тренировочным дням (полным и досрочным).
+  const streak = computeStreak(trainingDayAts);
 
   return {
     xp: levelInfo.xpTotal,
@@ -93,7 +114,11 @@ export async function getWeekActivity(
       where: { userId, status: WorkoutStatus.COMPLETED, completedAt: { gte: weekAgo } },
     }),
     prisma.workoutSessionVideo.count({
-      where: { completed: true, completedAt: { gte: weekAgo }, session: { userId, status: 'COMPLETED' } },
+      where: {
+        completed: true,
+        completedAt: { gte: weekAgo },
+        session: { userId, status: { in: [WorkoutStatus.COMPLETED, WorkoutStatus.PARTIAL] } },
+      },
     }),
   ]);
   return { workouts, modules };

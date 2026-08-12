@@ -60,6 +60,15 @@ const GOAL_LABELS: Record<string, string> = {
   SPORT_LONGEVITY: 'Спортивное долголетие',
 };
 
+/** Русское склонение: plural(2, ['модуль','модуля','модулей']) → 'модуля'. */
+function plural(n: number, forms: [string, string, string]): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return forms[0];
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return forms[1];
+  return forms[2];
+}
+
 export default function WorkoutPage() {
   const router = useRouter();
   const { user, webApp } = useTelegram();
@@ -81,7 +90,23 @@ export default function WorkoutPage() {
   const [characteristicsGains, setCharacteristicsGains] = useState<any>(null);
   const [newCharacteristics, setNewCharacteristics] = useState<any>(null);
   const [gainXp, setGainXp] = useState<{ xp: number; mult: number }>({ xp: 0, mult: 1 });
-  
+
+  // Досрочный финиш: модалка-предупреждение + текущий множитель «Темпа ×2»
+  // (нужен, чтобы показать честное «недозаработаешь X баллов»).
+  const [showEarlyFinishModal, setShowEarlyFinishModal] = useState(false);
+  const [earlyFinishing, setEarlyFinishing] = useState(false);
+  const [tempoMult, setTempoMult] = useState(1);
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/gamification/summary')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && typeof d?.tempoMultiplier === 'number') setTempoMult(d.tempoMultiplier);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   // Состояние для Toast уведомлений
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
   
@@ -291,13 +316,14 @@ export default function WorkoutPage() {
     }
   };
 
-  const completeWorkout = async () => {
+  const completeWorkout = async (earlyFinish = false) => {
     try {
       const response = await fetch('/api/training/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId: workout?.id,
+          earlyFinish,
         }),
       });
 
@@ -1082,7 +1108,98 @@ export default function WorkoutPage() {
               ? 'Продолжить тренировку'
               : 'Начать тренировку'}
         </button>
+
+        {/* Досрочный финиш: доступен, когда пройден хотя бы один модуль, но не
+            все. Засчитываем пройденные модули, но без бонуса за полную тренировку
+            (правки август-середина). */}
+        {workout && !allCompleted && workout.modules.some(m => m.completed) && (
+          <button
+            type="button"
+            onClick={() => setShowEarlyFinishModal(true)}
+            className="w-full mt-2 rounded-full font-medium transition-all"
+            style={{
+              backgroundColor: 'transparent',
+              color: '#AEABBB',
+              fontFamily: 'Overpass, sans-serif',
+              fontWeight: 600,
+              fontSize: '14px',
+              cursor: 'pointer',
+              height: '44px',
+              padding: '0 16px',
+            }}
+          >
+            Завершить досрочно
+          </button>
+        )}
       </div>
+
+      {/* Досрочный финиш — предупреждение «недозаработаешь X баллов».
+          Пройденные модули засчитываются, но бонус за полную тренировку теряется. */}
+      {showEarlyFinishModal && workout && (() => {
+        const passed = workout.modules.filter(m => m.completed).length;
+        const remaining = workout.modules.length - passed;
+        const kept = passed * 20 * tempoMult;                 // засчитается сейчас
+        const forfeited = (100 + remaining * 20) * tempoMult; // бонус + оставшиеся модули
+        return (
+          <div
+            style={{
+              position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              zIndex: 60, padding: 24,
+            }}
+            onClick={() => !earlyFinishing && setShowEarlyFinishModal(false)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: '#101530', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 20, padding: 24, maxWidth: 360, width: '100%',
+                fontFamily: 'Overpass, sans-serif',
+              }}
+            >
+              <div style={{ color: '#F9F8FE', fontWeight: 700, fontSize: 20, marginBottom: 12 }}>
+                Завершить досрочно?
+              </div>
+              <p style={{ color: '#AEABBB', fontSize: 14, lineHeight: '150%', marginBottom: 8 }}>
+                Ты прошёл <b style={{ color: '#A1FF4A' }}>{passed}</b> {plural(passed, ['модуль', 'модуля', 'модулей'])} — они засчитаются
+                (<b style={{ color: '#A1FF4A' }}>+{kept} XP</b>) вместе с приростом характеристик.
+              </p>
+              <p style={{ color: '#AEABBB', fontSize: 14, lineHeight: '150%', marginBottom: 20 }}>
+                Не доделаешь {remaining} {plural(remaining, ['модуль', 'модуля', 'модулей'])} — недозаработаешь{' '}
+                <b style={{ color: '#FF8C4A' }}>{forfeited} {plural(forfeited, ['балл', 'балла', 'баллов'])}</b>{' '}
+                (бонус за полную тренировку + оставшиеся модули).
+              </p>
+              <button
+                type="button"
+                disabled={earlyFinishing}
+                onClick={() => setShowEarlyFinishModal(false)}
+                style={{
+                  width: '100%', height: 52, borderRadius: 999, backgroundColor: '#A1FF4A',
+                  color: '#060919', fontWeight: 700, fontSize: 16, cursor: 'pointer', marginBottom: 10,
+                }}
+              >
+                Продолжить тренировку
+              </button>
+              <button
+                type="button"
+                disabled={earlyFinishing}
+                onClick={async () => {
+                  setEarlyFinishing(true);
+                  setShowEarlyFinishModal(false);
+                  await completeWorkout(true);
+                  setEarlyFinishing(false);
+                }}
+                style={{
+                  width: '100%', height: 48, borderRadius: 999, backgroundColor: 'transparent',
+                  color: '#AEABBB', fontWeight: 600, fontSize: 14, cursor: 'pointer',
+                }}
+              >
+                {earlyFinishing ? 'Сохраняем…' : 'Всё равно закончить'}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Модальное окно завершения тренировки */}
       {showCompletionModal && (
@@ -1210,7 +1327,7 @@ export default function WorkoutPage() {
             {/* Кнопка завершения */}
             <button
               type="button"
-              onClick={completeWorkout}
+              onClick={() => completeWorkout()}
               style={{
                 width: '100%',
                 height: '56px',

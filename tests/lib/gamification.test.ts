@@ -173,6 +173,39 @@ describe('computeXpFromHistory («Темп ×2»)', () => {
   });
 });
 
+describe('computeXpFromHistory — досрочный финиш (PARTIAL)', () => {
+  const NOW = new Date('2026-08-07T18:00:00');
+  const d = (daysAgo: number, hour = 10) => {
+    const x = new Date(NOW);
+    x.setDate(x.getDate() - daysAgo);
+    x.setHours(hour, 0, 0, 0);
+    return x;
+  };
+
+  it('досрочная тренировка: только 20×модули, без бонуса +100', () => {
+    // Полных тренировок нет (workoutAts пуст), 2 пройденных модуля сегодня,
+    // сегодня — тренировочный день (PARTIAL передаётся через trainingDayAts).
+    const { xpTotal } = computeXpFromHistory([], [d(0), d(0)], NOW, [d(0)]);
+    expect(xpTotal).toBe(40);
+  });
+
+  it('день досрочной тренировки продлевает серию и даёт «Темп ×2»', () => {
+    const workouts = [d(2), d(1)]; // 2 полные тренировки
+    const modules = [d(0)]; // модуль сегодня (досрочная)
+    const trainingDays = [d(2), d(1), d(0)]; // 3 тренировочных дня подряд
+    const { xpTotal, tempoActiveToday } = computeXpFromHistory(workouts, modules, NOW, trainingDays);
+    // дни -2, -1 — ×1 (100+100), сегодня 3-й день серии → модуль ×2 = 40
+    expect(xpTotal).toBe(240);
+    expect(tempoActiveToday).toBe(true);
+  });
+
+  it('без trainingDayAts поведение прежнее (обратная совместимость)', () => {
+    const a = computeXpFromHistory([d(2), d(1), d(0)], [d(0)], NOW);
+    const b = computeXpFromHistory([d(2), d(1), d(0)], [d(0)], NOW, [d(2), d(1), d(0)]);
+    expect(a).toEqual(b);
+  });
+});
+
 describe('computeWeeklyXp (недельная лига с «Темпом ×2»)', () => {
   // Неделя с Пн 2026-08-03; lookback лиги — Сб 08-01 и Вс 08-02
   const WEEK_START = new Date('2026-08-03T00:00:00');

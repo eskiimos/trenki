@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     if ('response' in auth) return auth.response;
 
     const body = await request.json();
-    const { sessionId } = body;
+    const { sessionId, earlyFinish } = body;
 
     if (!sessionId) {
       return NextResponse.json(
@@ -60,18 +60,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Идемпотентность: уже завершённую сессию повторно НЕ начисляем. Важно
-    // особенно для цикловых — у них больше нет дневного лимита-бэкстопа, и
-    // двойной вызов (ретрай/дабл-тап) иначе начислил бы прибавку дважды.
-    if (session.status === WorkoutStatus.COMPLETED) {
+    // Идемпотентность: уже начисленную сессию (полную COMPLETED или досрочную
+    // PARTIAL) повторно НЕ начисляем. Важно особенно для цикловых — у них больше
+    // нет дневного лимита-бэкстопа, и двойной вызов (ретрай/дабл-тап) иначе
+    // начислил бы прибавку дважды.
+    if (session.status === WorkoutStatus.COMPLETED || session.status === WorkoutStatus.PARTIAL) {
       return NextResponse.json({ success: true, alreadyCompleted: true });
     }
 
-    const allCompleted = session.videos.every(v => v.completed);
-    
-    if (!allCompleted) {
+    // Досрочный финиш (earlyFinish): засчитываем только пройденные модули, без
+    // бонуса за полную тренировку. Обычный финиш требует, чтобы были пройдены все.
+    const completedVideos = session.videos.filter(v => v.completed);
+    const allCompleted = session.videos.length > 0 && completedVideos.length === session.videos.length;
+    const isPartial = !!earlyFinish && !allCompleted;
+
+    if (!earlyFinish && !allCompleted) {
       return NextResponse.json(
         { error: 'Не все видео завершены' },
+        { status: 400 }
+      );
+    }
+    if (earlyFinish && completedVideos.length === 0) {
+      return NextResponse.json(
+        { error: 'Пройди хотя бы один модуль, чтобы засчитать тренировку' },
         { status: 400 }
       );
     }
@@ -92,10 +103,13 @@ export async function POST(request: NextRequest) {
     // Типы нагрузки по каждому видео. Берём video.loadType (enum — источник
     // истины алгоритма) с фолбэком на LOAD-теги; раньше читались только теги,
     // и у видео без LOAD-тега прирост был 0 (баллы не начислялись).
-    const moduleTags = session.videos.map(wsVideo => videoLoadTypes(wsVideo.video));
+    // Прирост считаем ТОЛЬКО по реально пройденным (completed) модулям: при
+    // досрочном финише непройденные не должны давать характеристики (иначе это
+    // эксплойт). При полном финише completedVideos == все модули сессии.
+    const moduleTags = completedVideos.map(wsVideo => videoLoadTypes(wsVideo.video));
 
     // Флаги разминки/заминки — дают x0.5 поинтов
-    const isWarmupOrCooldown = session.videos.map(wsVideo => {
+    const isWarmupOrCooldown = completedVideos.map(wsVideo => {
       const mt = wsVideo.video.moduleType;
       return mt === 'WARMUP' || mt === 'COOLDOWN';
     });
@@ -173,6 +187,23 @@ export async function POST(request: NextRequest) {
     // (не расходуют дневной бюджет быстрых тренировок).
     const newTrainingsToday = isCycleTraining ? trainingsToday : trainingsToday + 1;
 
+    // Атомарный «захват» сессии: ровно один запрос переведёт её из не-финального
+    // статуса в финальный (COMPLETED или досрочный PARTIAL) и начислит прибавку.
+    // Защита от двойного начисления при ретрае/дабл-тапе — начисляем ниже ТОЛЬКО
+    // если захват удался (count === 1).
+    const finishedAt = new Date();
+    const targetStatus = isPartial ? WorkoutStatus.PARTIAL : WorkoutStatus.COMPLETED;
+    const captured = await prisma.workoutSession.updateMany({
+      where: {
+        id: sessionId,
+        status: { notIn: [WorkoutStatus.COMPLETED, WorkoutStatus.PARTIAL] },
+      },
+      data: { status: targetStatus, completedAt: finishedAt },
+    });
+    if (captured.count === 0) {
+      return NextResponse.json({ success: true, alreadyCompleted: true });
+    }
+
     // Обновляем профиль
     await prisma.profile.update({
       where: { id: user.profile.id },
@@ -184,7 +215,7 @@ export async function POST(request: NextRequest) {
         ratingFlexibility: parseFloat(newCharacteristics.ratingFlexibility.toFixed(1)),
         potential: newPotential,
         trainingsToday: newTrainingsToday,
-        lastTrainingDate: new Date(),
+        lastTrainingDate: finishedAt,
       },
     });
 
@@ -215,66 +246,68 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ History entry created for workout completion');
 
-    // Обновляем статус тренировки на COMPLETED
-    const updatedSession = await prisma.workoutSession.update({
-      where: { id: sessionId },
-      data: {
-        status: WorkoutStatus.COMPLETED,
-        completedAt: new Date(),
-      },
-    });
-
-    console.log('✅ Workout completed:', {
-      sessionId: updatedSession.id,
-      status: updatedSession.status,
+    // Статус уже установлен атомарным захватом выше (COMPLETED или PARTIAL).
+    console.log('✅ Workout finished:', {
+      sessionId,
+      status: targetStatus,
+      isPartial,
       newPotential,
       isCycleTraining,
       trainingsToday: newTrainingsToday,
     });
 
-    // XP за эту тренировку: 100 (сессия) + 20×модули, всё ×множитель темпа
-    // «на сегодня». Модули считаются только сейчас (XP берётся из COMPLETED-
-    // сессий, а до этого статус был не COMPLETED) — поэтому здесь весь XP
-    // тренировки приземляется разом. Считаем после установки COMPLETED, чтобы
-    // сегодняшний день уже был «тренировочным» для множителя.
-    const completedModuleCount = session.videos.filter((v) => v.completed).length;
-    const workoutDates = await prisma.workoutSession.findMany({
-      where: { userId: user.id, status: WorkoutStatus.COMPLETED, completedAt: { not: null } },
+    // XP за эту тренировку. Полная: 100 (бонус) + 20×модули. Досрочная (PARTIAL):
+    // только 20×пройденные модули, без бонуса +100 — его и «недозарабатываешь».
+    // Всё ×множитель «Темпа ×2» на сегодня. Модуль-XP приземляется здесь разом
+    // (до этого статус был не финальным, ретроспектива их не считала). Множитель
+    // считаем после захвата, чтобы сегодняшний день уже был «тренировочным».
+    const completedModuleCount = completedVideos.length;
+    const trainingDates = await prisma.workoutSession.findMany({
+      where: {
+        userId: user.id,
+        status: { in: [WorkoutStatus.COMPLETED, WorkoutStatus.PARTIAL] },
+        completedAt: { not: null },
+      },
       select: { completedAt: true },
     });
-    const tempoMultiplier = tempoMultiplierToday(workoutDates.map((w) => w.completedAt!));
+    const tempoMultiplier = tempoMultiplierToday(trainingDates.map((w) => w.completedAt!));
+    const workoutBonus = isPartial ? 0 : XP_PER_COMPLETED_WORKOUT;
     const xpEarned =
-      (XP_PER_COMPLETED_WORKOUT + completedModuleCount * XP_PER_COMPLETED_MODULE) * tempoMultiplier;
+      (workoutBonus + completedModuleCount * XP_PER_COMPLETED_MODULE) * tempoMultiplier;
 
-    // Автозакрытие тренерских заданий:
+    // Автозакрытие тренерских заданий — ТОЛЬКО при полном завершении. Досрочный
+    // финиш (PARTIAL) не считается выполненным заданием тренера.
     //   1. Полноценное 4-модульное задание привязано к этой WorkoutSession
     //      через TrainingAssignment.workoutSessionId — закрываем по sessionId.
     //   2. Старые одиночные задания (по videoId) — через
     //      markAssignmentsCompletedForVideos.
-    (async () => {
-      try {
-        await prisma.trainingAssignment.updateMany({
-          where: {
-            workoutSessionId: sessionId,
-            status: { in: ['PENDING', 'IN_PROGRESS'] },
-          },
-          data: { status: 'COMPLETED', completedAt: new Date() },
-        });
-      } catch (e) {
-        console.error('auto-complete by workoutSessionId failed:', e);
-      }
-      try {
-        const completedVideoIds = session.videos.map((v) => v.videoId);
-        await markAssignmentsCompletedForVideos(auth.user.id, completedVideoIds);
-      } catch (e) {
-        console.error('auto-complete by videoId failed:', e);
-      }
-    })();
+    if (!isPartial) {
+      (async () => {
+        try {
+          await prisma.trainingAssignment.updateMany({
+            where: {
+              workoutSessionId: sessionId,
+              status: { in: ['PENDING', 'IN_PROGRESS'] },
+            },
+            data: { status: 'COMPLETED', completedAt: new Date() },
+          });
+        } catch (e) {
+          console.error('auto-complete by workoutSessionId failed:', e);
+        }
+        try {
+          const completedVideoIds = session.videos.map((v) => v.videoId);
+          await markAssignmentsCompletedForVideos(auth.user.id, completedVideoIds);
+        } catch (e) {
+          console.error('auto-complete by videoId failed:', e);
+        }
+      })();
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'Тренировка успешно завершена!',
-      workout: updatedSession,
+      message: isPartial ? 'Пройденные модули засчитаны!' : 'Тренировка успешно завершена!',
+      partial: isPartial,
+      workout: { id: sessionId, status: targetStatus, completedAt: finishedAt },
       gains,
       newCharacteristics: {
         ratingPower: newCharacteristics.ratingPower,
