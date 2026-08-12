@@ -123,9 +123,9 @@ export async function POST(request: NextRequest) {
       modulesToday = 0;
     }
 
-    // Читер-режим для админов приложения: обходят дневной лимит модулей —
+    // Читер-режим для админов и тест-аккаунтов: обходят дневной лимит модулей —
     // чтобы свободно тестировать геймификацию (решение босса 2026-08-09).
-    const isAdminCheat = user.isAdmin === true;
+    const isAdminCheat = user.isAdmin === true || user.isTester === true;
 
     // Проверяем лимит (4 модуля в день). Админам не мешаем.
     if (!isAdminCheat && modulesToday >= 4) {

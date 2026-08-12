@@ -77,6 +77,9 @@ export async function GET(request: NextRequest) {
           premiumUntil: user.premiumUntil,
           premiumNote: user.premiumNote,
 
+          // Тест-режим (читер-обход лимитов без админ-прав)
+          isTester: user.isTester,
+
           // Профиль
           profile: user.profile ? {
             position: user.profile.position,

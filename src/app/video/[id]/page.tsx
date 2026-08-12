@@ -142,7 +142,7 @@ export default function VideoPage({ params }: VideoPageProps) {
     let cancelled = false;
     fetch('/api/user/is-admin')
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (!cancelled && d?.isAdmin) setIsAdminCheat(true); })
+      .then((d) => { if (!cancelled && (d?.isAdmin || d?.isTester)) setIsAdminCheat(true); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);

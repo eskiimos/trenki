@@ -41,6 +41,7 @@ interface User {
   lastActivity: string;
   accessTier?: 'FREE' | 'PREMIUM';
   premiumUntil?: string | null;
+  isTester?: boolean;
   profile: UserProfile | null;
   stats: UserStats;
   pushNotifications: {
@@ -288,6 +289,33 @@ export default function AdminUsersPage() {
       }
     } catch (e) {
       console.error('set access failed', e);
+      alert('Сетевая ошибка');
+    }
+  };
+
+  // Включить / выключить тест-режим (читер-обход лимитов без админ-прав).
+  const handleSetTester = async (user: User) => {
+    const currentValue = user.isTester === true;
+    const action = currentValue ? 'выключить' : 'включить';
+    if (!window.confirm(`Тест-режим ${action} у ${user.firstName || user.telegramId}?`)) return;
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/tester`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !currentValue }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert(data?.error || 'Не удалось изменить тест-режим');
+        return;
+      }
+      const patch = { isTester: data.user.isTester as boolean };
+      setUsers(prev => prev.map(u => (u.id === user.id ? { ...u, ...patch } : u)));
+      if (selectedUser?.id === user.id) {
+        setSelectedUser({ ...selectedUser, ...patch });
+      }
+    } catch (e) {
+      console.error('set tester failed', e);
       alert('Сетевая ошибка');
     }
   };
@@ -664,6 +692,17 @@ export default function AdminUsersPage() {
                     title="Ручная выдача/снятие премиум-доступа"
                   >
                     {selectedUser.accessTier === 'PREMIUM' ? 'Снять PREMIUM' : 'Выдать PREMIUM'}
+                  </button>
+                  <button
+                    onClick={() => handleSetTester(selectedUser)}
+                    className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
+                      selectedUser.isTester
+                        ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'
+                        : 'bg-[#A1FF4A]/20 text-[#A1FF4A] hover:bg-[#A1FF4A]/30'
+                    }`}
+                    title="Тест-режим: читер-обход дневного лимита модулей и начисление XP на свободном просмотре (без админ-прав)"
+                  >
+                    {selectedUser.isTester ? 'Тест-режим ✓' : 'Тест-режим ✗'}
                   </button>
                   <button
                     onClick={() => handleSetReferral(selectedUser)}

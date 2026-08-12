@@ -6,16 +6,19 @@ export async function GET(request: NextRequest) {
   try {
     const userId = await getSessionUserId(request);
     if (!userId) {
-      return NextResponse.json({ isAdmin: false });
+      return NextResponse.json({ isAdmin: false, isTester: false });
     }
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { isAdmin: true },
+      select: { isAdmin: true, isTester: true },
     });
 
-    return NextResponse.json({ isAdmin: user?.isAdmin ?? false });
+    return NextResponse.json({
+      isAdmin: user?.isAdmin ?? false,
+      isTester: user?.isTester ?? false,
+    });
   } catch {
-    return NextResponse.json({ isAdmin: false });
+    return NextResponse.json({ isAdmin: false, isTester: false });
   }
 }
