@@ -41,6 +41,12 @@ export default function AdminShortsPage() {
   const [thumbnail, setThumbnail] = useState('');
   const [trainerId, setTrainerId] = useState<string>('');
   const [tags, setTags] = useState<string[]>([]);
+  // Сырой текст поля тегов: раньше value={tags.join(', ')} + парсинг на каждый
+  // ввод не давал напечатать запятую (хвостовой ", " срезался фильтром). Держим
+  // строку как есть, парсим в массив только при отправке.
+  const [tagsInput, setTagsInput] = useState('');
+  const parseTags = (s: string): string[] =>
+    Array.from(new Set(s.split(',').map((t) => t.trim()).filter(Boolean)));
   const [order, setOrder] = useState(0);
   const [isPublished, setIsPublished] = useState(true);
   const [audience, setAudience] = useState('HOCKEY');
@@ -82,13 +88,15 @@ export default function AdminShortsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const finalTags = parseTags(tagsInput);
+    setTags(finalTags);
     const shortData = {
       title,
       description,
       videoUrl,
       thumbnail,
       trainerId: trainerId || null,
-      tags,
+      tags: finalTags,
       order,
       isPublished,
       audience,
@@ -126,6 +134,7 @@ export default function AdminShortsPage() {
     setThumbnail(short.thumbnail || '');
     setTrainerId(short.trainerId || '');
     setTags(short.tags);
+    setTagsInput(short.tags.join(', '));
     setOrder(short.order);
     setIsPublished(short.isPublished);
     setAudience((short as any).audience || 'HOCKEY');
@@ -179,6 +188,7 @@ export default function AdminShortsPage() {
     setThumbnail('');
     setTrainerId('');
     setTags([]);
+    setTagsInput('');
     setOrder(0);
     setIsPublished(true);
     setAudience('HOCKEY');
@@ -464,8 +474,9 @@ export default function AdminShortsPage() {
               <label className="block text-sm font-medium mb-2">Теги (через запятую)</label>
               <input
                 type="text"
-                value={tags.join(', ')}
-                onChange={(e) => setTags(e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
+                value={tagsInput}
+                onChange={(e) => setTagsInput(e.target.value)}
+                onBlur={() => setTags(parseTags(tagsInput))}
                 className="w-full px-4 py-2 bg-[#2d3448] border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="дриблинг, катание, тренировка"
               />
