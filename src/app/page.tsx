@@ -18,6 +18,7 @@ import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay'
 import PotentialIslandBanner from '@/components/PotentialIslandBanner';
 import HowAiWorksModal from '@/components/HowAiWorksModal';
 import PushOptInBanner from '@/components/PushOptInBanner';
+import { Play, Zap, Lock } from 'lucide-react';
 import { openSubscriptionModal, handlePaywallResponse } from '@/lib/subscription-modal';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTour } from '@/components/tour/TourProvider';
@@ -869,7 +870,7 @@ const TrainingsSection = () => {
                   borderRadius: 8, cursor: 'pointer',
                 }}
               >
-                <div style={{ width: 40, height: 40, borderRadius: 999, background: 'rgba(161,255,74,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>▶️</div>
+                <div style={{ width: 40, height: 40, borderRadius: 999, background: 'rgba(161,255,74,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Play size={20} color="#A1FF4A" fill="#A1FF4A" aria-hidden /></div>
                 <div className="text-left flex-1 min-w-0">
                   <div style={{ color: '#A1FF4A', fontSize: 11, fontFamily: 'Overpass', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Бесплатно</div>
                   <div style={{ color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Урок недели</div>
@@ -897,7 +898,7 @@ const TrainingsSection = () => {
                 cursor: generatingCycle ? 'wait' : 'pointer', opacity: generatingCycle ? 0.7 : 1,
             }}
         >
-            <div style={{ width: 40, height: 40, borderRadius: 999, background: 'rgba(161,255,74,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>⚡️</div>
+            <div style={{ width: 40, height: 40, borderRadius: 999, background: 'rgba(161,255,74,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Zap size={20} color="#A1FF4A" fill="#A1FF4A" aria-hidden /></div>
             <div className="text-left flex-1 min-w-0">
                 <div style={{ color: '#A1FF4A', fontSize: 11, fontFamily: 'Overpass', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>ИИ-тренер</div>
                 <div style={{ color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
@@ -922,7 +923,7 @@ const TrainingsSection = () => {
             >
                 <div style={{position: 'relative', width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex', cursor: 'pointer'}}>
                     <Image src="/icons/icon-cards.svg" alt="Быстрая тренировка" width={24} height={24} />
-                    {paywalled && <span style={{ position: 'absolute', top: 8, right: 10, fontSize: 14 }}>🔒</span>}
+                    {paywalled && <Lock size={15} color="#F9F8FE" style={{ position: 'absolute', top: 8, right: 10 }} aria-hidden />}
                     <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50}}>
                         <span style={{color: '#A1FF4A'}}>быстрая</span> тренировка
                     </div>
@@ -937,7 +938,7 @@ const TrainingsSection = () => {
             >
                 <div style={{position: 'relative', width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex'}}>
                     <Image src="/icons/ant-design-thunderbolt-filled_f.svg" alt="Потенциал" width={16} height={16} />
-                    {paywalled && <span style={{ position: 'absolute', top: 8, right: 10, fontSize: 14 }}>🔒</span>}
+                    {paywalled && <Lock size={15} color="#F9F8FE" style={{ position: 'absolute', top: 8, right: 10 }} aria-hidden />}
                     <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>повышение потенциала</div>
                 </div>
             </Link>
@@ -1300,7 +1301,7 @@ const VideoCard = ({ video, isNew }: VideoCardProps & { isNew?: boolean }) => {
           )}
           {locked && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/45 backdrop-blur-[1px]">
-              <span style={{ fontSize: 28 }}>🔒</span>
+              <Lock size={28} color="#F9F8FE" aria-hidden />
             </div>
           )}
           {/* "Новинка" badge */}

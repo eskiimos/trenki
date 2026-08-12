@@ -5,25 +5,26 @@
 // подбора (цель + энергия + характеристики → модули нужной нагрузки).
 
 import { useState } from 'react';
+import { Target, BarChart3, Blocks, Zap, type LucideIcon } from 'lucide-react';
 
-const STEPS: { emoji: string; title: string; text: string }[] = [
+const STEPS: { Icon: LucideIcon; title: string; text: string }[] = [
   {
-    emoji: '🎯',
+    Icon: Target,
     title: 'Ты задаёшь цель и состояние',
     text: 'Выбираешь, что качаем (например «убежать от соперника» — скорость), и как себя чувствуешь сегодня — уровень энергии.',
   },
   {
-    emoji: '📊',
+    Icon: BarChart3,
     title: 'ИИ смотрит на твой профиль',
     text: 'Учитывает твои характеристики — силу, скорость, технику, выносливость, гибкость — и что уже прокачано, а что отстаёт.',
   },
   {
-    emoji: '🧩',
+    Icon: Blocks,
     title: 'Собирает тренировку под тебя',
     text: 'Подбирает модули нужной нагрузки: разминка → основная часть → заминка. Не перегружает и закрывает слабые места.',
   },
   {
-    emoji: '⚡',
+    Icon: Zap,
     title: 'Растёшь с каждой тренировкой',
     text: 'Каждое занятие даёт XP и поднимает характеристики. Три дня подряд включают «Ударный темп ×2».',
   },
@@ -90,7 +91,7 @@ export default function HowAiWorksModal() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {STEPS.map((s, i) => (
                 <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                  <div style={{ fontSize: 22, lineHeight: '28px', flexShrink: 0 }}>{s.emoji}</div>
+                  <div style={{ flexShrink: 0, marginTop: 1 }}><s.Icon size={22} color="#A1FF4A" aria-hidden /></div>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ color: '#F9F8FE', fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{s.title}</div>
                     <div style={{ color: '#AEABBB', fontSize: 13, lineHeight: '150%' }}>{s.text}</div>
