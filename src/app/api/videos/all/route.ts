@@ -32,7 +32,16 @@ export async function GET(request: NextRequest) {
           include: {
             tag: true
           }
-        }
+        },
+        // Мульти-тренер: соавторы (включая ведущего), по порядку.
+        coauthors: {
+          orderBy: { order: 'asc' },
+          include: {
+            trainer: {
+              select: { id: true, name: true, lastName: true, avatar: true },
+            },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -66,6 +75,13 @@ export async function GET(request: NextRequest) {
         avatar: video.trainer.avatar || '/images/avatars/trainer-avatar-1.png',
         speciality: video.trainer.speciality,
       },
+      // Мульти-тренер: плоский список авторов (включая ведущего), по порядку.
+      coauthors: video.coauthors.map((c) => ({
+        id: c.trainer.id,
+        name: c.trainer.name,
+        lastName: c.trainer.lastName,
+        avatar: c.trainer.avatar,
+      })),
       createdAt: video.createdAt,
       rpeMin: video.rpeMin,
       rpeMax: video.rpeMax,

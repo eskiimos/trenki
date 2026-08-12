@@ -41,6 +41,14 @@ interface TagsSectionProps {
     lastName: string;
     avatar: string | null;
   } | null;
+  // Мульти-тренер: полный список авторов. Если непустой — показываем всех;
+  // иначе откатываемся на одиночный trainer (обратная совместимость).
+  coauthors?: {
+    id: string;
+    name: string;
+    lastName: string;
+    avatar: string | null;
+  }[];
   // Новые пропсы для интерактивных тегов
   selectedTags?: string[];
   onTagsChange?: (tags: string[]) => void;
@@ -65,6 +73,7 @@ const TagsSection: React.FC<TagsSectionProps> = ({
   description,
   title,
   trainer,
+  coauthors,
   selectedTags = [],
   onTagsChange,
   multiSelect = true,
@@ -167,34 +176,49 @@ const TagsSection: React.FC<TagsSectionProps> = ({
         </div>
       )}
 
-      {/* Trainer Info */}
-      {trainer && (
-        <Link 
-          href={`/trainers/${trainer.id}`}
-          className="flex items-center space-x-3 mb-4 hover:opacity-80 transition-opacity cursor-pointer"
-        >
-          <div className="w-8 h-8 rounded-full overflow-hidden bg-[#2d3448] flex items-center justify-center">
-            {trainer.avatar ? (
-              <Image 
-                src={trainer.avatar} 
-                alt={trainer.name} 
-                width={32} 
-                height={32}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <span className="text-white text-sm font-semibold">
-                {trainer.name.charAt(0)}
-              </span>
+      {/* Trainer Info — мульти-тренер: все авторы, иначе одиночный trainer */}
+      {(() => {
+        const authors = (coauthors && coauthors.length > 0)
+          ? coauthors
+          : (trainer ? [trainer] : []);
+        if (authors.length === 0) return null;
+
+        return (
+          <div className="mb-4">
+            {authors.length > 1 && (
+              <p className="text-[#AEABBB] text-xs font-medium mb-2">Тренеры</p>
             )}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              {authors.map((author) => (
+                <Link
+                  key={author.id}
+                  href={`/trainers/${author.id}`}
+                  className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-full overflow-hidden bg-[#2d3448] flex items-center justify-center">
+                    {author.avatar ? (
+                      <Image
+                        src={author.avatar}
+                        alt={author.name}
+                        width={32}
+                        height={32}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-white text-sm font-semibold">
+                        {author.name.charAt(0)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-white text-sm font-medium">
+                    {author.name} {author.lastName}
+                  </p>
+                </Link>
+              ))}
+            </div>
           </div>
-          <div>
-            <p className="text-white text-sm font-medium">
-              {trainer.name} {trainer.lastName}
-            </p>
-          </div>
-        </Link>
-      )}
+        );
+      })()}
       
       {/* Video Title */}
       {title && (

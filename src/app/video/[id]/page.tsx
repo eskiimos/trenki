@@ -44,6 +44,13 @@ interface VideoData {
     speciality: string;
     avatar: string | null;
   };
+  // Мульти-тренер: полный список авторов (включая ведущего), из GET /api/videos/[id]
+  coauthors?: {
+    id: string;
+    name: string;
+    lastName: string;
+    avatar: string | null;
+  }[];
   tags: string[];
   loadTypes?: string[];
   equipment: string[];
@@ -2127,6 +2134,7 @@ export default function VideoPage({ params }: VideoPageProps) {
           lastName: videoData.trainer.lastName,
           avatar: videoData.trainer.avatar
         } : null}
+        coauthors={videoData?.coauthors}
         rpeMin={videoData?.rpeMin}
         rpeMax={videoData?.rpeMax}
         moduleType={videoData?.moduleType}

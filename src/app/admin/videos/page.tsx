@@ -26,6 +26,13 @@ interface Video {
     id: string;
     name: string;
   };
+  // Мульти-тренер: соавторы (включая ведущего) из /api/videos/all
+  coauthors?: {
+    id: string;
+    name: string;
+    lastName: string;
+    avatar?: string | null;
+  }[];
   category: string;
   difficulty: string;
   tags: string[];
@@ -103,6 +110,7 @@ const AdminVideosPage = () => {
     category: 'SKATING',
     difficulty: 'BEGINNER',
     trainerId: '',
+    coauthorIds: [] as string[], // мульти-тренер: доп. соавторы (без ведущего)
     tags: '', // Оставляем для обратной совместимости (старые текстовые теги)
     equipment: '',
     duration: 0, // Длительность в секундах (из Kinescope)
@@ -173,6 +181,10 @@ const AdminVideosPage = () => {
         category: formData.category,
         difficulty: formData.difficulty,
         trainerId: formData.trainerId,
+        // Мульти-тренер: ведущий + соавторы (дедуп, ведущий первым).
+        trainerIds: Array.from(
+          new Set([formData.trainerId, ...formData.coauthorIds].filter(Boolean))
+        ),
         tags: tagsArray,
         equipment: equipmentArray,
         isPublished: true,
@@ -589,6 +601,10 @@ const AdminVideosPage = () => {
       category: video.category,
       difficulty: video.difficulty,
       trainerId: video.trainer.id,
+      // Мульти-тренер: соавторы без ведущего (ведущий выбирается в trainerId).
+      coauthorIds: ((video as any).coauthors || [])
+        .map((c: { id: string }) => c.id)
+        .filter((cid: string) => cid !== video.trainer.id),
       tags: video.tags.join(', '), // Старые текстовые теги
       equipment: video.equipment.join(', '),
       duration: video.duration || 0, // Длительность в секундах
@@ -1477,6 +1493,44 @@ const AdminVideosPage = () => {
                         </option>
                       ))}
                     </select>
+                  </div>
+
+                  {/* Соавторы (доп. тренеры) — мульти-тренер */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-2">Соавторы (доп. тренеры)</label>
+                    <div className="flex flex-wrap gap-2">
+                      {trainers
+                        .filter(trainer => trainer.id !== formData.trainerId)
+                        .map(trainer => {
+                          const checked = formData.coauthorIds.includes(trainer.id);
+                          return (
+                            <label
+                              key={trainer.id}
+                              className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                                checked ? 'bg-blue-600 text-white' : 'bg-[#2d3448] text-gray-300'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    coauthorIds: prev.coauthorIds.includes(trainer.id)
+                                      ? prev.coauthorIds.filter(id => id !== trainer.id)
+                                      : [...prev.coauthorIds, trainer.id],
+                                  }));
+                                }}
+                                className="accent-blue-600"
+                              />
+                              <span className="text-sm">{trainer.name} {trainer.lastName}</span>
+                            </label>
+                          );
+                        })}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Ведущий тренер выбирается выше. Здесь — дополнительные соавторы видео.
+                    </p>
                   </div>
 
                   {/* Оборудование */}

@@ -32,7 +32,11 @@ export async function GET(request: NextRequest) {
       where.difficulty = difficulty.toUpperCase();
     }
     if (trainerId) {
-      where.trainerId = trainerId;
+      // Тренер видит видео, где он ведущий ИЛИ соавтор (мульти-тренер).
+      where.OR = [
+        { trainerId },
+        { coauthors: { some: { trainerId } } },
+      ];
     }
 
     const videos = await prisma.video.findMany({
@@ -145,9 +149,10 @@ export async function POST(request: NextRequest) {
       duration, 
       videoUrl, 
       thumbnail, 
-      category, 
-      difficulty, 
+      category,
+      difficulty,
       trainerId,
+      trainerIds, // мульти-тренер: полный список авторов (первый — ведущий)
       tags,
       equipment,
       level,
@@ -164,9 +169,19 @@ export async function POST(request: NextRequest) {
       sports, // виды спорта (только если isSfp)
     } = body;
 
-    if (!title || !videoUrl || !category || !difficulty || !trainerId) {
-      return NextResponse.json({ 
-        error: 'title, videoUrl, category, difficulty, and trainerId are required' 
+    // Список авторов: если пришёл непустой trainerIds — берём его, иначе [trainerId].
+    // Дедуп с сохранением порядка; первый автор — ведущий (VideoTrainer.order = 0).
+    const rawAuthorIds: unknown[] = Array.isArray(trainerIds) && trainerIds.length > 0
+      ? trainerIds
+      : [trainerId];
+    const authorIds = Array.from(
+      new Set(rawAuthorIds.filter((t): t is string => typeof t === 'string' && t.length > 0))
+    );
+    const primaryTrainerId = authorIds[0];
+
+    if (!title || !videoUrl || !category || !difficulty || !primaryTrainerId) {
+      return NextResponse.json({
+        error: 'title, videoUrl, category, difficulty, and trainerId are required'
       }, { status: 400 });
     }
 
@@ -226,35 +241,49 @@ export async function POST(request: NextRequest) {
     console.log('Creating video - ageGroups:', ageGroupsArray);
     console.log('Creating video - trainingGoals:', trainingGoalsArray);
 
-    const video = await prisma.video.create({
-      data: {
-        title,
-        description,
-        duration: durationNum,
-        videoUrl,
-        thumbnail: thumbnail || null,
-        category,
-        difficulty,
-        trainerId,
-        tags: tags || [],
-        equipment: equipment || [],
-        level: level || null,
-        isPublished: isPublished ?? false,
-        rpeMin: rpeMinNum,
-        rpeMax: rpeMaxNum,
-        moduleType: moduleTypeEnum as any,
-        complexity: complexityEnum as any,
-        muscleGroup: muscleGroupEnum as any,
-        loadType: loadTypeValue as any,
-        ageGroups: ageGroupsArray, // НОВОЕ
-        trainingGoals: trainingGoalsArray, // НОВОЕ
-        audience: audience || 'HOCKEY',
-        isSfp: isSfpFlag,
-        sports: sportsArray as any,
-      },
-      include: {
-        trainer: true
-      }
+    const video = await prisma.$transaction(async (tx) => {
+      const created = await tx.video.create({
+        data: {
+          title,
+          description,
+          duration: durationNum,
+          videoUrl,
+          thumbnail: thumbnail || null,
+          category,
+          difficulty,
+          trainerId: primaryTrainerId, // ведущий автор = первый в списке
+          tags: tags || [],
+          equipment: equipment || [],
+          level: level || null,
+          isPublished: isPublished ?? false,
+          rpeMin: rpeMinNum,
+          rpeMax: rpeMaxNum,
+          moduleType: moduleTypeEnum as any,
+          complexity: complexityEnum as any,
+          muscleGroup: muscleGroupEnum as any,
+          loadType: loadTypeValue as any,
+          ageGroups: ageGroupsArray, // НОВОЕ
+          trainingGoals: trainingGoalsArray, // НОВОЕ
+          audience: audience || 'HOCKEY',
+          isSfp: isSfpFlag,
+          sports: sportsArray as any,
+        },
+        include: {
+          trainer: true
+        }
+      });
+
+      // Полный набор авторов (включая ведущего), order = позиция в списке.
+      await tx.videoTrainer.createMany({
+        data: authorIds.map((tid, index) => ({
+          videoId: created.id,
+          trainerId: tid,
+          order: index,
+        })),
+        skipDuplicates: true,
+      });
+
+      return created;
     });
 
     console.log('Created video with isPublished:', video.isPublished);

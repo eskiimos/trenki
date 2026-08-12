@@ -54,7 +54,16 @@ export async function GET(
             speciality: true,
             avatar: true,
           }
-        }
+        },
+        // Мульти-тренер: полный набор авторов (включая ведущего), по порядку.
+        coauthors: {
+          orderBy: { order: 'asc' },
+          select: {
+            trainer: {
+              select: { id: true, name: true, lastName: true, avatar: true },
+            },
+          },
+        },
       }
     });
 
@@ -62,9 +71,17 @@ export async function GET(
       return NextResponse.json({ error: 'Video not found' }, { status: 404 });
     }
 
+    // Плоский список соавторов для фронтенда (ведущий трейнер остаётся в trainer).
+    const coauthors = video.coauthors.map((c) => ({
+      id: c.trainer.id,
+      name: c.trainer.name,
+      lastName: c.trainer.lastName,
+      avatar: c.trainer.avatar,
+    }));
+
     // Файлы из собственного S3 хранятся как s3://<key> — резолвим в presigned
     // GET (6 ч) только здесь, ПОСЛЕ paywall-гейта выше. Kinescope-URL — как есть.
-    return NextResponse.json({ ...video, videoUrl: await resolveVideoUrl(video.videoUrl) });
+    return NextResponse.json({ ...video, coauthors, videoUrl: await resolveVideoUrl(video.videoUrl) });
   } catch (error: any) {
     console.error('Error fetching video:', error);
     return NextResponse.json({ 
@@ -89,9 +106,10 @@ export async function PUT(
       duration, 
       videoUrl, 
       thumbnail, 
-      category, 
-      difficulty, 
+      category,
+      difficulty,
       trainerId,
+      trainerIds, // мульти-тренер: если пришёл — пересобираем набор авторов
       tags,
       equipment,
       level,
@@ -108,9 +126,24 @@ export async function PUT(
       sports,
     } = body;
 
-    if (!title || !videoUrl || !category || !difficulty || !trainerId) {
-      return NextResponse.json({ 
-        error: 'title, videoUrl, category, difficulty, and trainerId are required' 
+    // Список авторов: непустой trainerIds имеет приоритет (первый — ведущий).
+    // Дедуп с сохранением порядка.
+    const hasTrainerIds = Array.isArray(trainerIds) && trainerIds.length > 0;
+    const authorIds = hasTrainerIds
+      ? Array.from(
+          new Set(
+            (trainerIds as unknown[]).filter(
+              (t): t is string => typeof t === 'string' && t.length > 0
+            )
+          )
+        )
+      : [];
+    // Ведущий: первый из trainerIds, иначе одиночный trainerId (legacy-клиент).
+    const primaryTrainerId = hasTrainerIds ? authorIds[0] : trainerId;
+
+    if (!title || !videoUrl || !category || !difficulty || !primaryTrainerId) {
+      return NextResponse.json({
+        error: 'title, videoUrl, category, difficulty, and trainerId are required'
       }, { status: 400 });
     }
 
@@ -177,7 +210,7 @@ export async function PUT(
         thumbnail: thumbnail || '',
         category,
         difficulty,
-        trainerId,
+        trainerId: primaryTrainerId, // ведущий автор
         tags: tags || [],
         equipment: equipment || [],
         level: level || '',
@@ -205,6 +238,30 @@ export async function PUT(
         },
       },
     });
+
+    // Мульти-тренер: синхронизируем набор соавторов.
+    if (hasTrainerIds) {
+      // Пришёл полный список — пересобираем join-таблицу целиком (order = позиция).
+      await prisma.$transaction([
+        prisma.videoTrainer.deleteMany({ where: { videoId: id } }),
+        prisma.videoTrainer.createMany({
+          data: authorIds.map((tid, index) => ({
+            videoId: id,
+            trainerId: tid,
+            order: index,
+          })),
+          skipDuplicates: true,
+        }),
+      ]);
+    } else {
+      // Legacy-клиент прислал только trainerId — соавторов не трогаем,
+      // но гарантируем ведущую строку (order = 0) для актуального trainerId.
+      await prisma.videoTrainer.upsert({
+        where: { videoId_trainerId: { videoId: id, trainerId: primaryTrainerId } },
+        create: { videoId: id, trainerId: primaryTrainerId, order: 0 },
+        update: { order: 0 },
+      });
+    }
 
     // Обновляем LoadType тег, если указан loadType
     if (body.loadType) {
