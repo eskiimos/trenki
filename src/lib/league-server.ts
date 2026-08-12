@@ -85,6 +85,7 @@ export async function buildLeagueForUser(userId: string): Promise<LeagueForUser>
       SELECT ws."userId", date_trunc('day', ws."completedAt") AS d, COUNT(*)::int AS cnt
       FROM "workout_sessions" ws
       WHERE ws.status = 'COMPLETED'
+        AND ws.synthetic = false
         AND ws."completedAt" >= ${lookbackStart}
         AND ws."userId" IN (${Prisma.join(cohortIds)})
       GROUP BY 1, 2
@@ -96,6 +97,7 @@ export async function buildLeagueForUser(userId: string): Promise<LeagueForUser>
       JOIN "workout_sessions" ws ON ws.id = wsv."sessionId"
       WHERE wsv.completed = true
         AND ws.status = 'COMPLETED'
+        AND ws.synthetic = false
         AND wsv."completedAt" >= ${lookbackStart}
         AND ws."userId" IN (${Prisma.join(cohortIds)})
       GROUP BY 1, 2

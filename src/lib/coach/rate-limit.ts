@@ -30,3 +30,12 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateLim
   b.count++;
   return { ok: true, remaining: limit - b.count, resetIn: b.resetAt - now };
 }
+
+/**
+ * Сброс окна для конкретного ключа (напр. чтобы тестер мог сразу продолжить
+ * после накрутки, не дожидаясь окончания суточного окна gen-v3). In-memory —
+ * влияет только на текущий процесс.
+ */
+export function resetRateLimit(key: string): void {
+  buckets.delete(key);
+}

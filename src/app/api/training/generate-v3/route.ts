@@ -41,13 +41,17 @@ export async function POST(request: NextRequest) {
     // paywall-режима — прежняя квота 1/нед живёт только при активном paywall и
     // при mode=off была мёртвой, оставляя «принтер сессий» для XP-фарма.
     // 10/день честному юзеру не мешает никогда. In-memory (сброс при деплое) —
-    // приемлемо: это backstop, а не бухгалтерия.
-    const genRl = rateLimit(`gen-v3:${auth.user.id}`, 10, 24 * 60 * 60 * 1000);
-    if (!genRl.ok) {
-      return NextResponse.json(
-        { error: 'Слишком много тренировок за день — продолжи завтра' },
-        { status: 429 },
-      );
+    // приемлемо: это backstop, а не бухгалтерия. Чит-аккаунты (админ/тестер)
+    // байпасят cap — чтобы тестировать геймификацию без ожидания суток.
+    const isCheatAccount = auth.user.isAdmin === true || auth.user.isTester === true;
+    if (!isCheatAccount) {
+      const genRl = rateLimit(`gen-v3:${auth.user.id}`, 10, 24 * 60 * 60 * 1000);
+      if (!genRl.ok) {
+        return NextResponse.json(
+          { error: 'Слишком много тренировок за день — продолжи завтра' },
+          { status: 429 },
+        );
+      }
     }
 
     // Генерация ИИ-тренировок — только по подписке (Sprint 4: «генерации только

@@ -79,6 +79,8 @@ export async function GET(request: NextRequest) {
 
           // Тест-режим (читер-обход лимитов без админ-прав)
           isTester: user.isTester,
+          // Админ-флаг — для UI-гейта кнопок накрутки геймификации (тестеры/админы)
+          isAdmin: user.isAdmin,
 
           // Профиль
           profile: user.profile ? {

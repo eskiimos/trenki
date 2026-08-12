@@ -42,6 +42,7 @@ interface User {
   accessTier?: 'FREE' | 'PREMIUM';
   premiumUntil?: string | null;
   isTester?: boolean;
+  isAdmin?: boolean;
   profile: UserProfile | null;
   stats: UserStats;
   pushNotifications: {
@@ -316,6 +317,79 @@ export default function AdminUsersPage() {
       }
     } catch (e) {
       console.error('set tester failed', e);
+      alert('Сетевая ошибка');
+    }
+  };
+
+  // Накрутка геймификации ДЛЯ ТЕСТЕРОВ (собрать стрик/уровень без ожидания дней).
+  // XP/уровень/стрик деривируются из синтетических COMPLETED-сессий на бэке.
+  // Стрик и уровень взаимоисключающи (оба чистят всю синтетику юзера).
+  const handleSeedStreak = async (user: User) => {
+    const input = window.prompt('Стрик — сколько дней подряд (1..60)?', '7');
+    if (input == null) return;
+    const days = parseInt(input, 10);
+    if (!Number.isFinite(days) || days < 1) {
+      alert('Введите число от 1 до 60');
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/gamification/streak`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert(data?.error || 'Не удалось накрутить стрик');
+        return;
+      }
+      alert(`Готово: стрик ${data.streak} дн · уровень ${data.level} · XP ${data.xp}`);
+    } catch (e) {
+      console.error('seed streak failed', e);
+      alert('Сетевая ошибка');
+    }
+  };
+
+  const handleSeedLevel = async (user: User) => {
+    const input = window.prompt('Уровень (1..60)?', '10');
+    if (input == null) return;
+    const level = parseInt(input, 10);
+    if (!Number.isFinite(level) || level < 1) {
+      alert('Введите число от 1 до 60');
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/gamification/level`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert(data?.error || 'Не удалось накрутить уровень');
+        return;
+      }
+      alert(`Готово: уровень ${data.level} · XP ${data.xp} · стрик ${data.streak} дн`);
+    } catch (e) {
+      console.error('seed level failed', e);
+      alert('Сетевая ошибка');
+    }
+  };
+
+  const handleResetLimits = async (user: User) => {
+    if (!window.confirm(`Сбросить дневные лимиты у ${user.firstName || user.telegramId}?`)) return;
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/gamification/reset-limits`, {
+        method: 'POST',
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert(data?.error || 'Не удалось сбросить лимиты');
+        return;
+      }
+      alert('Дневные лимиты сброшены');
+    } catch (e) {
+      console.error('reset limits failed', e);
       alert('Сетевая ошибка');
     }
   };
@@ -704,6 +778,31 @@ export default function AdminUsersPage() {
                   >
                     {selectedUser.isTester ? 'Тест-режим ✓' : 'Тест-режим ✗'}
                   </button>
+                  {(selectedUser.isTester || selectedUser.isAdmin) && (
+                    <>
+                      <button
+                        onClick={() => handleSeedStreak(selectedUser)}
+                        className="px-4 py-2 rounded-lg bg-[#A1FF4A]/20 text-[#A1FF4A] hover:bg-[#A1FF4A]/30 transition-colors text-sm font-medium"
+                        title="Накрутить стрик N дней (синтетические сессии, только для тест-аккаунтов)"
+                      >
+                        Стрик N дней
+                      </button>
+                      <button
+                        onClick={() => handleSeedLevel(selectedUser)}
+                        className="px-4 py-2 rounded-lg bg-[#A1FF4A]/20 text-[#A1FF4A] hover:bg-[#A1FF4A]/30 transition-colors text-sm font-medium"
+                        title="Накрутить уровень N (синтетические сессии, только для тест-аккаунтов)"
+                      >
+                        Уровень N
+                      </button>
+                      <button
+                        onClick={() => handleResetLimits(selectedUser)}
+                        className="px-4 py-2 rounded-lg bg-[#2d3448] text-gray-200 hover:bg-[#3a4255] transition-colors text-sm font-medium"
+                        title="Сбросить дневные лимиты (модули/тренировки/генерация)"
+                      >
+                        Сброс лимитов
+                      </button>
+                    </>
+                  )}
                   <button
                     onClick={() => handleSetReferral(selectedUser)}
                     className="px-4 py-2 rounded-lg bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 transition-colors text-sm font-medium"
