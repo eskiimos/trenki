@@ -26,6 +26,7 @@ export const SETTING_KEYS = {
   priceMonthly: 'subscription.priceMonthlyRub', // базовая цена подписки ₽/мес
   introDiscountPercent: 'subscription.introDiscountPercent', // макс. скидка по промо, %
   introMonths: 'subscription.introMonths', // на сколько месяцев действует интро-скидка
+  emailCampaignsEnabled: 'emailCampaigns.enabled', // общий рубильник триггерных email-кампаний (default FALSE)
 } as const;
 
 export const REMINDER_DEFAULTS = {
@@ -136,6 +137,25 @@ export async function getFreeLessonVideoId(): Promise<string | null> {
     return v || null;
   } catch {
     return null; // таблицы может не быть — считаем, что не задано
+  }
+}
+
+/**
+ * Общий рубильник триггерных email-кампаний (welcome / первая тренировка /
+ * неактивность). По умолчанию ВЫКЛЮЧЕНО: кампании деплоятся OFF и не уходят
+ * реальным юзерам, пока значение не выставят в 'true'/'1' из админки. Битое/
+ * пустое значение или отсутствие таблицы — тоже OFF (fail-safe).
+ */
+export async function getEmailCampaignsEnabled(): Promise<boolean> {
+  try {
+    const row = await prisma.appSetting.findUnique({
+      where: { key: SETTING_KEYS.emailCampaignsEnabled },
+      select: { value: true },
+    });
+    const v = (row?.value ?? '').trim().toLowerCase();
+    return v === 'true' || v === '1';
+  } catch {
+    return false; // таблицы может не быть до миграции — кампании выключены
   }
 }
 

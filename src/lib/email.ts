@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { logger } from '@/lib/logger';
 
 // Ленивая инициализация Resend
 let resendInstance: Resend | null = null;
@@ -19,12 +20,16 @@ export interface SendEmailOptions {
   subject: string;
   html: string;
   from?: string;
+  /** Plain-text версия письма (антиспам + доступность). */
+  text?: string;
+  /** Доп. заголовки письма (напр. List-Unsubscribe для кампаний). */
+  headers?: Record<string, string>;
 }
 
 /**
  * Отправка email через Resend
  */
-export async function sendEmail({ to, subject, html, from }: SendEmailOptions) {
+export async function sendEmail({ to, subject, html, from, text, headers }: SendEmailOptions) {
   try {
     const resend = getResend();
     const result = await resend.emails.send({
@@ -32,12 +37,14 @@ export async function sendEmail({ to, subject, html, from }: SendEmailOptions) {
       to: Array.isArray(to) ? to : [to],
       subject,
       html,
+      text,
+      headers,
     });
 
-    console.log('✅ Email sent successfully:', result);
+    logger.info('email sent', { id: result.data?.id ?? null });
     return { success: true, data: result };
   } catch (error) {
-    console.error('❌ Error sending email:', error);
+    logger.error('email send failed', error);
     return { success: false, error };
   }
 }

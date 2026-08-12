@@ -10,6 +10,8 @@ import {
 import { markAssignmentsCompletedForVideos } from '@/lib/coach/auto-complete';
 import { requireAuthUser } from '@/lib/coach/guards';
 import { tempoMultiplierToday, XP_PER_COMPLETED_WORKOUT, XP_PER_COMPLETED_MODULE } from '@/lib/gamification';
+import { sendFirstWorkoutEmail } from '@/lib/email-campaigns';
+import { logger } from '@/lib/logger';
 
 /**
  * POST /api/training/complete
@@ -299,6 +301,32 @@ export async function POST(request: NextRequest) {
           await markAssignmentsCompletedForVideos(auth.user.id, completedVideoIds);
         } catch (e) {
           console.error('auto-complete by videoId failed:', e);
+        }
+      })();
+    }
+
+    // FIRST_WORKOUT-письмо: только после ПЕРВОЙ полной (COMPLETED) тренировки.
+    // Fire-and-forget — НЕ блокируем ответ роута (как auto-complete выше).
+    // sendFirstWorkoutEmail сам держит килл-свитч (canSendCampaign). completedCount
+    // считаем после атомарного захвата (эта сессия уже COMPLETED) — первая ⇔ === 1.
+    // Дедуп firstWorkoutEmailSentAt ставим только при реальной отправке.
+    if (targetStatus === WorkoutStatus.COMPLETED && user.firstWorkoutEmailSentAt == null) {
+      const u = user;
+      void (async () => {
+        try {
+          const completedCount = await prisma.workoutSession.count({
+            where: { userId: u.id, status: WorkoutStatus.COMPLETED },
+          });
+          if (completedCount !== 1) return; // не первая полная — не шлём
+          const ok = await sendFirstWorkoutEmail({ id: u.id, email: u.email, emailOptOut: u.emailOptOut });
+          if (ok) {
+            await prisma.user.update({
+              where: { id: u.id },
+              data: { firstWorkoutEmailSentAt: new Date() },
+            });
+          }
+        } catch (e) {
+          logger.error('first-workout email flow failed', { userId: u.id, err: String(e) });
         }
       })();
     }

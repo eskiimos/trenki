@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { signSession, setSessionCookie } from '@/lib/session';
 import { rateLimit } from '@/lib/coach/rate-limit';
 import { grantPremiumDays } from '@/lib/payments/grant';
+import { sendWelcomeEmail } from '@/lib/email-campaigns';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -114,6 +115,28 @@ export async function POST(request: NextRequest) {
         } catch (e) {
           logger.error('trial grant failed on signup', { userId: user.id, referralCode, error: String(e) });
         }
+      }
+
+      // WELCOME-письмо: fire-and-forget, НЕ ломаем логин (как grantPremiumDays
+      // выше). sendWelcomeEmail сам держит килл-свитч (canSendCampaign) и вернёт
+      // false, если кампании выключены / нет email / юзер отписан. Дедуп-поле
+      // welcomeEmailSentAt ставим только при реальной отправке — новый юзер
+      // логинится только раз, ретрая нет, поэтому ставим по факту успеха.
+      if (user.welcomeEmailSentAt == null) {
+        const u = user;
+        void (async () => {
+          try {
+            const ok = await sendWelcomeEmail({ id: u.id, email: u.email, emailOptOut: u.emailOptOut });
+            if (ok) {
+              await prisma.user.update({
+                where: { id: u.id },
+                data: { welcomeEmailSentAt: new Date() },
+              });
+            }
+          } catch (e) {
+            logger.error('welcome email flow failed', { userId: u.id, err: String(e) });
+          }
+        })();
       }
     } else {
       if (!user.emailVerified) {
