@@ -7,10 +7,46 @@
 import {
   Snowflake, Sparkles, Shield, Trophy, Star, Crown, Award,
   Zap, Target, Flame, Rocket, Swords, Medal,
-  Crosshair, Bomb, Dog, Axe, Wand2, Drama, HeartPulse, Footprints,
+  Crosshair, Bomb, Axe, Wand2, Drama, HeartPulse, Footprints,
   Cat, Wind, ShieldCheck, Bot,
   type LucideIcon,
 } from 'lucide-react';
+import type { SVGProps } from 'react';
+
+// Кастомная иконка «Питбуль с зубами» (ачивка strength_evo1). В lucide нет
+// клыкастой собаки, поэтому рисуем сами: оскал с рядом зубов + клыки + злые
+// глаза. Монохром, currentColor — тинтуется в лайм/серый как остальные иконки.
+// Сигнатура совместима с тем, как AchievementIcon вызывает иконку (size,
+// className, aria-hidden), поэтому кладём её в ту же мапу через каст.
+function PitbullTeethIcon({ size = 20, ...props }: SVGProps<SVGSVGElement> & { size?: number | string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      {/* Купированные уши */}
+      <path d="M9 5 L6 2.4 L9.6 4.6" />
+      <path d="M15 5 L18 2.4 L14.4 4.6" />
+      {/* Голова: лоб между ушами, скулы вниз к пасти (плоская верхняя губа y≈13.8) */}
+      <path d="M9 4.8 C6.1 5.6 5 8.2 5.4 10.9 C5.7 12.9 6.8 14.4 8.2 15.4 L8.2 13.8 L15.8 13.8 L15.8 15.4 C17.2 14.4 18.3 12.9 18.6 10.9 C19 8.2 17.9 5.6 15 4.8 Z" />
+      {/* Злые глаза (скошенные штрихи) */}
+      <path d="M8.5 9.2 L10.6 10.1" />
+      <path d="M15.5 9.2 L13.4 10.1" />
+      {/* Нос */}
+      <path d="M12 10.6 L11 11.9 L13 11.9 Z" fill="currentColor" stroke="none" />
+      {/* Оскал: ряд зубов зигзагом по нижней губе */}
+      <path d="M8.4 13.8 L9.2 15.7 L10 13.8 L10.8 15.7 L11.6 13.8 L12.4 15.7 L13.2 13.8 L14 15.7 L14.8 13.8 L15.6 15.7" />
+    </svg>
+  );
+}
 
 // ── Статусы-«эволюции» (ключи из STATUSES в @/lib/gamification) ──────────────
 // rookie 🏒→Snowflake (первый лёд), prospect ⛸️→Sparkles, junior 🥅→Shield,
@@ -31,7 +67,7 @@ export const ACHIEVEMENT_ICONS: Record<string, LucideIcon> = {
   outrun_evo2: Zap,         // Молния
   shot_evo1: Crosshair,     // Насквозь
   shot_evo2: Bomb,          // Пушка страшная
-  strength_evo1: Dog,       // Питбуль
+  strength_evo1: PitbullTeethIcon as unknown as LucideIcon, // Питбуль с зубами (кастомная)
   strength_evo2: Axe,       // Викинг
   hands_evo1: Wand2,        // Финтёр
   hands_evo2: Drama,        // Фокусник
