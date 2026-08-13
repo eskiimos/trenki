@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { signSession, setSessionCookie } from '@/lib/session';
+import {
+  getAccountsFromRequest,
+  writeAccounts,
+  addAccount,
+  sameList,
+} from '@/lib/account-list';
+import { getSessionFromRequest, sessionSecondsLeft } from '@/lib/session';
+import { isSameOrigin } from '@/lib/same-origin';
 import { rateLimit } from '@/lib/coach/rate-limit';
 import { grantPremiumDays } from '@/lib/payments/grant';
 import { sendWelcomeEmail } from '@/lib/email-campaigns';
@@ -16,6 +24,13 @@ function getClientIp(request: NextRequest): string {
 
 export async function POST(request: NextRequest) {
   try {
+    // Login-CSRF: без проверки origin с нашего же поддомена можно было бы
+    // залогинить жертву в аккаунт атакующего (и подсадить его id в список
+    // устройства — verify-code единственный, кто в этот список пишет).
+    if (!isSameOrigin(request, { allowMissingOrigin: true })) {
+      return NextResponse.json({ error: 'Запрос отклонён' }, { status: 403 });
+    }
+
     const body = await request.json();
     const email = (body.email || '').trim().toLowerCase();
     const code = (body.code || '').trim();
@@ -160,8 +175,31 @@ export async function POST(request: NextRequest) {
       needsOnboarding,
     });
 
-    const token = await signSession({ uid: user.id, role: user.role });
+    // lgn — момент реального входа по коду. От него считается абсолютный
+    // дедлайн доступа, в том числе для сессий, полученных переключением.
+    const lgn = Math.floor(Date.now() / 1000);
+    const token = await signSession({ uid: user.id, role: user.role, lgn });
     setSessionCookie(response, token);
+
+    // Мульти-аккаунт: это ЕДИНСТВЕННОЕ место, где список устройства растёт —
+    // только после успешной проверки кода.
+    const stored = await getAccountsFromRequest(request);
+
+    // Сохраняем аккаунт, из которого пришли «добавить ещё один»: иначе первый
+    // аккаунт выпадал бы из переключателя (у существующих юзеров списка ещё
+    // нет). Дедлайн у него остаётся СВОЙ (от его собственного входа по коду) —
+    // поэтому это не обмен сессии на новый долгоживущий доступ.
+    const prev = await getSessionFromRequest(request);
+    const withPrev =
+      prev?.uid && prev.uid !== user.id && sessionSecondsLeft(prev.lgn) > 0
+        ? addAccount(stored, prev.uid, prev.lgn)
+        : stored;
+
+    const next = addAccount(withPrev, user.id, lgn);
+    if (!sameList(next, stored)) {
+      await writeAccounts(response, next);
+    }
+
     logger.info('user login via email OTP', { userId: user.id });
     return response;
   } catch (error) {

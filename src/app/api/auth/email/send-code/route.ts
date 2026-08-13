@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
           },
           needsOnboarding: !profile && demoUser.role === 'ATHLETE',
         });
-        const token = await signSession({ uid: demoUser.id, role: demoUser.role });
+        const token = await signSession({ uid: demoUser.id, role: demoUser.role, lgn: Math.floor(Date.now() / 1000) });
         setSessionCookie(response, token);
         logger.info('demo bypass direct login', { userId: demoUser.id });
         return response;
