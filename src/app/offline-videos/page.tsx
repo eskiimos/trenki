@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Download, Trash2, Wifi, WifiOff, HardDrive } from 'lucide-react';
+import { Download, Trash2, Wifi, WifiOff, HardDrive } from 'lucide-react';
 import { 
   getAllOfflineVideos, 
   deleteVideo, 
@@ -110,7 +110,7 @@ export default function OfflineVideosPage() {
                 href="/"
                 className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
               >
-                <ArrowLeft size={20} />
+                <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
               </Link>
               <div>
                 <h1 className="text-xl font-bold flex items-center gap-2">

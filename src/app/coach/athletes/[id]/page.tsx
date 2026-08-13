@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, use } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import CoachPoseSessionsSection from '@/components/CoachPoseSessionsSection';
 import PotentialSection from '@/components/PotentialSection';
@@ -125,8 +126,13 @@ export default function CoachAthleteDetailPage({ params }: { params: Promise<{ i
         className="px-5 pb-6 max-w-3xl md:mx-auto md:px-8"
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 24px)' }}
       >
-        <button onClick={() => router.back()} className="font-overpass mb-4" style={{ color: '#AEABBB', fontSize: 13 }}>
-          ← К команде
+        <button
+          onClick={() => router.back()}
+          className="font-overpass mb-4 inline-flex items-center gap-2"
+          style={{ color: '#AEABBB', fontSize: 13 }}
+        >
+          <Image src="/icons/icon-action-back.svg" alt="" width={24} height={24} aria-hidden />
+          К команде
         </button>
 
         <div className="flex items-center gap-4">

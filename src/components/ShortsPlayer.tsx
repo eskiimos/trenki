@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Play, Heart, MessageCircle, Share2, Volume2, VolumeX } from 'lucide-react';
+import { Play, Heart, MessageCircle, Share2, Volume2, VolumeX } from 'lucide-react';
 import { isKinescopeUrl, getKinescopeDirectUrl } from '@/lib/videoQuality';
 
 interface ShortData {
@@ -355,7 +356,7 @@ export const ShortsPlayer: React.FC<ShortsPlayerProps> = ({
             className="w-10 h-10 flex items-center justify-center bg-black/30 rounded-full"
             aria-label="Назад"
           >
-            <ChevronLeft size={24} className="text-white" />
+            <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
           </button>
         </div>
       )}

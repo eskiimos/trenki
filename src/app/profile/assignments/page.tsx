@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 interface Assignment {
@@ -62,8 +63,13 @@ export default function MyAssignmentsPage() {
   return (
     <div className="min-h-screen bg-[#101530] text-white pb-16">
       <div className="px-5 py-6 max-w-3xl md:mx-auto md:px-8" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 24px)' }}>
-        <button onClick={() => router.back()} className="font-overpass mb-3" style={{ color: '#AEABBB', fontSize: 13 }}>
-          ← Назад
+        <button
+          onClick={() => router.back()}
+          className="font-overpass mb-3 inline-flex items-center gap-2"
+          style={{ color: '#AEABBB', fontSize: 13 }}
+        >
+          <Image src="/icons/icon-action-back.svg" alt="" width={24} height={24} aria-hidden />
+          Назад
         </button>
         <h1 className="font-overpass uppercase" style={{ fontWeight: 900, fontSize: 22 }}>
           Задания от тренера

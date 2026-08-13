@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ChevronLeft, Play } from 'lucide-react';
+import { Play } from 'lucide-react';
 import BottomNavigation from '@/components/BottomNavigation';
 
 // «12 400 → 12,4 тыс.» — компактный счётчик просмотров на тайле
@@ -124,7 +124,7 @@ export default function ShortsCatalogPage() {
         <div className="flex items-center gap-2">
           <Link href="/" className="inline-block" aria-label="Назад">
             <div className="w-10 h-10 flex items-center justify-center">
-              <ChevronLeft size={24} className="text-white" />
+              <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
             </div>
           </Link>
           <h1

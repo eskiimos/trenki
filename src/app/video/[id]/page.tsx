@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  Heart, ChevronLeft, Play, Pause, RotateCcw, RotateCw,
+  Heart, Play, Pause, RotateCcw, RotateCw,
   Volume2, VolumeX, Maximize, Minimize, Smartphone, CalendarPlus, Share2,
   Zap, WifiOff, Check, X, Loader2, Settings2,
 } from 'lucide-react';
@@ -1415,7 +1415,7 @@ export default function VideoPage({ params }: VideoPageProps) {
             className="text-white hover:text-gray-300 flex-shrink-0"
             aria-label="Назад"
           >
-            <ChevronLeft size={24} />
+            <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
           </button>
           <div className="flex-1 min-w-0">
             {/* В тренировке — маленький оверлайн над названием видео */}

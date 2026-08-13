@@ -7,8 +7,8 @@
 // приглушённые с амбер-прогрессом.
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
-import { ChevronLeft } from 'lucide-react';
 import BottomNavigation from '@/components/BottomNavigation';
 import { AchievementIcon } from '@/components/gamification/icons';
 import { SKILL_TREE } from '@/lib/achievements';
@@ -112,7 +112,7 @@ const AchievementsPage = () => {
         style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
       >
         <Link href="/profile" aria-label="Назад в профиль">
-          <ChevronLeft size={28} className="text-white" />
+          <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
         </Link>
         <h1 className="text-white text-xs font-bold font-overpass uppercase tracking-[0.5px]">
           Древо навыков{items ? ` (${unlockedCount}/${total})` : ''}
