@@ -2,29 +2,73 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import {
+  AdminPage,
+  PageHeader,
+  SectionTitle,
+  AdminCard,
+  AdminButton,
+  inputStyle,
+  labelStyle,
+} from '@/components/admin/ui';
+import {
+  Lock,
+  Unlock,
+  ShieldCheck,
+  CreditCard,
+  ReceiptText,
+  Gift,
+  Lightbulb,
+  Check,
+  AlertCircle,
+  Save,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 
 type Mode = 'off' | 'admins' | 'on';
 
-const OPTIONS: { value: Mode; title: string; desc: string; accent: string }[] = [
+const OPTIONS: { value: Mode; title: string; desc: string; icon: LucideIcon }[] = [
   {
     value: 'off',
     title: 'Выключен',
     desc: 'Paywall не работает. Все функции бесплатны для всех. Безопасное состояние.',
-    accent: '#AEABBB',
+    icon: Unlock,
   },
   {
     value: 'admins',
     title: 'Только админы (обкатка)',
     desc: 'Paywall видят и упираются в него ТОЛЬКО админы приложения (isAdmin). Живые пользователи ничего не замечают — можно тестировать в проде.',
-    accent: '#A1FF4A',
+    icon: ShieldCheck,
   },
   {
     value: 'on',
     title: 'Включён для всех',
     desc: 'Paywall активен для всех без премиума. Платные функции закрыты, показываются окна оформления подписки.',
-    accent: '#FF9F45',
+    icon: Lock,
   },
 ];
+
+/** Единая плашка результата сохранения (было 4 копии одинаковой вёрстки). */
+function StatusMsg({ msg }: { msg: { type: 'ok' | 'err'; text: string } | null }) {
+  if (!msg) return null;
+  const ok = msg.type === 'ok';
+  return (
+    <div
+      className="flex items-center gap-2"
+      aria-live="polite"
+      style={{
+        fontSize: 13,
+        fontWeight: 700,
+        marginTop: 12,
+        color: ok ? 'var(--color-brand)' : 'var(--color-danger)',
+      }}
+    >
+      {ok ? <Check size={16} aria-hidden /> : <AlertCircle size={16} aria-hidden />}
+      {msg.text}
+    </div>
+  );
+}
 
 // Админка: режим paywall (роллаут-контроль, читается сервером из app_settings).
 export default function PaywallAdminPage() {
@@ -68,7 +112,7 @@ export default function PaywallAdminPage() {
         setRcMsg({ type: 'err', text: d?.error || 'Ошибка сохранения' });
         return;
       }
-      setRcMsg({ type: 'ok', text: rcEnabled ? 'Чеки включены ✓' : 'Чеки выключены' });
+      setRcMsg({ type: 'ok', text: rcEnabled ? 'Чеки включены' : 'Чеки выключены' });
     } catch {
       setRcMsg({ type: 'err', text: 'Сетевая ошибка' });
     } finally {
@@ -103,7 +147,7 @@ export default function PaywallAdminPage() {
       }
       setFreeLesson(d.freeLesson ?? null);
       setPickedVideoId('');
-      setLessonMsg({ type: 'ok', text: d.freeLesson ? 'Занятие недели обновлено ✓' : 'Занятие недели снято' });
+      setLessonMsg({ type: 'ok', text: d.freeLesson ? 'Занятие недели обновлено' : 'Занятие недели снято' });
     } catch {
       setLessonMsg({ type: 'err', text: 'Сетевая ошибка' });
     } finally {
@@ -165,7 +209,7 @@ export default function PaywallAdminPage() {
         setDiscount(String(d.pricing.introDiscountPercent));
         setMonths(String(d.pricing.introMonths));
       }
-      setPriceMsg({ type: 'ok', text: 'Цены сохранены ✓' });
+      setPriceMsg({ type: 'ok', text: 'Цены сохранены' });
     } catch {
       setPriceMsg({ type: 'err', text: 'Сетевая ошибка' });
     } finally {
@@ -191,7 +235,7 @@ export default function PaywallAdminPage() {
         return;
       }
       setMode(d.mode);
-      setMsg({ type: 'ok', text: 'Сохранено ✓' });
+      setMsg({ type: 'ok', text: 'Сохранено' });
     } catch {
       setMode(prev);
       setMsg({ type: 'err', text: 'Сетевая ошибка' });
@@ -201,393 +245,288 @@ export default function PaywallAdminPage() {
   };
 
   return (
-    <div style={{ background: '#101530', minHeight: '100vh', color: '#F9F8FE' }}>
-      <div
-        className="max-w-2xl mx-auto px-5 pb-24"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)' }}
-      >
-        <Link href="/admin" style={{ color: '#AEABBB', fontSize: 13 }}>
-          ← В админку
-        </Link>
-        <h1 className="font-overpass uppercase" style={{ fontWeight: 900, fontSize: 24, marginTop: 8 }}>
-          🔒 Paywall (подписка)
-        </h1>
-        <p style={{ color: '#AEABBB', fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>
-          Режим показа платного доступа. Меняется на лету, без перезапуска. Премиум-пользователи
-          не упираются в paywall ни в каком режиме.
-        </p>
+    <AdminPage width="narrow">
+      <PageHeader
+        title="Paywall (подписка)"
+        icon={Lock}
+        backHref="/admin"
+        subtitle="Режим показа платного доступа. Меняется на лету, без перезапуска. Премиум-пользователи не упираются в paywall ни в каком режиме."
+      />
 
-        {loading ? (
-          <div style={{ color: '#AEABBB', fontSize: 14, marginTop: 30 }}>Загружаем…</div>
-        ) : (
-          <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {OPTIONS.map((opt) => {
-              const active = mode === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => !saving && !active && save(opt.value)}
-                  disabled={saving}
-                  style={{
-                    textAlign: 'left',
-                    background: active ? '#0B1030' : '#0B1030',
-                    border: `2px solid ${active ? opt.accent : '#26252F'}`,
-                    borderRadius: 16,
-                    padding: 18,
-                    cursor: saving ? 'not-allowed' : 'pointer',
-                    opacity: saving ? 0.7 : 1,
-                    transition: 'border-color 0.15s',
-                  }}
-                >
-                  <div className="flex items-center gap-3">
-                    <span
-                      style={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: 999,
-                        border: `2px solid ${active ? opt.accent : '#4A4857'}`,
-                        background: active ? opt.accent : 'transparent',
-                        flexShrink: 0,
-                        display: 'inline-block',
-                      }}
-                    />
-                    <span style={{ fontWeight: 800, fontSize: 15, color: active ? opt.accent : '#F9F8FE' }}>
-                      {opt.title}
-                    </span>
-                  </div>
-                  <div style={{ color: '#AEABBB', fontSize: 12.5, marginTop: 8, lineHeight: 1.45 }}>
-                    {opt.desc}
-                  </div>
-                </button>
-              );
-            })}
-
-            {msg && (
-              <div
-                style={{
-                  fontSize: 14,
-                  fontWeight: 700,
-                  marginTop: 4,
-                  color: msg.type === 'ok' ? '#A1FF4A' : '#FF6B6B',
-                }}
-              >
-                {msg.text}
-              </div>
-            )}
-
-            {/* Цены подписки */}
-            <section
+      {loading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="animate-pulse"
               style={{
-                marginTop: 20,
-                background: '#0B1030',
-                border: '1px solid #26252F',
-                borderRadius: 16,
-                padding: 18,
+                height: 96,
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-surface)',
+                border: '1px solid var(--border-hairline)',
               }}
-            >
-              <div style={{ color: '#F9F8FE', fontWeight: 800, fontSize: 15, marginBottom: 4 }}>
-                💳 Цены подписки
-              </div>
-              <div style={{ color: '#AEABBB', fontSize: 12.5, lineHeight: 1.45, marginBottom: 14 }}>
-                Отображаются в окне оформления. Годовой тариф пока не используется.
-              </div>
-              <div className="flex gap-4 flex-wrap">
-                {[
-                  { lbl: 'Цена ₽/мес', val: priceMonthly, set: setPriceMonthly, min: 1, max: 1000000 },
-                  { lbl: 'Скидка по промо, %', val: discount, set: setDiscount, min: 0, max: 100 },
-                  { lbl: 'Интро, мес', val: months, set: setMonths, min: 0, max: 36 },
-                ].map((f) => (
-                  <div key={f.lbl}>
-                    <div style={{ color: '#AEABBB', fontSize: 12, marginBottom: 4 }}>{f.lbl}</div>
-                    <input
-                      type="number"
-                      min={f.min}
-                      max={f.max}
-                      value={f.val}
-                      onChange={(e) => f.set(e.target.value)}
-                      style={{
-                        background: '#060919',
-                        border: '1px solid #26252F',
-                        borderRadius: 10,
-                        padding: '12px 14px',
-                        color: '#F9F8FE',
-                        fontSize: 16,
-                        outline: 'none',
-                        colorScheme: 'dark',
-                        width: 120,
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-              <div style={{ color: '#AEABBB', fontSize: 13, marginTop: 12 }}>
-                Со скидкой:{' '}
-                <b style={{ color: '#A1FF4A' }}>
-                  {Number.isFinite(introPreview) ? introPreview : '—'} ₽/мес
-                </b>{' '}
-                на первые {months} мес.
-              </div>
-              {priceMsg && (
-                <div
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 700,
-                    marginTop: 10,
-                    color: priceMsg.type === 'ok' ? '#A1FF4A' : '#FF6B6B',
-                  }}
-                >
-                  {priceMsg.text}
-                </div>
-              )}
+            />
+          ))}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {OPTIONS.map((opt) => {
+            const active = mode === opt.value;
+            const Icon = opt.icon;
+            return (
               <button
+                key={opt.value}
                 type="button"
-                onClick={savePricing}
-                disabled={savingPrice}
-                className="font-overpass uppercase transition-transform active:scale-95"
+                onClick={() => !saving && !active && save(opt.value)}
+                disabled={saving}
+                aria-pressed={active}
                 style={{
-                  marginTop: 14,
-                  background: '#A1FF4A',
-                  color: '#060919',
-                  border: 'none',
-                  borderRadius: 999,
-                  padding: '12px 22px',
-                  fontWeight: 900,
-                  fontSize: 13,
-                  cursor: savingPrice ? 'not-allowed' : 'pointer',
-                  opacity: savingPrice ? 0.6 : 1,
+                  textAlign: 'left',
+                  background: active ? 'rgba(161,255,74,0.08)' : 'var(--color-surface)',
+                  border: `1px solid ${active ? 'var(--border-lime)' : 'var(--border-hairline)'}`,
+                  borderRadius: 'var(--radius-md)',
+                  padding: 16,
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  opacity: saving ? 0.7 : 1,
+                  transition: 'border-color 0.15s, background 0.15s',
                 }}
               >
-                {savingPrice ? 'Сохраняю…' : 'Сохранить цены'}
-              </button>
-            </section>
-
-            {/* Чек 54-ФЗ */}
-            <section
-              style={{
-                marginTop: 16,
-                background: '#0B1030',
-                border: `1px solid ${rcEnabled ? 'rgba(161,255,74,0.4)' : '#26252F'}`,
-                borderRadius: 16,
-                padding: 18,
-              }}
-            >
-              <div style={{ color: '#F9F8FE', fontWeight: 800, fontSize: 15, marginBottom: 4 }}>
-                🧾 Чеки 54-ФЗ
-              </div>
-              <div style={{ color: '#AEABBB', fontSize: 12.5, lineHeight: 1.45, marginBottom: 14 }}>
-                Включай, только когда подключена облачная касса «Чеки от Т-Бизнеса» и бухгалтер
-                подтвердил систему налогообложения. Пока выключено — платежи идут без чека.
-              </div>
-
-              <label className="flex items-center gap-2 cursor-pointer" style={{ marginBottom: 14 }}>
-                <input
-                  type="checkbox"
-                  checked={rcEnabled}
-                  onChange={(e) => setRcEnabled(e.target.checked)}
-                  disabled={savingRc}
-                  style={{ width: 18, height: 18, cursor: 'pointer' }}
-                />
-                <span style={{ color: '#F9F8FE', fontSize: 14, fontWeight: 700 }}>
-                  Формировать чек при оплате
-                </span>
-              </label>
-
-              <div className="flex gap-4 flex-wrap">
-                <div>
-                  <div style={{ color: '#AEABBB', fontSize: 12, marginBottom: 4 }}>Налогообложение</div>
-                  <select
-                    value={rcTaxation}
-                    onChange={(e) => setRcTaxation(e.target.value)}
-                    disabled={savingRc}
+                <div className="flex items-center gap-3">
+                  <span
+                    className="inline-flex items-center justify-center shrink-0"
                     style={{
-                      background: '#060919', border: '1px solid #26252F', borderRadius: 10,
-                      padding: '10px 12px', color: '#F9F8FE', fontSize: 14, outline: 'none',
-                    }}
-                  >
-                    <option value="usn_income">УСН Доходы</option>
-                    <option value="usn_income_outcome">УСН Доходы−Расходы</option>
-                    <option value="osn">ОСН (общая)</option>
-                    <option value="patent">Патент</option>
-                    <option value="envd">ЕНВД</option>
-                    <option value="esn">ЕСХН</option>
-                  </select>
-                </div>
-                <div>
-                  <div style={{ color: '#AEABBB', fontSize: 12, marginBottom: 4 }}>Ставка НДС</div>
-                  <select
-                    value={rcVat}
-                    onChange={(e) => setRcVat(e.target.value)}
-                    disabled={savingRc}
-                    style={{
-                      background: '#060919', border: '1px solid #26252F', borderRadius: 10,
-                      padding: '10px 12px', color: '#F9F8FE', fontSize: 14, outline: 'none',
-                    }}
-                  >
-                    <option value="none">Без НДС (УСН)</option>
-                    <option value="vat0">0%</option>
-                    <option value="vat10">10%</option>
-                    <option value="vat20">20%</option>
-                    <option value="vat110">10/110</option>
-                    <option value="vat120">20/120</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ color: '#6E6B7B', fontSize: 11.5, marginTop: 10, lineHeight: 1.4 }}>
-                Чек уходит на email покупателя. Позиция: услуга, полный расчёт, сумма чека равна сумме платежа.
-              </div>
-
-              {rcMsg && (
-                <div style={{ fontSize: 14, fontWeight: 700, marginTop: 10, color: rcMsg.type === 'ok' ? '#A1FF4A' : '#FF6B6B' }}>
-                  {rcMsg.text}
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={saveReceipt}
-                disabled={savingRc}
-                className="font-overpass uppercase transition-transform active:scale-95"
-                style={{
-                  marginTop: 14, background: '#A1FF4A', color: '#060919', border: 'none',
-                  borderRadius: 999, padding: '12px 22px', fontWeight: 900, fontSize: 13,
-                  cursor: savingRc ? 'not-allowed' : 'pointer', opacity: savingRc ? 0.6 : 1,
-                }}
-              >
-                {savingRc ? 'Сохраняю…' : 'Сохранить настройки чека'}
-              </button>
-            </section>
-
-            {/* Бесплатное занятие недели */}
-            <section
-              style={{
-                marginTop: 16,
-                background: '#0B1030',
-                border: '1px solid #26252F',
-                borderRadius: 16,
-                padding: 18,
-              }}
-            >
-              <div style={{ color: '#F9F8FE', fontWeight: 800, fontSize: 15, marginBottom: 4 }}>
-                🎁 Бесплатное занятие недели
-              </div>
-              <div style={{ color: '#AEABBB', fontSize: 12.5, lineHeight: 1.45, marginBottom: 12 }}>
-                Это видео открыто всем даже при включённом paywall. Меняй раз в неделю.
-              </div>
-
-              <div
-                style={{
-                  padding: 12,
-                  borderRadius: 10,
-                  background: '#060919',
-                  border: '1px solid #26252F',
-                  marginBottom: 12,
-                }}
-              >
-                <div style={{ color: '#AEABBB', fontSize: 12 }}>Сейчас выбрано:</div>
-                <div style={{ color: freeLesson ? '#A1FF4A' : '#6E6B7B', fontSize: 14, fontWeight: 700, marginTop: 2 }}>
-                  {freeLesson ? freeLesson.title : '— не задано (все видео платные) —'}
-                </div>
-              </div>
-
-              <select
-                value={pickedVideoId}
-                onChange={(e) => setPickedVideoId(e.target.value)}
-                disabled={savingLesson}
-                style={{
-                  width: '100%',
-                  background: '#060919',
-                  border: '1px solid #26252F',
-                  borderRadius: 10,
-                  padding: '12px 14px',
-                  color: '#F9F8FE',
-                  fontSize: 14,
-                  outline: 'none',
-                }}
-              >
-                <option value="">— выбрать видео —</option>
-                {videos.map((v) => (
-                  <option key={v.id} value={v.id}>{v.title}</option>
-                ))}
-              </select>
-
-              {lessonMsg && (
-                <div
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 700,
-                    marginTop: 10,
-                    color: lessonMsg.type === 'ok' ? '#A1FF4A' : '#FF6B6B',
-                  }}
-                >
-                  {lessonMsg.text}
-                </div>
-              )}
-
-              <div className="flex gap-2 flex-wrap" style={{ marginTop: 14 }}>
-                <button
-                  type="button"
-                  onClick={() => pickedVideoId && saveFreeLesson(pickedVideoId)}
-                  disabled={savingLesson || !pickedVideoId}
-                  className="font-overpass uppercase transition-transform active:scale-95"
-                  style={{
-                    background: '#A1FF4A',
-                    color: '#060919',
-                    border: 'none',
-                    borderRadius: 999,
-                    padding: '12px 22px',
-                    fontWeight: 900,
-                    fontSize: 13,
-                    cursor: savingLesson || !pickedVideoId ? 'not-allowed' : 'pointer',
-                    opacity: savingLesson || !pickedVideoId ? 0.5 : 1,
-                  }}
-                >
-                  {savingLesson ? 'Сохраняю…' : 'Назначить'}
-                </button>
-                {freeLesson && (
-                  <button
-                    type="button"
-                    onClick={() => saveFreeLesson('')}
-                    disabled={savingLesson}
-                    className="font-overpass uppercase"
-                    style={{
-                      background: '#2d3448',
-                      color: '#AEABBB',
-                      border: 'none',
+                      width: 20,
+                      height: 20,
                       borderRadius: 999,
-                      padding: '12px 18px',
-                      fontWeight: 800,
-                      fontSize: 12,
-                      cursor: 'pointer',
+                      border: `2px solid ${active ? 'var(--color-brand)' : 'var(--color-muted)'}`,
+                      background: active ? 'var(--color-brand)' : 'transparent',
                     }}
                   >
-                    Снять
-                  </button>
-                )}
+                    {active && <Check size={12} strokeWidth={3} color="var(--color-night)" aria-hidden />}
+                  </span>
+                  <Icon
+                    size={20}
+                    style={{ color: active ? 'var(--color-brand)' : 'var(--color-muted)', flexShrink: 0 }}
+                    aria-hidden
+                  />
+                  <span
+                    style={{
+                      fontWeight: 800,
+                      fontSize: 14,
+                      color: active ? 'var(--color-brand)' : 'var(--color-ink)',
+                    }}
+                  >
+                    {opt.title}
+                  </span>
+                </div>
+                <div style={{ color: 'var(--color-muted)', fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
+                  {opt.desc}
+                </div>
+              </button>
+            );
+          })}
+
+          <StatusMsg msg={msg} />
+
+          {/* Цены подписки */}
+          <AdminCard style={{ marginTop: 12 }}>
+            <SectionTitle icon={CreditCard}>Цены подписки</SectionTitle>
+            <div style={{ color: 'var(--color-muted)', fontSize: 12, lineHeight: 1.5, marginBottom: 16 }}>
+              Отображаются в окне оформления. Годовой тариф пока не используется.
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { lbl: 'Цена ₽/мес', val: priceMonthly, set: setPriceMonthly, min: 1, max: 1000000 },
+                { lbl: 'Скидка по промо, %', val: discount, set: setDiscount, min: 0, max: 100 },
+                { lbl: 'Интро, мес', val: months, set: setMonths, min: 0, max: 36 },
+              ].map((f) => (
+                <div key={f.lbl}>
+                  <label style={labelStyle}>{f.lbl}</label>
+                  <input
+                    type="number"
+                    min={f.min}
+                    max={f.max}
+                    value={f.val}
+                    onChange={(e) => f.set(e.target.value)}
+                    style={{ ...inputStyle, colorScheme: 'dark' }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div style={{ color: 'var(--color-muted)', fontSize: 13, marginTop: 16 }}>
+              Со скидкой:{' '}
+              <b style={{ color: 'var(--color-brand)' }}>
+                {Number.isFinite(introPreview) ? introPreview : '—'} ₽/мес
+              </b>{' '}
+              на первые {months} мес.
+            </div>
+            <StatusMsg msg={priceMsg} />
+            <div style={{ marginTop: 16 }}>
+              <AdminButton type="button" icon={Save} onClick={savePricing} disabled={savingPrice}>
+                {savingPrice ? 'Сохраняю…' : 'Сохранить цены'}
+              </AdminButton>
+            </div>
+          </AdminCard>
+
+          {/* Чек 54-ФЗ */}
+          <AdminCard
+            style={{
+              border: `1px solid ${rcEnabled ? 'var(--border-lime)' : 'var(--border-hairline)'}`,
+            }}
+          >
+            <SectionTitle icon={ReceiptText}>Чеки 54-ФЗ</SectionTitle>
+            <div style={{ color: 'var(--color-muted)', fontSize: 12, lineHeight: 1.5, marginBottom: 16 }}>
+              Включай, только когда подключена облачная касса «Чеки от Т-Бизнеса» и бухгалтер
+              подтвердил систему налогообложения. Пока выключено — платежи идут без чека.
+            </div>
+
+            <label
+              className="flex items-center gap-3 cursor-pointer"
+              style={{ marginBottom: 16, minHeight: 44 }}
+            >
+              <input
+                type="checkbox"
+                checked={rcEnabled}
+                onChange={(e) => setRcEnabled(e.target.checked)}
+                disabled={savingRc}
+                style={{ width: 20, height: 20, accentColor: 'var(--color-brand)', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: 14, fontWeight: 700 }}>Формировать чек при оплате</span>
+            </label>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label style={labelStyle}>Налогообложение</label>
+                <select
+                  value={rcTaxation}
+                  onChange={(e) => setRcTaxation(e.target.value)}
+                  disabled={savingRc}
+                  style={{ ...inputStyle, colorScheme: 'dark' }}
+                >
+                  <option value="usn_income">УСН Доходы</option>
+                  <option value="usn_income_outcome">УСН Доходы−Расходы</option>
+                  <option value="osn">ОСН (общая)</option>
+                  <option value="patent">Патент</option>
+                  <option value="envd">ЕНВД</option>
+                  <option value="esn">ЕСХН</option>
+                </select>
               </div>
-            </section>
+              <div>
+                <label style={labelStyle}>Ставка НДС</label>
+                <select
+                  value={rcVat}
+                  onChange={(e) => setRcVat(e.target.value)}
+                  disabled={savingRc}
+                  style={{ ...inputStyle, colorScheme: 'dark' }}
+                >
+                  <option value="none">Без НДС (УСН)</option>
+                  <option value="vat0">0%</option>
+                  <option value="vat10">10%</option>
+                  <option value="vat20">20%</option>
+                  <option value="vat110">10/110</option>
+                  <option value="vat120">20/120</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ color: 'var(--color-muted)', fontSize: 12, marginTop: 12, lineHeight: 1.5 }}>
+              Чек уходит на email покупателя. Позиция: услуга, полный расчёт, сумма чека равна сумме платежа.
+            </div>
+
+            <StatusMsg msg={rcMsg} />
+
+            <div style={{ marginTop: 16 }}>
+              <AdminButton type="button" icon={Save} onClick={saveReceipt} disabled={savingRc}>
+                {savingRc ? 'Сохраняю…' : 'Сохранить настройки чека'}
+              </AdminButton>
+            </div>
+          </AdminCard>
+
+          {/* Бесплатное занятие недели */}
+          <AdminCard>
+            <SectionTitle icon={Gift}>Бесплатное занятие недели</SectionTitle>
+            <div style={{ color: 'var(--color-muted)', fontSize: 12, lineHeight: 1.5, marginBottom: 16 }}>
+              Это видео открыто всем даже при включённом paywall. Меняй раз в неделю.
+            </div>
 
             <div
               style={{
-                marginTop: 12,
-                padding: 14,
-                borderRadius: 12,
-                background: '#0B1030',
-                border: '1px solid #26252F',
-                color: '#AEABBB',
-                fontSize: 12.5,
-                lineHeight: 1.5,
+                padding: 12,
+                borderRadius: 'var(--radius-sm)',
+                background: 'var(--color-night)',
+                border: '1px solid var(--border-hairline)',
+                marginBottom: 16,
               }}
             >
-              💡 «Только админы» — для обкатки в проде: отметь нужные аккаунты как админов
-              (<Link href="/admin/admins" style={{ color: '#A1FF4A' }}>Администраторы</Link>) и
-              переключи сюда. Премиум им выдаётся вручную на странице{' '}
-              <Link href="/admin/users" style={{ color: '#A1FF4A' }}>Пользователи</Link>.
+              <div style={{ color: 'var(--color-muted)', fontSize: 12 }}>Сейчас выбрано:</div>
+              <div
+                style={{
+                  color: freeLesson ? 'var(--color-brand)' : 'var(--color-muted)',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  marginTop: 4,
+                }}
+              >
+                {freeLesson ? freeLesson.title : '— не задано (все видео платные) —'}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-    </div>
+
+            <label style={labelStyle}>Видео</label>
+            <select
+              value={pickedVideoId}
+              onChange={(e) => setPickedVideoId(e.target.value)}
+              disabled={savingLesson}
+              style={{ ...inputStyle, colorScheme: 'dark' }}
+            >
+              <option value="">— выбрать видео —</option>
+              {videos.map((v) => (
+                <option key={v.id} value={v.id}>{v.title}</option>
+              ))}
+            </select>
+
+            <StatusMsg msg={lessonMsg} />
+
+            <div className="flex gap-3 flex-wrap" style={{ marginTop: 16 }}>
+              <AdminButton
+                type="button"
+                icon={Save}
+                onClick={() => pickedVideoId && saveFreeLesson(pickedVideoId)}
+                disabled={savingLesson || !pickedVideoId}
+              >
+                {savingLesson ? 'Сохраняю…' : 'Назначить'}
+              </AdminButton>
+              {freeLesson && (
+                <AdminButton
+                  type="button"
+                  tone="secondary"
+                  icon={X}
+                  onClick={() => saveFreeLesson('')}
+                  disabled={savingLesson}
+                >
+                  Снять
+                </AdminButton>
+              )}
+            </div>
+          </AdminCard>
+
+          <AdminCard tone="accent">
+            <div className="flex items-start gap-3">
+              <span
+                className="flex items-center justify-center shrink-0"
+                style={{ width: 40, height: 40, borderRadius: 999, background: 'rgba(161,255,74,0.12)' }}
+              >
+                <Lightbulb size={20} style={{ color: 'var(--color-brand)' }} aria-hidden />
+              </span>
+              <div style={{ color: 'var(--color-muted)', fontSize: 12, lineHeight: 1.5 }}>
+                «Только админы» — для обкатки в проде: отметь нужные аккаунты как админов
+                (<Link href="/admin/admins" style={{ color: 'var(--color-brand)' }}>Администраторы</Link>) и
+                переключи сюда. Премиум им выдаётся вручную на странице{' '}
+                <Link href="/admin/users" style={{ color: 'var(--color-brand)' }}>Пользователи</Link>.
+              </div>
+            </div>
+          </AdminCard>
+        </div>
+      )}
+    </AdminPage>
   );
 }

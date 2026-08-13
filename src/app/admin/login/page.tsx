@@ -1,15 +1,21 @@
 'use client';
 
+// Единственная НЕавторизованная страница админки: сюда попадают по редиректу
+// из middleware/layout, поэтому ссылки «назад в админку» (PageHeader) здесь
+// быть не должно — только выход в приложение. Вёрстка — на токенах и
+// примитивах админки (см. /admin/ui-kit).
+
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { AdminPage, AdminCard, AdminButton, inputStyle, labelStyle } from '@/components/admin/ui';
+import { AlertCircle, ArrowLeft, Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
 
 export default function AdminLoginPage() {
-  const router = useRouter();
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,87 +49,168 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0e1a] to-[#1a1f3a] text-white flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Логотип/Заголовок */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">ТРЕНЬКИ</h1>
-          <p className="text-gray-400">Админ-панель</p>
-        </div>
-
-        {/* Карточка входа */}
-        <div className="bg-[#1a1f3a] rounded-2xl p-8 border border-white/10">
-          <h2 className="text-2xl font-bold mb-2 text-center">Вход в админку</h2>
-          <p className="text-gray-400 text-sm text-center mb-6">
-            Введите логин и пароль для доступа к админ-панели
-          </p>
-
-          {error && (
-            <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
-              <p className="text-red-200 text-sm">{error}</p>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Логин */}
-            <div>
-              <label htmlFor="login" className="block text-sm font-medium mb-2">
-                Логин
-              </label>
-              <input
-                id="login"
-                type="text"
-                value={login}
-                onChange={(e) => setLogin(e.target.value)}
-                placeholder="Введите логин"
-                disabled={isLoading}
-                className="w-full px-4 py-3 bg-[#0a0e1a] border border-white/20 rounded-lg focus:border-blue-500 focus:outline-none transition-colors disabled:opacity-50"
-                required
-              />
-            </div>
-
-            {/* Пароль */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium mb-2">
-                Пароль
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Введите пароль"
-                disabled={isLoading}
-                className="w-full px-4 py-3 bg-[#0a0e1a] border border-white/20 rounded-lg focus:border-blue-500 focus:outline-none transition-colors disabled:opacity-50"
-                required
-              />
-            </div>
-
-            {/* Кнопка входа */}
-            <button
-              type="submit"
-              disabled={isLoading || !login || !password}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors mt-6"
+    <AdminPage width="narrow">
+      <div
+        className="flex flex-col justify-center"
+        style={{ minHeight: 'calc(100vh - 64px)', paddingTop: 'var(--safe-top)' }}
+      >
+        <div style={{ width: '100%', maxWidth: 420, margin: '0 auto' }}>
+          {/* Бренд-блок */}
+          <div className="flex flex-col items-center text-center" style={{ marginBottom: 24 }}>
+            <span
+              className="flex items-center justify-center"
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 999,
+                background: 'rgba(161,255,74,0.12)',
+                marginBottom: 12,
+              }}
             >
-              {isLoading ? 'Вход...' : 'Войти'}
-            </button>
-          </form>
+              <ShieldCheck size={24} style={{ color: 'var(--color-brand)' }} aria-hidden />
+            </span>
+            <h1 style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.2, margin: 0 }}>ТРЕНЬКИ</h1>
+            <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '4px 0 0' }}>Админ-панель</p>
+          </div>
 
-          {/* Информация */}
-          <div className="mt-6 pt-6 border-t border-white/10">
-            <p className="text-xs text-gray-400 text-center">
-              Учетные данные админа находятся в переменной окружения <code className="bg-black/50 px-2 py-1 rounded">ADMIN_LOGIN</code> и <code className="bg-black/50 px-2 py-1 rounded">ADMIN_PASSWORD</code>
+          {/* Карточка входа */}
+          <AdminCard style={{ padding: 24 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, textAlign: 'center' }}>
+              Вход в админку
+            </h2>
+            <p
+              style={{
+                fontSize: 13,
+                color: 'var(--color-muted)',
+                textAlign: 'center',
+                margin: '4px 0 24px',
+              }}
+            >
+              Введите логин и пароль для доступа к админ-панели
             </p>
+
+            {error && (
+              <div
+                role="alert"
+                className="flex items-start gap-2"
+                style={{
+                  marginBottom: 16,
+                  padding: 12,
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'rgba(255,140,74,0.12)',
+                  border: '1px solid rgba(255,140,74,0.30)',
+                }}
+              >
+                <AlertCircle
+                  size={20}
+                  style={{ color: 'var(--color-danger)', flexShrink: 0 }}
+                  aria-hidden
+                />
+                <span style={{ fontSize: 13, color: 'var(--color-danger)' }}>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Логин */}
+              <div>
+                <label htmlFor="login" style={labelStyle}>
+                  Логин
+                </label>
+                <input
+                  id="login"
+                  type="text"
+                  autoComplete="username"
+                  autoFocus
+                  value={login}
+                  onChange={(e) => setLogin(e.target.value)}
+                  placeholder="Введите логин"
+                  disabled={isLoading}
+                  style={inputStyle}
+                  required
+                />
+              </div>
+
+              {/* Пароль */}
+              <div>
+                <label htmlFor="password" style={labelStyle}>
+                  Пароль
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Введите пароль"
+                    disabled={isLoading}
+                    style={{ ...inputStyle, paddingRight: 48 }}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                    className="absolute inline-flex items-center justify-center"
+                    style={{
+                      top: 0,
+                      right: 0,
+                      width: 44,
+                      height: 44,
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--color-muted)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {showPassword ? <EyeOff size={20} aria-hidden /> : <Eye size={20} aria-hidden />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Кнопка входа */}
+              <AdminButton
+                type="submit"
+                disabled={isLoading || !login || !password}
+                style={{ width: '100%', marginTop: 8 }}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 size={20} className="animate-spin" aria-hidden />
+                    Вход…
+                  </>
+                ) : (
+                  'Войти'
+                )}
+              </AdminButton>
+            </form>
+
+            <div
+              style={{
+                marginTop: 24,
+                paddingTop: 16,
+                borderTop: '1px solid var(--border-hairline)',
+              }}
+            >
+              <p style={{ fontSize: 12, color: 'var(--color-muted)', textAlign: 'center', margin: 0 }}>
+                Доступ выдаёт администратор системы
+              </p>
+            </div>
+          </AdminCard>
+
+          {/* Выход в приложение */}
+          <div className="text-center" style={{ marginTop: 24 }}>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 transition-opacity hover:opacity-70"
+              style={{ color: 'var(--color-brand)', fontSize: 13 }}
+            >
+              <ArrowLeft size={16} aria-hidden />
+              Вернуться на главную
+            </Link>
           </div>
         </div>
-
-        {/* Ссылка на главную */}
-        <div className="mt-6 text-center">
-          <Link href="/" className="inline-block text-blue-400 hover:text-blue-300 text-sm transition-colors">
-            ← Вернуться на главную
-          </Link>
-        </div>
       </div>
-    </div>
+    </AdminPage>
   );
 }

@@ -1,8 +1,17 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { ChevronLeft, Star } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { AlertTriangle, Eye, Flame, Gamepad2, RefreshCw, RotateCcw } from 'lucide-react';
+import {
+  AdminPage,
+  PageHeader,
+  SectionTitle,
+  AdminCard,
+  AdminButton,
+  inputStyle,
+  labelStyle,
+} from '@/components/admin/ui';
+import { StatusIcon } from '@/components/gamification/icons';
 import {
   computeXp,
   levelFromXp,
@@ -22,27 +31,86 @@ const cumulativeXp = (level: number): number => {
   return sum;
 };
 
+interface RealSummary {
+  xp: number;
+  level: number;
+  status: { key: string; title: string };
+  streak: number;
+}
+
+/** Числовое поле симулятора: подпись сверху, поле — на общих токенах админки. */
+function NumberField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <label style={{ display: 'block' }}>
+      <span style={labelStyle}>{label}</span>
+      <input
+        type="number"
+        min={0}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value) || 0)}
+        style={{ ...inputStyle, width: 120 }}
+      />
+    </label>
+  );
+}
+
 export default function AdminGamificationPage() {
   // Симулятор: вход — счётчики, как в реальном API
   const [workouts, setWorkouts] = useState(10);
   const [modules, setModules] = useState(40);
   const [streak, setStreak] = useState(3);
   // Реальные значения текущего админа
-  const [real, setReal] = useState<{ xp: number; level: number; status: { title: string; emoji: string }; streak: number } | null>(null);
+  const [real, setReal] = useState<RealSummary | null>(null);
+  // Раньше ошибка глушилась пустым catch → блок навсегда висел в «Загрузка…»
+  const [realState, setRealState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [flagsMsg, setFlagsMsg] = useState<string | null>(null);
   // Превью модалки эволюции (локальный стейт, НЕ localStorage-механика)
   const [previewStatus, setPreviewStatus] = useState<(typeof STATUSES)[number] | null>(null);
 
-  useEffect(() => {
+  const loadReal = useCallback(() => {
+    setRealState('loading');
     fetch('/api/gamification/summary')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d && setReal(d))
-      .catch(() => {});
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('summary'))))
+      .then((d) => {
+        setReal(d);
+        setRealState('ready');
+      })
+      .catch(() => setRealState('error'));
   }, []);
+
+  useEffect(() => {
+    loadReal();
+  }, [loadReal]);
+
+  // Модалка превью: Escape закрывает, фон не скроллится (фокус на кнопку —
+  // через autoFocus на «Дальше»).
+  useEffect(() => {
+    if (!previewStatus) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPreviewStatus(null);
+    };
+    document.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [previewStatus]);
 
   const xp = computeXp({ completedWorkouts: workouts, completedModules: modules });
   const info = levelFromXp(xp);
   const status = statusFromLevel(info.level);
+  // Защита от NaN (xpForNext = 0) и от выезда полоски за контейнер (>100%)
+  const progressPct = Math.min(100, Math.max(0, (info.xpIntoLevel / (info.xpForNext || 1)) * 100));
 
   // Сброс локальных «показано один раз» флагов — чтобы повторно затестить
   // модалку эволюции, предложение цикла и install-плашку на этом устройстве.
@@ -57,134 +125,234 @@ export default function AdminGamificationPage() {
     }
   };
 
-  const inputCls = 'w-24 bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#A1FF4A]';
-
   return (
-    <div className="min-h-screen bg-[#060919] text-white p-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 24px)' }}>
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-center gap-2 mb-6">
-          <Link href="/admin" aria-label="Назад"><ChevronLeft size={24} className="text-white" /></Link>
-          <h1 className="font-bold uppercase" style={{ fontFamily: 'Overpass', fontSize: 15, letterSpacing: 0.5 }}>
-            Геймификация — песочница
-          </h1>
-        </div>
+    <AdminPage width="narrow">
+      <PageHeader
+        title="Геймификация — песочница"
+        icon={Gamepad2}
+        subtitle="Прогон XP, уровней, званий и стрика без реальных тренировок"
+      />
 
-        {/* Мои реальные значения */}
-        <div className="bg-[#101530] rounded-2xl p-4 mb-6">
-          <div className="text-[#AEABBB] text-xs uppercase font-bold mb-2" style={{ fontFamily: 'Overpass' }}>Мои реальные значения (из API)</div>
-          {real ? (
-            <div className="text-sm">
-              {real.status.emoji} {real.status.title} · Уровень {real.level} · XP {real.xp} · 🔥 стрик {real.streak}
-            </div>
-          ) : (
-            <div className="text-[#AEABBB] text-sm">Загрузка…</div>
-          )}
-        </div>
-
-        {/* Симулятор */}
-        <div className="bg-[#101530] rounded-2xl p-4 mb-6">
-          <div className="text-[#AEABBB] text-xs uppercase font-bold mb-3" style={{ fontFamily: 'Overpass' }}>Симулятор</div>
-          <div className="flex flex-wrap gap-4 mb-4">
-            <label className="text-xs text-[#AEABBB]">Тренировок<br />
-              <input type="number" min={0} value={workouts} onChange={(e) => setWorkouts(Number(e.target.value) || 0)} className={inputCls} />
-            </label>
-            <label className="text-xs text-[#AEABBB]">Модулей<br />
-              <input type="number" min={0} value={modules} onChange={(e) => setModules(Number(e.target.value) || 0)} className={inputCls} />
-            </label>
-            <label className="text-xs text-[#AEABBB]">Стрик, дней<br />
-              <input type="number" min={0} value={streak} onChange={(e) => setStreak(Number(e.target.value) || 0)} className={inputCls} />
-            </label>
+      {/* ───────── Мои реальные значения ───────── */}
+      <AdminCard style={{ marginBottom: 24 }}>
+        <SectionTitle>Мои реальные значения (из API)</SectionTitle>
+        {realState === 'loading' && (
+          <div style={{ fontSize: 14, color: 'var(--color-muted)' }}>Загрузка…</div>
+        )}
+        {realState === 'error' && (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center gap-2" style={{ fontSize: 14, color: 'var(--color-danger)' }}>
+              <AlertTriangle size={20} aria-hidden />
+              Не удалось загрузить сводку
+            </span>
+            <AdminButton tone="secondary" size="sm" icon={RefreshCw} onClick={loadReal}>
+              Повторить
+            </AdminButton>
           </div>
+        )}
+        {realState === 'ready' && real && (
+          <div className="flex flex-wrap items-center gap-3" style={{ fontSize: 14 }}>
+            <span
+              className="inline-flex items-center gap-2"
+              style={{ color: 'var(--color-brand)', fontWeight: 700 }}
+            >
+              <StatusIcon statusKey={real.status.key} size={20} />
+              {real.status.title}
+            </span>
+            <span style={{ color: 'var(--color-muted)' }}>Уровень {real.level}</span>
+            <span style={{ color: 'var(--color-muted)' }}>XP {real.xp}</span>
+            <span className="inline-flex items-center gap-1" style={{ color: 'var(--color-danger)' }}>
+              <Flame size={16} aria-hidden />
+              стрик {real.streak}
+            </span>
+          </div>
+        )}
+      </AdminCard>
 
-          {/* Рендер «как в профиле» */}
-          <div className="bg-[#0B1030] border border-[#26252F] rounded-2xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="bg-[#A1FF4A]/15 text-[#A1FF4A] text-xs font-bold rounded-full px-3 py-1">
-                {status.emoji} {status.title}
+      {/* ───────── Симулятор ───────── */}
+      <AdminCard style={{ marginBottom: 24 }}>
+        <SectionTitle>Симулятор</SectionTitle>
+        <div className="flex flex-wrap gap-4" style={{ marginBottom: 16 }}>
+          <NumberField label="Тренировок" value={workouts} onChange={setWorkouts} />
+          <NumberField label="Модулей" value={modules} onChange={setModules} />
+          <NumberField label="Стрик, дней" value={streak} onChange={setStreak} />
+        </div>
+
+        {/* Рендер «как в профиле» */}
+        <div
+          style={{
+            background: 'var(--color-night)',
+            border: '1px solid var(--border-hairline)',
+            borderRadius: 'var(--radius-md)',
+            padding: 16,
+          }}
+        >
+          <div className="flex flex-wrap items-center gap-2" style={{ marginBottom: 8 }}>
+            <span
+              className="inline-flex items-center gap-2"
+              style={{
+                background: 'rgba(161,255,74,0.15)',
+                color: 'var(--color-brand)',
+                fontSize: 12,
+                fontWeight: 700,
+                borderRadius: 'var(--radius-pill)',
+                padding: '4px 12px',
+              }}
+            >
+              <StatusIcon statusKey={status.key} size={16} />
+              {status.title}
+            </span>
+            <span style={{ fontWeight: 700 }}>Уровень {info.level}</span>
+            {streak >= 2 && (
+              <span
+                className="inline-flex items-center gap-1"
+                style={{ fontSize: 12, color: 'var(--color-danger)' }}
+              >
+                <Flame size={16} aria-hidden />
+                {streak} дн.
               </span>
-              <span className="text-white font-bold">Уровень {info.level}</span>
-              {streak >= 2 && <span className="text-xs text-[#FF8C4A]">🔥 {streak} дн.</span>}
-            </div>
-            <div className="h-2 bg-white/10 rounded-full overflow-hidden mb-1">
-              <div className="h-full bg-[#A1FF4A]" style={{ width: `${(info.xpIntoLevel / info.xpForNext) * 100}%` }} />
-            </div>
-            <div className="text-[#AEABBB] text-xs">
-              XP: {info.xpIntoLevel}/{info.xpForNext} · всего {info.xpTotal}
-              {status.nextStatus && <> · следующее звание: {status.nextStatus.title} (ур. {status.nextStatus.minLevel})</>}
-            </div>
+            )}
+          </div>
+          <div
+            style={{
+              height: 8,
+              background: 'rgba(174,171,187,0.20)',
+              borderRadius: 'var(--radius-pill)',
+              overflow: 'hidden',
+              marginBottom: 4,
+            }}
+          >
+            <div style={{ height: '100%', width: `${progressPct}%`, background: 'var(--color-brand)' }} />
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+            XP: {info.xpIntoLevel}/{info.xpForNext} · всего {info.xpTotal}
+            {status.nextStatus && (
+              <> · следующее звание: {status.nextStatus.title} (ур. {status.nextStatus.minLevel})</>
+            )}
           </div>
         </div>
+      </AdminCard>
 
-        {/* Таблица званий */}
-        <div className="bg-[#101530] rounded-2xl p-4 mb-6">
-          <div className="text-[#AEABBB] text-xs uppercase font-bold mb-3" style={{ fontFamily: 'Overpass' }}>Звания и пороги</div>
-          <table className="w-full text-sm">
+      {/* ───────── Таблица званий ───────── */}
+      <AdminCard style={{ marginBottom: 24 }}>
+        <SectionTitle>Звания и пороги</SectionTitle>
+        {/* Скролл-контейнер: 5 колонок не влезают в телефон и рвали карточку */}
+        <div className="overflow-x-auto -mx-4 px-4">
+          <table style={{ width: '100%', fontSize: 14, borderCollapse: 'collapse', minWidth: 480 }}>
             <thead>
-              <tr className="text-[#AEABBB] text-left text-xs">
-                <th className="py-1">Звание</th><th>С уровня</th><th>Нужно XP всего</th><th>≈ тренировок*</th><th></th>
+              <tr style={{ color: 'var(--color-muted)', fontSize: 12, textAlign: 'left' }}>
+                <th style={{ padding: '4px 8px 4px 0', fontWeight: 700 }}>Звание</th>
+                <th style={{ padding: '4px 8px', fontWeight: 700 }}>С уровня</th>
+                <th style={{ padding: '4px 8px', fontWeight: 700 }}>Нужно XP всего</th>
+                <th style={{ padding: '4px 8px', fontWeight: 700 }}>≈ тренировок*</th>
+                <th style={{ padding: '4px 0 4px 8px' }}>
+                  <span className="sr-only">Действия</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               {STATUSES.map((s) => {
                 const needXp = cumulativeXp(s.minLevel);
                 return (
-                  <tr key={s.key} className="border-t border-white/10">
-                    <td className="py-2">{s.emoji} {s.title}</td>
-                    <td>{s.minLevel}</td>
-                    <td>{needXp}</td>
-                    <td>{Math.ceil(needXp / 180)}</td>
-                    <td>
-                      <button
-                        type="button"
+                  <tr key={s.key} style={{ borderTop: '1px solid var(--border-hairline)' }}>
+                    <td style={{ padding: '8px 8px 8px 0', whiteSpace: 'nowrap' }}>
+                      <span className="inline-flex items-center gap-2">
+                        <StatusIcon statusKey={s.key} size={20} />
+                        {s.title}
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px' }}>{s.minLevel}</td>
+                    <td style={{ padding: '8px' }}>{needXp}</td>
+                    <td style={{ padding: '8px' }}>{Math.ceil(needXp / 180)}</td>
+                    <td style={{ padding: '8px 0 8px 8px' }}>
+                      <AdminButton
+                        tone="secondary"
+                        size="sm"
+                        icon={Eye}
                         onClick={() => setPreviewStatus(s)}
-                        className="text-xs bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-2 py-1 hover:border-[#A1FF4A]"
+                        aria-label={`Показать модалку эволюции: ${s.title}`}
                       >
                         модалка
-                      </button>
+                      </AdminButton>
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-          <div className="text-[#6E6B7B] text-xs mt-2">* при тренировке из 4 модулей (100 + 4×20 = 180 XP)</div>
         </div>
-
-        {/* Сброс локальных флагов */}
-        <div className="bg-[#101530] rounded-2xl p-4">
-          <div className="text-[#AEABBB] text-xs uppercase font-bold mb-2" style={{ fontFamily: 'Overpass' }}>Повторный тест на этом устройстве</div>
-          <button
-            type="button"
-            onClick={resetLocalFlags}
-            className="bg-[#A1FF4A] text-[#060919] font-bold text-sm rounded-lg px-4 py-2"
-          >
-            Сбросить локальные флаги
-          </button>
-          {flagsMsg && <div className="text-[#A1FF4A] text-xs mt-2">{flagsMsg}</div>}
-          <div className="text-[#6E6B7B] text-xs mt-2">
-            Сбрасывает «уже показано»: модалка эволюции (профиль), предложение собрать цикл, плашка «на экран домой».
-          </div>
+        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 8 }}>
+          * при тренировке из 4 модулей (100 + 4×20 = 180 XP)
         </div>
+      </AdminCard>
 
-        {/* Превью модалки эволюции — копия вёрстки EvolutionModal, без localStorage */}
-        {previewStatus && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-            <div className="absolute inset-0 bg-black/60" onClick={() => setPreviewStatus(null)} />
-            <div className="relative w-full max-w-sm rounded-2xl bg-[#0B1030] border border-[rgba(161,255,74,0.35)] p-6 text-center animate-popIn">
-              <div style={{ fontSize: 56 }}>{previewStatus.emoji}</div>
-              <div className="text-white text-xl font-bold mt-2">Эволюция!</div>
-              <div className="text-white/80 text-sm mt-1">Ты теперь <span className="text-[#A1FF4A] font-semibold">{previewStatus.title}</span></div>
-              <button
-                type="button"
-                onClick={() => setPreviewStatus(null)}
-                className="mt-4 w-full rounded-lg bg-[#A1FF4A] px-3 py-2.5 text-sm font-semibold text-[#0B0F2A]"
-              >
-                Дальше
-              </button>
-            </div>
-          </div>
+      {/* ───────── Сброс локальных флагов ───────── */}
+      <AdminCard>
+        <SectionTitle>Повторный тест на этом устройстве</SectionTitle>
+        <AdminButton icon={RotateCcw} onClick={resetLocalFlags}>
+          Сбросить локальные флаги
+        </AdminButton>
+        {flagsMsg && (
+          <div style={{ fontSize: 12, color: 'var(--color-brand)', marginTop: 8 }}>{flagsMsg}</div>
         )}
-      </div>
-    </div>
+        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 8 }}>
+          Сбрасывает «уже показано»: модалка эволюции (профиль), предложение собрать цикл, плашка «на
+          экран домой».
+        </div>
+      </AdminCard>
+
+      {/* ───────── Превью модалки эволюции (копия вёрстки EvolutionModal) ───────── */}
+      {previewStatus && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Превью эволюции: ${previewStatus.title}`}
+        >
+          <div
+            className="absolute inset-0"
+            style={{ background: 'var(--scrim)' }}
+            onClick={() => setPreviewStatus(null)}
+          />
+          <div
+            className="relative w-full max-w-sm text-center animate-popIn"
+            style={{
+              background: 'var(--color-elevated)',
+              border: '1px solid var(--border-lime)',
+              borderRadius: 'var(--radius-xl)',
+              padding: 24,
+            }}
+          >
+            {/* Декоративный тайл 64 с глифом 28 — как в UI-ките */}
+            <div className="flex justify-center">
+              <span
+                className="flex items-center justify-center"
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 999,
+                  background: 'rgba(161,255,74,0.12)',
+                  color: 'var(--color-brand)',
+                }}
+              >
+                <StatusIcon statusKey={previewStatus.key} size={28} />
+              </span>
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 800, marginTop: 12 }}>Эволюция!</div>
+            <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>
+              Ты теперь{' '}
+              <span style={{ color: 'var(--color-brand)', fontWeight: 700 }}>{previewStatus.title}</span>
+            </div>
+            <AdminButton
+              autoFocus
+              onClick={() => setPreviewStatus(null)}
+              style={{ width: '100%', marginTop: 24 }}
+            >
+              Дальше
+            </AdminButton>
+          </div>
+        </div>
+      )}
+    </AdminPage>
   );
 }

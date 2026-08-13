@@ -12,6 +12,22 @@ import { hasAdminAccessRSC } from '@/lib/admin-session';
  * /api/user/is-admin с telegramId в query — это уже не работает для email-
  * юзеров и было уязвимо к timing/race conditions.
  */
+
+/**
+ * Оболочка админки. Класс .admin-layout нужен только для снятия мобильных
+ * ограничений ширины (globals.css), а фон переопределяем токеном страницы:
+ * в .admin-layout зашит #101530 — это токен КАРТОЧЕК (--color-surface), фон
+ * страниц по дизайн-системе — --color-night. Страницы поверх всё равно красят
+ * себя сами через <AdminPage>, так что оболочка не должна спорить с ними.
+ */
+function AdminShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="admin-layout" style={{ background: 'var(--color-night)' }}>
+      {children}
+    </div>
+  );
+}
+
 export default async function AdminLayout({
   children,
 }: {
@@ -23,7 +39,7 @@ export default async function AdminLayout({
   const pathname = headerStore.get('x-pathname') ?? '';
 
   if (pathname.startsWith('/admin/login')) {
-    return <div className="admin-layout">{children}</div>;
+    return <AdminShell>{children}</AdminShell>;
   }
 
   const isAdmin = await hasAdminAccessRSC();
@@ -31,5 +47,5 @@ export default async function AdminLayout({
     redirect('/admin/login');
   }
 
-  return <div className="admin-layout">{children}</div>;
+  return <AdminShell>{children}</AdminShell>;
 }

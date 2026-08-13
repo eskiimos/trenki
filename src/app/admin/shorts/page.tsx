@@ -1,8 +1,32 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import Image from 'next/image';
+import {
+  AdminPage,
+  PageHeader,
+  SectionTitle,
+  AdminCard,
+  AdminButton,
+  EmptyState,
+  inputStyle,
+  labelStyle,
+} from '@/components/admin/ui';
+import {
+  Zap,
+  Plus,
+  Save,
+  X,
+  Pencil,
+  Trash2,
+  Pin,
+  PinOff,
+  RefreshCw,
+  Upload,
+  Film,
+  List,
+  Loader2,
+} from 'lucide-react';
 
 interface Short {
   id: string;
@@ -309,63 +333,58 @@ export default function AdminShortsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#101530] text-white p-6" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 24px)' }}>
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-8">
-          <h1 className="text-3xl font-bold">Управление тренями</h1>
-          <div className="flex flex-col w-full sm:w-auto gap-2">
-            {!showForm && (
-              <button
-                onClick={() => setShowForm(true)}
-                className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 w-full sm:w-auto"
-              >
-                + Добавить тренью
-              </button>
-            )}
-            <Link href="/admin" className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600 text-center">
-              ← Назад в админку
-            </Link>
-          </div>
-        </div>
+    <AdminPage>
+      <PageHeader
+        title="Треньки"
+        icon={Zap}
+        backHref="/admin"
+        actions={
+          !showForm ? (
+            <AdminButton icon={Plus} onClick={() => setShowForm(true)}>
+              Добавить тренью
+            </AdminButton>
+          ) : undefined
+        }
+      />
 
-        {/* Форма добавления/редактирования */}
-        {showForm && (
-          <div className="bg-[#1a1f3a] rounded-lg p-6 mb-8 border border-white/5">
-          <h2 className="text-xl font-semibold mb-4">
+      {/* Форма добавления/редактирования */}
+      {showForm && (
+        <AdminCard style={{ marginBottom: 24 }}>
+          <SectionTitle icon={Zap}>
             {editingShortId ? 'Редактировать тренью' : 'Добавить новую тренью'}
-          </h2>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
+          </SectionTitle>
+
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Название */}
             <div>
-              <label className="block text-sm font-medium mb-2">Название *</label>
+              <label style={labelStyle}>Название *</label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-4 py-2 bg-[#2d3448] border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={inputStyle}
                 required
               />
             </div>
 
             {/* Описание */}
             <div>
-              <label className="block text-sm font-medium mb-2">Описание</label>
+              <label style={labelStyle}>Описание</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-4 py-2 bg-[#2d3448] border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={{ ...inputStyle, minHeight: 88, resize: 'vertical' }}
                 rows={3}
               />
             </div>
 
             {/* Тренер */}
             <div>
-              <label className="block text-sm font-medium mb-2">Тренер</label>
+              <label style={labelStyle}>Тренер</label>
               <select
                 value={trainerId}
                 onChange={(e) => setTrainerId(e.target.value)}
-                className="w-full px-4 py-2 bg-[#2d3448] border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={{ ...inputStyle, colorScheme: 'dark' }}
               >
                 <option value="">Не выбран</option>
                 {trainers.map((trainer) => (
@@ -378,51 +397,65 @@ export default function AdminShortsPage() {
 
             {/* Аудитория */}
             <div>
-              <label className="block text-sm font-medium mb-2">Аудитория</label>
+              <label style={labelStyle}>Аудитория</label>
               <select
                 value={audience}
                 onChange={(e) => setAudience(e.target.value)}
-                className="w-full px-4 py-2 bg-[#2d3448] border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={{ ...inputStyle, colorScheme: 'dark' }}
               >
-                <option value="HOCKEY">🏒 Хоккей (trenki.app)</option>
-                <option value="ADAPTIVE">♿ Адаптивный (adaptive.trenki.app)</option>
-                <option value="ALL">🌐 Все платформы</option>
+                <option value="HOCKEY">Хоккей (trenki.app)</option>
+                <option value="ADAPTIVE">Адаптивный (adaptive.trenki.app)</option>
+                <option value="ALL">Все платформы</option>
               </select>
             </div>
 
             {/* URL видео */}
             <div>
-              <label className="block text-sm font-medium mb-2">URL видео *</label>
-              <div className="flex gap-2">
+              <label style={labelStyle}>URL видео *</label>
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
                   value={videoUrl}
                   onChange={(e) => setVideoUrl(e.target.value)}
-                  className="flex-1 px-4 py-2 bg-[#2d3448] border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ ...inputStyle, flex: 1 }}
                   placeholder="ID или ссылка на видео"
                   required
                 />
-                <button
+                <AdminButton
                   type="button"
+                  tone="secondary"
+                  icon={RefreshCw}
                   onClick={handleFetchKinescopeMetadata}
-                  className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
+                  style={{ flexShrink: 0 }}
                 >
-                  🔄 Получить данные
-                </button>
+                  Получить данные
+                </AdminButton>
               </div>
 
-              {/* Загрузка файла напрямую на Kinescope */}
-              <div className="flex items-center gap-3 mt-3">
-                <div className="flex-1 h-px bg-gray-600"></div>
-                <span className="text-xs text-gray-400">или загрузить файл</span>
-                <div className="flex-1 h-px bg-gray-600"></div>
+              {/* Загрузка файла напрямую в S3 */}
+              <div className="flex items-center gap-3" style={{ marginTop: 16 }}>
+                <div style={{ flex: 1, height: 1, background: 'var(--border-hairline)' }} />
+                <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>или загрузить файл</span>
+                <div style={{ flex: 1, height: 1, background: 'var(--border-hairline)' }} />
               </div>
-              <div className="mt-2">
+              <div style={{ marginTop: 12 }}>
                 <label
                   htmlFor="shortsVideoFileUpload"
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${uploadProgress !== null ? 'bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                  className="inline-flex items-center justify-center gap-2 transition-opacity hover:opacity-85"
+                  style={{
+                    minHeight: 44,
+                    padding: '10px 20px',
+                    borderRadius: 'var(--radius-pill)',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    background: 'var(--color-brand)',
+                    color: 'var(--color-night)',
+                    cursor: uploadProgress !== null ? 'not-allowed' : 'pointer',
+                    opacity: uploadProgress !== null ? 0.6 : 1,
+                  }}
                 >
-                  📁 Загрузить видеофайл
+                  <Upload size={20} aria-hidden />
+                  Загрузить видеофайл
                 </label>
                 <input
                   id="shortsVideoFileUpload"
@@ -433,12 +466,32 @@ export default function AdminShortsPage() {
                   className="hidden"
                 />
                 {uploadProgress !== null && (
-                  <div className="mt-2">
-                    <div className="text-sm text-gray-400 mb-1">Загрузка: {uploadProgress}%</div>
-                    <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 8 }}>
+                      Загрузка: {uploadProgress}%
+                    </div>
+                    <div
+                      role="progressbar"
+                      aria-valuenow={uploadProgress}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label="Загрузка видеофайла"
+                      style={{
+                        width: '100%',
+                        height: 8,
+                        borderRadius: 'var(--radius-pill)',
+                        background: 'rgba(255,255,255,0.08)',
+                        overflow: 'hidden',
+                      }}
+                    >
                       <div
-                        className="bg-green-500 h-2 rounded-full transition-all"
-                        style={{ width: `${uploadProgress}%` }}
+                        className="transition-all"
+                        style={{
+                          width: `${uploadProgress}%`,
+                          height: '100%',
+                          borderRadius: 'var(--radius-pill)',
+                          background: 'var(--color-brand)',
+                        }}
                       />
                     </div>
                   </div>
@@ -448,177 +501,251 @@ export default function AdminShortsPage() {
 
             {/* Превью */}
             <div>
-              <label className="block text-sm font-medium mb-2">Превью (URL или загрузить файл)</label>
-              <div className="space-y-2">
+              <label style={labelStyle}>Превью (URL или загрузить файл)</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <input
                   type="text"
                   value={thumbnail}
                   onChange={(e) => setThumbnail(e.target.value)}
-                  className="w-full px-4 py-2 bg-[#2d3448] border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={inputStyle}
                   placeholder="https://..."
                 />
                 <input
                   type="file"
                   accept="image/*"
                   onChange={handleFileUpload}
-                  className="w-full px-4 py-2 bg-[#2d3448] border border-gray-600 rounded"
+                  style={{ ...inputStyle, padding: '8px 12px' }}
+                  className="file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:cursor-pointer file:font-bold file:text-[13px] file:bg-brand file:text-night"
                 />
                 {thumbnail && (
-                  <Image src={thumbnail} alt="Preview" width={200} height={356} className="rounded mt-2" />
+                  <Image
+                    src={thumbnail}
+                    alt="Preview"
+                    width={180}
+                    height={320}
+                    style={{ borderRadius: 'var(--radius-md)' }}
+                  />
                 )}
               </div>
             </div>
 
             {/* Теги */}
             <div>
-              <label className="block text-sm font-medium mb-2">Теги (через запятую)</label>
+              <label style={labelStyle}>Теги (через запятую)</label>
               <input
                 type="text"
                 value={tagsInput}
                 onChange={(e) => setTagsInput(e.target.value)}
                 onBlur={() => setTags(parseTags(tagsInput))}
-                className="w-full px-4 py-2 bg-[#2d3448] border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={inputStyle}
                 placeholder="дриблинг, катание, тренировка"
               />
             </div>
 
             {/* Порядок отображения */}
             <div>
-              <label className="block text-sm font-medium mb-2">Порядок отображения</label>
+              <label style={labelStyle}>Порядок отображения</label>
               <input
                 type="number"
                 value={order}
                 onChange={(e) => setOrder(Number(e.target.value))}
-                className="w-full px-4 py-2 bg-[#2d3448] border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={{ ...inputStyle, colorScheme: 'dark' }}
               />
             </div>
 
             {/* Опубликовано */}
-            <div className="flex items-center gap-2">
+            <label
+              htmlFor="isPublished"
+              className="flex items-center gap-3 cursor-pointer"
+              style={{ minHeight: 44 }}
+            >
               <input
                 type="checkbox"
                 id="isPublished"
                 checked={isPublished}
                 onChange={(e) => setIsPublished(e.target.checked)}
-                className="w-4 h-4"
+                style={{ width: 20, height: 20, accentColor: 'var(--color-brand)', cursor: 'pointer' }}
               />
-              <label htmlFor="isPublished" className="text-sm font-medium">Опубликовано</label>
-            </div>
+              <span style={{ fontSize: 14, fontWeight: 700 }}>Опубликовано</span>
+            </label>
 
             {/* Кнопки */}
-            <div className="flex gap-4">
-              <button
-                type="submit"
-                className="px-6 py-2 bg-green-600 rounded hover:bg-green-700"
-              >
+            <div className="flex flex-wrap gap-3">
+              <AdminButton type="submit" icon={Save}>
                 {editingShortId ? 'Обновить' : 'Добавить'}
-              </button>
+              </AdminButton>
               {editingShortId && (
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="px-6 py-2 bg-gray-600 rounded hover:bg-gray-700"
-                >
+                <AdminButton type="button" tone="secondary" icon={X} onClick={resetForm}>
                   Отменить
-                </button>
+                </AdminButton>
               )}
             </div>
           </form>
-        </div>
-        )}
+        </AdminCard>
+      )}
 
-        {/* Список shorts */}
-        <div className="bg-[#1a1f3a] rounded-lg p-6 border border-white/5">
-          <h2 className="text-xl font-semibold mb-4">Список тренек ({shorts.length})</h2>
-          
-          {isLoading ? (
-            <div className="text-center py-8">Загрузка...</div>
-          ) : shorts.length === 0 ? (
-            <div className="text-center py-8 text-gray-400">Shorts пока нет</div>
-          ) : (
-            <div className="space-y-2">
-              {shorts.map((short) => (
-                <div key={short.id} className="bg-[#2d3448] rounded-lg p-2 sm:p-3">
-                  {/* Структура: превью слева, контент справа */}
-                  <div className="flex gap-3 items-stretch">
-                    {/* Миниатюра */}
-                    <div className="w-16 h-24 sm:w-20 sm:h-28 flex-shrink-0 rounded overflow-hidden bg-black relative">
-                      {short.thumbnail ? (
-                        <Image 
-                          src={short.thumbnail} 
-                          alt={short.title} 
-                          fill
-                          className="object-cover"
-                        />
-                      ) : (
-                        <video 
-                          src={short.videoUrl}
-                          className="w-full h-full object-cover"
-                          muted
-                          playsInline
-                        />
+      {/* Список тренек */}
+      <AdminCard>
+        <SectionTitle icon={List}>Список тренек ({shorts.length})</SectionTitle>
+
+        {isLoading ? (
+          <EmptyState icon={Loader2} title="Загрузка…" />
+        ) : shorts.length === 0 ? (
+          <EmptyState
+            icon={Zap}
+            title="Тренек пока нет"
+            hint="Нажми «Добавить тренью» в шапке страницы"
+          />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {shorts.map((short) => (
+              <div
+                key={short.id}
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid var(--border-hairline)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: 12,
+                }}
+              >
+                {/* Структура: превью слева, контент справа */}
+                <div className="flex gap-3 items-stretch">
+                  {/* Миниатюра 9:16 */}
+                  <div
+                    className="shrink-0 overflow-hidden relative flex items-center justify-center"
+                    style={{
+                      width: 64,
+                      height: 114,
+                      borderRadius: 'var(--radius-sm)',
+                      background: 'var(--color-night)',
+                    }}
+                  >
+                    {short.thumbnail ? (
+                      <Image
+                        src={short.thumbnail}
+                        alt={short.title}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : short.videoUrl ? (
+                      <video
+                        src={short.videoUrl}
+                        className="w-full h-full object-cover"
+                        preload="metadata"
+                        muted
+                        playsInline
+                      />
+                    ) : (
+                      <Film size={20} style={{ color: 'var(--color-muted)' }} aria-hidden />
+                    )}
+                  </div>
+
+                  {/* Информация */}
+                  <div className="flex-1 min-w-0 w-full flex flex-col justify-between">
+                    {/* Заголовок + статус */}
+                    <div className="flex items-start justify-between gap-2">
+                      <h3
+                        className="flex-1 min-w-0 truncate"
+                        style={{ fontSize: 14, fontWeight: 700 }}
+                      >
+                        {short.title}
+                      </h3>
+                      {short.isPinned && (
+                        <span
+                          className="inline-flex items-center gap-1 shrink-0"
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 800,
+                            padding: '4px 8px',
+                            borderRadius: 'var(--radius-pill)',
+                            background: 'var(--color-brand)',
+                            color: 'var(--color-night)',
+                          }}
+                          title="Закреплён первым в ленте"
+                        >
+                          <Pin size={16} aria-hidden />
+                          Закреплён
+                        </span>
                       )}
+                      <span
+                        className="shrink-0"
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 800,
+                          padding: '4px 8px',
+                          borderRadius: 'var(--radius-pill)',
+                          background: short.isPublished
+                            ? 'rgba(161,255,74,0.15)'
+                            : 'rgba(255,255,255,0.08)',
+                          color: short.isPublished ? 'var(--color-brand)' : 'var(--color-muted)',
+                        }}
+                      >
+                        {short.isPublished ? 'Опубликован' : 'Черновик'}
+                      </span>
                     </div>
 
-                    {/* Информация */}
-                    <div className="flex-1 min-w-0 w-full flex flex-col justify-between">
-                      {/* Заголовок + статус */}
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-semibold text-sm sm:text-base flex-1 min-w-0 truncate">{short.title}</h3>
-                        {short.isPinned && (
-                          <span className="px-1.5 py-0.5 rounded text-xs flex-shrink-0 bg-yellow-600" title="Закреплён первым в ленте">
-                            📌
-                          </span>
-                        )}
-                        <span className={`px-1.5 py-0.5 rounded text-xs flex-shrink-0 ${short.isPublished ? 'bg-green-600' : 'bg-gray-600'}`}>
-                          {short.isPublished ? 'Опубл.' : 'Черн.'}
+                    {/* Описание */}
+                    {short.description && (
+                      <p
+                        className="line-clamp-1"
+                        style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 4 }}
+                      >
+                        {short.description}
+                      </p>
+                    )}
+
+                    {/* Мета */}
+                    <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 4 }}>
+                      Автор: {getTrainerName(short.trainerId)}
+                    </div>
+                    {short.tags.length > 0 && (
+                      <div
+                        className="hidden sm:block truncate"
+                        style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 4 }}
+                      >
+                        Теги: {short.tags.join(', ')}
+                      </div>
+                    )}
+
+                    {/* Кнопки */}
+                    <div className="flex flex-wrap gap-2" style={{ marginTop: 12 }}>
+                      <AdminButton
+                        size="sm"
+                        tone="secondary"
+                        icon={Pencil}
+                        onClick={() => handleEditShort(short)}
+                        aria-label="Редактировать тренью"
+                      >
+                        <span className="hidden sm:inline">Редактировать</span>
+                      </AdminButton>
+                      <AdminButton
+                        size="sm"
+                        tone={short.isPinned ? 'primary' : 'secondary'}
+                        icon={short.isPinned ? PinOff : Pin}
+                        onClick={() => handleTogglePin(short)}
+                        aria-label={short.isPinned ? 'Открепить тренью' : 'Закрепить тренью'}
+                      >
+                        <span className="hidden sm:inline">
+                          {short.isPinned ? 'Открепить' : 'Закрепить'}
                         </span>
-                      </div>
-
-                      {/* Описание */}
-                      {short.description && (
-                        <p className="text-xs text-gray-400 mt-1 line-clamp-1">{short.description}</p>
-                      )}
-
-                      {/* Мета */}
-                      <div className="text-xs text-gray-500 mt-1">
-                        Автор: {getTrainerName(short.trainerId)}
-                      </div>
-                      {short.tags.length > 0 && (
-                        <div className="text-xs text-gray-500 mt-1 hidden sm:block">
-                          Теги: {short.tags.join(', ')}
-                        </div>
-                      )}
-
-                      {/* Кнопки */}
-                      <div className="flex gap-1.5 w-full mt-2">
-                        <button
-                          onClick={() => handleEditShort(short)}
-                          className="flex-1 sm:flex-none px-2 sm:px-3 py-1 bg-blue-600 rounded hover:bg-blue-700 text-xs"
-                        >
-                          Редактировать
-                        </button>
-                        <button
-                          onClick={() => handleTogglePin(short)}
-                          className={`flex-1 sm:flex-none px-2 sm:px-3 py-1 rounded text-xs ${short.isPinned ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-gray-600 hover:bg-gray-500'}`}
-                        >
-                          {short.isPinned ? '📌 Открепить' : '📌 Закрепить'}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteShort(short.id)}
-                          className="flex-1 sm:flex-none px-2 sm:px-3 py-1 bg-red-600 rounded hover:bg-red-700 text-xs"
-                        >
-                          Удалить
-                        </button>
-                      </div>
+                      </AdminButton>
+                      <AdminButton
+                        size="sm"
+                        tone="danger"
+                        icon={Trash2}
+                        onClick={() => handleDeleteShort(short.id)}
+                        aria-label="Удалить тренью"
+                      >
+                        <span className="hidden sm:inline">Удалить</span>
+                      </AdminButton>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </AdminCard>
+    </AdminPage>
   );
 }

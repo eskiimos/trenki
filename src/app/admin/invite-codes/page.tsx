@@ -1,7 +1,27 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
+import {
+  AdminPage,
+  PageHeader,
+  AdminCard,
+  AdminButton,
+  Kpi,
+  EmptyState,
+  inputStyle,
+} from '@/components/admin/ui';
+import {
+  Ticket,
+  Search,
+  ChevronDown,
+  ChevronUp,
+  Power,
+  PowerOff,
+  Trash2,
+  Users,
+  CheckCircle2,
+  CircleSlash,
+} from 'lucide-react';
 
 interface User {
   id: string;
@@ -29,6 +49,25 @@ interface Stats {
   active: number;
   used: number;
   fullyUsed: number;
+}
+
+/** Статусный бейдж карточки кода — pill + токены вместо red/orange-500/20. */
+function StatusBadge({ tone, children }: { tone: 'danger' | 'muted'; children: React.ReactNode }) {
+  return (
+    <span
+      style={{
+        fontSize: 12,
+        fontWeight: 700,
+        padding: '2px 8px',
+        borderRadius: 'var(--radius-pill)',
+        whiteSpace: 'nowrap',
+        background: tone === 'danger' ? 'rgba(255,140,74,0.15)' : 'rgba(174,171,187,0.18)',
+        color: tone === 'danger' ? 'var(--color-danger)' : 'var(--color-muted)',
+      }}
+    >
+      {children}
+    </span>
+  );
 }
 
 export default function InviteCodesAdminPage() {
@@ -110,181 +149,246 @@ export default function InviteCodesAdminPage() {
     return matchesSearch && matchesFilter;
   });
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#101530] text-white p-8 flex items-center justify-center">
-        <div className="text-xl">Загрузка...</div>
-      </div>
-    );
-  }
+  // Пустой список: различаем «ничего не создано» и «ничего не нашлось по фильтру»
+  const filtersApplied = searchTerm.trim() !== '' || filterStatus !== 'all';
 
   return (
-    <div className="min-h-screen bg-[#101530] text-white p-4 md:p-8" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
-      <div className="max-w-7xl mx-auto">
-        {/* Заголовок */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">🎫 Инвайт-коды</h1>
-            <p className="text-gray-400">Управление кодами доступа</p>
-          </div>
-          <Link
-            href="/admin"
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-          >
-            ← Назад
-          </Link>
-        </div>
+    <AdminPage>
+      <PageHeader
+        title="Инвайт-коды"
+        icon={Ticket}
+        subtitle="Управление кодами доступа"
+        backHref="/admin"
+      />
 
-        {/* Статистика */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-[#1a1f3a] rounded-lg p-4 border border-white/5">
-            <div className="text-gray-400 text-sm mb-1">Всего кодов</div>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </div>
-          <div className="bg-[#1a1f3a] rounded-lg p-4 border border-white/5">
-            <div className="text-gray-400 text-sm mb-1">Активных</div>
-            <div className="text-2xl font-bold text-green-400">{stats.active}</div>
-          </div>
-          <div className="bg-[#1a1f3a] rounded-lg p-4 border border-white/5">
-            <div className="text-gray-400 text-sm mb-1">Использовано</div>
-            <div className="text-2xl font-bold text-blue-400">{stats.used}</div>
-          </div>
-          <div className="bg-[#1a1f3a] rounded-lg p-4 border border-white/5">
-            <div className="text-gray-400 text-sm mb-1">Исчерпано</div>
-            <div className="text-2xl font-bold text-orange-400">{stats.fullyUsed}</div>
-          </div>
+      {/* Статистика */}
+      {isLoading ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3" style={{ marginBottom: 24 }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="animate-pulse"
+              style={{
+                height: 96,
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-surface)',
+                border: '1px solid var(--border-hairline)',
+              }}
+            />
+          ))}
         </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3" style={{ marginBottom: 24 }}>
+          <Kpi icon={Ticket} label="Всего кодов" value={stats.total} />
+          <Kpi icon={Power} label="Активных" value={stats.active} accent />
+          <Kpi icon={Users} label="Использовано" value={stats.used} />
+          <Kpi icon={CircleSlash} label="Исчерпано" value={stats.fullyUsed} />
+        </div>
+      )}
 
-        {/* Поиск и фильтры */}
-        <div className="bg-[#1a1f3a] rounded-lg p-4 mb-6 border border-white/5">
-          <div className="flex flex-col md:flex-row gap-4">
+      {/* Поиск и фильтры */}
+      <AdminCard style={{ marginBottom: 24 }}>
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search
+              size={16}
+              aria-hidden
+              className="absolute pointer-events-none"
+              style={{ left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)' }}
+            />
             <input
               type="text"
               placeholder="Поиск по коду, описанию или пользователю..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 px-4 py-2 bg-[#0D1425] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              aria-label="Поиск по кодам"
+              style={{ ...inputStyle, paddingLeft: 40 }}
             />
+          </div>
+          <div className="relative md:w-64">
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as any)}
-              className="px-4 py-2 bg-[#0D1425] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
+              aria-label="Фильтр по статусу"
+              className="appearance-none"
+              style={{ ...inputStyle, paddingRight: 40 }}
             >
               <option value="all">Все коды</option>
               <option value="active">Активные</option>
               <option value="used">Использованные</option>
               <option value="unused">Неиспользованные</option>
             </select>
+            <ChevronDown
+              size={16}
+              aria-hidden
+              className="absolute pointer-events-none"
+              style={{ right: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)' }}
+            />
           </div>
         </div>
+      </AdminCard>
 
-        {/* Список кодов */}
-        <div className="space-y-4">
-          {filteredCodes.map((code) => (
+      {/* Список кодов */}
+      {isLoading ? (
+        <div className="flex flex-col" style={{ gap: 16 }}>
+          {Array.from({ length: 3 }).map((_, i) => (
             <div
-              key={code.id}
-              className="bg-[#1a1f3a] rounded-lg p-6 border border-white/5 hover:border-white/10 transition-colors"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-2xl font-mono font-bold text-blue-400">
-                      {code.code}
-                    </span>
-                    {!code.isActive && (
-                      <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded">
-                        Деактивирован
-                      </span>
-                    )}
-                    {code.usedCount >= code.maxUses && (
-                      <span className="px-2 py-1 bg-orange-500/20 text-orange-400 text-xs rounded">
-                        Исчерпан
-                      </span>
-                    )}
-                  </div>
-                  {code.description && (
-                    <p className="text-gray-400 text-sm mb-2">{code.description}</p>
-                  )}
-                  <div className="flex gap-4 text-sm text-gray-500">
-                    <span>
-                      Использовано: {code.usedCount} / {code.maxUses}
-                    </span>
-                    <span>
-                      Создан: {new Date(code.createdAt).toLocaleDateString('ru-RU')}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => toggleCodeStatus(code.id, code.isActive)}
-                    className={`px-3 py-1 rounded text-sm ${
-                      code.isActive
-                        ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                        : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                    }`}
-                  >
-                    {code.isActive ? 'Деактивировать' : 'Активировать'}
-                  </button>
-                  <button
-                    onClick={() => setSelectedCode(selectedCode?.id === code.id ? null : code)}
-                    className="px-3 py-1 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 rounded text-sm"
-                  >
-                    {selectedCode?.id === code.id ? 'Скрыть' : 'Подробнее'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Пользователи, использовавшие код */}
-              {selectedCode?.id === code.id && (
-                <div className="mt-4 pt-4 border-t border-gray-700">
-                  <h3 className="text-lg font-semibold mb-3">
-                    Пользователи ({code.users.length})
-                  </h3>
-                  {code.users.length === 0 ? (
-                    <p className="text-gray-500">Код ещё не использовался</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {code.users.map((user) => (
-                        <div
-                          key={user.id}
-                          className="bg-[#0D1425] rounded-lg p-4 border border-gray-700"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="font-semibold">
-                                {user.firstName || user.username || 'Без имени'}{' '}
-                                {user.lastName || ''}
-                              </div>
-                              <div className="text-sm text-gray-400">
-                                @{user.username || 'no_username'} • ID: {user.telegramId}
-                              </div>
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {new Date(user.createdAt).toLocaleDateString('ru-RU')}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <button
-                    onClick={() => deleteCode(code.id)}
-                    className="mt-4 px-4 py-2 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded text-sm"
-                  >
-                    Удалить код
-                  </button>
-                </div>
-              )}
-            </div>
+              key={i}
+              className="animate-pulse"
+              style={{
+                height: 140,
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-surface)',
+                border: '1px solid var(--border-hairline)',
+              }}
+            />
           ))}
         </div>
+      ) : filteredCodes.length === 0 ? (
+        filtersApplied ? (
+          <EmptyState
+            icon={Search}
+            title="Коды не найдены"
+            hint="Попробуйте изменить поиск или сбросить фильтр"
+          />
+        ) : (
+          <EmptyState icon={Ticket} title="Кодов пока нет" hint="Ни одного инвайт-кода не создано" />
+        )
+      ) : (
+        <div className="flex flex-col" style={{ gap: 16 }}>
+          {filteredCodes.map((code) => {
+            const open = selectedCode?.id === code.id;
+            return (
+              <AdminCard key={code.id} style={{ padding: 24 }}>
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3 flex-wrap" style={{ marginBottom: 8 }}>
+                      <span
+                        className="font-mono"
+                        style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-brand)' }}
+                      >
+                        {code.code}
+                      </span>
+                      {!code.isActive && <StatusBadge tone="danger">Деактивирован</StatusBadge>}
+                      {code.usedCount >= code.maxUses && (
+                        <StatusBadge tone="muted">Исчерпан</StatusBadge>
+                      )}
+                    </div>
+                    {code.description && (
+                      <p style={{ fontSize: 14, color: 'var(--color-muted)', margin: '0 0 8px' }}>
+                        {code.description}
+                      </p>
+                    )}
+                    <div
+                      className="flex flex-wrap gap-4"
+                      style={{ fontSize: 12, color: 'var(--color-muted)' }}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        <CheckCircle2 size={16} aria-hidden />
+                        Использовано: {code.usedCount} / {code.maxUses}
+                      </span>
+                      <span>Создан: {new Date(code.createdAt).toLocaleDateString('ru-RU')}</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-wrap shrink-0">
+                    <AdminButton
+                      size="sm"
+                      tone="secondary"
+                      icon={code.isActive ? PowerOff : Power}
+                      onClick={() => toggleCodeStatus(code.id, code.isActive)}
+                    >
+                      {code.isActive ? 'Деактивировать' : 'Активировать'}
+                    </AdminButton>
+                    <AdminButton
+                      size="sm"
+                      tone="secondary"
+                      icon={open ? ChevronUp : ChevronDown}
+                      onClick={() => setSelectedCode(open ? null : code)}
+                    >
+                      {open ? 'Скрыть' : 'Подробнее'}
+                    </AdminButton>
+                    <AdminButton
+                      size="sm"
+                      tone="danger"
+                      icon={Trash2}
+                      onClick={() => deleteCode(code.id)}
+                    >
+                      Удалить
+                    </AdminButton>
+                  </div>
+                </div>
 
-        {filteredCodes.length === 0 && (
-          <div className="text-center py-12 text-gray-400">
-            Коды не найдены
-          </div>
-        )}
-      </div>
-    </div>
+                {/* Пользователи, использовавшие код */}
+                {open && (
+                  <div
+                    style={{
+                      marginTop: 16,
+                      paddingTop: 16,
+                      borderTop: '1px solid var(--border-hairline)',
+                    }}
+                  >
+                    <h3
+                      className="flex items-center gap-2"
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 800,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.08em',
+                        color: 'var(--color-muted)',
+                        margin: '0 0 12px',
+                      }}
+                    >
+                      <Users size={16} aria-hidden />
+                      Пользователи ({code.users.length})
+                    </h3>
+                    {code.users.length === 0 ? (
+                      <p style={{ fontSize: 14, color: 'var(--color-muted)', margin: 0 }}>
+                        Код ещё не использовался
+                      </p>
+                    ) : (
+                      <div className="flex flex-col" style={{ gap: 8 }}>
+                        {code.users.map((user) => (
+                          <div
+                            key={user.id}
+                            style={{
+                              background: 'var(--color-night)',
+                              borderRadius: 'var(--radius-sm)',
+                              border: '1px solid var(--border-hairline)',
+                              padding: 16,
+                            }}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <div style={{ fontSize: 14, fontWeight: 700 }} className="truncate">
+                                  {user.firstName || user.username || 'Без имени'}{' '}
+                                  {user.lastName || ''}
+                                </div>
+                                {/* Идентификаторы для поиска юзера: username и
+                                    telegramId (по ним же работает поиск выше),
+                                    внутренний id — как фолбэк. */}
+                                <div
+                                  className="font-mono truncate"
+                                  style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}
+                                >
+                                  {user.username ? `@${user.username} · ` : ''}
+                                  {user.telegramId ? `ID: ${user.telegramId}` : user.id}
+                                </div>
+                              </div>
+                              <div style={{ fontSize: 12, color: 'var(--color-muted)', flexShrink: 0 }}>
+                                {new Date(user.createdAt).toLocaleDateString('ru-RU')}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </AdminCard>
+            );
+          })}
+        </div>
+      )}
+    </AdminPage>
   );
 }

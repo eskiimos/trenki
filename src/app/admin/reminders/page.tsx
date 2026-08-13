@@ -1,7 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import {
+  AdminPage,
+  PageHeader,
+  SectionTitle,
+  AdminCard,
+  AdminButton,
+  inputStyle,
+} from '@/components/admin/ui';
+import { AlarmClock, BellRing, CalendarClock, Check, AlertTriangle } from 'lucide-react';
 
 // Админка: время уведомлений (читается крон-роутами из app_settings).
 export default function RemindersAdminPage() {
@@ -51,7 +59,7 @@ export default function RemindersAdminPage() {
       setDailyTime(d.dailyTime);
       setEarly(String(d.preworkoutEarlyMin));
       setLate(String(d.preworkoutLateMin));
-      setMsg({ type: 'ok', text: 'Сохранено ✓' });
+      setMsg({ type: 'ok', text: 'Сохранено' });
     } catch {
       setMsg({ type: 'err', text: 'Сетевая ошибка' });
     } finally {
@@ -59,147 +67,120 @@ export default function RemindersAdminPage() {
     }
   };
 
-  const labelStyle: React.CSSProperties = {
-    color: '#F9F8FE',
+  const hintStyle: React.CSSProperties = {
+    color: 'var(--color-muted)',
     fontSize: 14,
-    fontWeight: 700,
-    marginBottom: 6,
+    marginTop: 8,
+    lineHeight: 1.4,
   };
-  const hintStyle: React.CSSProperties = { color: '#AEABBB', fontSize: 12, marginTop: 6, lineHeight: 1.4 };
-  const inputStyle: React.CSSProperties = {
-    background: '#060919',
-    border: '1px solid #26252F',
-    borderRadius: 10,
-    padding: '12px 14px',
-    color: '#F9F8FE',
-    fontSize: 16,
-    outline: 'none',
-    colorScheme: 'dark',
-    width: '100%',
-    maxWidth: 200,
+  const fieldLabelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: 12,
+    fontWeight: 700,
+    color: 'var(--color-muted)',
+    marginBottom: 8,
   };
 
   return (
-    <div style={{ background: '#101530', minHeight: '100vh', color: '#F9F8FE' }}>
-      <div
-        className="max-w-2xl mx-auto px-5 pb-24"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)' }}
-      >
-        <Link href="/admin" style={{ color: '#AEABBB', fontSize: 13 }}>
-          ← В админку
-        </Link>
-        <h1 className="font-overpass uppercase" style={{ fontWeight: 900, fontSize: 24, marginTop: 8 }}>
-          ⏰ Время уведомлений
-        </h1>
-        <p style={{ color: '#AEABBB', fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>
-          Когда приложение шлёт пуши. Время ежедневного напоминания — <b>локальное для каждого
-          пользователя</b> (по его часовому поясу). Меняется на лету, без перезапуска.
-        </p>
+    <AdminPage width="narrow">
+      <PageHeader title="Время уведомлений" icon={AlarmClock} backHref="/admin" />
 
-        {loading ? (
-          <div style={{ color: '#AEABBB', fontSize: 14, marginTop: 30 }}>Загружаем…</div>
-        ) : (
-          <div style={{ marginTop: 26, display: 'flex', flexDirection: 'column', gap: 26 }}>
-            {/* Ежедневное напоминание */}
-            <section
+      <p style={{ color: 'var(--color-muted)', fontSize: 14, lineHeight: 1.5, margin: '0 0 24px' }}>
+        Когда приложение шлёт пуши. Время ежедневного напоминания — <b>локальное для каждого
+        пользователя</b> (по его часовому поясу). Меняется на лету, без перезапуска.
+      </p>
+
+      {loading ? (
+        <div className="flex flex-col" style={{ gap: 24 }}>
+          {[0, 1].map((i) => (
+            <div
+              key={i}
+              className="animate-pulse"
               style={{
-                background: '#0B1030',
-                border: '1px solid #26252F',
-                borderRadius: 16,
-                padding: 18,
+                height: 160,
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-surface)',
+                border: '1px solid var(--border-hairline)',
               }}
-            >
-              <div style={labelStyle}>🔔 Ежедневное напоминание о тренировке</div>
-              <input
-                type="time"
-                min="06:00"
-                max="22:00"
-                value={dailyTime}
-                onChange={(e) => setDailyTime(e.target.value)}
-                style={inputStyle}
-              />
-              <div style={hintStyle}>
-                Каждый игрок получит пуш в это время по своему часовому поясу. Диапазон 06:00–22:00, по
-                умолчанию 10:00.
-              </div>
-            </section>
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col" style={{ gap: 24 }}>
+          {/* Ежедневное напоминание */}
+          <AdminCard>
+            <SectionTitle icon={BellRing}>Ежедневное напоминание о тренировке</SectionTitle>
+            <input
+              type="time"
+              min="06:00"
+              max="22:00"
+              value={dailyTime}
+              onChange={(e) => setDailyTime(e.target.value)}
+              style={{ ...inputStyle, maxWidth: 200, colorScheme: 'dark' }}
+            />
+            <div style={hintStyle}>
+              Каждый игрок получит пуш в это время по своему часовому поясу. Диапазон 06:00–22:00, по
+              умолчанию 10:00.
+            </div>
+          </AdminCard>
 
-            {/* Предтренировочные */}
-            <section
-              style={{
-                background: '#0B1030',
-                border: '1px solid #26252F',
-                borderRadius: 16,
-                padding: 18,
-              }}
-            >
-              <div style={labelStyle}>🏒 Напоминания перед запланированной тренировкой</div>
-              <div className="flex gap-4 flex-wrap" style={{ marginTop: 4 }}>
-                <div>
-                  <div style={{ color: '#AEABBB', fontSize: 12, marginBottom: 4 }}>Раннее (за, мин)</div>
-                  <input
-                    type="number"
-                    min={1}
-                    max={1440}
-                    value={early}
-                    onChange={(e) => setEarly(e.target.value)}
-                    style={{ ...inputStyle, maxWidth: 120 }}
-                  />
-                </div>
-                <div>
-                  <div style={{ color: '#AEABBB', fontSize: 12, marginBottom: 4 }}>Позднее (за, мин)</div>
-                  <input
-                    type="number"
-                    min={1}
-                    max={1440}
-                    value={late}
-                    onChange={(e) => setLate(e.target.value)}
-                    style={{ ...inputStyle, maxWidth: 120 }}
-                  />
-                </div>
+          {/* Предтренировочные */}
+          <AdminCard>
+            <SectionTitle icon={CalendarClock}>
+              Напоминания перед запланированной тренировкой
+            </SectionTitle>
+            <div className="flex gap-4 flex-wrap">
+              <div>
+                <label style={fieldLabelStyle} htmlFor="reminder-early">Раннее (за, мин)</label>
+                <input
+                  id="reminder-early"
+                  type="number"
+                  min={1}
+                  max={1440}
+                  value={early}
+                  onChange={(e) => setEarly(e.target.value)}
+                  style={{ ...inputStyle, maxWidth: 120, colorScheme: 'dark' }}
+                />
               </div>
-              <div style={hintStyle}>
-                Два пуша до старта занятия в календаре. По умолчанию за 30 и за 10 минут. Раннее должно
-                быть минимум на 10 минут больше позднего.
+              <div>
+                <label style={fieldLabelStyle} htmlFor="reminder-late">Позднее (за, мин)</label>
+                <input
+                  id="reminder-late"
+                  type="number"
+                  min={1}
+                  max={1440}
+                  value={late}
+                  onChange={(e) => setLate(e.target.value)}
+                  style={{ ...inputStyle, maxWidth: 120, colorScheme: 'dark' }}
+                />
               </div>
-            </section>
+            </div>
+            <div style={hintStyle}>
+              Два пуша до старта занятия в календаре. По умолчанию за 30 и за 10 минут. Раннее должно
+              быть минимум на 10 минут больше позднего.
+            </div>
+          </AdminCard>
 
-            {msg && (
-              <div
-                style={{
-                  fontSize: 14,
-                  fontWeight: 700,
-                  color: msg.type === 'ok' ? '#A1FF4A' : '#FF6B6B',
-                }}
-              >
-                {msg.text}
+          {msg && (
+            <AdminCard tone={msg.type === 'ok' ? 'accent' : 'danger'}>
+              <div className="flex items-center gap-3" role="status" aria-live="polite">
+                {msg.type === 'ok' ? (
+                  <Check size={20} style={{ color: 'var(--color-brand)', flexShrink: 0 }} aria-hidden />
+                ) : (
+                  <AlertTriangle size={20} style={{ color: 'var(--color-danger)', flexShrink: 0 }} aria-hidden />
+                )}
+                <span style={{ fontSize: 14, fontWeight: 700 }}>{msg.text}</span>
               </div>
-            )}
+            </AdminCard>
+          )}
 
-            <button
-              type="button"
-              onClick={save}
-              disabled={saving}
-              className="font-overpass uppercase transition-transform active:scale-95"
-              style={{
-                background: '#A1FF4A',
-                color: '#060919',
-                border: 'none',
-                borderRadius: 999,
-                padding: '14px 24px',
-                fontWeight: 900,
-                fontSize: 14,
-                letterSpacing: '0.03em',
-                cursor: saving ? 'not-allowed' : 'pointer',
-                opacity: saving ? 0.6 : 1,
-                alignSelf: 'flex-start',
-              }}
-            >
+          <div>
+            <AdminButton type="button" onClick={save} disabled={saving} icon={Check}>
               {saving ? 'Сохраняю…' : 'Сохранить'}
-            </button>
+            </AdminButton>
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </AdminPage>
   );
 }

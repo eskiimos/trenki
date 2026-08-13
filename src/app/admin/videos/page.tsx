@@ -2,10 +2,27 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import MultiLevelTagFilter from '@/components/MultiLevelTagFilter';
 import { AgeGroup, TrainingGoal } from '@/generated/prisma';
 import { GOAL_LABELS } from '@/lib/training-algorithm-v3';
+import {
+  AdminPage,
+  PageHeader,
+  SectionTitle,
+  AdminCard,
+  AdminButton,
+  EmptyState,
+  inputStyle,
+  labelStyle,
+} from '@/components/admin/ui';
+import {
+  Video as VideoIcon, VideoOff, Plus, X, Save, Pencil, Trash2, Eye, EyeOff,
+  Bell, BellRing, Upload, CloudUpload, Wand2, RefreshCw, AlertTriangle, Info,
+  Check, Settings, Sliders, Target, Users, User, UserRound, Baby, Backpack,
+  Dumbbell, Zap, HeartPulse, PersonStanding, Flame, Wind, Gauge, Snowflake,
+  Goal, CircleDot, Swords, Hand, Stethoscope, Move, Loader2, Sparkles,
+  TrendingUp, Star, type LucideIcon,
+} from 'lucide-react';
 
 interface Trainer {
   id: string;
@@ -70,10 +87,265 @@ const formatDuration = (seconds: number): string => {
   return `${minutes}:${secs.toString().padStart(2, '0')}`;
 };
 
+/* ─── Иконки вместо эмодзи ──────────────────────────────────────────────── */
+
+/** Характеристика атлета → иконка (раньше здесь были эмодзи). */
+const CHAR_ICON: Record<string, LucideIcon> = {
+  'Сила': Dumbbell,
+  'Скорость': Zap,
+  'Выносливость': HeartPulse,
+  'Техника': Target,
+  'Гибкость': PersonStanding,
+};
+
+/** Тип нагрузки → что развивает (бейдж в шапке формы). */
+const LOAD_TYPE_DEVELOPS: Record<string, { icon: LucideIcon; label: string }> = {
+  MAX_STRENGTH: { icon: Dumbbell, label: 'Силу' },
+  POWER: { icon: Dumbbell, label: 'Силу' },
+  SPEED: { icon: Zap, label: 'Скорость' },
+  STRENGTH_ENDURANCE: { icon: HeartPulse, label: 'Выносливость' },
+  ANAEROBIC_ENDURANCE: { icon: HeartPulse, label: 'Выносливость' },
+  AEROBIC_ENDURANCE: { icon: HeartPulse, label: 'Выносливость' },
+  AGILITY: { icon: Target, label: 'Технику' },
+  MOBILITY: { icon: PersonStanding, label: 'Гибкость' },
+  TECHNICAL_SKILL: { icon: Target, label: 'Технику' },
+  STATIC_STRETCH: { icon: PersonStanding, label: 'Гибкость' },
+  DYNAMIC_STRETCH: { icon: PersonStanding, label: 'Гибкость' },
+  PREHAB: { icon: PersonStanding, label: 'Гибкость' },
+};
+
+/** Тип модуля → иконка бейджа в карточке списка. */
+const MODULE_TYPE_ICON: Record<string, LucideIcon> = {
+  'Разминка': Flame,
+  'ОФП': Dumbbell,
+  'Техника': Target,
+  'Заминка': Wind,
+};
+
+/** Цель тренировки → иконка (эмодзи из GOAL_LABELS больше не рендерим). */
+const GOAL_ICON: Record<string, LucideIcon> = {
+  POWERFUL_SHOT: Target,
+  OUTRUN_OPPONENT: Zap,
+  STRENGTH_STABILITY: Dumbbell,
+  SOFT_HANDS: Hand,
+  FULL_GAME_ENDURANCE: HeartPulse,
+  AGILITY: Move,
+  SPORT_LONGEVITY: Stethoscope,
+};
+
+const AGE_GROUP_ICON: Record<string, LucideIcon> = {
+  CHILD: Baby,
+  TEEN: Backpack,
+  YOUNG_ADULT: User,
+  ADULT: UserRound,
+};
+
+const SPORT_ICON: Record<string, LucideIcon> = {
+  HOCKEY: Snowflake,
+  FOOTBALL: Goal,
+  BASKETBALL: CircleDot,
+  BOXING: Swords,
+};
+
+/* ─── Локальные примитивы вёрстки (стили из токенов, без логики) ────────── */
+
+const hintStyle: React.CSSProperties = {
+  fontSize: 12,
+  color: 'var(--color-muted)',
+  margin: '6px 0 0',
+};
+
+/** Подсказка секции (была строка с эмодзи-лампочкой). */
+function Hint({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="flex items-start gap-2"
+      style={{ marginBottom: 16, fontSize: 12, color: 'var(--color-muted)' }}
+    >
+      <Info size={16} style={{ flexShrink: 0, marginTop: 1 }} aria-hidden />
+      <span>{children}</span>
+    </div>
+  );
+}
+
+/** Секция формы вместо fieldset с цветовым кодированием (blue/purple/green). */
+function FormSection({
+  icon,
+  title,
+  children,
+}: {
+  icon: LucideIcon;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <AdminCard style={{ borderRadius: 'var(--radius-lg)' }}>
+      <SectionTitle icon={icon}>{title}</SectionTitle>
+      {children}
+    </AdminCard>
+  );
+}
+
+/** Единый переключатель вкладок: один активный цвет на всю страницу. */
+function TabButton({
+  active,
+  icon: Icon,
+  onClick,
+  children,
+  className = '',
+}: {
+  active: boolean;
+  icon: LucideIcon;
+  onClick: () => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`inline-flex items-center justify-center gap-2 transition-colors ${className}`}
+      style={{
+        minHeight: 44,
+        padding: '10px 16px',
+        borderRadius: 'var(--radius-pill)',
+        fontSize: 14,
+        fontWeight: 700,
+        cursor: 'pointer',
+        background: active ? 'var(--color-brand)' : 'transparent',
+        color: active ? 'var(--color-night)' : 'var(--color-muted)',
+        border: `1px solid ${active ? 'var(--color-brand)' : 'var(--border-hairline)'}`,
+      }}
+    >
+      <Icon size={20} aria-hidden />
+      {children}
+    </button>
+  );
+}
+
+/** Чекбокс с видимой галочкой: глобальный appearance:none гасит нативную. */
+function Checkbox({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <span className="relative inline-flex shrink-0" style={{ width: 20, height: 20 }}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className="absolute inset-0 cursor-pointer opacity-0"
+        style={{ width: 20, height: 20, margin: 0 }}
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none flex items-center justify-center"
+        style={{
+          width: 20,
+          height: 20,
+          borderRadius: 'var(--radius-sm)',
+          background: checked ? 'var(--color-brand)' : 'var(--color-night)',
+          border: `1px solid ${checked ? 'var(--color-brand)' : 'var(--border-hairline)'}`,
+        }}
+      >
+        {checked && <Check size={14} strokeWidth={3} style={{ color: 'var(--color-night)' }} />}
+      </span>
+    </span>
+  );
+}
+
+/** Строка выбора «чекбокс + иконка + подпись», тач-таргет 44px. */
+function CheckRow({
+  checked,
+  onChange,
+  icon: Icon,
+  children,
+}: {
+  checked: boolean;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  icon?: LucideIcon;
+  children: React.ReactNode;
+}) {
+  return (
+    <label
+      className="flex items-center gap-3 cursor-pointer transition-colors hover:brightness-125"
+      style={{ minHeight: 44, padding: 8, borderRadius: 'var(--radius-sm)' }}
+    >
+      <Checkbox checked={checked} onChange={onChange} />
+      {Icon && (
+        <Icon size={20} style={{ color: 'var(--color-muted)', flexShrink: 0 }} aria-hidden />
+      )}
+      <span style={{ fontSize: 14 }}>{children}</span>
+    </label>
+  );
+}
+
+/** Один прогресс-бар на обе загрузки (были зелёный и синий). */
+function ProgressBar({ value, label }: { value: number; label: string }) {
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 4 }}>
+        {label}: {value}%
+      </div>
+      <div
+        style={{
+          width: '100%',
+          height: 8,
+          borderRadius: 'var(--radius-pill)',
+          background: 'rgba(174,171,187,0.20)',
+        }}
+      >
+        <div
+          className="transition-all"
+          style={{
+            width: `${value}%`,
+            height: 8,
+            borderRadius: 'var(--radius-pill)',
+            background: 'var(--color-brand)',
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** Кнопка-загрузка на <label> (скрытый input рядом) — единый вид и 44px. */
+const uploadLabelStyle = (
+  disabled: boolean,
+  tone: 'primary' | 'secondary' = 'secondary'
+): React.CSSProperties => ({
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  minHeight: 44,
+  padding: '10px 20px',
+  borderRadius: 'var(--radius-pill)',
+  fontSize: 14,
+  fontWeight: 700,
+  cursor: disabled ? 'not-allowed' : 'pointer',
+  opacity: disabled ? 0.5 : 1,
+  background: tone === 'primary' ? 'var(--color-brand)' : 'transparent',
+  color: tone === 'primary' ? 'var(--color-night)' : 'var(--color-ink)',
+  border: tone === 'primary' ? 'none' : '1px solid var(--border-hairline)',
+});
+
+/** Единый маркер обязательного поля (были «*» и жёлтая звезда). */
+function Req() {
+  return <span style={{ color: 'var(--color-danger)' }}> *</span>;
+}
+
 const AdminVideosPage = () => {
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  // Состояния списка разведены: пока грузим — скелетон, а не «Видео пока нет».
+  const [isListLoading, setIsListLoading] = useState(true);
+  const [listError, setListError] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]); // ID тегов из базы
@@ -158,8 +430,12 @@ const AdminVideosPage = () => {
       const data = await response.json();
       console.log('Fetched videos:', data.videos);
       setVideos(data.videos || []);
+      setListError(false);
     } catch (error) {
       console.error('Error fetching videos:', error);
+      setListError(true);
+    } finally {
+      setIsListLoading(false);
     }
   };
 
@@ -350,7 +626,7 @@ const AdminVideosPage = () => {
           updates.title = data.title;
           updatedFields.push('название');
           
-          // 🤖 Умный парсинг названия для автозаполнения полей алгоритма
+          // Умный парсинг названия для автозаполнения полей алгоритма
           const parsedData = parseVideoTitle(data.title);
           if (Object.keys(parsedData).length > 0) {
             Object.assign(updates, parsedData);
@@ -1092,16 +1368,17 @@ const AdminVideosPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#101530] text-white p-4 md:p-8" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-4">
-          <Link href="/admin" className="inline-block text-blue-400 hover:text-blue-300 text-sm">
-            ← Назад в админ-панель
-          </Link>
-        </div>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold">Управление видео</h1>
-          <button
+    <AdminPage>
+      <PageHeader
+        title="Управление видео"
+        icon={VideoIcon}
+        backHref="/admin"
+        backLabel="Назад в админ-панель"
+        actions={
+          <AdminButton
+            type="button"
+            tone={showForm ? 'secondary' : 'primary'}
+            icon={showForm ? X : Plus}
             onClick={() => {
               if (showForm && editingVideoId) {
                 handleCancelEdit();
@@ -1120,89 +1397,91 @@ const AdminVideosPage = () => {
                 handleCancelEdit();
               }
             }}
-            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg font-semibold transition-colors"
           >
-            {showForm ? 'Отмена' : '+ Добавить видео'}
-          </button>
-        </div>
+            {showForm ? 'Отмена' : 'Добавить видео'}
+          </AdminButton>
+        }
+      />
 
-        {/* Форма добавления/редактирования видео */}
-        {showForm && (
-          <div className="bg-[#1a1f3a] rounded-lg p-4 md:p-6 mb-6 md:mb-8 border border-white/5">
-            <div className="flex items-start justify-between mb-4 md:mb-6">
-              <div>
-                <h2 className="text-xl md:text-2xl font-bold">
-                  {editingVideoId ? 'Редактировать видео' : 'Новое видео'}
-                </h2>
-                <p className="text-sm text-gray-400 mt-1">
-                  LoadType теги создаются автоматически на основе "Типа физической нагрузки"
-                </p>
-              </div>
-              {formData.типНагрузки && (
-                <div className="hidden md:block">
-                  <div className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg shadow-lg">
-                    <p className="text-xs text-white/70">Развивает</p>
-                    <p className="text-sm font-bold text-white">
-                      {(() => {
-                        const charMap: any = {
-                          'MAX_STRENGTH': '💪 Силу',
-                          'POWER': '💪 Силу',
-                          'SPEED': '⚡ Скорость',
-                          'STRENGTH_ENDURANCE': '🫀 Выносливость',
-                          'ANAEROBIC_ENDURANCE': '🫀 Выносливость',
-                          'AEROBIC_ENDURANCE': '🫀 Выносливость',
-                          'AGILITY': '🎯 Технику',
-                          'MOBILITY': '🤸 Гибкость',
-                          'TECHNICAL_SKILL': '🎯 Технику',
-                          'STATIC_STRETCH': '🤸 Гибкость',
-                          'DYNAMIC_STRETCH': '🤸 Гибкость',
-                          'PREHAB': '🤸 Гибкость',
-                        };
-                        return charMap[formData.типНагрузки] || '—';
-                      })()}
-                    </p>
+      {/* Форма добавления/редактирования видео */}
+      {showForm && (
+        <AdminCard style={{ borderRadius: 'var(--radius-lg)', marginBottom: 24 }}>
+          <div
+            className="flex flex-wrap items-start justify-between gap-3"
+            style={{ marginBottom: 16 }}
+          >
+            <div className="min-w-0">
+              <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>
+                {editingVideoId ? 'Редактировать видео' : 'Новое видео'}
+              </h2>
+              <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '4px 0 0' }}>
+                LoadType теги создаются автоматически на основе «Типа физической нагрузки»
+              </p>
+            </div>
+            {/* Бейдж «Развивает» — виден и на планшете/мобиле (был hidden md:block) */}
+            {formData.типНагрузки && (() => {
+              const dev = LOAD_TYPE_DEVELOPS[formData.типНагрузки] ?? {
+                icon: Target,
+                label: '—',
+              };
+              const DevIcon = dev.icon;
+              return (
+                <div
+                  className="flex items-center gap-3 shrink-0"
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 'var(--radius-md)',
+                    background: 'var(--grad-accent)',
+                    border: '1px solid var(--border-lime)',
+                  }}
+                >
+                  <DevIcon size={20} style={{ color: 'var(--color-brand)' }} aria-hidden />
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.06em',
+                        color: 'var(--color-muted)',
+                      }}
+                    >
+                      Развивает
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>{dev.label}</div>
                   </div>
                 </div>
-              )}
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              
+              );
+            })()}
+          </div>
+          <form onSubmit={handleSubmit} className="space-y-6">
+
               {/* Табы */}
-              <div className="flex gap-2 border-b border-white/10 pb-2">
-                <button
-                  type="button"
+              <div className="flex flex-wrap gap-2">
+                <TabButton
+                  active={activeTab === 'basic'}
+                  icon={VideoIcon}
                   onClick={() => setActiveTab('basic')}
-                  className={`px-4 py-2 rounded-t-lg font-medium transition-colors ${
-                    activeTab === 'basic' 
-                      ? 'bg-blue-600 text-white' 
-                      : 'bg-[#1a1f3a] text-gray-400 hover:text-white hover:bg-[#2d3448]'
-                  }`}
                 >
-                  📹 Основное
-                </button>
-                <button
-                  type="button"
+                  Основное
+                </TabButton>
+                <TabButton
+                  active={activeTab === 'algorithm'}
+                  icon={Settings}
                   onClick={() => setActiveTab('algorithm')}
-                  className={`px-4 py-2 rounded-t-lg font-medium transition-colors ${
-                    activeTab === 'algorithm' 
-                      ? 'bg-purple-600 text-white' 
-                      : 'bg-[#1a1f3a] text-gray-400 hover:text-white hover:bg-[#2d3448]'
-                  }`}
                 >
-                  ⚙️ Алгоритм 2.0
-                </button>
+                  Алгоритм 2.0
+                </TabButton>
               </div>
 
               {/* Вкладка: Основное */}
               {activeTab === 'basic' && (
-              <fieldset className="border border-blue-500/30 rounded-lg p-4 md:p-6 bg-blue-900/5">
-                <legend className="px-3 text-base font-bold text-blue-300">📹 Основная информация</legend>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                  
+              <FormSection icon={VideoIcon} title="Основная информация">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
                   {/* Название */}
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-2">Название *</label>
-                    <div className="flex gap-2">
+                    <label style={labelStyle}>Название<Req /></label>
+                    <div className="flex flex-wrap gap-2">
                       <input
                         type="text"
                         name="title"
@@ -1210,11 +1489,13 @@ const AdminVideosPage = () => {
                         onChange={handleChange}
                         required
                         placeholder="Например: Ловкость+низ тела+продвинутый.RPE8"
-                        className="flex-1 bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        style={{ ...inputStyle, width: 'auto', flex: '1 1 240px', minWidth: 0 }}
                       />
                       {formData.title && (
-                        <button
+                        <AdminButton
                           type="button"
+                          tone="secondary"
+                          icon={Wand2}
                           onClick={() => {
                             const normalizedInput = normalizeTitleForCompare(formData.title);
                             const duplicate = videos.find((video) =>
@@ -1222,7 +1503,7 @@ const AdminVideosPage = () => {
                             );
                             if (duplicate && duplicate.id !== editingVideoId) {
                               const proceed = confirm(
-                                `⚠️ Видео с таким названием уже существует:\n${duplicate.title}\n\nПродолжить автозаполнение?`
+                                `Видео с таким названием уже существует:\n${duplicate.title}\n\nПродолжить автозаполнение?`
                               );
                               if (!proceed) {
                                 return;
@@ -1241,21 +1522,20 @@ const AdminVideosPage = () => {
                               alert('Не удалось распознать данные из названия.\n\nФормат: "Тип нагрузки+Группа мышц+Сложность.RPE8"');
                             }
                           }}
-                          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
                         >
-                          🤖 Распарсить
-                        </button>
+                          Распарсить
+                        </AdminButton>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">
-                      💡 Формат: "Ловкость+низ тела+продвинутый.RPE8" - нажмите "Распарсить" для автозаполнения
+                    <p style={hintStyle}>
+                      Формат: «Ловкость+низ тела+продвинутый.RPE8» — нажмите «Распарсить» для автозаполнения
                     </p>
                   </div>
 
                   {/* URL видео */}
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-2">URL видео *</label>
-                    <div className="flex gap-2">
+                    <label style={labelStyle}>URL видео<Req /></label>
+                    <div className="flex flex-wrap gap-2">
                       <input
                         type="url"
                         name="videoUrl"
@@ -1263,35 +1543,38 @@ const AdminVideosPage = () => {
                         onChange={handleChange}
                         required
                         placeholder="ID или ссылка на видео"
-                        className="flex-1 bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        style={{ ...inputStyle, width: 'auto', flex: '1 1 240px', minWidth: 0 }}
                       />
                       {formData.videoUrl && formData.videoUrl.includes('kinescope.io') && (
-                        <button
+                        <AdminButton
                           type="button"
+                          tone="secondary"
                           onClick={handleFetchKinescopeMetadata}
                           disabled={isLoading}
-                          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                         >
-                          {isLoading ? 'Загрузка...' : '🔄 Получить данные'}
-                        </button>
+                          {isLoading ? (
+                            <Loader2 size={20} className="animate-spin" aria-hidden />
+                          ) : (
+                            <RefreshCw size={20} aria-hidden />
+                          )}
+                          {isLoading ? 'Загрузка...' : 'Получить данные'}
+                        </AdminButton>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">
-                      💡 После вставки URL нажмите "Получить данные" для автозаполнения превью
+                    <p style={hintStyle}>
+                      После вставки URL нажмите «Получить данные» для автозаполнения превью
                     </p>
 
                     {/* Загрузка файла напрямую на Kinescope */}
-                    <div className="flex items-center gap-3 mt-3">
-                      <div className="flex-1 h-px bg-gray-600"></div>
-                      <span className="text-xs text-gray-400">или загрузить файл</span>
-                      <div className="flex-1 h-px bg-gray-600"></div>
+                    <div className="flex items-center gap-3" style={{ marginTop: 16 }}>
+                      <div style={{ flex: 1, height: 1, background: 'var(--border-hairline)' }} />
+                      <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>или загрузить файл</span>
+                      <div style={{ flex: 1, height: 1, background: 'var(--border-hairline)' }} />
                     </div>
-                    <div className="mt-2">
-                      <label
-                        htmlFor="videoFileUpload"
-                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${uploadProgress !== null ? 'bg-gray-600 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
-                      >
-                        📁 Загрузить видеофайл
+                    <div style={{ marginTop: 12 }}>
+                      <label htmlFor="videoFileUpload" style={uploadLabelStyle(uploadProgress !== null)}>
+                        <Upload size={20} aria-hidden />
+                        Загрузить видеофайл
                       </label>
                       <input
                         id="videoFileUpload"
@@ -1302,25 +1585,15 @@ const AdminVideosPage = () => {
                         className="hidden"
                       />
                       {uploadProgress !== null && (
-                        <div className="mt-2">
-                          <div className="text-sm text-gray-400 mb-1">Загрузка: {uploadProgress}%</div>
-                          <div className="w-full bg-gray-700 rounded-full h-2">
-                            <div
-                              className="bg-green-500 h-2 rounded-full transition-all"
-                              style={{ width: `${uploadProgress}%` }}
-                            />
-                          </div>
-                        </div>
+                        <ProgressBar value={uploadProgress} label="Загрузка" />
                       )}
                     </div>
 
                     {/* Загрузка файла в собственное S3-хранилище (reg.ru) */}
-                    <div className="mt-2">
-                      <label
-                        htmlFor="s3FileUpload"
-                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${s3UploadProgress !== null ? 'bg-gray-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
-                      >
-                        ☁️ Загрузить файл в хранилище
+                    <div style={{ marginTop: 12 }}>
+                      <label htmlFor="s3FileUpload" style={uploadLabelStyle(s3UploadProgress !== null)}>
+                        <CloudUpload size={20} aria-hidden />
+                        Загрузить файл в хранилище
                       </label>
                       <input
                         id="s3FileUpload"
@@ -1331,37 +1604,39 @@ const AdminVideosPage = () => {
                         className="hidden"
                       />
                       {s3UploadProgress !== null && (
-                        <div className="mt-2">
-                          <div className="text-sm text-gray-400 mb-1">Загрузка в хранилище: {s3UploadProgress}%</div>
-                          <div className="w-full bg-gray-700 rounded-full h-2">
-                            <div
-                              className="bg-blue-500 h-2 rounded-full transition-all"
-                              style={{ width: `${s3UploadProgress}%` }}
-                            />
-                          </div>
-                        </div>
+                        <ProgressBar value={s3UploadProgress} label="Загрузка в хранилище" />
                       )}
-                      <p className="text-xs text-gray-400 mt-1">
-                        💡 Файл зальётся в собственное S3, в поле URL запишется s3://-ссылка
+                      <p style={hintStyle}>
+                        Файл зальётся в собственное S3, в поле URL запишется s3://-ссылка
                       </p>
                     </div>
                   </div>
 
                   {/* Превью */}
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-2">Превью</label>
+                    <label style={labelStyle}>Превью</label>
                     <div className="space-y-3">
-                      {/* Текущее превью */}
+                      {/* Текущее превью — всегда 16:9, как в плеере */}
                       {formData.thumbnail && (
-                        <div className="relative w-full h-40 bg-[#2d3448] rounded-lg overflow-hidden">
-                          <img 
-                            src={formData.thumbnail} 
-                            alt="Preview" 
+                        <div
+                          className="relative w-full overflow-hidden"
+                          style={{
+                            aspectRatio: '16 / 9',
+                            maxWidth: 480,
+                            background: 'var(--color-night)',
+                            border: '1px solid var(--border-hairline)',
+                            borderRadius: 'var(--radius-md)',
+                          }}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={formData.thumbnail}
+                            alt="Превью видео"
                             className="w-full h-full object-cover"
                           />
                         </div>
                       )}
-                      
+
                       {/* URL превью */}
                       <input
                         type="text"
@@ -1369,11 +1644,11 @@ const AdminVideosPage = () => {
                         value={formData.thumbnail}
                         onChange={handleChange}
                         placeholder="URL превью (заполнится автоматически или вставьте свой)"
-                        className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        style={inputStyle}
                       />
-                      
+
                       {/* Загрузка файла */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <input
                           type="file"
                           accept="image/*"
@@ -1381,11 +1656,9 @@ const AdminVideosPage = () => {
                           className="hidden"
                           id="thumbnail-upload"
                         />
-                        <label
-                          htmlFor="thumbnail-upload"
-                          className="cursor-pointer bg-[#3d4759] hover:bg-[#4d5769] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                        >
-                          📁 Загрузить с устройства
+                        <label htmlFor="thumbnail-upload" style={uploadLabelStyle(false)}>
+                          <Upload size={20} aria-hidden />
+                          Загрузить с устройства
                         </label>
                         {/* Превью в S3: публичный объект, прямая ссылка без TTL */}
                         <input
@@ -1398,11 +1671,12 @@ const AdminVideosPage = () => {
                         />
                         <label
                           htmlFor="thumbnail-s3-upload"
-                          className={`cursor-pointer text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors ${s3UploadProgress !== null ? 'bg-gray-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                          style={uploadLabelStyle(s3UploadProgress !== null)}
                         >
-                          ☁️ В хранилище S3
+                          <CloudUpload size={20} aria-hidden />
+                          В хранилище S3
                         </label>
-                        <span className="text-xs text-gray-400">
+                        <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
                           Опционально: загрузите своё превью
                         </span>
                       </div>
@@ -1411,81 +1685,81 @@ const AdminVideosPage = () => {
 
                   {/* Описание */}
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-2">Описание</label>
+                    <label style={labelStyle}>Описание</label>
                     <textarea
                       name="description"
                       value={formData.description}
                       onChange={handleChange}
                       rows={3}
                       placeholder="Опишите видео: цели, особенности, кому подходит..."
-                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      style={inputStyle}
                     />
                   </div>
 
                   {/* Категория и Сложность в одной строке */}
                   <div>
-                    <label className="block text-sm font-medium mb-2">Категория *</label>
+                    <label style={labelStyle}>Категория<Req /></label>
                     <select
                       name="category"
                       value={formData.category}
                       onChange={handleChange}
                       required
-                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      style={inputStyle}
                     >
-                      <option value="STRENGTH">💪 Сила</option>
-                      <option value="ENDURANCE">🫀 Выносливость</option>
-                      <option value="SPEED">⚡ Скорость</option>
-                      <option value="TECHNIQUE">🎯 Техника</option>
-                      <option value="SKATING">⛸️ Катание</option>
-                      <option value="SHOOTING">🏒 Броски</option>
-                      <option value="PASSING">🎯 Пас</option>
-                      <option value="CHECKING">💥 Силовая борьба</option>
-                      <option value="GOALKEEPER">🥅 Вратарь</option>
-                      <option value="TACTICAL">🧠 Тактика</option>
-                      <option value="GENERAL">🔄 Общая</option>
+                      <option value="STRENGTH">Сила</option>
+                      <option value="ENDURANCE">Выносливость</option>
+                      <option value="SPEED">Скорость</option>
+                      <option value="TECHNIQUE">Техника</option>
+                      <option value="SKATING">Катание</option>
+                      <option value="SHOOTING">Броски</option>
+                      <option value="PASSING">Пас</option>
+                      <option value="CHECKING">Силовая борьба</option>
+                      <option value="GOALKEEPER">Вратарь</option>
+                      <option value="TACTICAL">Тактика</option>
+                      <option value="GENERAL">Общая</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-2">Сложность *</label>
+                    <label style={labelStyle}>Сложность<Req /></label>
                     <select
                       name="difficulty"
                       value={formData.difficulty}
                       onChange={handleChange}
                       required
-                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      style={inputStyle}
                     >
-                      <option value="BEGINNER">🟢 Начальный</option>
-                      <option value="INTERMEDIATE">🔵 Средний</option>
-                      <option value="ADVANCED">🟠 Продвинутый</option>
-                      <option value="EXPERT">🔴 Эксперт</option>
+                      <option value="BEGINNER">Начальный</option>
+                      <option value="INTERMEDIATE">Средний</option>
+                      <option value="ADVANCED">Продвинутый</option>
+                      <option value="EXPERT">Эксперт</option>
                     </select>
                   </div>
 
                   {/* Аудитория */}
                   <div>
-                    <label className="block text-sm font-medium mb-2">Аудитория</label>
+                    <label style={labelStyle}>Аудитория</label>
                     <select
                       name="audience"
                       value={formData.audience}
                       onChange={handleChange}
-                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      style={inputStyle}
                     >
-                      <option value="HOCKEY">🏒 Хоккей (trenki.app)</option>
-                      <option value="ADAPTIVE">♿ Адаптивный (adaptive.trenki.app)</option>
-                      <option value="ALL">🌐 Все платформы</option>
+                      <option value="HOCKEY">Хоккей (trenki.app)</option>
+                      <option value="ADAPTIVE">Адаптивный (adaptive.trenki.app)</option>
+                      <option value="ALL">Все платформы</option>
                     </select>
                   </div>
 
                   {/* Тренер */}
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-2">Тренер *</label>
+                    <label style={labelStyle}>Тренер<Req /></label>
                     <select
                       name="trainerId"
                       value={formData.trainerId}
                       onChange={handleChange}
                       required
-                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      style={inputStyle}
                     >
                       {trainers.map(trainer => (
                         <option key={trainer.id} value={trainer.id}>
@@ -1497,7 +1771,7 @@ const AdminVideosPage = () => {
 
                   {/* Соавторы (доп. тренеры) — мульти-тренер */}
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-2">Соавторы (доп. тренеры)</label>
+                    <label style={labelStyle}>Соавторы (доп. тренеры)</label>
                     <div className="flex flex-wrap gap-2">
                       {trainers
                         .filter(trainer => trainer.id !== formData.trainerId)
@@ -1506,12 +1780,17 @@ const AdminVideosPage = () => {
                           return (
                             <label
                               key={trainer.id}
-                              className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                                checked ? 'bg-blue-600 text-white' : 'bg-[#2d3448] text-gray-300'
-                              }`}
+                              className="flex items-center gap-2 cursor-pointer transition-colors"
+                              style={{
+                                minHeight: 44,
+                                padding: '8px 12px',
+                                borderRadius: 'var(--radius-pill)',
+                                background: checked ? 'var(--lime-subtle)' : 'transparent',
+                                border: `1px solid ${checked ? 'var(--border-lime)' : 'var(--border-hairline)'}`,
+                                color: checked ? 'var(--color-brand)' : 'var(--color-ink)',
+                              }}
                             >
-                              <input
-                                type="checkbox"
+                              <Checkbox
                                 checked={checked}
                                 onChange={() => {
                                   setFormData(prev => ({
@@ -1521,42 +1800,41 @@ const AdminVideosPage = () => {
                                       : [...prev.coauthorIds, trainer.id],
                                   }));
                                 }}
-                                className="accent-blue-600"
                               />
-                              <span className="text-sm">{trainer.name} {trainer.lastName}</span>
+                              <span style={{ fontSize: 14 }}>{trainer.name} {trainer.lastName}</span>
                             </label>
                           );
                         })}
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p style={hintStyle}>
                       Ведущий тренер выбирается выше. Здесь — дополнительные соавторы видео.
                     </p>
                   </div>
 
                   {/* Оборудование */}
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-2">Оборудование</label>
+                    <label style={labelStyle}>Оборудование</label>
                     <input
                       type="text"
                       name="equipment"
                       value={formData.equipment}
                       onChange={handleChange}
                       placeholder="Коньки, Шлем, Клюшка, Шайба (через запятую)"
-                      className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                      style={inputStyle}
                     />
                   </div>
 
                   {/* Теги */}
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-2">Теги</label>
-                    <MultiLevelTagFilter 
+                    <label style={labelStyle}>Теги</label>
+                    <MultiLevelTagFilter
                       selectedTags={selectedTagIds}
                       onTagsChange={setSelectedTagIds}
                     />
                   </div>
 
                 </div>
-              </fieldset>
+              </FormSection>
               )}
 
               {/* Вкладка: Алгоритм 2.0 */}
@@ -1564,82 +1842,91 @@ const AdminVideosPage = () => {
               <div className="space-y-4">
               
               {/* Внутренние вкладки (sub-tabs) */}
-              <div className="flex gap-2 bg-[#1a1f3a] p-1 rounded-lg">
-                <button
-                  type="button"
+              <div className="flex flex-wrap gap-2">
+                <TabButton
+                  active={algorithmSubTab === 'classification'}
+                  icon={Sliders}
                   onClick={() => setAlgorithmSubTab('classification')}
-                  className={`flex-1 px-4 py-2 rounded-md font-medium transition-all duration-200 ${
-                    algorithmSubTab === 'classification' 
-                      ? 'bg-purple-600 text-white shadow-lg' 
-                      : 'text-gray-400 hover:text-white hover:bg-[#2d3448]'
-                  }`}
+                  className="flex-1"
                 >
-                  ⚙️ Классификация
-                </button>
-                <button
-                  type="button"
+                  Классификация
+                </TabButton>
+                <TabButton
+                  active={algorithmSubTab === 'targeting'}
+                  icon={Target}
                   onClick={() => setAlgorithmSubTab('targeting')}
-                  className={`flex-1 px-4 py-2 rounded-md font-medium transition-all duration-200 ${
-                    algorithmSubTab === 'targeting' 
-                      ? 'bg-green-600 text-white shadow-lg' 
-                      : 'text-gray-400 hover:text-white hover:bg-[#2d3448]'
-                  }`}
+                  className="flex-1"
                 >
-                  🎯 Цели и возраст
-                </button>
+                  Цели и возраст
+                </TabButton>
               </div>
-              
+
               {/* Секция 1: Классификация модуля */}
               {algorithmSubTab === 'classification' && (
-              <fieldset className="border border-purple-500/30 rounded-lg p-4 md:p-6 bg-purple-900/10">
-                <legend className="px-3 text-base font-bold text-purple-300">⚙️ Классификация модуля</legend>
-                <div className="bg-purple-900/20 border border-purple-500/20 rounded-lg p-3 mb-4">
-                  <p className="text-xs text-gray-300">
-                    💡 Основные параметры для автоматического подбора видео в тренировки
-                  </p>
-                </div>
+              <FormSection icon={Sliders} title="Классификация модуля">
+                <Hint>Основные параметры для автоматического подбора видео в тренировки</Hint>
 
                 <div className="space-y-6">
-                  
+
                   {/* Строка 1: ТИП НАГРУЗКИ (ГЛАВНОЕ!) */}
                   <div className="space-y-4">
-                    
+
                     {/* Тип нагрузки - ГЛАВНОЕ ПОЛЕ */}
-                    <div className="bg-purple-900/20 border-2 border-purple-500/50 rounded-lg p-4">
-                      <label className="block text-base font-bold mb-2 text-purple-300">
-                        🎯 Тип физической нагрузки
-                        <span className="text-yellow-400 ml-1">★</span>
+                    <div
+                      style={{
+                        padding: 16,
+                        borderRadius: 'var(--radius-md)',
+                        background: 'var(--lime-subtle)',
+                        border: '1px solid var(--border-lime)',
+                      }}
+                    >
+                      <label
+                        style={{
+                          ...labelStyle,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          fontSize: 14,
+                          color: 'var(--color-ink)',
+                        }}
+                      >
+                        <Target size={16} style={{ color: 'var(--color-brand)' }} aria-hidden />
+                        <span>Тип физической нагрузки<Req /></span>
                       </label>
                       <select
                         name="типНагрузки"
                         value={formData.типНагрузки}
                         onChange={handleChange}
-                        className="w-full bg-[#2d3448] text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 font-medium text-base"
+                        style={inputStyle}
                       >
-                        <option value="">⚠️ Выберите тип нагрузки</option>
-                        <optgroup label="💪 Сила и мощность">
+                        <option value="">Выберите тип нагрузки</option>
+                        <optgroup label="Сила и мощность">
                           <option value="MAX_STRENGTH">Максимальная сила</option>
                           <option value="POWER">Мощность</option>
                           <option value="SPEED">Скорость</option>
                         </optgroup>
-                        <optgroup label="🫀 Выносливость">
+                        <optgroup label="Выносливость">
                           <option value="STRENGTH_ENDURANCE">Силовая выносливость</option>
                           <option value="ANAEROBIC_ENDURANCE">Анаэробная выносливость</option>
                           <option value="AEROBIC_ENDURANCE">Аэробная выносливость</option>
                         </optgroup>
-                        <optgroup label="🎯 Функциональные качества">
+                        <optgroup label="Функциональные качества">
                           <option value="AGILITY">Ловкость</option>
                           <option value="MOBILITY">Мобильность</option>
                           <option value="TECHNICAL_SKILL">Технические навыки</option>
                         </optgroup>
-                        <optgroup label="🤸 Восстановление">
+                        <optgroup label="Восстановление">
                           <option value="STATIC_STRETCH">Статическая растяжка</option>
                           <option value="DYNAMIC_STRETCH">Динамическая растяжка</option>
                           <option value="PREHAB">ЛФК (профилактика травм)</option>
                         </optgroup>
                       </select>
-                      <p className="text-sm text-purple-200 mt-2 font-medium">
-                        ⭐ Это главное поле! Определяет какие характеристики развивает видео
+                      <p
+                        className="flex items-start gap-2"
+                        style={{ ...hintStyle, color: 'var(--color-brand)' }}
+                      >
+                        <Star size={16} style={{ flexShrink: 0, marginTop: 1 }} aria-hidden />
+                        <span>Главное поле: определяет, какие характеристики развивает видео</span>
                       </p>
                     </div>
 
@@ -1647,25 +1934,29 @@ const AdminVideosPage = () => {
 
                   {/* Информация о влиянии на характеристики - СРАЗУ ПОСЛЕ ВЫБОРА */}
                   {formData.типНагрузки && (
-                    <div className="p-4 bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 rounded-lg animate-in fade-in slide-in-from-top-2 duration-300">
-                      <h4 className="text-sm font-semibold text-purple-300 mb-3 flex items-center gap-2">
-                        ✨ Влияние на характеристики пользователя
-                      </h4>
-                      
+                    <div
+                      className="animate-in fade-in slide-in-from-top-2 duration-300"
+                      style={{
+                        padding: 16,
+                        borderRadius: 'var(--radius-md)',
+                        background: 'var(--color-night)',
+                        border: '1px solid var(--border-hairline)',
+                      }}
+                    >
+                      <SectionTitle icon={Sparkles}>Влияние на характеристики пользователя</SectionTitle>
+
                       {(() => {
                         // Определяем, какая характеристика развивается
-                        const loadTypeImpact: { 
-                          [key: string]: { 
-                            char: string; 
-                            emoji: string; 
+                        const loadTypeImpact: {
+                          [key: string]: {
+                            char: string;
                             description: string;
                             loadTypeName: string;
                             gains: { char: string; multiplier: number }[];
-                          } 
+                          }
                         } = {
                           'MAX_STRENGTH': { 
                             char: 'Сила', 
-                            emoji: '💪', 
                             description: 'Развивает максимальную силу мышц',
                             loadTypeName: 'Максимальная сила',
                             gains: [
@@ -1674,7 +1965,6 @@ const AdminVideosPage = () => {
                           },
                           'POWER': { 
                             char: 'Сила', 
-                            emoji: '💪', 
                             description: 'Развивает взрывную силу и мощность',
                             loadTypeName: 'Мощность',
                             gains: [
@@ -1684,7 +1974,6 @@ const AdminVideosPage = () => {
                           },
                           'SPEED': { 
                             char: 'Скорость', 
-                            emoji: '⚡', 
                             description: 'Развивает скоростные качества',
                             loadTypeName: 'Скорость',
                             gains: [
@@ -1694,7 +1983,6 @@ const AdminVideosPage = () => {
                           },
                           'STRENGTH_ENDURANCE': { 
                             char: 'Выносливость', 
-                            emoji: '🫀', 
                             description: 'Развивает силовую выносливость',
                             loadTypeName: 'Силовая выносливость',
                             gains: [
@@ -1703,7 +1991,6 @@ const AdminVideosPage = () => {
                           },
                           'ANAEROBIC_ENDURANCE': { 
                             char: 'Выносливость', 
-                            emoji: '🫀', 
                             description: 'Развивает анаэробную выносливость',
                             loadTypeName: 'Анаэробная выносливость',
                             gains: [
@@ -1712,7 +1999,6 @@ const AdminVideosPage = () => {
                           },
                           'AEROBIC_ENDURANCE': { 
                             char: 'Выносливость', 
-                            emoji: '🫀', 
                             description: 'Развивает аэробную выносливость',
                             loadTypeName: 'Аэробная выносливость',
                             gains: [
@@ -1721,7 +2007,6 @@ const AdminVideosPage = () => {
                           },
                           'AGILITY': { 
                             char: 'Техника', 
-                            emoji: '🎯', 
                             description: 'Развивает ловкость и координацию',
                             loadTypeName: 'Ловкость',
                             gains: [
@@ -1730,7 +2015,6 @@ const AdminVideosPage = () => {
                           },
                           'MOBILITY': { 
                             char: 'Гибкость', 
-                            emoji: '🤸', 
                             description: 'Улучшает подвижность суставов',
                             loadTypeName: 'Мобильность',
                             gains: [
@@ -1740,7 +2024,6 @@ const AdminVideosPage = () => {
                           },
                           'TECHNICAL_SKILL': { 
                             char: 'Техника', 
-                            emoji: '🎯', 
                             description: 'Совершенствует технические навыки',
                             loadTypeName: 'Технические навыки',
                             gains: [
@@ -1749,7 +2032,6 @@ const AdminVideosPage = () => {
                           },
                           'STATIC_STRETCH': { 
                             char: 'Гибкость', 
-                            emoji: '🤸', 
                             description: 'Улучшает гибкость через статическую растяжку',
                             loadTypeName: 'Статическая растяжка',
                             gains: [
@@ -1759,7 +2041,6 @@ const AdminVideosPage = () => {
                           },
                           'DYNAMIC_STRETCH': { 
                             char: 'Гибкость', 
-                            emoji: '🤸', 
                             description: 'Улучшает гибкость через динамическую растяжку',
                             loadTypeName: 'Динамическая растяжка',
                             gains: [
@@ -1769,7 +2050,6 @@ const AdminVideosPage = () => {
                           },
                           'PREHAB': { 
                             char: 'Гибкость', 
-                            emoji: '🤸', 
                             description: 'Профилактика травм и восстановление',
                             loadTypeName: 'ЛФК',
                             gains: [
@@ -1791,41 +2071,93 @@ const AdminVideosPage = () => {
                           return gain.toFixed(2);
                         };
 
+                        const CharIcon = CHAR_ICON[impact.char] || Target;
+
                         return (
                           <div className="space-y-3">
                             {/* Заголовок + LoadType badge в одну строку */}
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <div className="text-2xl">{impact.emoji}</div>
-                                <div>
-                                  <p className="font-semibold text-white text-sm">{impact.char}</p>
-                                  <p className="text-[10px] text-gray-400">{impact.description}</p>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <span
+                                  className="flex items-center justify-center shrink-0"
+                                  style={{
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: 'var(--radius-pill)',
+                                    background: 'var(--lime-subtle)',
+                                  }}
+                                >
+                                  <CharIcon size={20} style={{ color: 'var(--color-brand)' }} aria-hidden />
+                                </span>
+                                <div className="min-w-0">
+                                  <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{impact.char}</p>
+                                  <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '2px 0 0' }}>
+                                    {impact.description}
+                                  </p>
                                 </div>
                               </div>
-                              <div className="px-2 py-1 bg-purple-600/40 rounded text-[10px] text-purple-100 border border-purple-400/30 whitespace-nowrap">
+                              <span
+                                className="shrink-0"
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  padding: '4px 8px',
+                                  borderRadius: 'var(--radius-pill)',
+                                  background: 'var(--lime-subtle)',
+                                  color: 'var(--color-brand)',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
                                 {impact.loadTypeName}
-                              </div>
+                              </span>
                             </div>
-                            
+
                             {/* Прирост - компактно */}
-                            <div className="p-2 bg-black/20 rounded border border-green-500/20">
-                              <p className="text-[10px] font-semibold text-green-300 mb-1">📈 Прирост за модуль (при характеристике 70):</p>
+                            <div
+                              style={{
+                                padding: 12,
+                                borderRadius: 'var(--radius-md)',
+                                background: 'var(--color-surface)',
+                                border: '1px solid var(--border-hairline)',
+                              }}
+                            >
+                              <p
+                                className="flex items-center gap-2"
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  color: 'var(--color-muted)',
+                                  margin: '0 0 8px',
+                                }}
+                              >
+                                <TrendingUp size={16} aria-hidden />
+                                Прирост за модуль (при характеристике 70)
+                              </p>
                               <div className="flex flex-wrap gap-2">
-                                {impact.gains.map((gain, idx) => (
-                                  <div key={idx} className="px-2 py-1 bg-green-900/20 rounded border border-green-500/30 text-xs">
-                                    <span className="text-gray-300">
-                                      {gain.char === 'Сила' && '💪'} 
-                                      {gain.char === 'Скорость' && '⚡'} 
-                                      {gain.char === 'Выносливость' && '🫀'} 
-                                      {gain.char === 'Техника' && '🎯'} 
-                                      {gain.char === 'Гибкость' && '🤸'} 
+                                {impact.gains.map((gain, idx) => {
+                                  const GainIcon = CHAR_ICON[gain.char] || Target;
+                                  return (
+                                    <span
+                                      key={idx}
+                                      className="inline-flex items-center gap-1"
+                                      style={{
+                                        padding: '4px 8px',
+                                        borderRadius: 'var(--radius-pill)',
+                                        background: 'var(--lime-subtle)',
+                                        border: '1px solid var(--border-lime)',
+                                        fontSize: 12,
+                                      }}
+                                    >
+                                      <GainIcon size={16} style={{ color: 'var(--color-muted)' }} aria-hidden />
+                                      <span style={{ fontWeight: 700, color: 'var(--color-brand)' }}>
+                                        +{calculateExampleGain(gain.multiplier)}
+                                      </span>
+                                      {gain.multiplier === 1.5 && (
+                                        <Star size={16} style={{ color: 'var(--color-brand)' }} aria-hidden />
+                                      )}
                                     </span>
-                                    <span className="font-mono text-green-400 font-bold ml-1">
-                                      +{calculateExampleGain(gain.multiplier)}
-                                      {gain.multiplier === 1.5 && <span className="text-yellow-400 ml-0.5">⭐</span>}
-                                    </span>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           </div>
@@ -1839,82 +2171,83 @@ const AdminVideosPage = () => {
                     
                     {/* Тип модуля */}
                     <div>
-                      <label className="block text-sm font-medium mb-2">
+                      <label style={labelStyle}>
                         Тип модуля в тренировке
                       </label>
                       <select
                         name="типМодуля"
                         value={formData.типМодуля}
                         onChange={handleChange}
-                        className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                        style={inputStyle}
                       >
                         <option value="">Не указано</option>
-                        <option value="Разминка">🔥 Разминка</option>
-                        <option value="ОФП">💪 ОФП (физподготовка)</option>
-                        <option value="Техника">🎯 Техника</option>
-                        <option value="Заминка">🧘 Заминка</option>
+                        <option value="Разминка">Разминка</option>
+                        <option value="ОФП">ОФП (физподготовка)</option>
+                        <option value="Техника">Техника</option>
+                        <option value="Заминка">Заминка</option>
                       </select>
-                      <p className="text-xs text-gray-400 mt-1">В какой части тренировки используется</p>
+                      <p style={hintStyle}>В какой части тренировки используется</p>
                     </div>
 
                     {/* Сложность для алгоритма */}
                     <div>
-                      <label className="block text-sm font-medium mb-2">
+                      <label style={labelStyle}>
                         Уровень подготовки
                       </label>
                       <select
                         name="сложность"
                         value={formData.сложность}
                         onChange={handleChange}
-                        className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                        style={inputStyle}
                       >
                         <option value="">Не указано</option>
-                        <option value="Новичок">🟢 Новичок</option>
-                        <option value="Любитель">🔵 Любитель</option>
-                        <option value="Продвинутый">🟠 Продвинутый</option>
-                        <option value="Профи">🔴 Профи</option>
+                        <option value="Новичок">Новичок</option>
+                        <option value="Любитель">Любитель</option>
+                        <option value="Продвинутый">Продвинутый</option>
+                        <option value="Профи">Профи</option>
                       </select>
-                      <p className="text-xs text-gray-400 mt-1">Для кого подходит упражнение</p>
+                      <p style={hintStyle}>Для кого подходит упражнение</p>
                     </div>
 
                   </div>
 
                   {/* Строка 3: Группа мышц */}
                   <div className="grid grid-cols-1 gap-4">
-                    
+
                     {/* Группа мышц */}
                     <div>
-                      <label className="block text-sm font-medium mb-2">
+                      <label style={labelStyle}>
                         Целевая группа мышц
                       </label>
                       <select
                         name="группаМышц"
                         value={formData.группаМышц}
                         onChange={handleChange}
-                        className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                        style={inputStyle}
                       >
                         <option value="">Не указано</option>
-                        <option value="Все тело">🔄 Все тело</option>
-                        <option value="Низ тела">🦵 Низ тела (ноги)</option>
-                        <option value="Верх тяга">💪 Верх тела (тяга)</option>
-                        <option value="Верх жим">🏋️ Верх тела (жим)</option>
-                        <option value="Кор стабилизация">⚖️ Кор стабилизация</option>
-                        <option value="Кор динамика">🔥 Кор динамика</option>
-                        <option value="ЛФК плечо">🩹 ЛФК плечо</option>
-                        <option value="ЛФК колено">🩹 ЛФК колено</option>
-                        <option value="ЛФК спина">🩹 ЛФК спина</option>
+                        <option value="Все тело">Все тело</option>
+                        <option value="Низ тела">Низ тела (ноги)</option>
+                        <option value="Верх тяга">Верх тела (тяга)</option>
+                        <option value="Верх жим">Верх тела (жим)</option>
+                        <option value="Кор стабилизация">Кор стабилизация</option>
+                        <option value="Кор динамика">Кор динамика</option>
+                        <option value="ЛФК плечо">ЛФК плечо</option>
+                        <option value="ЛФК колено">ЛФК колено</option>
+                        <option value="ЛФК спина">ЛФК спина</option>
                       </select>
-                      <p className="text-xs text-gray-400 mt-1">На какие мышцы воздействует</p>
+                      <p style={hintStyle}>На какие мышцы воздействует</p>
                     </div>
 
                   </div>
 
                   {/* Строка 4: RPE (метрика нагрузки) */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    
+
                     <div>
-                      <label className="block text-sm font-medium mb-2">
-                        📊 RPE минимум (1-10)
+                      <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Gauge size={16} aria-hidden />
+                        RPE минимум (1-10)
                       </label>
                       <input
                         type="number"
@@ -1924,14 +2257,15 @@ const AdminVideosPage = () => {
                         min="1"
                         max="10"
                         placeholder="Например: 3"
-                        className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                        style={inputStyle}
                       />
-                      <p className="text-xs text-gray-400 mt-1">Минимальные усилия/энергозатраты</p>
+                      <p style={hintStyle}>Минимальные усилия/энергозатраты</p>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium mb-2">
-                        📊 RPE максимум (1-10)
+                      <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Gauge size={16} aria-hidden />
+                        RPE максимум (1-10)
                       </label>
                       <input
                         type="number"
@@ -1941,123 +2275,127 @@ const AdminVideosPage = () => {
                         min="1"
                         max="10"
                         placeholder="Например: 7"
-                        className="w-full bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                        style={inputStyle}
                       />
-                      <p className="text-xs text-gray-400 mt-1">Максимальные усилия/энергозатраты</p>
+                      <p style={hintStyle}>Максимальные усилия/энергозатраты</p>
                     </div>
 
                   </div>
 
                 </div>
-              </fieldset>
+              </FormSection>
               )}
 
               {/* Секция 2: Цели и возрастные группы */}
               {algorithmSubTab === 'targeting' && (
-              <fieldset className="border border-green-500/30 rounded-lg p-4 md:p-6 bg-green-900/10">
-                <legend className="px-3 text-base font-bold text-green-300">🎯 Цели и возрастные группы</legend>
-                
-                <div className="bg-green-900/20 border border-green-500/20 rounded-lg p-3 mb-4">
-                  <p className="text-xs text-gray-300">
-                    💡 Укажите, для каких целей тренировок и возрастных групп подходит это видео
-                  </p>
-                </div>
+              <FormSection icon={Target} title="Цели и возрастные группы">
+                <Hint>Укажите, для каких целей тренировок и возрастных групп подходит это видео</Hint>
 
                 <div className="space-y-6">
-                  
+
                   {/* Возрастные группы (множественный выбор) */}
                   <div>
-                    <label className="block text-sm font-medium mb-2 text-green-300">
-                      👥 Возрастные группы
+                    <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Users size={16} aria-hidden />
+                      Возрастные группы
                     </label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       {Object.values(AgeGroup).map((group) => {
                         const labels: Record<string, string> = {
-                          CHILD: '👶 Дети (до 12 лет)',
-                          TEEN: '🧒 Подростки (13-17 лет)',
-                          YOUNG_ADULT: '👨 Молодые (18-35 лет)',
-                          ADULT: '👴 Взрослые (36+ лет)',
+                          CHILD: 'Дети (до 12 лет)',
+                          TEEN: 'Подростки (13-17 лет)',
+                          YOUNG_ADULT: 'Молодые (18-35 лет)',
+                          ADULT: 'Взрослые (36+ лет)',
                         };
-                        
+
                         return (
-                          <label key={group} className="flex items-center gap-2 p-2 rounded hover:bg-green-900/20 cursor-pointer transition-colors">
-                            <input
-                              type="checkbox"
-                              checked={formData.ageGroups.includes(group)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setFormData(prev => ({
-                                    ...prev,
-                                    ageGroups: [...prev.ageGroups, group]
-                                  }));
-                                } else {
-                                  setFormData(prev => ({
-                                    ...prev,
-                                    ageGroups: prev.ageGroups.filter(g => g !== group)
-                                  }));
-                                }
-                              }}
-                              className="w-5 h-5 rounded border-2 border-green-500 bg-[#2d3448] checked:bg-green-600 checked:border-green-600 focus:ring-2 focus:ring-green-500 cursor-pointer"
-                            />
-                            <span className="text-sm text-gray-200">{labels[group]}</span>
-                          </label>
+                          <CheckRow
+                            key={group}
+                            icon={AGE_GROUP_ICON[group]}
+                            checked={formData.ageGroups.includes(group)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  ageGroups: [...prev.ageGroups, group]
+                                }));
+                              } else {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  ageGroups: prev.ageGroups.filter(g => g !== group)
+                                }));
+                              }
+                            }}
+                          >
+                            {labels[group]}
+                          </CheckRow>
                         );
                       })}
                     </div>
-                    <p className="text-xs text-gray-400 mt-2">
-                      ✓ Выбрано: {formData.ageGroups.length > 0 ? `${formData.ageGroups.length} из 4` : 'Не указано'}
+                    <p className="flex items-center gap-1" style={{ ...hintStyle, marginTop: 8 }}>
+                      <Check size={16} aria-hidden />
+                      Выбрано: {formData.ageGroups.length > 0 ? `${formData.ageGroups.length} из 4` : 'Не указано'}
                     </p>
 
                     {/* СФП — подходит не только хоккею */}
-                    <div className="mt-5 pt-4 border-t border-green-900/40">
-                      <label className="flex items-center gap-2 p-2 rounded hover:bg-green-900/20 cursor-pointer transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={formData.isSfp}
-                          onChange={(e) =>
-                            setFormData(prev => ({
-                              ...prev,
-                              isSfp: e.target.checked,
-                              sports: e.target.checked ? prev.sports : [],
-                            }))
-                          }
-                          className="w-5 h-5 rounded border-2 border-green-500 bg-[#2d3448] checked:bg-green-600 checked:border-green-600 focus:ring-2 focus:ring-green-500 cursor-pointer"
-                        />
-                        <span className="text-sm font-medium text-green-300">🏋️ СФП (общая физподготовка)</span>
-                      </label>
-                      <p className="text-xs text-gray-400 ml-9 -mt-1">
+                    <div
+                      style={{
+                        marginTop: 24,
+                        paddingTop: 16,
+                        borderTop: '1px solid var(--border-hairline)',
+                      }}
+                    >
+                      <CheckRow
+                        icon={Dumbbell}
+                        checked={formData.isSfp}
+                        onChange={(e) =>
+                          setFormData(prev => ({
+                            ...prev,
+                            isSfp: e.target.checked,
+                            sports: e.target.checked ? prev.sports : [],
+                          }))
+                        }
+                      >
+                        СФП (общая физподготовка)
+                      </CheckRow>
+                      <p style={{ ...hintStyle, paddingLeft: 8 }}>
                         Тренировка подходит не только хоккею — укажи виды спорта
                       </p>
 
                       {formData.isSfp && (
-                        <div className="mt-3 ml-9">
-                          <div className="grid grid-cols-2 gap-2">
+                        <div style={{ marginTop: 12, paddingLeft: 32 }}>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {([
-                              ['HOCKEY', '🏒 Хоккей'],
-                              ['FOOTBALL', '⚽ Футбол'],
-                              ['BASKETBALL', '🏀 Баскетбол'],
-                              ['BOXING', '🥊 Бокс'],
+                              ['HOCKEY', 'Хоккей'],
+                              ['FOOTBALL', 'Футбол'],
+                              ['BASKETBALL', 'Баскетбол'],
+                              ['BOXING', 'Бокс'],
                             ] as const).map(([value, label]) => (
-                              <label key={value} className="flex items-center gap-2 p-2 rounded hover:bg-green-900/20 cursor-pointer transition-colors">
-                                <input
-                                  type="checkbox"
-                                  checked={formData.sports.includes(value)}
-                                  onChange={(e) =>
-                                    setFormData(prev => ({
-                                      ...prev,
-                                      sports: e.target.checked
-                                        ? [...prev.sports, value]
-                                        : prev.sports.filter(s => s !== value),
-                                    }))
-                                  }
-                                  className="w-5 h-5 rounded border-2 border-green-500 bg-[#2d3448] checked:bg-green-600 checked:border-green-600 focus:ring-2 focus:ring-green-500 cursor-pointer"
-                                />
-                                <span className="text-sm text-gray-200">{label}</span>
-                              </label>
+                              <CheckRow
+                                key={value}
+                                icon={SPORT_ICON[value]}
+                                checked={formData.sports.includes(value)}
+                                onChange={(e) =>
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    sports: e.target.checked
+                                      ? [...prev.sports, value]
+                                      : prev.sports.filter(s => s !== value),
+                                  }))
+                                }
+                              >
+                                {label}
+                              </CheckRow>
                             ))}
                           </div>
                           {formData.sports.length === 0 && (
-                            <p className="text-xs text-amber-400 mt-2">Выбери хотя бы один вид спорта</p>
+                            <p
+                              className="flex items-center gap-2"
+                              style={{ ...hintStyle, marginTop: 8, color: 'var(--color-danger)' }}
+                            >
+                              <AlertTriangle size={16} aria-hidden />
+                              Выбери хотя бы один вид спорта
+                            </p>
                           )}
                         </div>
                       )}
@@ -2066,168 +2404,264 @@ const AdminVideosPage = () => {
 
                   {/* Цели тренировок (множественный выбор) */}
                   <div>
-                    <label className="block text-sm font-medium mb-2 text-green-300">
-                      🎯 Цели тренировок
+                    <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Target size={16} aria-hidden />
+                      Цели тренировок
                     </label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                    {/* max-h убран: целей всего 7, скрытый скролл прятал часть списка */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       {Object.values(TrainingGoal).map((goal) => {
                         const goalInfo = GOAL_LABELS[goal];
                         return (
-                          <label key={goal} className="flex items-center gap-2 p-2 rounded hover:bg-green-900/20 cursor-pointer transition-colors">
-                            <input
-                              type="checkbox"
-                              checked={formData.trainingGoals.includes(goal)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setFormData(prev => ({
-                                    ...prev,
-                                    trainingGoals: [...prev.trainingGoals, goal]
-                                  }));
-                                } else {
-                                  setFormData(prev => ({
-                                    ...prev,
-                                    trainingGoals: prev.trainingGoals.filter(g => g !== goal)
-                                  }));
-                                }
-                              }}
-                              className="w-5 h-5 rounded border-2 border-green-500 bg-[#2d3448] checked:bg-green-600 checked:border-green-600 focus:ring-2 focus:ring-green-500 cursor-pointer"
-                            />
-                            <span className="text-sm text-gray-200">{goalInfo.emoji} {goalInfo.label}</span>
-                          </label>
+                          <CheckRow
+                            key={goal}
+                            icon={GOAL_ICON[goal] || Target}
+                            checked={formData.trainingGoals.includes(goal)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  trainingGoals: [...prev.trainingGoals, goal]
+                                }));
+                              } else {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  trainingGoals: prev.trainingGoals.filter(g => g !== goal)
+                                }));
+                              }
+                            }}
+                          >
+                            {goalInfo.label}
+                          </CheckRow>
                         );
                       })}
                     </div>
-                    <p className="text-xs text-gray-400 mt-2">
-                      ✓ Выбрано: {formData.trainingGoals.length > 0 ? `${formData.trainingGoals.length} из 7` : 'Не указано'}
+                    <p className="flex items-center gap-1" style={{ ...hintStyle, marginTop: 8 }}>
+                      <Check size={16} aria-hidden />
+                      Выбрано: {formData.trainingGoals.length > 0 ? `${formData.trainingGoals.length} из 7` : 'Не указано'}
                     </p>
                   </div>
 
                 </div>
-              </fieldset>
+              </FormSection>
               )}
 
               </div>
               )}
 
               {/* Кнопки управления (всегда видны) */}
-              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
-                <button
+              <div className="flex flex-wrap justify-end gap-3" style={{ paddingTop: 16 }}>
+                <AdminButton
                   type="button"
+                  tone="secondary"
+                  icon={X}
                   onClick={() => setShowForm(false)}
-                  className="w-full sm:w-auto px-6 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg font-semibold transition-colors"
                 >
                   Отмена
-                </button>
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full sm:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors disabled:opacity-50"
-                >
+                </AdminButton>
+                <AdminButton type="submit" tone="primary" disabled={isLoading}>
+                  {isLoading ? (
+                    <Loader2 size={20} className="animate-spin" aria-hidden />
+                  ) : (
+                    <Save size={20} aria-hidden />
+                  )}
                   {isLoading ? 'Сохранение...' : editingVideoId ? 'Сохранить изменения' : 'Добавить видео'}
-                </button>
+                </AdminButton>
               </div>
             </form>
-          </div>
+          </AdminCard>
         )}
 
         {/* Список видео */}
-        <div className="bg-[#1a1f3a] rounded-lg p-4 md:p-6 border border-white/5">
-          <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Все видео</h2>
-          {videos.length === 0 ? (
-            <p className="text-gray-400 text-center py-8">Видео пока нет. Добавьте первое!</p>
+        <div>
+          <SectionTitle icon={VideoIcon}>Все видео</SectionTitle>
+          {isListLoading ? (
+            // Скелетон, а не «Видео пока нет»: пустое состояние больше не врёт при загрузке
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="animate-pulse"
+                  style={{
+                    height: 148,
+                    borderRadius: 'var(--radius-md)',
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--border-hairline)',
+                  }}
+                />
+              ))}
+            </div>
+          ) : listError ? (
+            <EmptyState
+              tone="danger"
+              icon={AlertTriangle}
+              title="Не удалось загрузить список видео"
+              hint="Обновите страницу или проверьте соединение"
+            />
+          ) : videos.length === 0 ? (
+            <EmptyState
+              icon={VideoOff}
+              title="Видео пока нет"
+              hint="Нажмите «Добавить видео», чтобы создать первое"
+            />
           ) : (
             <div className="space-y-3">
-              {videos.map((video) => (
-                <div key={video.id} className="bg-[#2d3448] rounded-lg p-4 relative">
-                  {/* Статус в правом верхнем углу */}
-                  <div className="absolute top-4 right-4">
-                    <span className={`inline-block px-2 py-1 rounded-full text-xs ${video.isPublished ? 'bg-green-600' : 'bg-gray-600'}`}>
+              {videos.map((video) => {
+                const missingFields = getMissingAlgorithmFields(video);
+                const ModuleIcon =
+                  (video.типМодуля && MODULE_TYPE_ICON[video.типМодуля]) || VideoIcon;
+                return (
+                <AdminCard key={video.id}>
+                  {/* Шапка: заголовок в потоке + статус справа (был absolute + pr-28) */}
+                  <div className="flex items-start justify-between gap-3">
+                    <h3
+                      className="flex-1 min-w-0 line-clamp-2"
+                      style={{ fontSize: 16, fontWeight: 700, margin: 0 }}
+                    >
+                      {video.title}
+                    </h3>
+                    <span
+                      className="shrink-0 inline-flex items-center gap-1"
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        padding: '4px 12px',
+                        borderRadius: 'var(--radius-pill)',
+                        background: video.isPublished
+                          ? 'var(--lime-subtle)'
+                          : 'rgba(174,171,187,0.15)',
+                        color: video.isPublished ? 'var(--color-brand)' : 'var(--color-muted)',
+                      }}
+                    >
+                      {video.isPublished ? <Eye size={16} aria-hidden /> : <EyeOff size={16} aria-hidden />}
                       {video.isPublished ? 'Опубликовано' : 'Черновик'}
                     </span>
                   </div>
-                  
-                  {/* Название видео */}
-                  <h3 className="font-semibold text-base md:text-lg mb-2 pr-28">{video.title}</h3>
 
-                  {(() => {
-                    const missingFields = getMissingAlgorithmFields(video);
-                    if (missingFields.length === 0) return null;
-                    return (
-                      <div className="mb-2 text-xs text-red-300">
-                        ⚠️ Не заполнено: {missingFields.join(', ')}
-                      </div>
-                    );
-                  })()}
-                  
+                  {missingFields.length > 0 && (
+                    <div
+                      className="flex items-start gap-2"
+                      style={{
+                        marginTop: 12,
+                        padding: 12,
+                        borderRadius: 'var(--radius-md)',
+                        background: 'rgba(255,140,74,0.12)',
+                        border: '1px solid rgba(255,140,74,0.30)',
+                        fontSize: 13,
+                        color: 'var(--color-danger)',
+                      }}
+                    >
+                      <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} aria-hidden />
+                      <span>Не заполнено: {missingFields.join(', ')}</span>
+                    </div>
+                  )}
+
                   {/* Тип модуля (если указан) */}
                   {video.типМодуля && (
-                    <div className="mb-2">
-                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
-                        video.типМодуля === 'Разминка' ? 'bg-orange-600/20 text-orange-300 border border-orange-500/30' :
-                        video.типМодуля === 'ОФП' ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30' :
-                        video.типМодуля === 'Техника' ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30' :
-                        video.типМодуля === 'Заминка' ? 'bg-green-600/20 text-green-300 border border-green-500/30' :
-                        'bg-gray-600/20 text-gray-300 border border-gray-500/30'
-                      }`}>
-                        {video.типМодуля === 'Разминка' ? '🔥' :
-                         video.типМодуля === 'ОФП' ? '💪' :
-                         video.типМодуля === 'Техника' ? '🎯' :
-                         video.типМодуля === 'Заминка' ? '🧘' : '📹'}
+                    <div style={{ marginTop: 12 }}>
+                      <span
+                        className="inline-flex items-center gap-1"
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          padding: '4px 12px',
+                          borderRadius: 'var(--radius-pill)',
+                          background: 'var(--lime-subtle)',
+                          border: '1px solid var(--border-lime)',
+                          color: 'var(--color-brand)',
+                        }}
+                      >
+                        <ModuleIcon size={16} aria-hidden />
                         {video.типМодуля}
                       </span>
                     </div>
                   )}
-                  
+
                   {/* Информация о тренере */}
-                  <p className="text-xs md:text-sm text-gray-400 mb-2 truncate">
+                  <p
+                    className="truncate"
+                    style={{ fontSize: 13, color: 'var(--color-muted)', margin: '12px 0 0' }}
+                  >
                     Тренер: {video.trainer.name}
                   </p>
-                  
+
                   {/* Категория и длительность */}
-                  <p className="text-xs md:text-sm text-gray-400 mb-3">
+                  <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '4px 0 0' }}>
                     {video.category} • {video.durationFormatted || formatDuration(video.duration)}
                   </p>
-                  
-                  {/* Кнопки */}
-                  <div className="flex flex-wrap gap-2 mt-4">
-                    <button
+
+                  {/* Кнопки: одно primary-действие, остальные — ghost */}
+                  <div className="flex flex-wrap items-center gap-2" style={{ marginTop: 16 }}>
+                    <AdminButton
+                      type="button"
+                      tone="secondary"
+                      icon={Pencil}
                       onClick={() => handleEditVideo(video)}
-                      className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-sm font-semibold transition-colors"
                     >
                       Редактировать
-                    </button>
+                    </AdminButton>
                     <Link
                       href={`/video/${video.id}`}
-                      className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-semibold transition-colors"
+                      className="inline-flex items-center justify-center gap-2 transition-opacity hover:opacity-85"
+                      style={{
+                        minHeight: 44,
+                        padding: '10px 20px',
+                        borderRadius: 'var(--radius-pill)',
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: 'var(--color-ink)',
+                        border: '1px solid var(--border-hairline)',
+                      }}
                     >
+                      <Eye size={20} aria-hidden />
                       Просмотр
                     </Link>
-                    <button
+                    <AdminButton
+                      type="button"
+                      tone={video.athletesNotifiedAt ? 'secondary' : 'primary'}
                       onClick={() => handleNotifyAthletes(video)}
                       disabled={!video.isPublished}
                       title={!video.isPublished ? 'Сначала опубликуйте видео' : undefined}
-                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                        video.athletesNotifiedAt
-                          ? 'bg-[#101530] text-[#A1FF4A] border border-[#A1FF4A]/40 hover:bg-[#A1FF4A]/10'
-                          : 'bg-[#A1FF4A] text-[#060919] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed'
-                      }`}
                     >
-                      {video.athletesNotifiedAt ? '🔔 Уведомлены ✓' : '🔔 Опубликовать для атлетов'}
-                    </button>
+                      {video.athletesNotifiedAt ? (
+                        <>
+                          <BellRing size={20} aria-hidden />
+                          Уведомлены
+                          <Check size={20} aria-hidden />
+                        </>
+                      ) : (
+                        <>
+                          <Bell size={20} aria-hidden />
+                          Опубликовать для атлетов
+                        </>
+                      )}
+                    </AdminButton>
                     <button
+                      type="button"
                       onClick={() => handleDeleteVideo(video.id)}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-semibold transition-colors"
+                      aria-label="Удалить видео"
+                      title="Удалить видео"
+                      className="ml-auto inline-flex items-center justify-center transition-opacity hover:opacity-85"
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 'var(--radius-pill)',
+                        background: 'transparent',
+                        border: '1px solid rgba(255,140,74,0.30)',
+                        color: 'var(--color-danger)',
+                        cursor: 'pointer',
+                      }}
                     >
-                      Удалить
+                      <Trash2 size={20} aria-hidden />
                     </button>
                   </div>
-                </div>
-              ))}
+                </AdminCard>
+                );
+              })}
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </AdminPage>
   );
 };
 

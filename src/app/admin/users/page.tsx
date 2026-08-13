@@ -1,8 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
+import React, { useState, useEffect } from 'react';
+import {
+  AdminPage,
+  PageHeader,
+  SectionTitle,
+  AdminCard,
+  Kpi,
+  AdminButton,
+  EmptyState,
+  inputStyle,
+  labelStyle,
+} from '@/components/admin/ui';
+import {
+  Activity, AlertTriangle, BadgeCheck, BarChart3, Bell, ChevronsUp, Contact,
+  Crown, Dumbbell, FilterX, Flame, FlaskConical, Heart, Link2, Loader2, Mail,
+  MailCheck, MessageCircle, Radio, RefreshCw, RotateCcw, Search, SearchX, Star,
+  Trash2, UserCircle, UserPlus, Users, Wrench, X,
+  type LucideIcon,
+} from 'lucide-react';
 
 interface UserProfile {
   position: string | null;
@@ -58,10 +74,69 @@ interface TotalStats {
   verifiedEmails: number;
 }
 
+/* ─── Локальные примитивы страницы ─────────────────────────────────────── */
+
+/** Бейдж-статус (Online / Новый / Push / PREMIUM). Всегда одна строка. */
+function Badge({
+  icon: Icon,
+  children,
+  tone = 'muted',
+}: {
+  icon?: LucideIcon;
+  children: React.ReactNode;
+  tone?: 'muted' | 'brand';
+}) {
+  const brand = tone === 'brand';
+  return (
+    <span
+      className="inline-flex items-center gap-1 shrink-0 whitespace-nowrap"
+      style={{
+        fontSize: 12,
+        fontWeight: 700,
+        padding: '4px 8px',
+        borderRadius: 'var(--radius-pill)',
+        color: brand ? 'var(--color-brand)' : 'var(--color-muted)',
+        background: brand ? 'var(--lime-subtle)' : 'transparent',
+        border: `1px solid ${brand ? 'var(--border-lime)' : 'var(--border-hairline)'}`,
+      }}
+    >
+      {Icon && <Icon size={16} aria-hidden />}
+      {children}
+    </span>
+  );
+}
+
+/** Строка «подпись — значение» внутри карточки модалки. */
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div
+      className="flex items-center justify-between gap-4"
+      style={{ padding: '8px 0', fontSize: 14 }}
+    >
+      <span className="shrink-0" style={{ color: 'var(--color-muted)' }}>
+        {label}
+      </span>
+      <span className="min-w-0 text-right truncate">{value}</span>
+    </div>
+  );
+}
+
+/** Включённый тоггл: заливка лаймом, вместо инверсии «вкл = тревожный янтарь». */
+const toggleOn = (on: boolean): React.CSSProperties =>
+  on
+    ? {
+        background: 'var(--lime-medium)',
+        color: 'var(--color-brand)',
+        border: '1px solid var(--border-lime)',
+      }
+    : {};
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [totalStats, setTotalStats] = useState<TotalStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Ошибка загрузки списка: раньше падение фетча оставляло вечный пустой список.
+  const [loadError, setLoadError] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSubscribed, setFilterSubscribed] = useState<boolean | null>(null);
   const [sortBy, setSortBy] = useState<'createdAt' | 'lastActivity' | 'sessions'>('lastActivity');
@@ -110,6 +185,21 @@ export default function AdminUsersPage() {
       .catch(() => {});
   }, []);
 
+  // Закрытие модалок по Escape (сначала вложенный пикер, затем карточка юзера).
+  useEffect(() => {
+    if (!selectedUser && !refPickerUser) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (refPickerUser) {
+        if (!refSaving) setRefPickerUser(null);
+      } else {
+        setSelectedUser(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedUser, refPickerUser, refSaving]);
+
   const fetchUsers = async (silent = false) => {
     try {
       if (!silent) setIsLoading(true);
@@ -134,8 +224,7 @@ export default function AdminUsersPage() {
         
         if (updated.size > 0) {
           setUpdatedUserIds(updated);
-          console.log(`📊 Обновлено пользователей: ${updated.size}`);
-          
+
           // Убираем подсветку через 3 секунды
           setTimeout(() => {
             setUpdatedUserIds(new Set());
@@ -146,9 +235,11 @@ export default function AdminUsersPage() {
       setUsers(data.users || []);
       setTotalStats(data.stats || null);
       setLastUpdate(new Date());
-      
+      setLoadError(false);
+
     } catch (error) {
       console.error('Error fetching users:', error);
+      setLoadError(true);
     } finally {
       if (!silent) setIsLoading(false);
     }
@@ -469,539 +560,657 @@ export default function AdminUsersPage() {
     'RIGHT_WING': 'Правый крайний'
   };
 
+  // Плейсхолдер загрузки повторяет геометрию реального экрана (4 KPI + 5 строк),
+  // чтобы после отрисовки данных не было прыжка вёрстки.
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#101530] text-white p-4 md:p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center gap-3 mb-6">
-            <Link href="/admin">
-              <div className="w-10 h-10 rounded-full bg-[#1a1f3a] flex items-center justify-center">
-                <div className="w-5 h-5 bg-gray-700 animate-pulse rounded" />
-              </div>
-            </Link>
-            <div className="h-8 w-48 bg-gray-700 animate-pulse rounded" />
-          </div>
-          <div className="space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="bg-[#1a1f3a] rounded-lg p-4 animate-pulse">
-                <div className="h-6 w-3/4 bg-gray-700 rounded mb-2" />
-                <div className="h-4 w-1/2 bg-gray-700 rounded" />
-              </div>
-            ))}
-          </div>
+      <AdminPage>
+        <PageHeader title="Пользователи" icon={Users} subtitle="Загружаю…" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="animate-pulse"
+              style={{
+                height: 96,
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-surface)',
+                border: '1px solid var(--border-hairline)',
+              }}
+            />
+          ))}
         </div>
-      </div>
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={i}
+              className="animate-pulse"
+              style={{
+                height: 108,
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-surface)',
+                border: '1px solid var(--border-hairline)',
+              }}
+            />
+          ))}
+        </div>
+      </AdminPage>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#101530] text-white p-4 md:p-8" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <Link href="/admin">
-              <button className="w-10 h-10 rounded-full bg-[#1a1f3a] hover:bg-[#2d3448] flex items-center justify-center transition-colors">
-                <Image 
-                  src="/icons/arrow.svg" 
-                  alt="Назад" 
-                  width={20} 
-                  height={20}
-                  style={{ transform: 'rotate(180deg)' }}
-                />
-              </button>
-            </Link>
-            <h1 className="text-2xl md:text-3xl font-bold">Пользователи</h1>
-          </div>
-
-          {/* Live режим */}
-          <div className="flex items-center gap-3">
-            <button
+    <AdminPage>
+      <PageHeader
+        title="Пользователи"
+        icon={Users}
+        subtitle={`Обновлено в ${lastUpdate.toLocaleTimeString('ru-RU')}`}
+        actions={
+          <>
+            <AdminButton
+              tone="secondary"
               onClick={() => fetchUsers(false)}
               disabled={isLoading}
-              className="p-2 rounded-lg bg-[#1a1f3a] hover:bg-[#2d3448] transition-colors disabled:opacity-50"
+              aria-label="Обновить список"
               title="Обновить вручную"
+              style={{ width: 44, padding: 0 }}
             >
-              <svg 
-                className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`}
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
-                />
-              </svg>
-            </button>
-            
-            <button
+              <RefreshCw size={20} className={isLoading ? 'animate-spin' : ''} aria-hidden />
+            </AdminButton>
+
+            {/* Фиксированная ширина: раньше при LIVE→OFF шапка дёргалась */}
+            <AdminButton
+              tone="secondary"
               onClick={() => setIsLive(!isLive)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                isLive 
-                  ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' 
-                  : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
-              }`}
+              aria-pressed={isLive}
+              title={isLive ? 'Автообновление включено' : 'Автообновление выключено'}
+              style={{ minWidth: 104, ...toggleOn(isLive) }}
             >
-              <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`} />
-              <span className="text-sm font-medium">{isLive ? 'LIVE' : 'OFF'}</span>
-            </button>
-            
-            <div className="text-xs text-gray-400 hidden md:block">
-              {lastUpdate.toLocaleTimeString('ru-RU')}
+              <Radio size={20} aria-hidden />
+              {isLive ? 'LIVE' : 'OFF'}
+            </AdminButton>
+          </>
+        }
+      />
+
+      {loadError && (
+        <div className="mb-6">
+          <AdminCard tone="danger">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <AlertTriangle size={20} style={{ color: 'var(--color-danger)' }} aria-hidden />
+                <span style={{ fontSize: 14 }}>Не удалось загрузить список пользователей.</span>
+              </div>
+              <AdminButton tone="secondary" size="sm" icon={RefreshCw} onClick={() => fetchUsers(false)}>
+                Повторить
+              </AdminButton>
             </div>
-          </div>
+          </AdminCard>
         </div>
+      )}
 
-        {/* Общая статистика */}
-        {totalStats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-[#1a1f3a] rounded-lg p-4">
-              <p className="text-gray-400 text-sm mb-1">Всего</p>
-              <p className="text-2xl font-bold">{totalStats.totalUsers}</p>
-            </div>
-            <div className="bg-[#1a1f3a] rounded-lg p-4">
-              <p className="text-gray-400 text-sm mb-1">Активных</p>
-              <p className="text-2xl font-bold text-green-400">{totalStats.activeUsers}</p>
-            </div>
-            <div className="bg-[#1a1f3a] rounded-lg p-4">
-              <p className="text-gray-400 text-sm mb-1">Подписаны на push</p>
-              <p className="text-2xl font-bold text-blue-400">{totalStats.subscribedUsers}</p>
-            </div>
-            <div className="bg-[#1a1f3a] rounded-lg p-4">
-              <p className="text-gray-400 text-sm mb-1">Email подтверждён</p>
-              <p className="text-2xl font-bold text-purple-400">{totalStats.verifiedEmails}</p>
-            </div>
-          </div>
-        )}
+      {/* ───────── Общая статистика ───────── */}
+      {totalStats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <Kpi icon={Users} label="Всего" value={totalStats.totalUsers} />
+          <Kpi
+            icon={Activity}
+            label="Активных"
+            value={totalStats.activeUsers}
+            accent={totalStats.activeUsers > 0}
+          />
+          <Kpi icon={Bell} label="Подписаны на push" value={totalStats.subscribedUsers} />
+          <Kpi icon={MailCheck} label="Email подтверждён" value={totalStats.verifiedEmails} />
+        </div>
+      )}
 
-        {/* Фильтры и поиск */}
-        <div className="bg-[#1a1f3a] rounded-lg p-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Поиск */}
+      {/* ───────── Фильтры и поиск ───────── */}
+      <AdminCard className="mb-6">
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search
+              size={16}
+              aria-hidden
+              style={{
+                position: 'absolute',
+                left: 14,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--color-muted)',
+                pointerEvents: 'none',
+              }}
+            />
             <input
               type="text"
-              placeholder="Поиск по имени, username, Telegram ID..."
+              placeholder="Поиск по имени, username, Telegram ID…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+              style={{ ...inputStyle, padding: '10px 44px' }}
             />
-
-            {/* Фильтр по подписке */}
-            <select
-              value={filterSubscribed === null ? 'all' : filterSubscribed.toString()}
-              onChange={(e) => setFilterSubscribed(
-                e.target.value === 'all' ? null : e.target.value === 'true'
-              )}
-              className="bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-            >
-              <option value="all">Все подписки</option>
-              <option value="true">Подписаны на push</option>
-              <option value="false">Не подписаны</option>
-            </select>
-
-            {/* Сортировка */}
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-[#2d3448] text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-            >
-              <option value="lastActivity">По активности</option>
-              <option value="createdAt">По дате регистрации</option>
-              <option value="sessions">По тренировкам</option>
-            </select>
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                aria-label="Очистить поиск"
+                className="inline-flex items-center justify-center"
+                style={{
+                  position: 'absolute',
+                  right: 2,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: 40,
+                  height: 40,
+                  borderRadius: 'var(--radius-pill)',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--color-muted)',
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={16} aria-hidden />
+              </button>
+            )}
           </div>
 
-          <div className="mt-3 text-sm text-gray-400">
-            Найдено: {filteredUsers.length} из {users.length}
-          </div>
+          <select
+            aria-label="Фильтр по подписке на push"
+            value={filterSubscribed === null ? 'all' : filterSubscribed.toString()}
+            onChange={(e) => setFilterSubscribed(
+              e.target.value === 'all' ? null : e.target.value === 'true'
+            )}
+            style={{ ...inputStyle, width: 'auto', minWidth: 200 }}
+          >
+            <option value="all">Все подписки</option>
+            <option value="true">Подписаны на push</option>
+            <option value="false">Не подписаны</option>
+          </select>
+
+          <select
+            aria-label="Сортировка"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            style={{ ...inputStyle, width: 'auto', minWidth: 200 }}
+          >
+            <option value="lastActivity">По активности</option>
+            <option value="createdAt">По дате регистрации</option>
+            <option value="sessions">По тренировкам</option>
+          </select>
         </div>
 
-        {/* Список пользователей */}
-        <div className="space-y-4">
-          {filteredUsers.map((user) => {
-            const isUpdated = updatedUserIds.has(user.id);
-            
-            return (
-            <div
+        <div style={{ marginTop: 12, fontSize: 13, color: 'var(--color-muted)' }}>
+          Найдено: {filteredUsers.length} из {users.length}
+        </div>
+      </AdminCard>
+
+      {/* ───────── Список пользователей ───────── */}
+      <div className="space-y-3">
+        {filteredUsers.map((user) => {
+          const isUpdated = updatedUserIds.has(user.id);
+          const online = isOnlineNow(user.lastActivity);
+
+          return (
+            <button
               key={user.id}
+              type="button"
               onClick={() => setSelectedUser(user)}
-              className={`bg-[#1a1f3a] rounded-lg p-4 hover:bg-[#2d3448] transition-all cursor-pointer ${
-                isUpdated ? 'ring-2 ring-green-400 animate-pulse' : ''
-              }`}
+              className="block w-full text-left transition-colors hover:brightness-125"
+              style={{
+                padding: 16,
+                borderRadius: 'var(--radius-md)',
+                cursor: 'pointer',
+                // Обновлённая строка: статичная лаймовая рамка вместо мигания всей карточки
+                background: isUpdated ? 'var(--lime-subtle)' : 'var(--color-surface)',
+                border: `1px solid ${isUpdated ? 'var(--border-lime)' : 'var(--border-hairline)'}`,
+              }}
             >
-              <div className="flex items-center justify-between">
-                {/* Основная информация */}
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold">
+              {/* Внутри <button> — только phrasing-контент (span), иначе невалидная вёрстка */}
+              <span className="flex items-start justify-between gap-4">
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-2" style={{ marginBottom: 8 }}>
+                    {online && (
+                      <span
+                        aria-hidden
+                        className="shrink-0"
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 'var(--radius-pill)',
+                          background: 'var(--color-brand)',
+                        }}
+                      />
+                    )}
+                    <span style={{ fontSize: 16, fontWeight: 700 }}>
                       {user.firstName || user.username || `User ${user.telegramId.slice(0, 8)}`}
                       {user.lastName && ` ${user.lastName}`}
-                    </h3>
-                    
-                    {isOnlineNow(user.lastActivity) && (
-                      <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full flex items-center gap-1">
-                        <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                        Online
-                      </span>
-                    )}
+                    </span>
                     {user.accessTier === 'PREMIUM' && (
-                      <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-1 rounded-full">
-                        ⭐ PREMIUM
-                      </span>
+                      <Badge icon={Crown} tone="brand">PREMIUM</Badge>
                     )}
-                  </div>
-                  
-                  <div className="text-sm text-gray-400 space-y-1">
-                    <p>ID: {user.telegramId}</p>
-                    <p>Регистрация: {formatDate(user.createdAt)}</p>
-                    <p>Последняя активность: {getTimeSince(user.lastActivity)}</p>
-                  </div>
+                  </span>
+
+                  <span
+                    className="block"
+                    style={{ fontSize: 13, color: 'var(--color-muted)', lineHeight: 1.6 }}
+                  >
+                    <span className="block">ID: {user.telegramId}</span>
+                    <span className="block">Регистрация: {formatDate(user.createdAt)}</span>
+                  </span>
+                </span>
+
+                {/* Одна индикация статуса вместо двух: чип + пилюля */}
+                <span
+                  className="shrink-0 text-right"
+                  style={{ fontSize: 12, color: online ? 'var(--color-brand)' : 'var(--color-muted)' }}
+                >
+                  {online ? 'Онлайн' : getTimeSince(user.lastActivity)}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+
+        {filteredUsers.length === 0 && (
+          <AdminCard>
+            {users.length === 0 ? (
+              <EmptyState
+                icon={Users}
+                title="Пользователей пока нет"
+                hint="Как только кто-то зарегистрируется — он появится здесь"
+              />
+            ) : (
+              <>
+                <EmptyState
+                  icon={SearchX}
+                  title="Под фильтры никто не попал"
+                  hint={`Всего пользователей: ${users.length}`}
+                />
+                <div className="flex justify-center">
+                  <AdminButton
+                    tone="secondary"
+                    icon={FilterX}
+                    onClick={() => {
+                      setSearchTerm('');
+                      setFilterSubscribed(null);
+                    }}
+                  >
+                    Сбросить фильтры
+                  </AdminButton>
                 </div>
+              </>
+            )}
+          </AdminCard>
+        )}
+      </div>
 
-                {/* Статус */}
-                <div className="text-right">
-                  {isOnlineNow(user.lastActivity) ? (
-                    <span className="inline-block px-4 py-2 bg-green-500/20 text-green-400 rounded-lg text-sm font-medium">
-                      Онлайн
-                    </span>
-                  ) : (
-                    <span className="inline-block px-4 py-2 bg-gray-700 text-gray-400 rounded-lg text-sm font-medium">
-                      Офлайн
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            );
-          })}
-
-          {filteredUsers.length === 0 && (
-            <div className="bg-[#1a1f3a] rounded-lg p-8 text-center text-gray-400">
-              <p className="text-lg mb-2">Пользователи не найдены</p>
-              <p className="text-sm">Попробуйте изменить параметры поиска или фильтры</p>
-            </div>
-          )}
-        </div>
-
-        {/* Модальное окно с детальной информацией */}
-        {selectedUser && (
-          <div 
-            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
-            onClick={() => setSelectedUser(null)}
+      {/* ───────── Модалка: карточка пользователя ───────── */}
+      {selectedUser && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'var(--scrim)' }}
+          onClick={() => setSelectedUser(null)}
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Карточка пользователя"
+            className="w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+            style={{
+              background: 'var(--color-elevated)',
+              border: '1px solid var(--border-hairline)',
+              borderRadius: 'var(--radius-xl)',
+            }}
+            onClick={(e) => e.stopPropagation()}
           >
-            <div 
-              className="bg-[#1a1f3a] rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
+            {/* Шапка: имя + кнопка «Закрыть». Бейджи вынесены отдельной строкой,
+                чтобы заголовок не переносился и высота шапки не скакала. */}
+            <div
+              className="sticky top-0 z-10"
+              style={{
+                background: 'var(--color-elevated)',
+                borderBottom: '1px solid var(--border-hairline)',
+                padding: 24,
+              }}
             >
-              {/* Заголовок модального окна */}
-              <div className="sticky top-0 bg-[#1a1f3a] border-b border-gray-700 p-6">
-                {/* Верхняя строка: имя + всегда видимая кнопка «Закрыть» */}
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                  <h2 className="text-2xl font-bold flex items-center gap-3 flex-wrap break-words">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }} className="truncate">
                     {selectedUser.firstName || selectedUser.username || `User ${selectedUser.telegramId.slice(0, 8)}`}
                     {selectedUser.lastName && ` ${selectedUser.lastName}`}
-                    
-                    {isOnlineNow(selectedUser.lastActivity) && (
-                      <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full flex items-center gap-1">
-                        <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                        Online
-                      </span>
-                    )}
-                    
-                    {isNewUser(selectedUser.createdAt) && (
-                      <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-full">
-                        🆕 Новый
-                      </span>
-                    )}
-                    
-                    {selectedUser.pushNotifications.isSubscribed && (
-                      <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-1 rounded-full">
-                        🔔 Push
-                      </span>
-                    )}
                   </h2>
-                  <p className="text-sm text-gray-400 mt-1">
+                  <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '4px 0 0' }}>
                     @{selectedUser.username || 'no_username'} • ID: {selectedUser.telegramId}
                   </p>
                   {selectedUser.profile?.position && (
-                    <p className="text-sm text-blue-400 mt-1">
+                    <p style={{ fontSize: 13, color: 'var(--color-brand)', margin: '4px 0 0' }}>
                       {positionMap[selectedUser.profile.position] || selectedUser.profile.position}
                       {selectedUser.profile.number && ` #${selectedUser.profile.number}`}
                     </p>
                   )}
-                  </div>
 
-                  <button
-                    onClick={() => setSelectedUser(null)}
-                    aria-label="Закрыть"
-                    className="shrink-0 inline-flex items-center gap-1.5 h-10 px-4 rounded-full bg-[#2d3448] hover:bg-[#3a4255] text-gray-200 text-sm font-medium transition-colors"
-                  >
-                    <span className="text-lg leading-none">×</span>
-                    Закрыть
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2" style={{ marginTop: 12 }}>
+                    {isOnlineNow(selectedUser.lastActivity) && (
+                      <Badge icon={Activity} tone="brand">Online</Badge>
+                    )}
+                    {isNewUser(selectedUser.createdAt) && <Badge icon={UserPlus}>Новый</Badge>}
+                    {selectedUser.pushNotifications.isSubscribed && <Badge icon={Bell}>Push</Badge>}
+                    {selectedUser.accessTier === 'PREMIUM' && (
+                      <Badge icon={Crown} tone="brand">PREMIUM</Badge>
+                    )}
+                  </div>
                 </div>
 
-                {/* Действия над пользователем */}
-                <div className="flex flex-wrap items-center gap-2 mt-4">
-                  <button
-                    onClick={() => handleAttachEmail(selectedUser)}
-                    className="px-4 py-2 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors text-sm font-medium"
-                    title="Привязать или сменить email — нужно, чтобы пользователь без email мог войти OTP-ом"
-                  >
-                    {selectedUser.email && !selectedUser.email.endsWith('@t.me')
-                      ? 'Сменить email'
-                      : 'Привязать email'}
-                  </button>
-                  <button
-                    onClick={() => handleSetAccess(selectedUser)}
-                    className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
-                      selectedUser.accessTier === 'PREMIUM'
-                        ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'
-                        : 'bg-[#A1FF4A]/20 text-[#A1FF4A] hover:bg-[#A1FF4A]/30'
-                    }`}
-                    title="Ручная выдача/снятие премиум-доступа"
-                  >
-                    {selectedUser.accessTier === 'PREMIUM' ? 'Снять PREMIUM' : 'Выдать PREMIUM'}
-                  </button>
-                  <button
-                    onClick={() => handleSetTester(selectedUser)}
-                    className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
-                      selectedUser.isTester
-                        ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'
-                        : 'bg-[#A1FF4A]/20 text-[#A1FF4A] hover:bg-[#A1FF4A]/30'
-                    }`}
-                    title="Тест-режим: читер-обход дневного лимита модулей и начисление XP на свободном просмотре (без админ-прав)"
-                  >
-                    {selectedUser.isTester ? 'Тест-режим ✓' : 'Тест-режим ✗'}
-                  </button>
+                <AdminButton
+                  tone="secondary"
+                  onClick={() => setSelectedUser(null)}
+                  aria-label="Закрыть"
+                  style={{ width: 44, padding: 0, flexShrink: 0 }}
+                >
+                  <X size={20} aria-hidden />
+                </AdminButton>
+              </div>
+            </div>
+
+            {/* Тело модалки */}
+            <div className="space-y-6" style={{ padding: 24 }}>
+              {/* ─── Действия: три группы вместо «стены кнопок» ─── */}
+              <div>
+                <SectionTitle icon={Wrench}>Действия</SectionTitle>
+                <AdminCard>
+                  <div className="flex flex-wrap gap-2">
+                    <AdminButton
+                      tone="secondary"
+                      size="sm"
+                      icon={Mail}
+                      onClick={() => handleAttachEmail(selectedUser)}
+                      title="Привязать или сменить email — нужно, чтобы пользователь без email мог войти OTP-ом"
+                    >
+                      {selectedUser.email && !selectedUser.email.endsWith('@t.me')
+                        ? 'Сменить email'
+                        : 'Привязать email'}
+                    </AdminButton>
+
+                    {/* Вкл = лайм, выкл = ghost (раньше семантика цвета была инвертирована) */}
+                    <AdminButton
+                      tone="secondary"
+                      size="sm"
+                      icon={Crown}
+                      aria-pressed={selectedUser.accessTier === 'PREMIUM'}
+                      style={toggleOn(selectedUser.accessTier === 'PREMIUM')}
+                      onClick={() => handleSetAccess(selectedUser)}
+                      title="Ручная выдача/снятие премиум-доступа"
+                    >
+                      {selectedUser.accessTier === 'PREMIUM' ? 'Снять PREMIUM' : 'Выдать PREMIUM'}
+                    </AdminButton>
+
+                    {/* Состояние — через aria-pressed и заливку, а не глифами ✓/✗ */}
+                    <AdminButton
+                      tone="secondary"
+                      size="sm"
+                      icon={FlaskConical}
+                      aria-pressed={selectedUser.isTester === true}
+                      style={toggleOn(selectedUser.isTester === true)}
+                      onClick={() => handleSetTester(selectedUser)}
+                      title="Тест-режим: читер-обход дневного лимита модулей и начисление XP на свободном просмотре (без админ-прав)"
+                    >
+                      Тест-режим
+                    </AdminButton>
+                  </div>
+
                   {(selectedUser.isTester || selectedUser.isAdmin) && (
-                    <>
-                      <button
-                        onClick={() => handleSeedStreak(selectedUser)}
-                        className="px-4 py-2 rounded-lg bg-[#A1FF4A]/20 text-[#A1FF4A] hover:bg-[#A1FF4A]/30 transition-colors text-sm font-medium"
-                        title="Накрутить стрик N дней (синтетические сессии, только для тест-аккаунтов)"
-                      >
-                        Стрик N дней
-                      </button>
-                      <button
-                        onClick={() => handleSeedLevel(selectedUser)}
-                        className="px-4 py-2 rounded-lg bg-[#A1FF4A]/20 text-[#A1FF4A] hover:bg-[#A1FF4A]/30 transition-colors text-sm font-medium"
-                        title="Накрутить уровень N (синтетические сессии, только для тест-аккаунтов)"
-                      >
-                        Уровень N
-                      </button>
-                      <button
-                        onClick={() => handleResetLimits(selectedUser)}
-                        className="px-4 py-2 rounded-lg bg-[#2d3448] text-gray-200 hover:bg-[#3a4255] transition-colors text-sm font-medium"
-                        title="Сбросить дневные лимиты (модули/тренировки/генерация)"
-                      >
-                        Сброс лимитов
-                      </button>
-                    </>
+                    <div style={{ borderTop: '1px solid var(--border-hairline)', marginTop: 16, paddingTop: 16 }}>
+                      <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 8 }}>
+                        Тест-инструменты
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <AdminButton
+                          tone="secondary"
+                          size="sm"
+                          icon={Flame}
+                          onClick={() => handleSeedStreak(selectedUser)}
+                          title="Накрутить стрик N дней (синтетические сессии, только для тест-аккаунтов)"
+                        >
+                          Накрутить стрик
+                        </AdminButton>
+                        <AdminButton
+                          tone="secondary"
+                          size="sm"
+                          icon={ChevronsUp}
+                          onClick={() => handleSeedLevel(selectedUser)}
+                          title="Накрутить уровень N (синтетические сессии, только для тест-аккаунтов)"
+                        >
+                          Накрутить уровень
+                        </AdminButton>
+                        <AdminButton
+                          tone="secondary"
+                          size="sm"
+                          icon={RotateCcw}
+                          onClick={() => handleResetLimits(selectedUser)}
+                          title="Сбросить дневные лимиты (модули/тренировки/генерация)"
+                        >
+                          Сброс лимитов
+                        </AdminButton>
+                      </div>
+                    </div>
                   )}
-                  <button
-                    onClick={() => handleSetReferral(selectedUser)}
-                    className="px-4 py-2 rounded-lg bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 transition-colors text-sm font-medium"
-                    title="Привязать пользователя к реф-каналу (напр. к тренеру). Принимает код или алиас; пусто — снять."
-                  >
-                    Реф-код: {selectedUser.referralCode || '—'}
-                  </button>
-                  <button
-                    onClick={() => handleDeleteUser(selectedUser)}
-                    disabled={isDeletingUserId === selectedUser.id}
-                    className="px-4 py-2 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isDeletingUserId === selectedUser.id ? 'Удаление...' : 'Удалить'}
-                  </button>
+
+                  <div style={{ borderTop: '1px solid var(--border-hairline)', marginTop: 16, paddingTop: 16 }}>
+                    <AdminButton
+                      tone="danger"
+                      size="sm"
+                      disabled={isDeletingUserId === selectedUser.id}
+                      onClick={() => handleDeleteUser(selectedUser)}
+                      title="Необратимо удалить аккаунт и все его данные"
+                    >
+                      {isDeletingUserId === selectedUser.id ? (
+                        <Loader2 size={16} className="animate-spin" aria-hidden />
+                      ) : (
+                        <Trash2 size={16} aria-hidden />
+                      )}
+                      {isDeletingUserId === selectedUser.id ? 'Удаление…' : 'Удалить пользователя'}
+                    </AdminButton>
+                  </div>
+                </AdminCard>
+              </div>
+
+              {/* ─── Активность ─── */}
+              <div>
+                <SectionTitle icon={Activity}>Активность</SectionTitle>
+                <AdminCard>
+                  <Row label="Последняя активность" value={getTimeSince(selectedUser.lastActivity)} />
+                  <Row label="Дата регистрации" value={formatDate(selectedUser.createdAt)} />
+                </AdminCard>
+              </div>
+
+              {/* ─── Статистика ─── */}
+              <div>
+                <SectionTitle icon={BarChart3}>Статистика</SectionTitle>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <Kpi
+                    icon={Dumbbell}
+                    label="Тренировки"
+                    value={`${selectedUser.stats.completedSessions}/${selectedUser.stats.totalSessions}`}
+                    hint={
+                      selectedUser.stats.totalSessions > 0
+                        ? `${selectedUser.stats.completionRate}% завершено`
+                        : undefined
+                    }
+                  />
+                  <Kpi icon={Star} label="Избранное" value={selectedUser.stats.favoritesCount} />
+                  <Kpi
+                    icon={Heart}
+                    label="Лайки"
+                    value={selectedUser.stats.videoLikesCount + selectedUser.stats.shortLikesCount}
+                    hint={`Видео ${selectedUser.stats.videoLikesCount} · Шортсы ${selectedUser.stats.shortLikesCount}`}
+                  />
+                  <Kpi
+                    icon={MessageCircle}
+                    label="Комментарии"
+                    value={selectedUser.stats.shortCommentsCount}
+                  />
                 </div>
               </div>
 
-              {/* Контент модального окна */}
-              <div className="p-6 space-y-6">
-                {/* Время активности */}
-                <div className="bg-[#2d3448] rounded-lg p-4">
-                  <h3 className="text-lg font-semibold mb-3">Активность</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Последняя активность:</span>
-                      <span className="text-white">{getTimeSince(selectedUser.lastActivity)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Дата регистрации:</span>
-                      <span className="text-white">{formatDate(selectedUser.createdAt)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Статистика */}
-                <div className="bg-[#2d3448] rounded-lg p-4">
-                  <h3 className="text-lg font-semibold mb-3">Статистика</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="bg-[#1a1f3a] rounded-lg p-3">
-                      <p className="text-xs text-gray-400 mb-1">Тренировки</p>
-                      <p className="text-lg font-bold">
-                        {selectedUser.stats.completedSessions}/{selectedUser.stats.totalSessions}
-                      </p>
-                      {selectedUser.stats.totalSessions > 0 && (
-                        <p className="text-xs text-green-400">
-                          {selectedUser.stats.completionRate}% завершено
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="bg-[#1a1f3a] rounded-lg p-3">
-                      <p className="text-xs text-gray-400 mb-1">Избранное</p>
-                      <p className="text-lg font-bold">{selectedUser.stats.favoritesCount}</p>
-                    </div>
-
-                    <div className="bg-[#1a1f3a] rounded-lg p-3">
-                      <p className="text-xs text-gray-400 mb-1">Лайки</p>
-                      <p className="text-lg font-bold">
-                        {selectedUser.stats.videoLikesCount + selectedUser.stats.shortLikesCount}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        В: {selectedUser.stats.videoLikesCount} | Ш: {selectedUser.stats.shortLikesCount}
-                      </p>
-                    </div>
-
-                    <div className="bg-[#1a1f3a] rounded-lg p-3">
-                      <p className="text-xs text-gray-400 mb-1">Комментарии</p>
-                      <p className="text-lg font-bold">{selectedUser.stats.shortCommentsCount}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Профиль */}
-                {selectedUser.profile && (
-                  <div className="bg-[#2d3448] rounded-lg p-4">
-                    <h3 className="text-lg font-semibold mb-3">Профиль игрока</h3>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+              {/* ─── Профиль игрока ─── */}
+              {selectedUser.profile && (
+                <div>
+                  <SectionTitle icon={UserCircle}>Профиль игрока</SectionTitle>
+                  <AdminCard>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
                       {selectedUser.profile.age && (
-                        <div>
-                          <span className="text-gray-400">Возраст:</span>
-                          <span className="text-white ml-2">{selectedUser.profile.age} лет</span>
-                        </div>
+                        <Row label="Возраст" value={`${selectedUser.profile.age} лет`} />
                       )}
                       {selectedUser.profile.height && (
-                        <div>
-                          <span className="text-gray-400">Рост:</span>
-                          <span className="text-white ml-2">{selectedUser.profile.height} см</span>
-                        </div>
+                        <Row label="Рост" value={`${selectedUser.profile.height} см`} />
                       )}
                       {selectedUser.profile.weight && (
-                        <div>
-                          <span className="text-gray-400">Вес:</span>
-                          <span className="text-white ml-2">{selectedUser.profile.weight} кг</span>
-                        </div>
+                        <Row label="Вес" value={`${selectedUser.profile.weight} кг`} />
                       )}
                       {selectedUser.profile.overall > 0 && (
-                        <div>
-                          <span className="text-gray-400">Общий уровень:</span>
-                          <span className="text-white ml-2">{selectedUser.profile.overall}</span>
-                        </div>
+                        <Row label="Общий уровень" value={selectedUser.profile.overall} />
                       )}
                       {selectedUser.profile.gender && (
-                        <div>
-                          <span className="text-gray-400">Пол:</span>
-                          <span className="text-white ml-2">
-                            {selectedUser.profile.gender === 'MALE' ? 'Мужской' : 'Женский'}
-                          </span>
-                        </div>
+                        <Row
+                          label="Пол"
+                          value={selectedUser.profile.gender === 'MALE' ? 'Мужской' : 'Женский'}
+                        />
                       )}
                       {selectedUser.profile.dailyProgress !== undefined && (
-                        <div>
-                          <span className="text-gray-400">Прогресс дня:</span>
-                          <span className="text-white ml-2">
-                            {selectedUser.profile.dailyProgress}/{selectedUser.profile.maxDailyGoal}
-                          </span>
-                        </div>
+                        <Row
+                          label="Прогресс дня"
+                          value={`${selectedUser.profile.dailyProgress}/${selectedUser.profile.maxDailyGoal}`}
+                        />
                       )}
                     </div>
-                  </div>
-                )}
-
-                {/* Контактная информация */}
-                <div className="bg-[#2d3448] rounded-lg p-4">
-                  <h3 className="text-lg font-semibold mb-3">Контакты</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedUser.email && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400">Email:</span>
-                        <span className={selectedUser.emailVerified ? 'text-green-400' : 'text-white'}>
-                          {selectedUser.email} {selectedUser.emailVerified && '✓'}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Telegram ID:</span>
-                      <span className="text-white font-mono">{selectedUser.telegramId}</span>
-                    </div>
-                    {selectedUser.pushNotifications.isSubscribed && selectedUser.pushNotifications.subscribedAt && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Push подписка:</span>
-                        <span className="text-purple-400">
-                          {formatDate(selectedUser.pushNotifications.subscribedAt)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                  </AdminCard>
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
+              )}
 
-        {/* Пикер реф-канала: выбор из существующих промокодов (выпадающий список) */}
-        {refPickerUser && (
-          <div
-            className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4"
-            onClick={() => !refSaving && setRefPickerUser(null)}
-          >
-            <div
-              className="bg-[#1a1f3a] rounded-lg w-full max-w-sm p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-lg font-bold text-white mb-1">Реф-канал</h3>
-              <p className="text-sm text-gray-400 mb-4 truncate">
-                {refPickerUser.firstName || refPickerUser.email || refPickerUser.telegramId}
-              </p>
-              <select
-                value={refPickerValue}
-                onChange={(e) => setRefPickerValue(e.target.value)}
-                disabled={refSaving}
-                className="w-full bg-[#0f1428] border border-gray-700 rounded-lg px-3 py-3 text-white mb-4 focus:outline-none focus:border-[#A1FF4A]"
-              >
-                <option value="">— без канала —</option>
-                {refCodes.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.label} ({c.code}){c.isActive ? '' : ' · неактивен'}
-                  </option>
-                ))}
-              </select>
-              <div className="flex gap-2 justify-end">
-                <button
-                  onClick={() => setRefPickerUser(null)}
-                  disabled={refSaving}
-                  className="px-4 py-2 rounded-lg bg-[#2d3448] text-gray-300 hover:bg-[#3a4255] text-sm disabled:opacity-50"
-                >
-                  Отмена
-                </button>
-                <button
-                  onClick={submitReferral}
-                  disabled={refSaving}
-                  className="px-4 py-2 rounded-lg bg-[#A1FF4A]/20 text-[#A1FF4A] hover:bg-[#A1FF4A]/30 text-sm font-medium disabled:opacity-50"
-                >
-                  {refSaving ? 'Сохраняю…' : 'Сохранить'}
-                </button>
+              {/* ─── Контакты ─── */}
+              <div>
+                <SectionTitle icon={Contact}>Контакты</SectionTitle>
+                <AdminCard>
+                  {selectedUser.email && (
+                    <Row
+                      label="Email"
+                      value={
+                        <span className="inline-flex items-center gap-1">
+                          <span className="truncate">{selectedUser.email}</span>
+                          {selectedUser.emailVerified && (
+                            <BadgeCheck
+                              size={16}
+                              className="shrink-0"
+                              style={{ color: 'var(--color-brand)' }}
+                              aria-label="Email подтверждён"
+                            />
+                          )}
+                        </span>
+                      }
+                    />
+                  )}
+                  <Row
+                    label="Telegram ID"
+                    value={<span className="font-mono">{selectedUser.telegramId}</span>}
+                  />
+                  {/* Реф-код показан значением, а не в лейбле кнопки — ряд действий
+                      больше не перекладывается при смене длины кода. */}
+                  <div
+                    className="flex items-center justify-between gap-4"
+                    style={{ padding: '8px 0', fontSize: 14 }}
+                  >
+                    <span className="shrink-0" style={{ color: 'var(--color-muted)' }}>
+                      Реф-канал
+                    </span>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="truncate">{selectedUser.referralCode || '—'}</span>
+                      <AdminButton
+                        tone="secondary"
+                        size="sm"
+                        onClick={() => handleSetReferral(selectedUser)}
+                        aria-label="Изменить реф-канал"
+                        title="Привязать пользователя к реф-каналу (напр. к тренеру); пусто — снять."
+                        style={{ width: 44, minHeight: 44, padding: 0, flexShrink: 0 }}
+                      >
+                        <Link2 size={16} aria-hidden />
+                      </AdminButton>
+                    </span>
+                  </div>
+                  {selectedUser.pushNotifications.isSubscribed && selectedUser.pushNotifications.subscribedAt && (
+                    <Row
+                      label="Push подписка"
+                      value={formatDate(selectedUser.pushNotifications.subscribedAt)}
+                    />
+                  )}
+                </AdminCard>
               </div>
             </div>
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+
+      {/* ───────── Пикер реф-канала (вложенная модалка) ───────── */}
+      {refPickerUser && (
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center p-4"
+          style={{ background: 'var(--scrim)' }}
+          onClick={() => !refSaving && setRefPickerUser(null)}
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Реф-канал"
+            className="w-full max-w-sm"
+            style={{
+              background: 'var(--color-elevated)',
+              border: '1px solid var(--border-hairline)',
+              borderRadius: 'var(--radius-xl)',
+              padding: 24,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>Реф-канал</h3>
+            <p
+              className="truncate"
+              style={{ fontSize: 13, color: 'var(--color-muted)', margin: '4px 0 16px' }}
+            >
+              {refPickerUser.firstName || refPickerUser.email || refPickerUser.telegramId}
+            </p>
+
+            <label htmlFor="ref-picker-select" style={labelStyle}>
+              Канал привлечения
+            </label>
+            <select
+              id="ref-picker-select"
+              value={refPickerValue}
+              onChange={(e) => setRefPickerValue(e.target.value)}
+              disabled={refSaving}
+              style={{ ...inputStyle, marginBottom: 16 }}
+            >
+              <option value="">— без канала —</option>
+              {refCodes.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.label} ({c.code}){c.isActive ? '' : ' · неактивен'}
+                </option>
+              ))}
+            </select>
+
+            <div className="flex justify-end gap-2">
+              <AdminButton
+                tone="secondary"
+                size="sm"
+                onClick={() => setRefPickerUser(null)}
+                disabled={refSaving}
+              >
+                Отмена
+              </AdminButton>
+              <AdminButton tone="primary" size="sm" onClick={submitReferral} disabled={refSaving}>
+                {refSaving && <Loader2 size={16} className="animate-spin" aria-hidden />}
+                {refSaving ? 'Сохраняю…' : 'Сохранить'}
+              </AdminButton>
+            </div>
+          </div>
+        </div>
+      )}
+    </AdminPage>
   );
 }

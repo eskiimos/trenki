@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
+import {
+  AdminPage,
+  PageHeader,
+  AdminCard,
+  AdminButton,
+  EmptyState,
+} from '@/components/admin/ui';
+import { Star, Check, EyeOff, Trash2 } from 'lucide-react';
 
 interface Review {
   id: string;
@@ -27,6 +34,47 @@ interface Review {
   };
 }
 
+const FILTERS: Array<{ key: 'pending' | 'approved' | 'all'; label: string }> = [
+  { key: 'pending', label: 'На модерации' },
+  { key: 'approved', label: 'Одобренные' },
+  { key: 'all', label: 'Все' },
+];
+
+/** Круглый аватар 40×40 с инициалом-фолбэком (канон проекта). */
+function Avatar({ src, alt, initial }: { src: string | null; alt: string; initial: string }) {
+  return (
+    <span
+      className="flex items-center justify-center overflow-hidden shrink-0"
+      style={{ width: 40, height: 40, borderRadius: 999, background: 'var(--color-elevated)' }}
+    >
+      {src ? (
+        <Image src={src} alt={alt} width={40} height={40} className="w-full h-full object-cover" />
+      ) : (
+        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-muted)' }}>{initial}</span>
+      )}
+    </span>
+  );
+}
+
+/** Статус отзыва: одобрен (лайм) / на модерации (danger). */
+function StatusBadge({ approved }: { approved: boolean }) {
+  return (
+    <span
+      style={{
+        fontSize: 12,
+        fontWeight: 700,
+        padding: '4px 12px',
+        borderRadius: 'var(--radius-pill)',
+        whiteSpace: 'nowrap',
+        background: approved ? 'var(--lime-medium)' : 'rgba(255,140,74,0.15)',
+        color: approved ? 'var(--color-brand)' : 'var(--color-danger)',
+      }}
+    >
+      {approved ? 'Одобрено' : 'На модерации'}
+    </span>
+  );
+}
+
 export default function AdminReviewsPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,7 +90,7 @@ export default function AdminReviewsPage() {
       setLoading(true);
       const response = await fetch(`/api/admin/reviews?status=${filter}`);
       const data = await response.json();
-      
+
       if (data.reviews) {
         setReviews(data.reviews);
       }
@@ -97,210 +145,204 @@ export default function AdminReviewsPage() {
   const pendingCount = reviews.filter(r => !r.isApproved).length;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Шапка */}
-      <div className="bg-white shadow" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Link href="/admin" className="text-gray-600 hover:text-gray-900">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </Link>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Модерация отзывов
-              </h1>
-              {pendingCount > 0 && (
-                <span className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">
-                  {pendingCount} на модерации
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+    <AdminPage>
+      <PageHeader
+        title="Модерация отзывов"
+        icon={Star}
+        backHref="/admin"
+        actions={
+          pendingCount > 0 ? (
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 800,
+                padding: '6px 12px',
+                borderRadius: 'var(--radius-pill)',
+                background: 'rgba(255,140,74,0.15)',
+                color: 'var(--color-danger)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {pendingCount} на модерации
+            </span>
+          ) : null
+        }
+      />
 
       {/* Фильтры */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex gap-4 mb-6">
-          <button
-            onClick={() => setFilter('pending')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filter === 'pending'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            На модерации
-          </button>
-          <button
-            onClick={() => setFilter('approved')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filter === 'approved'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            Одобренные
-          </button>
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filter === 'all'
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            Все
-          </button>
+      <div className="flex flex-wrap gap-2" style={{ marginBottom: 24 }}>
+        {FILTERS.map(({ key, label }) => {
+          const active = filter === key;
+          return (
+            <button
+              key={key}
+              onClick={() => setFilter(key)}
+              className="transition-colors"
+              style={{
+                minHeight: 44,
+                padding: '10px 20px',
+                borderRadius: 'var(--radius-pill)',
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: 'pointer',
+                background: active ? 'var(--color-brand)' : 'transparent',
+                color: active ? 'var(--color-night)' : 'var(--color-ink)',
+                border: `1px solid ${active ? 'var(--color-brand)' : 'var(--border-hairline)'}`,
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Список отзывов */}
+      {loading ? (
+        <div className="flex flex-col" style={{ gap: 16 }}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="animate-pulse"
+              style={{
+                height: 220,
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-surface)',
+                border: '1px solid var(--border-hairline)',
+              }}
+            />
+          ))}
         </div>
-
-        {/* Список отзывов */}
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="text-gray-500">Загрузка...</div>
-          </div>
-        ) : reviews.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-gray-500">Нет отзывов</div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {reviews.map((review) => (
-              <div
-                key={review.id}
-                className={`bg-white rounded-lg shadow p-6 ${
-                  !review.isApproved ? 'border-l-4 border-yellow-400' : ''
-                }`}
-              >
-                <div className="flex items-start justify-between mb-4">
-                  {/* Информация о тренере */}
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200">
-                      {review.trainer.avatar ? (
-                        <Image
-                          src={review.trainer.avatar}
-                          alt={review.trainer.name}
-                          width={48}
-                          height={48}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-500 font-bold">
-                          {review.trainer.name[0]}
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-gray-900">
-                        {review.trainer.name} {review.trainer.lastName}
-                      </h3>
-                      <p className="text-sm text-gray-500">Тренер</p>
-                    </div>
-                  </div>
-
-                  {/* Статус */}
-                  <div>
-                    {review.isApproved ? (
-                      <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                        Одобрено
-                      </span>
-                    ) : (
-                      <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
-                        На модерации
-                      </span>
-                    )}
+      ) : reviews.length === 0 ? (
+        <EmptyState
+          icon={Star}
+          title="Нет отзывов"
+          hint={
+            filter === 'pending'
+              ? 'Всё промодерировано — новых отзывов нет'
+              : filter === 'approved'
+                ? 'Одобренных отзывов пока нет'
+                : 'Отзывы ещё не оставляли'
+          }
+        />
+      ) : (
+        <div className="flex flex-col" style={{ gap: 16 }}>
+          {reviews.map((review) => (
+            <AdminCard
+              key={review.id}
+              style={
+                !review.isApproved
+                  ? { borderLeft: '4px solid var(--color-danger)' }
+                  : undefined
+              }
+            >
+              <div className="flex items-start justify-between gap-3" style={{ marginBottom: 16 }}>
+                {/* Информация о тренере */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar
+                    src={review.trainer.avatar}
+                    alt={review.trainer.name}
+                    initial={review.trainer.name[0]}
+                  />
+                  <div className="min-w-0">
+                    <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }} className="truncate">
+                      {review.trainer.name} {review.trainer.lastName}
+                    </h3>
+                    <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '2px 0 0' }}>
+                      Тренер
+                    </p>
                   </div>
                 </div>
 
-                <div className="border-t pt-4">
-                  {/* Информация о пользователе */}
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200">
-                      {review.user.profile?.avatarUrl ? (
-                        <Image
-                          src={review.user.profile.avatarUrl}
-                          alt={review.user.firstName || 'User'}
-                          width={40}
-                          height={40}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-500 font-bold text-sm">
-                          {review.user.firstName?.[0] || 'U'}
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {review.user.firstName || 'Пользователь'} {review.user.lastName || ''}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {review.user.email || `ID: ${review.user.id}`}
-                      </p>
-                    </div>
-                  </div>
+                {/* Статус */}
+                <StatusBadge approved={review.isApproved} />
+              </div>
 
-                  {/* Рейтинг */}
-                  <div className="flex items-center gap-2 mb-3">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <svg
-                        key={star}
-                        className={`w-5 h-5 ${
-                          star <= review.rating ? 'text-yellow-400' : 'text-gray-300'
-                        }`}
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                    ))}
-                    <span className="text-sm text-gray-600 ml-2">
-                      {new Date(review.createdAt).toLocaleDateString('ru-RU')}
-                    </span>
-                  </div>
-
-                  {/* Комментарий */}
-                  {review.comment && (
-                    <p className="text-gray-700 mb-4 whitespace-pre-wrap">
-                      {review.comment}
+              <div style={{ borderTop: '1px solid var(--border-hairline)', paddingTop: 16 }}>
+                {/* Информация о пользователе */}
+                <div className="flex items-center gap-3" style={{ marginBottom: 16 }}>
+                  <Avatar
+                    src={review.user.profile?.avatarUrl ?? null}
+                    alt={review.user.firstName || 'User'}
+                    initial={review.user.firstName?.[0] || 'U'}
+                  />
+                  <div className="min-w-0">
+                    <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }} className="truncate">
+                      {review.user.firstName || 'Пользователь'} {review.user.lastName || ''}
                     </p>
-                  )}
-
-                  {/* Кнопки действий */}
-                  <div className="flex gap-3">
-                    {!review.isApproved ? (
-                      <button
-                        onClick={() => handleSetApproved(review.id, true)}
-                        disabled={processingId === review.id}
-                        className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium"
-                      >
-                        {processingId === review.id ? 'Обработка...' : 'Одобрить'}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleSetApproved(review.id, false)}
-                        disabled={processingId === review.id}
-                        className="flex-1 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 font-medium"
-                      >
-                        {processingId === review.id ? 'Обработка...' : 'Скрыть'}
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleReject(review.id)}
-                      disabled={processingId === review.id}
-                      className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium"
+                    <p
+                      style={{ fontSize: 12, color: 'var(--color-muted)', margin: '2px 0 0' }}
+                      className="truncate"
                     >
-                      {processingId === review.id ? 'Обработка...' : 'Удалить'}
-                    </button>
+                      {review.user.email || `ID: ${review.user.id}`}
+                    </p>
                   </div>
+                </div>
+
+                {/* Рейтинг */}
+                <div className="flex items-center gap-1" style={{ marginBottom: 12 }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      size={20}
+                      aria-hidden
+                      style={{
+                        color: star <= review.rating ? 'var(--color-brand)' : 'var(--border-hairline)',
+                        fill: star <= review.rating ? 'var(--color-brand)' : 'transparent',
+                      }}
+                    />
+                  ))}
+                  <span style={{ fontSize: 12, color: 'var(--color-muted)', marginLeft: 8 }}>
+                    {new Date(review.createdAt).toLocaleDateString('ru-RU')}
+                  </span>
+                </div>
+
+                {/* Комментарий */}
+                {review.comment && (
+                  <p
+                    className="whitespace-pre-wrap"
+                    style={{ fontSize: 14, color: 'var(--color-ink)', margin: '0 0 16px' }}
+                  >
+                    {review.comment}
+                  </p>
+                )}
+
+                {/* Кнопки действий */}
+                <div className="flex flex-wrap gap-3">
+                  {!review.isApproved ? (
+                    <AdminButton
+                      onClick={() => handleSetApproved(review.id, true)}
+                      disabled={processingId === review.id}
+                      icon={Check}
+                      style={{ flex: '1 1 160px' }}
+                    >
+                      {processingId === review.id ? 'Обработка…' : 'Одобрить'}
+                    </AdminButton>
+                  ) : (
+                    <AdminButton
+                      tone="secondary"
+                      onClick={() => handleSetApproved(review.id, false)}
+                      disabled={processingId === review.id}
+                      icon={EyeOff}
+                      style={{ flex: '1 1 160px' }}
+                    >
+                      {processingId === review.id ? 'Обработка…' : 'Скрыть'}
+                    </AdminButton>
+                  )}
+                  <AdminButton
+                    tone="danger"
+                    onClick={() => handleReject(review.id)}
+                    disabled={processingId === review.id}
+                    icon={Trash2}
+                    style={{ flex: '1 1 160px' }}
+                  >
+                    {processingId === review.id ? 'Обработка…' : 'Удалить'}
+                  </AdminButton>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+            </AdminCard>
+          ))}
+        </div>
+      )}
+    </AdminPage>
   );
 }

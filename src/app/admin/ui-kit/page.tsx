@@ -10,8 +10,8 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-// lucide — только для демо размеров иконок в секции «Иконки».
-import { Bell, Play, Home, Lock, type LucideIcon } from 'lucide-react';
+// lucide — демо размеров иконок в секции «Иконки» + иконки самой витрины.
+import { Bell, Play, Home, Lock, Palette, Flame, type LucideIcon } from 'lucide-react';
 
 // ── Живые UI-примитивы (единственный источник правды по вариантам) ──────────
 import { Button, Card, Badge, Chip, Banner, Input } from '@/components/ui';
@@ -159,7 +159,10 @@ export default function UiKitPage() {
           <Link href="/admin" className="text-white hover:text-gray-300 transition-colors" aria-label="Назад в админку">
             <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
           </Link>
-          <h1 className="text-2xl md:text-3xl font-bold">🎨 UI-кит</h1>
+          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+            <Palette size={24} className="text-brand" aria-hidden />
+            UI-кит
+          </h1>
         </div>
         <p className="text-sm text-muted mb-4">
           Живые токены и компоненты «Треньки» — единый ориентир для команды. Всё ниже импортируется
@@ -418,7 +421,7 @@ export default function UiKitPage() {
             <SectionHeader id="banner">Баннер</SectionHeader>
             {bannerVisible ? (
               <Banner
-                icon={<span className="text-2xl">🔥</span>}
+                icon={<Flame size={24} className="text-danger" aria-hidden />}
                 title="Ударный темп активен"
                 subtitle="Серия 3 дня подряд — весь опыт дня ×2"
                 action={

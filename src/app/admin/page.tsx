@@ -2,8 +2,22 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import AccountSwitcher from '@/components/AccountSwitcher';
+import {
+  AdminPage,
+  PageHeader,
+  SectionTitle,
+  AdminCard,
+  Kpi,
+  NavCard,
+  EmptyState,
+} from '@/components/admin/ui';
+import {
+  Users, Activity, Video, Dumbbell, Bell, Star, MessageSquare,
+  Film, BarChart3, Settings, Zap, GraduationCap, Blocks, Gamepad2,
+  Link2, Ticket, ShieldCheck, Send, AlarmClock, Lock, ScanSearch, Palette,
+  ArrowRight, LayoutDashboard, AlertTriangle,
+} from 'lucide-react';
 
 // Подмножество ответа /api/admin/stats, которое использует дашборд.
 interface AdminStats {
@@ -34,6 +48,10 @@ interface AdminStats {
   };
 }
 
+/** Сколько KPI-карточек рендерится — скелетон берёт это же число, чтобы при
+ *  загрузке не было прыжка вёрстки (раньше скелетон рисовал 6, карточек было 7). */
+const KPI_COUNT = 7;
+
 const num = (v: number | string | undefined): string => {
   const n = typeof v === 'string' ? parseFloat(v) : v ?? 0;
   return (n || 0).toLocaleString('ru-RU');
@@ -51,53 +69,14 @@ const timeAgo = (iso: string): string => {
   return `${d} дн назад`;
 };
 
-// ───────── KPI-карточка ─────────
-function Kpi({
-  icon,
-  value,
-  label,
-  hint,
-  href,
-  accent,
-}: {
-  icon: string;
-  value: React.ReactNode;
-  label: string;
-  hint?: string;
-  href?: string;
-  accent?: boolean;
-}) {
-  const body = (
-    <div
-      className={`h-full rounded-xl p-4 border transition-colors ${
-        accent
-          ? 'bg-[#A1FF4A]/10 border-[#A1FF4A]/30 hover:bg-[#A1FF4A]/15'
-          : 'bg-[#1a1f3a] border-white/5 hover:bg-[#2d3448]'
-      }`}
-    >
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-lg leading-none">{icon}</span>
-        <span className="text-[11px] uppercase tracking-wider text-gray-400">{label}</span>
-      </div>
-      <div className={`text-2xl font-bold leading-none ${accent ? 'text-[#A1FF4A]' : 'text-white'}`}>
-        {value}
-      </div>
-      {hint && <div className="text-xs text-gray-500 mt-1">{hint}</div>}
-    </div>
-  );
-  return href ? (
-    <Link href={href} className="block h-full">
-      {body}
-    </Link>
-  ) : (
-    body
-  );
-}
-
 // ───────── Мини-спарклайн (CSS-бары, без либы) ─────────
 function Sparkline({ data, color }: { data: Array<{ date: string; count: number }>; color: string }) {
   if (!data.length) {
-    return <div className="h-16 flex items-center justify-center text-xs text-gray-600">нет данных</div>;
+    return (
+      <div className="h-16 flex items-center justify-center" style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+        нет данных
+      </div>
+    );
   }
   const max = Math.max(...data.map((d) => d.count), 1);
   return (
@@ -114,47 +93,21 @@ function Sparkline({ data, color }: { data: Array<{ date: string; count: number 
   );
 }
 
-// ───────── Навигационная карточка раздела ─────────
-function NavCard({
-  href,
-  icon,
-  title,
-  desc,
-  badge,
-}: {
-  href: string;
-  icon: string;
-  title: string;
-  desc: string;
-  badge?: number;
-}) {
+/** Ссылка «Подробнее →» в шапке блока (иконка вместо текстовой стрелки). */
+function MoreLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href}>
-      <div className="group relative h-full bg-[#1a1f3a] rounded-xl p-4 border border-white/5 hover:bg-[#2d3448] hover:border-white/10 transition-colors cursor-pointer">
-        {badge ? (
-          <span className="absolute top-3 right-3 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-[#FF6B6B] text-white text-xs font-bold">
-            {badge}
-          </span>
-        ) : null}
-        <div className="flex items-start gap-3">
-          <span className="text-2xl leading-none mt-0.5">{icon}</span>
-          <div>
-            <h3 className="text-base font-semibold text-white">{title}</h3>
-            <p className="text-sm text-gray-400 mt-0.5">{desc}</p>
-          </div>
-        </div>
-      </div>
+    <Link
+      href={href}
+      className="inline-flex items-center gap-1 hover:underline shrink-0"
+      style={{ fontSize: 12, color: 'var(--color-brand)' }}
+    >
+      {children}
+      <ArrowRight size={16} aria-hidden />
     </Link>
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">{children}</h2>
-  );
-}
-
-export default function AdminPage() {
+export default function AdminDashboardPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -181,215 +134,246 @@ export default function AdminPage() {
   const sessSum = stats?.charts.sessions.reduce((s, d) => s + d.count, 0) ?? 0;
 
   return (
-    <div
-      className="min-h-screen bg-[#101530] text-white px-4 pb-10 md:px-8"
-      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
-    >
-      <div className="max-w-7xl mx-auto">
-        {/* Шапка */}
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="text-white hover:text-gray-300 transition-colors">
-              <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
-            </Link>
-            <h1 className="text-2xl md:text-3xl font-bold">Админ-панель</h1>
-          </div>
+    <AdminPage>
+      <PageHeader
+        title="Админ-панель"
+        icon={LayoutDashboard}
+        backHref="/"
+        backLabel="В приложение"
+        actions={
           <div className="w-full max-w-[220px]">
             <AccountSwitcher />
           </div>
+        }
+      />
+
+      {/* ───────── KPI ───────── */}
+      {loading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 mb-8">
+          {Array.from({ length: KPI_COUNT }).map((_, i) => (
+            <div
+              key={i}
+              className="animate-pulse"
+              style={{
+                height: 96,
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-surface)',
+                border: '1px solid var(--border-hairline)',
+              }}
+            />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="mb-8">
+          <AdminCard tone="danger">
+            <div className="flex items-center gap-3">
+              <AlertTriangle size={20} style={{ color: 'var(--color-danger)' }} aria-hidden />
+              <span style={{ fontSize: 14 }}>Не удалось загрузить метрики. Разделы ниже доступны.</span>
+            </div>
+          </AdminCard>
+        </div>
+      ) : stats ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 mb-8">
+          <Kpi
+            icon={Users}
+            label="Пользователи"
+            value={num(stats.users.total)}
+            hint={`+${num(stats.users.today)} сегодня`}
+            href="/admin/users"
+          />
+          <Kpi icon={Activity} label="Онлайн" value={num(stats.activity.onlineNow)} hint="сейчас" />
+          <Kpi
+            icon={Video}
+            label="Видео"
+            value={num(stats.content.videos.total)}
+            hint={`${num(stats.content.videos.published)} опубл.`}
+            href="/admin/videos"
+          />
+          <Kpi icon={Dumbbell} label="Тренировки" value={num(stats.training.today)} hint="сегодня" />
+          <Kpi icon={Bell} label="Push" value={num(stats.engagement.pushSubscriptions)} hint="подписки" />
+          <Kpi
+            icon={Star}
+            label="Отзывы"
+            value={num(stats.reviews.pending)}
+            hint="на модерации"
+            href="/admin/reviews"
+            accent={stats.reviews.pending > 0}
+          />
+          <Kpi
+            icon={MessageSquare}
+            label="Комментарии"
+            value={num(stats.content.comments.today)}
+            hint="за сегодня"
+            href="/admin/comments"
+            accent={stats.content.comments.today > 0}
+          />
+        </div>
+      ) : null}
+
+      {/* ───────── Мини-графики ───────── */}
+      {stats && !error && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          <AdminCard>
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    color: 'var(--color-muted)',
+                  }}
+                >
+                  Регистрации
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 800 }}>{num(regSum)} за 30 дней</div>
+              </div>
+              <MoreLink href="/admin/stats">Подробнее</MoreLink>
+            </div>
+            <Sparkline data={stats.charts.registrations} color="var(--color-brand-blue)" />
+          </AdminCard>
+          <AdminCard>
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    color: 'var(--color-muted)',
+                  }}
+                >
+                  Тренировки
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 800 }}>{num(sessSum)} за 30 дней</div>
+              </div>
+              <MoreLink href="/admin/stats">Подробнее</MoreLink>
+            </div>
+            <Sparkline data={stats.charts.sessions} color="var(--color-brand)" />
+          </AdminCard>
+        </div>
+      )}
+
+      {/* ───────── Последние регистрации ───────── */}
+      {stats && (
+        <div className="mb-8">
+          <AdminCard>
+            <div className="flex items-start justify-between gap-3">
+              <SectionTitle icon={Users}>Последние регистрации</SectionTitle>
+              <MoreLink href="/admin/users">Все</MoreLink>
+            </div>
+            {stats.recent.users.length === 0 ? (
+              <EmptyState title="Пока никто не зарегистрировался" />
+            ) : (
+              <div className="divide-y" style={{ borderColor: 'var(--border-hairline)' }}>
+                {stats.recent.users.slice(0, 6).map((u) => {
+                  const name =
+                    [u.firstName, u.lastName].filter(Boolean).join(' ') || u.username || 'Без имени';
+                  return (
+                    <div key={u.id} className="flex items-center justify-between py-2">
+                      <span style={{ fontSize: 14 }} className="truncate">
+                        {name}
+                      </span>
+                      <span
+                        className="shrink-0 ml-3"
+                        style={{ fontSize: 12, color: 'var(--color-muted)' }}
+                      >
+                        {timeAgo(u.createdAt)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </AdminCard>
+        </div>
+      )}
+
+      {/* ───────── Разделы ───────── */}
+      <div className="space-y-8">
+        <div>
+          <SectionTitle icon={Film}>Контент</SectionTitle>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <NavCard href="/admin/videos" icon={Video} title="Видео" desc="Каталог и публикация" />
+            <NavCard href="/admin/shorts" icon={Zap} title="Треньки" desc="Короткие ролики (shorts)" />
+            <NavCard href="/admin/trainers" icon={GraduationCap} title="Тренеры" desc="Профили тренеров" />
+            <NavCard
+              href="/admin/training-modules"
+              icon={Blocks}
+              title="Тренировочные модули"
+              desc="Модули и упражнения"
+            />
+            <NavCard
+              href="/admin/gamification"
+              icon={Gamepad2}
+              title="Геймификация"
+              desc="Песочница: уровни, звания, стрик"
+            />
+          </div>
         </div>
 
-        {/* ───────── KPI ───────── */}
-        {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-[92px] rounded-xl bg-[#1a1f3a] border border-white/5 animate-pulse" />
-            ))}
-          </div>
-        ) : error ? (
-          <div className="mb-8 rounded-xl bg-[#1a1f3a] border border-white/5 p-4 text-sm text-gray-400">
-            Не удалось загрузить метрики. Разделы ниже доступны.
-          </div>
-        ) : stats ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
-            <Kpi
-              icon="👥"
-              label="Пользователи"
-              value={num(stats.users.total)}
-              hint={`+${num(stats.users.today)} сегодня`}
-              href="/admin/users"
+        <div>
+          <SectionTitle icon={Users}>Пользователи</SectionTitle>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <NavCard href="/admin/users" icon={Users} title="Пользователи" desc="Список и управление" />
+            <NavCard
+              href="/admin/referrals"
+              icon={Link2}
+              title="Реферальные каналы"
+              desc="Коды/ссылки сборов и кто пришёл"
             />
-            <Kpi icon="🟢" label="Онлайн" value={num(stats.activity.onlineNow)} hint="сейчас" />
-            <Kpi
-              icon="📹"
-              label="Видео"
-              value={num(stats.content.videos.total)}
-              hint={`${num(stats.content.videos.published)} опубл.`}
-              href="/admin/videos"
-            />
-            <Kpi icon="🏋" label="Тренировки" value={num(stats.training.today)} hint="сегодня" />
-            <Kpi
-              icon="🔔"
-              label="Push"
-              value={num(stats.engagement.pushSubscriptions)}
-              hint="подписки"
-            />
-            <Kpi
-              icon="⭐"
-              label="Отзывы"
-              value={num(stats.reviews.pending)}
-              hint="на модерации"
+            <NavCard href="/admin/invite-codes" icon={Ticket} title="Инвайт-коды" desc="Коды приглашений" />
+            <NavCard href="/admin/admins" icon={ShieldCheck} title="Администраторы" desc="Права доступа" />
+            <NavCard
               href="/admin/reviews"
-              accent={stats.reviews.pending > 0}
+              icon={Star}
+              title="Отзывы"
+              desc="Модерация отзывов о тренерах"
+              badge={stats?.reviews.pending || undefined}
             />
-            <Kpi
-              icon="💬"
-              label="Комментарии"
-              value={num(stats.content.comments.today)}
-              hint="за сегодня"
+            <NavCard
               href="/admin/comments"
-              accent={stats.content.comments.today > 0}
+              icon={MessageSquare}
+              title="Комментарии"
+              desc="Модерация комментов к видео и тренькам"
+              badge={stats?.content.comments.today || undefined}
             />
           </div>
-        ) : null}
+        </div>
 
-        {/* ───────── Мини-графики ───────── */}
-        {stats && !error && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-            <div className="rounded-xl bg-[#1a1f3a] border border-white/5 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-gray-400">Регистрации</div>
-                  <div className="text-lg font-bold">{num(regSum)} за 30 дней</div>
-                </div>
-                <Link href="/admin/stats" className="text-xs text-[#A1FF4A] hover:underline">
-                  Подробнее →
-                </Link>
-              </div>
-              <Sparkline data={stats.charts.registrations} color="#445CFF" />
-            </div>
-            <div className="rounded-xl bg-[#1a1f3a] border border-white/5 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-gray-400">Тренировки</div>
-                  <div className="text-lg font-bold">{num(sessSum)} за 30 дней</div>
-                </div>
-                <Link href="/admin/stats" className="text-xs text-[#A1FF4A] hover:underline">
-                  Подробнее →
-                </Link>
-              </div>
-              <Sparkline data={stats.charts.sessions} color="#A1FF4A" />
-            </div>
+        <div>
+          <SectionTitle icon={BarChart3}>Аналитика и коммуникация</SectionTitle>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <NavCard href="/admin/stats" icon={BarChart3} title="Статистика" desc="Полная аналитика" />
+            <NavCard href="/admin/notifications" icon={Send} title="Уведомления" desc="Push-рассылки" />
+            <NavCard
+              href="/admin/reminders"
+              icon={AlarmClock}
+              title="Время уведомлений"
+              desc="Когда слать пуши (ежедн. + предтрен.)"
+            />
           </div>
-        )}
+        </div>
 
-        {/* ───────── Последние регистрации ───────── */}
-        {stats && stats.recent.users.length > 0 && (
-          <div className="rounded-xl bg-[#1a1f3a] border border-white/5 p-4 mb-8">
-            <div className="flex items-center justify-between mb-3">
-              <SectionTitle>Последние регистрации</SectionTitle>
-              <Link href="/admin/users" className="text-xs text-[#A1FF4A] hover:underline -mt-3">
-                Все →
-              </Link>
-            </div>
-            <div className="divide-y divide-white/5">
-              {stats.recent.users.slice(0, 6).map((u) => {
-                const name =
-                  [u.firstName, u.lastName].filter(Boolean).join(' ') ||
-                  u.username ||
-                  'Без имени';
-                return (
-                  <div key={u.id} className="flex items-center justify-between py-2">
-                    <span className="text-sm text-white truncate">{name}</span>
-                    <span className="text-xs text-gray-500 shrink-0 ml-3">{timeAgo(u.createdAt)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ───────── Разделы ───────── */}
-        <div className="space-y-8">
-          <div>
-            <SectionTitle>📹 Контент</SectionTitle>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <NavCard href="/admin/videos" icon="📹" title="Видео" desc="Каталог и публикация" />
-              <NavCard href="/admin/shorts" icon="⚡" title="Треньки" desc="Короткие ролики (shorts)" />
-              <NavCard href="/admin/trainers" icon="🎓" title="Тренеры" desc="Профили тренеров" />
-              <NavCard
-                href="/admin/training-modules"
-                icon="🧩"
-                title="Тренировочные модули"
-                desc="Модули и упражнения"
-              />
-              <NavCard
-                href="/admin/gamification"
-                icon="🎮"
-                title="Геймификация"
-                desc="Песочница: уровни, звания, стрик"
-              />
-            </div>
-          </div>
-
-          <div>
-            <SectionTitle>👥 Пользователи</SectionTitle>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <NavCard href="/admin/users" icon="👤" title="Пользователи" desc="Список и управление" />
-              <NavCard href="/admin/referrals" icon="🔗" title="Реферальные каналы" desc="Коды/ссылки сборов и кто пришёл" />
-              <NavCard href="/admin/invite-codes" icon="🎟️" title="Инвайт-коды" desc="Коды приглашений" />
-              <NavCard href="/admin/admins" icon="🔐" title="Администраторы" desc="Права доступа" />
-              <NavCard
-                href="/admin/reviews"
-                icon="⭐"
-                title="Отзывы"
-                desc="Модерация отзывов о тренерах"
-                badge={stats?.reviews.pending || undefined}
-              />
-              <NavCard
-                href="/admin/comments"
-                icon="💬"
-                title="Комментарии"
-                desc="Модерация комментов к видео и тренькам"
-                badge={stats?.content.comments.today || undefined}
-              />
-            </div>
-          </div>
-
-          <div>
-            <SectionTitle>📊 Аналитика и коммуникация</SectionTitle>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <NavCard href="/admin/stats" icon="📊" title="Статистика" desc="Полная аналитика" />
-              <NavCard href="/admin/notifications" icon="🔔" title="Уведомления" desc="Push-рассылки" />
-              <NavCard href="/admin/reminders" icon="⏰" title="Время уведомлений" desc="Когда слать пуши (ежедн. + предтрен.)" />
-            </div>
-          </div>
-
-          <div>
-            <SectionTitle>⚙️ Система</SectionTitle>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <NavCard
-                href="/admin/paywall"
-                icon="🔒"
-                title="Paywall (подписка)"
-                desc="Вкл/выкл, режим обкатки на админах"
-              />
-              <NavCard
-                href="/admin/content-check"
-                icon="🔎"
-                title="Проверка контента"
-                desc="Целостность данных"
-              />
-              <NavCard
-                href="/admin/ui-kit"
-                icon="🎨"
-                title="UI-кит"
-                desc="Токены и компоненты"
-              />
-            </div>
+        <div>
+          <SectionTitle icon={Settings}>Система</SectionTitle>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <NavCard
+              href="/admin/paywall"
+              icon={Lock}
+              title="Paywall (подписка)"
+              desc="Вкл/выкл, режим обкатки на админах"
+            />
+            <NavCard
+              href="/admin/content-check"
+              icon={ScanSearch}
+              title="Проверка контента"
+              desc="Целостность данных"
+            />
+            <NavCard href="/admin/ui-kit" icon={Palette} title="UI-кит" desc="Токены и компоненты" />
           </div>
         </div>
       </div>
-    </div>
+    </AdminPage>
   );
 }

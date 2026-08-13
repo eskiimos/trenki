@@ -2,8 +2,30 @@
 
 import React, { useState, useEffect } from 'react';
 import { pluralYears } from '@/lib/plural';
-import Link from 'next/link';
 import Image from 'next/image';
+import {
+  AdminPage,
+  PageHeader,
+  SectionTitle,
+  AdminCard,
+  AdminButton,
+  EmptyState,
+  inputStyle,
+  labelStyle,
+} from '@/components/admin/ui';
+import {
+  GraduationCap,
+  Plus,
+  Save,
+  X,
+  Pencil,
+  Trash2,
+  Star,
+  CalendarDays,
+  Video as VideoIcon,
+  Users,
+  Loader2,
+} from 'lucide-react';
 
 interface Trainer {
   id: string;
@@ -182,45 +204,37 @@ export default function AdminTrainersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#101530] text-white p-4 md:p-8" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
-      <div className="max-w-7xl mx-auto">
-        {/* Заголовок и кнопки */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold">Управление тренерами</h1>
-          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            {!showForm && (
-              <button
-                onClick={() => setShowForm(true)}
-                className="w-full sm:w-auto px-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
-              >
-                + Добавить тренера
-              </button>
-            )}
-            <Link href="/admin" className="w-full sm:w-auto">
-              <button className="w-full px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">
-                ← Назад в админку
-              </button>
-            </Link>
-          </div>
-        </div>
+    <AdminPage>
+      <PageHeader
+        title="Тренеры"
+        icon={GraduationCap}
+        backHref="/admin"
+        actions={
+          !showForm ? (
+            <AdminButton icon={Plus} onClick={() => setShowForm(true)}>
+              Добавить тренера
+            </AdminButton>
+          ) : undefined
+        }
+      />
 
-        {/* Форма добавления/редактирования */}
-        {showForm && (
-        <div className="bg-[#1a1f3a] rounded-lg p-4 md:p-6 mb-6 md:mb-8">
-          <h2 className="text-xl md:text-2xl font-bold mb-4">
+      {/* Форма добавления/редактирования */}
+      {showForm && (
+        <AdminCard style={{ marginBottom: 24 }}>
+          <SectionTitle icon={GraduationCap}>
             {editingTrainerId ? 'Редактировать тренера' : 'Добавить нового тренера'}
-          </h2>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
+          </SectionTitle>
+
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Имя */}
               <div>
-                <label className="block text-sm font-medium mb-2">Имя *</label>
+                <label style={labelStyle}>Имя *</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-2 rounded bg-[#101530] border border-gray-700 focus:border-blue-500 focus:outline-none"
+                  style={inputStyle}
                   required
                   placeholder="Александр"
                 />
@@ -228,12 +242,12 @@ export default function AdminTrainersPage() {
 
               {/* Фамилия */}
               <div>
-                <label className="block text-sm font-medium mb-2">Фамилия *</label>
+                <label style={labelStyle}>Фамилия *</label>
                 <input
                   type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  className="w-full px-4 py-2 rounded bg-[#101530] border border-gray-700 focus:border-blue-500 focus:outline-none"
+                  style={inputStyle}
                   required
                   placeholder="Иванов"
                 />
@@ -241,12 +255,12 @@ export default function AdminTrainersPage() {
 
               {/* Специализация */}
               <div>
-                <label className="block text-sm font-medium mb-2">Специализация *</label>
+                <label style={labelStyle}>Специализация *</label>
                 <input
                   type="text"
                   value={speciality}
                   onChange={(e) => setSpeciality(e.target.value)}
-                  className="w-full px-4 py-2 rounded bg-[#101530] border border-gray-700 focus:border-blue-500 focus:outline-none"
+                  style={inputStyle}
                   required
                   placeholder="Техника катания"
                 />
@@ -254,12 +268,12 @@ export default function AdminTrainersPage() {
 
               {/* Опыт работы */}
               <div>
-                <label className="block text-sm font-medium mb-2">Опыт работы (лет)</label>
+                <label style={labelStyle}>Опыт работы (лет)</label>
                 <input
                   type="number"
                   value={experience}
                   onChange={(e) => setExperience(parseInt(e.target.value) || 0)}
-                  className="w-full px-4 py-2 rounded bg-[#101530] border border-gray-700 focus:border-blue-500 focus:outline-none"
+                  style={{ ...inputStyle, colorScheme: 'dark' }}
                   min="0"
                   placeholder="5"
                 />
@@ -267,12 +281,12 @@ export default function AdminTrainersPage() {
 
               {/* Рейтинг */}
               <div>
-                <label className="block text-sm font-medium mb-2">Рейтинг</label>
+                <label style={labelStyle}>Рейтинг</label>
                 <input
                   type="number"
                   value={rating}
                   onChange={(e) => setRating(parseFloat(e.target.value) || 5.0)}
-                  className="w-full px-4 py-2 rounded bg-[#101530] border border-gray-700 focus:border-blue-500 focus:outline-none"
+                  style={{ ...inputStyle, colorScheme: 'dark' }}
                   min="0"
                   max="5"
                   step="0.1"
@@ -284,12 +298,15 @@ export default function AdminTrainersPage() {
 
             {/* Аватар - полная ширина */}
             <div>
-              <label className="block text-sm font-medium mb-2">Аватар</label>
-              
+              <label style={labelStyle}>Аватар</label>
+
               {/* Превью аватара */}
               {avatar && (
-                <div className="mb-3 flex items-center gap-4">
-                  <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-700">
+                <div className="flex items-center gap-4" style={{ marginBottom: 12 }}>
+                  <div
+                    className="w-20 h-20 overflow-hidden shrink-0"
+                    style={{ borderRadius: 999, background: 'rgba(255,255,255,0.06)' }}
+                  >
                     <Image
                       src={avatar}
                       alt="Preview"
@@ -298,40 +315,49 @@ export default function AdminTrainersPage() {
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <button
+                  <AdminButton
                     type="button"
+                    tone="danger"
+                    size="sm"
+                    icon={Trash2}
                     onClick={() => setAvatar('')}
-                    className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm transition-colors"
                   >
                     Удалить
-                  </button>
+                  </AdminButton>
                 </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Загрузка файла */}
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">Загрузить файл</label>
+                  <label style={labelStyle}>Загрузить файл</label>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleAvatarUpload}
                     disabled={isUploading}
-                    className="w-full px-4 py-2 rounded bg-[#101530] border border-gray-700 focus:border-blue-500 focus:outline-none text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:cursor-pointer"
+                    style={{ ...inputStyle, padding: '8px 12px' }}
+                    className="file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:cursor-pointer file:font-bold file:text-[13px] file:bg-brand file:text-night disabled:opacity-50"
                   />
                   {isUploading && (
-                    <p className="text-sm text-blue-400 mt-2">Загрузка...</p>
+                    <p
+                      className="flex items-center gap-2"
+                      style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 8 }}
+                    >
+                      <Loader2 size={16} className="animate-spin" aria-hidden />
+                      Загрузка…
+                    </p>
                   )}
                 </div>
 
                 {/* Или вставить URL */}
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">Или вставить URL</label>
+                  <label style={labelStyle}>Или вставить URL</label>
                   <input
                     type="text"
                     value={avatar}
                     onChange={(e) => setAvatar(e.target.value)}
-                    className="w-full px-4 py-2 rounded bg-[#101530] border border-gray-700 focus:border-blue-500 focus:outline-none"
+                    style={inputStyle}
                     placeholder="https://example.com/avatar.jpg"
                   />
                 </div>
@@ -340,112 +366,142 @@ export default function AdminTrainersPage() {
 
             {/* Описание */}
             <div>
-              <label className="block text-sm font-medium mb-2">Описание</label>
+              <label style={labelStyle}>Описание</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-4 py-2 rounded bg-[#101530] border border-gray-700 focus:border-blue-500 focus:outline-none resize-none"
+                style={{ ...inputStyle, minHeight: 112, resize: 'vertical' }}
                 rows={4}
                 placeholder="Опытный тренер с многолетним стажем..."
               />
             </div>
 
             {/* Кнопки */}
-            <div className="flex gap-4">
-              <button
-                type="submit"
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors"
-              >
+            <div className="flex flex-wrap gap-3">
+              <AdminButton type="submit" icon={Save}>
                 {editingTrainerId ? 'Обновить' : 'Добавить'}
-              </button>
-              
+              </AdminButton>
+
               {editingTrainerId && (
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="px-6 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg font-semibold transition-colors"
-                >
+                <AdminButton type="button" tone="secondary" icon={X} onClick={resetForm}>
                   Отменить
-                </button>
+                </AdminButton>
               )}
             </div>
           </form>
-        </div>
-        )}
+        </AdminCard>
+      )}
 
-        {/* Список тренеров */}
-        <div className="bg-[#1a1f3a] rounded-lg p-4 md:p-6">
-          <h2 className="text-xl md:text-2xl font-bold mb-4">Список тренеров</h2>
-          
-          {isLoading ? (
-            <div className="text-center py-8 text-gray-400">Загрузка...</div>
-          ) : trainers.length === 0 ? (
-            <div className="text-center py-8 text-gray-400">Нет тренеров</div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {trainers.map((trainer) => (
+      {/* Список тренеров */}
+      <AdminCard>
+        <SectionTitle icon={Users}>Список тренеров ({trainers.length})</SectionTitle>
+
+        {isLoading ? (
+          <EmptyState icon={Loader2} title="Загрузка…" />
+        ) : trainers.length === 0 ? (
+          <EmptyState
+            icon={GraduationCap}
+            title="Тренеров пока нет"
+            hint="Нажми «Добавить тренера» в шапке страницы"
+          />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {trainers.map((trainer) => (
+              <div
+                key={trainer.id}
+                className="flex flex-col md:flex-row gap-4 items-start md:items-center"
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid var(--border-hairline)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: 16,
+                }}
+              >
+                {/* Аватар */}
                 <div
-                  key={trainer.id}
-                  className="bg-[#101530] rounded-lg p-4 flex flex-col md:flex-row gap-4 items-start md:items-center"
+                  className="w-16 h-16 overflow-hidden shrink-0"
+                  style={{ borderRadius: 999, background: 'rgba(255,255,255,0.06)' }}
                 >
-                  {/* Аватар */}
-                  <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-700 flex-shrink-0">
-                    {trainer.avatar ? (
-                      <Image
-                        src={trainer.avatar}
-                        alt={`${trainer.name} ${trainer.lastName}`}
-                        width={64}
-                        height={64}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-white">
-                        {trainer.name.charAt(0)}{trainer.lastName.charAt(0)}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Информация */}
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold">
-                      {trainer.name} {trainer.lastName}
-                    </h3>
-                    <p className="text-sm text-gray-400">{trainer.speciality}</p>
-                    <div className="flex gap-4 mt-2 text-xs text-gray-500">
-                      <span>⭐ {trainer.rating.toFixed(1)}</span>
-                      <span>📅 Опыт: {pluralYears(trainer.experience)}</span>
-                      {trainer.videos && trainer.videos.length > 0 && (
-                        <span>🎥 Видео: {trainer.videos.length}</span>
-                      )}
+                  {trainer.avatar ? (
+                    <Image
+                      src={trainer.avatar}
+                      alt={`${trainer.name} ${trainer.lastName}`}
+                      width={64}
+                      height={64}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="w-full h-full flex items-center justify-center"
+                      style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-muted)' }}
+                    >
+                      {trainer.name.charAt(0)}{trainer.lastName.charAt(0)}
                     </div>
-                    {trainer.description && (
-                      <p className="text-sm text-gray-300 mt-2 line-clamp-2">
-                        {trainer.description}
-                      </p>
+                  )}
+                </div>
+
+                {/* Информация */}
+                <div className="flex-1 min-w-0">
+                  <h3 style={{ fontSize: 16, fontWeight: 700 }}>
+                    {trainer.name} {trainer.lastName}
+                  </h3>
+                  <p style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 2 }}>
+                    {trainer.speciality}
+                  </p>
+                  <div
+                    className="flex flex-wrap items-center gap-4"
+                    style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 8 }}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      <Star size={16} aria-hidden />
+                      <span className="sr-only">Рейтинг: </span>
+                      {trainer.rating.toFixed(1)}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <CalendarDays size={16} aria-hidden />
+                      Опыт: {pluralYears(trainer.experience)}
+                    </span>
+                    {trainer.videos && trainer.videos.length > 0 && (
+                      <span className="inline-flex items-center gap-1">
+                        <VideoIcon size={16} aria-hidden />
+                        Видео: {trainer.videos.length}
+                      </span>
                     )}
                   </div>
-
-                  {/* Кнопки действий */}
-                  <div className="flex gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => handleEdit(trainer)}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-semibold transition-colors"
+                  {trainer.description && (
+                    <p
+                      className="line-clamp-2"
+                      style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 8 }}
                     >
-                      Изменить
-                    </button>
-                    <button
-                      onClick={() => handleDelete(trainer.id)}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-semibold transition-colors"
-                    >
-                      Удалить
-                    </button>
-                  </div>
+                      {trainer.description}
+                    </p>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+
+                {/* Кнопки действий */}
+                <div className="flex gap-2 shrink-0">
+                  <AdminButton
+                    size="sm"
+                    tone="secondary"
+                    icon={Pencil}
+                    onClick={() => handleEdit(trainer)}
+                  >
+                    Изменить
+                  </AdminButton>
+                  <AdminButton
+                    size="sm"
+                    tone="danger"
+                    icon={Trash2}
+                    onClick={() => handleDelete(trainer.id)}
+                  >
+                    Удалить
+                  </AdminButton>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </AdminCard>
+    </AdminPage>
   );
 }

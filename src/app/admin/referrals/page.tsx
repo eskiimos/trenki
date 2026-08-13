@@ -5,7 +5,32 @@
 // пользователям + выгрузка CSV.
 
 import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
+import {
+  AdminPage,
+  PageHeader,
+  SectionTitle,
+  AdminCard,
+  AdminButton,
+  Kpi,
+  EmptyState,
+  inputStyle,
+} from '@/components/admin/ui';
+import {
+  Link2,
+  Plus,
+  Copy,
+  Check,
+  Users,
+  Download,
+  Power,
+  PowerOff,
+  Trash2,
+  Gift,
+  Star,
+  UserPlus,
+  Activity,
+  AlertTriangle,
+} from 'lucide-react';
 
 interface RefUser {
   id: string;
@@ -28,6 +53,31 @@ interface RefCode {
   createdAt: string;
   stats: { registrations: number; onboarded: number; active7d: number; premium: number };
   users: RefUser[];
+}
+
+/** Компактная метрика в карточке канала: значение над подписью. */
+function MiniStat({
+  icon: Icon,
+  value,
+  label,
+  accent,
+  title,
+}: {
+  icon: typeof Users;
+  value: number;
+  label: string;
+  accent?: string;
+  title?: string;
+}) {
+  return (
+    <div title={title}>
+      <div className="flex items-center gap-1" style={{ color: accent ?? 'var(--color-ink)' }}>
+        <Icon size={16} aria-hidden />
+        <span style={{ fontSize: 16, fontWeight: 800, lineHeight: 1 }}>{value}</span>
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 4 }}>{label}</div>
+    </div>
+  );
 }
 
 export default function AdminReferralsPage() {
@@ -57,8 +107,8 @@ export default function AdminReferralsPage() {
       setCodes(d.codes || []);
       setStats(d.stats || null);
       setErr(null);
-    } catch (e: any) {
-      setErr(e?.message || 'Ошибка');
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : 'Ошибка');
     } finally {
       setLoading(false);
     }
@@ -129,7 +179,7 @@ export default function AdminReferralsPage() {
   };
 
   const exportCsv = (c: RefCode) => {
-    const esc = (s: any) => {
+    const esc = (s: unknown) => {
       let v = String(s ?? '');
       // CSV-инъекция: если ячейка начинается с =,+,-,@,Tab,CR — нейтрализуем
       // ведущей кавычкой (имя/почта приходят от пользователя).
@@ -150,141 +200,260 @@ export default function AdminReferralsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const smallInput: React.CSSProperties = {
+    ...inputStyle,
+    minHeight: 40,
+    padding: '8px 12px',
+    fontSize: 13,
+  };
+
   return (
-    <div className="min-h-screen bg-[#060919] text-white p-4 sm:p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold">🔗 Реферальные каналы</h1>
-        <Link href="/admin" className="text-sm text-[#A1FF4A] hover:underline">← В админку</Link>
-      </div>
+    <AdminPage>
+      <PageHeader title="Реферальные каналы" icon={Link2} backHref="/admin" />
 
       {stats && (
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          {[['Каналов', stats.total], ['Активных', stats.active], ['Всего регистраций', stats.totalRegistrations]].map(([t, v]) => (
-            <div key={t as string} className="bg-[#101530] rounded-xl p-4">
-              <div className="text-gray-400 text-xs">{t}</div>
-              <div className="text-2xl font-bold text-[#A1FF4A]">{v as number}</div>
-            </div>
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3" style={{ marginBottom: 24 }}>
+          <Kpi icon={Link2} label="Каналов" value={stats.total} />
+          <Kpi icon={Power} label="Активных" value={stats.active} />
+          <Kpi icon={UserPlus} label="Всего регистраций" value={stats.totalRegistrations} accent />
         </div>
       )}
 
       {/* Создание кода */}
-      <div className="bg-[#101530] rounded-xl p-4 mb-6">
-        <div className="text-sm font-semibold mb-3">Новый канал</div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
+      <AdminCard style={{ marginBottom: 24 }}>
+        <SectionTitle icon={Plus}>Новый канал</SectionTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3" style={{ marginBottom: 12 }}>
           <input value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="код (igls26)"
-            autoCapitalize="none" spellCheck={false}
-            className="bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#A1FF4A]" />
+            autoCapitalize="none" spellCheck={false} style={smallInput} />
           <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="название (ИГЛС)"
-            className="bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#A1FF4A]" />
+            style={smallInput} />
           <input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="заметка (необязательно)"
-            className="bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#A1FF4A]" />
+            style={smallInput} />
         </div>
         <input value={newAliases} onChange={(e) => setNewAliases(e.target.value)} placeholder="промокоды для ручного ввода через запятую (напр. ИГЛС, иглс)"
-          className="w-full mb-2 bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#A1FF4A]" />
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-gray-400 text-xs">Пробный период:</span>
+          style={{ ...smallInput, marginBottom: 12 }} />
+        <div className="flex items-center flex-wrap gap-2" style={{ marginBottom: 12 }}>
+          <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Пробный период:</span>
           <input type="number" min={0} max={365} value={newTrial} onChange={(e) => setNewTrial(e.target.value)}
-            className="w-20 bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#A1FF4A]" />
-          <span className="text-gray-500 text-xs">дней премиума при регистрации по этому коду (0 — без триала)</span>
+            style={{ ...smallInput, width: 88 }} />
+          <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+            дней премиума при регистрации по этому коду (0 — без триала)
+          </span>
         </div>
-        <button onClick={create} disabled={busy || !newCode.trim() || !newLabel.trim()}
-          className="bg-[#A1FF4A] text-[#060919] font-bold text-sm rounded-lg px-4 py-2 disabled:opacity-50">
+        <AdminButton onClick={create} disabled={busy || !newCode.trim() || !newLabel.trim()} icon={Plus}>
           Создать
-        </button>
-        <div className="text-gray-500 text-xs mt-2">Код/слаг ссылки — латиница (ссылка {origin}/r/&lt;код&gt;). Промокоды (алиасы) можно кириллицей — по ним пускаем при ручном вводе.</div>
-      </div>
+        </AdminButton>
+        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 12, lineHeight: 1.4 }}>
+          Код/слаг ссылки — латиница (ссылка {origin}/r/&lt;код&gt;). Промокоды (алиасы) можно кириллицей — по ним пускаем при ручном вводе.
+        </div>
+      </AdminCard>
 
-      {err && <div className="text-red-400 text-sm mb-4">{err}</div>}
-      {loading && <div className="text-gray-400 text-sm">Загрузка…</div>}
+      {err && (
+        <div style={{ marginBottom: 16 }}>
+          <AdminCard tone="danger">
+            <div className="flex items-center gap-3" role="status" aria-live="polite">
+              <AlertTriangle size={20} style={{ color: 'var(--color-danger)', flexShrink: 0 }} aria-hidden />
+              <span style={{ fontSize: 14 }}>{err}</span>
+            </div>
+          </AdminCard>
+        </div>
+      )}
 
-      <div className="flex flex-col gap-3">
-        {codes.map((c) => (
-          <div key={c.id} className="bg-[#101530] rounded-xl p-4">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold">{c.label}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: c.isActive ? 'rgba(161,255,74,0.18)' : 'rgba(174,171,187,0.18)', color: c.isActive ? '#A1FF4A' : '#AEABBB' }}>
-                    {c.isActive ? 'активен' : 'выкл'}
-                  </span>
-                  {c.trialDays > 0 && (
-                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(99,102,241,0.22)', color: '#A5B4FC' }} title="Пробный период при регистрации по этому коду">
-                      🎁 триал {c.trialDays} дн.
+      {loading && codes.length === 0 ? (
+        <div className="flex flex-col" style={{ gap: 12 }}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="animate-pulse"
+              style={{
+                height: 180,
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-surface)',
+                border: '1px solid var(--border-hairline)',
+              }}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col" style={{ gap: 12, opacity: loading ? 0.6 : 1 }}>
+          {codes.map((c) => (
+            <AdminCard key={c.id}>
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span style={{ fontSize: 14, fontWeight: 800 }}>{c.label}</span>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        padding: '2px 8px',
+                        borderRadius: 'var(--radius-pill)',
+                        background: c.isActive ? 'var(--lime-medium)' : 'rgba(174,171,187,0.18)',
+                        color: c.isActive ? 'var(--color-brand)' : 'var(--color-muted)',
+                      }}
+                    >
+                      {c.isActive ? 'активен' : 'выкл'}
                     </span>
+                    {c.trialDays > 0 && (
+                      <span
+                        className="inline-flex items-center gap-1"
+                        style={{
+                          fontSize: 12,
+                          padding: '2px 8px',
+                          borderRadius: 'var(--radius-pill)',
+                          background: 'var(--blue-medium)',
+                          color: 'var(--color-ink)',
+                        }}
+                        title="Пробный период при регистрации по этому коду"
+                      >
+                        <Gift size={16} aria-hidden />
+                        триал {c.trialDays} дн.
+                      </span>
+                    )}
+                  </div>
+                  <div className="font-mono" style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 4 }}>
+                    {c.code}
+                  </div>
+                  {c.aliases?.length > 0 && (
+                    <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 4 }}>
+                      промокоды: {c.aliases.join(', ')}
+                    </div>
                   )}
                 </div>
-                <div className="text-gray-400 text-xs mt-1 font-mono">{c.code}</div>
-                {c.aliases?.length > 0 && (
-                  <div className="text-gray-500 text-xs mt-0.5">промокоды: {c.aliases.join(', ')}</div>
-                )}
+                <div className="grid grid-cols-4 gap-3 shrink-0">
+                  <MiniStat icon={UserPlus} value={c.stats.registrations} label="рег." accent="var(--color-brand)" />
+                  <MiniStat icon={Check} value={c.stats.onboarded} label="действ." title="Прошёл онбординг — заполнен профиль" />
+                  <MiniStat icon={Star} value={c.stats.premium} label="премиум" accent="var(--color-brand)" title="Активная подписка сейчас" />
+                  <MiniStat icon={Activity} value={c.stats.active7d} label="акт. 7д" />
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-xs flex-wrap justify-end">
-                <span className="text-[#A1FF4A] font-bold">{c.stats.registrations}</span><span className="text-gray-500">рег.</span>
-                <span className="text-gray-300" title="Прошёл онбординг — заполнен профиль">{c.stats.onboarded}</span><span className="text-gray-500">действ.</span>
-                <span className="text-amber-400 font-bold" title="Активная подписка сейчас">{c.stats.premium}</span><span className="text-gray-500">премиум</span>
-                <span className="text-gray-300">{c.stats.active7d}</span><span className="text-gray-500">акт.7д</span>
+
+              <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 16 }}>
+                <AdminButton
+                  size="sm"
+                  tone="secondary"
+                  icon={copied === `link-${c.id}` ? Check : Link2}
+                  onClick={() => copy(linkFor(c.code), `link-${c.id}`)}
+                >
+                  {copied === `link-${c.id}` ? 'скопировано' : 'копировать ссылку'}
+                </AdminButton>
+                <AdminButton
+                  size="sm"
+                  tone="secondary"
+                  icon={copied === `code-${c.id}` ? Check : Copy}
+                  onClick={() => copy(c.code, `code-${c.id}`)}
+                >
+                  код
+                </AdminButton>
+                <AdminButton
+                  size="sm"
+                  tone="secondary"
+                  icon={Users}
+                  onClick={() => setExpanded(expanded === c.id ? null : c.id)}
+                >
+                  {expanded === c.id ? 'скрыть' : `кто пришёл (${c.stats.registrations})`}
+                </AdminButton>
+                <AdminButton
+                  size="sm"
+                  tone="secondary"
+                  icon={Download}
+                  onClick={() => exportCsv(c)}
+                  disabled={c.users.length === 0}
+                >
+                  CSV
+                </AdminButton>
+                <AdminButton
+                  size="sm"
+                  tone="secondary"
+                  icon={c.isActive ? PowerOff : Power}
+                  onClick={() => toggle(c)}
+                  disabled={busy}
+                >
+                  {c.isActive ? 'выключить' : 'включить'}
+                </AdminButton>
+
+                <span className="inline-flex items-center gap-2 ml-auto" style={{ fontSize: 12 }}>
+                  <span style={{ color: 'var(--color-muted)' }}>триал</span>
+                  <input type="number" min={0} max={365}
+                    aria-label={`Пробный период по коду ${c.code}, дней`}
+                    value={trialEdit[c.id] ?? String(c.trialDays)}
+                    onChange={(e) => setTrialEdit((m) => ({ ...m, [c.id]: e.target.value }))}
+                    style={{ ...smallInput, width: 72 }} />
+                  <span style={{ color: 'var(--color-muted)' }}>дн.</span>
+                  {/* Место под кнопку зарезервировано, чтобы строка не дёргалась */}
+                  <span style={{ minWidth: 132, display: 'inline-flex' }}>
+                    {trialEdit[c.id] !== undefined && trialEdit[c.id] !== String(c.trialDays) && (
+                      <AdminButton size="sm" icon={Check} onClick={() => saveTrial(c)} disabled={busy}>
+                        сохранить
+                      </AdminButton>
+                    )}
+                  </span>
+                  <AdminButton
+                    size="sm"
+                    tone="danger"
+                    icon={Trash2}
+                    onClick={() => remove(c)}
+                    disabled={busy}
+                  >
+                    удалить
+                  </AdminButton>
+                </span>
               </div>
-            </div>
 
-            <div className="flex items-center gap-2 mt-3 flex-wrap">
-              <button onClick={() => copy(linkFor(c.code), `link-${c.id}`)} className="text-xs bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-3 py-1.5 hover:border-[#A1FF4A]">
-                {copied === `link-${c.id}` ? '✓ скопировано' : '🔗 копировать ссылку'}
-              </button>
-              <button onClick={() => copy(c.code, `code-${c.id}`)} className="text-xs bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-3 py-1.5 hover:border-[#A1FF4A]">
-                {copied === `code-${c.id}` ? '✓' : '📋 код'}
-              </button>
-              <button onClick={() => setExpanded(expanded === c.id ? null : c.id)} className="text-xs bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-3 py-1.5 hover:border-[#A1FF4A]">
-                {expanded === c.id ? 'скрыть' : `👥 кто пришёл (${c.stats.registrations})`}
-              </button>
-              <button onClick={() => exportCsv(c)} disabled={c.users.length === 0} className="text-xs bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-3 py-1.5 hover:border-[#A1FF4A] disabled:opacity-40">⬇️ CSV</button>
-              <button onClick={() => toggle(c)} disabled={busy} className="text-xs bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-3 py-1.5 hover:border-[#A1FF4A]">{c.isActive ? 'выключить' : 'включить'}</button>
-              <button onClick={() => remove(c)} disabled={busy} className="text-xs text-red-400 border border-red-500/40 rounded-lg px-3 py-1.5 hover:bg-red-500/10">удалить</button>
-              <span className="inline-flex items-center gap-1 text-xs ml-auto">
-                <span className="text-gray-500">триал</span>
-                <input type="number" min={0} max={365}
-                  value={trialEdit[c.id] ?? String(c.trialDays)}
-                  onChange={(e) => setTrialEdit((m) => ({ ...m, [c.id]: e.target.value }))}
-                  className="w-16 bg-[#0A0E1A] border border-[#2a2f4a] rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#A1FF4A]" />
-                <span className="text-gray-500">дн.</span>
-                {trialEdit[c.id] !== undefined && trialEdit[c.id] !== String(c.trialDays) && (
-                  <button onClick={() => saveTrial(c)} disabled={busy} className="bg-[#A1FF4A] text-[#060919] font-bold rounded-lg px-2.5 py-1.5">✓ сохранить</button>
-                )}
-              </span>
-            </div>
-
-            {expanded === c.id && (
-              <div className="mt-3 overflow-x-auto">
-                {c.users.length === 0 ? (
-                  <div className="text-gray-500 text-xs py-2">Пока никто не зарегистрировался по этому коду.</div>
-                ) : (
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-gray-500 text-left">
-                        <th className="py-1 pr-2">Имя</th><th className="py-1 pr-2">Email</th><th className="py-1 pr-2">Роль</th>
-                        <th className="py-1 pr-2">Действ.</th><th className="py-1 pr-2">Премиум</th><th className="py-1 pr-2">Дата</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {c.users.map((u) => (
-                        <tr key={u.id} className="border-t border-[#2a2f4a]">
-                          <td className="py-1.5 pr-2">{u.name}</td>
-                          <td className="py-1.5 pr-2 text-gray-400">{u.email || '—'}</td>
-                          <td className="py-1.5 pr-2 text-gray-400">{u.role === 'COACH' ? 'тренер' : 'атлет'}</td>
-                          <td className="py-1.5 pr-2">{u.onboarded ? '✓' : '—'}</td>
-                          <td className="py-1.5 pr-2">{u.premium ? <span className="text-amber-400">★</span> : '—'}</td>
-                          <td className="py-1.5 pr-2 text-gray-400">{new Date(u.createdAt).toLocaleDateString('ru-RU')}</td>
+              {expanded === c.id && (
+                <div style={{ marginTop: 16 }} className="overflow-x-auto">
+                  {c.users.length === 0 ? (
+                    <div style={{ fontSize: 14, color: 'var(--color-muted)', padding: '8px 0' }}>
+                      Пока никто не зарегистрировался по этому коду.
+                    </div>
+                  ) : (
+                    <table className="w-full min-w-160" style={{ fontSize: 14 }}>
+                      <thead>
+                        <tr className="text-left" style={{ color: 'var(--color-muted)', fontSize: 12 }}>
+                          <th className="py-2 pr-3 font-normal">Имя</th>
+                          <th className="py-2 pr-3 font-normal">Email</th>
+                          <th className="py-2 pr-3 font-normal">Роль</th>
+                          <th className="py-2 pr-3 font-normal">Действ.</th>
+                          <th className="py-2 pr-3 font-normal">Премиум</th>
+                          <th className="py-2 pr-3 font-normal">Дата</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-        {!loading && codes.length === 0 && <div className="text-gray-500 text-sm">Каналов пока нет — создай первый выше.</div>}
-      </div>
-    </div>
+                      </thead>
+                      <tbody>
+                        {c.users.map((u) => (
+                          <tr key={u.id} style={{ borderTop: '1px solid var(--border-hairline)' }}>
+                            <td className="py-2 pr-3">{u.name}</td>
+                            <td className="py-2 pr-3" style={{ color: 'var(--color-muted)' }}>{u.email || '—'}</td>
+                            <td className="py-2 pr-3" style={{ color: 'var(--color-muted)' }}>{u.role === 'COACH' ? 'тренер' : 'атлет'}</td>
+                            <td className="py-2 pr-3">
+                              {u.onboarded
+                                ? <Check size={16} style={{ color: 'var(--color-brand)' }} aria-label="да" />
+                                : <span style={{ color: 'var(--color-muted)' }}>—</span>}
+                            </td>
+                            <td className="py-2 pr-3">
+                              {u.premium
+                                ? <Star size={16} style={{ color: 'var(--color-brand)', fill: 'var(--color-brand)' }} aria-label="да" />
+                                : <span style={{ color: 'var(--color-muted)' }}>—</span>}
+                            </td>
+                            <td className="py-2 pr-3" style={{ color: 'var(--color-muted)' }}>
+                              {new Date(u.createdAt).toLocaleDateString('ru-RU')}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+            </AdminCard>
+          ))}
+          {!loading && codes.length === 0 && (
+            <EmptyState
+              icon={Link2}
+              title="Каналов пока нет"
+              hint="Создай первый канал в форме выше"
+            />
+          )}
+        </div>
+      )}
+    </AdminPage>
   );
 }

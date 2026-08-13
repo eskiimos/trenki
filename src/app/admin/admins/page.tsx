@@ -1,8 +1,24 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
+import {
+  AdminPage,
+  PageHeader,
+  SectionTitle,
+  AdminCard,
+  AdminButton,
+  EmptyState,
+  inputStyle,
+} from '@/components/admin/ui';
+import {
+  ShieldCheck,
+  UserPlus,
+  UserMinus,
+  Users,
+  Check,
+  AlertTriangle,
+  Loader2,
+} from 'lucide-react';
 
 interface Admin {
   id: string;
@@ -88,80 +104,120 @@ export default function AdminsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#101530] text-white p-4 md:p-8" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
-      <div className="max-w-2xl mx-auto">
-        <div className="flex items-center gap-4 mb-8">
-          <Link href="/admin" className="text-white hover:text-gray-300">
-            <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
-          </Link>
-          <h1 className="text-2xl font-bold">Управление администраторами</h1>
+    <AdminPage width="narrow">
+      <PageHeader title="Администраторы" icon={ShieldCheck} backHref="/admin" />
+
+      {/* Добавить админа */}
+      <AdminCard style={{ marginBottom: 16 }}>
+        <SectionTitle icon={UserPlus}>Добавить администратора</SectionTitle>
+        <div className="flex gap-3">
+          <input
+            type="text"
+            placeholder="Email или User ID"
+            value={identifier}
+            onChange={e => setIdentifier(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addAdmin()}
+            style={inputStyle}
+          />
+          <AdminButton
+            onClick={addAdmin}
+            disabled={adding || !identifier.trim()}
+            icon={adding ? undefined : UserPlus}
+            style={{ minWidth: 148, flexShrink: 0 }}
+          >
+            {adding ? <Loader2 size={20} className="animate-spin" aria-hidden /> : 'Добавить'}
+          </AdminButton>
         </div>
+        <p style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 8, lineHeight: 1.4 }}>
+          Пользователь должен быть уже зарегистрирован. Введи email
+          (для email-юзеров) или User ID (cuid из БД).
+        </p>
+      </AdminCard>
 
-        {/* Добавить admin */}
-        <div className="bg-[#1a1f3a] rounded-xl p-5 mb-6 border border-white/5">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4">Добавить администратора</h2>
-          <div className="flex gap-3">
-            <input
-              type="text"
-              placeholder="Email или User ID"
-              value={identifier}
-              onChange={e => setIdentifier(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addAdmin()}
-              className="flex-1 bg-white/10 rounded-full px-4 py-2 text-sm text-white placeholder-gray-500 outline-none focus:ring-1 focus:ring-[#A1FF4A]"
-            />
-            <button
-              onClick={addAdmin}
-              disabled={adding || !identifier.trim()}
-              className="px-5 py-2 rounded-full text-sm font-bold bg-[#A1FF4A] text-[#0A0E1A] disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {adding ? '...' : 'Добавить'}
-            </button>
-          </div>
-          <p className="text-xs text-gray-500 mt-2">
-            Пользователь должен быть уже зарегистрирован. Введи email
-            (для email-юзеров) или User ID (cuid из БД).
-          </p>
+      {error && (
+        <div style={{ marginBottom: 16 }}>
+          <AdminCard tone="danger">
+            <div className="flex items-center gap-3" role="status" aria-live="polite">
+              <AlertTriangle size={20} style={{ color: 'var(--color-danger)', flexShrink: 0 }} aria-hidden />
+              <span style={{ fontSize: 14 }}>{error}</span>
+            </div>
+          </AdminCard>
         </div>
+      )}
+      {success && (
+        <div style={{ marginBottom: 16 }}>
+          <AdminCard tone="accent">
+            <div className="flex items-center gap-3" role="status" aria-live="polite">
+              <Check size={20} style={{ color: 'var(--color-brand)', flexShrink: 0 }} aria-hidden />
+              <span style={{ fontSize: 14 }}>{success}</span>
+            </div>
+          </AdminCard>
+        </div>
+      )}
 
-        {error && <div className="bg-red-500/20 text-red-400 rounded-xl px-4 py-3 mb-4 text-sm">{error}</div>}
-        {success && <div className="bg-green-500/20 text-green-400 rounded-xl px-4 py-3 mb-4 text-sm">{success}</div>}
-
-        {/* Список админов */}
-        <div className="bg-[#1a1f3a] rounded-xl border border-white/5">
-          <div className="px-5 py-4 border-b border-white/5">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400">
-              Текущие администраторы ({admins.length})
-            </h2>
+      {/* Список админов */}
+      <SectionTitle icon={Users}>Текущие администраторы ({admins.length})</SectionTitle>
+      <AdminCard style={{ padding: 0 }}>
+        {loading ? (
+          <div style={{ padding: 16 }}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="animate-pulse"
+                style={{
+                  height: 44,
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'var(--color-night)',
+                  marginBottom: i < 2 ? 12 : 0,
+                }}
+              />
+            ))}
           </div>
-          {loading ? (
-            <div className="px-5 py-8 text-center text-gray-500 text-sm">Загрузка...</div>
-          ) : admins.length === 0 ? (
-            <div className="px-5 py-8 text-center text-gray-500 text-sm">Нет администраторов</div>
-          ) : (
-            <ul>
-              {admins.map((admin, i) => (
-                <li key={admin.id} className={`flex items-center justify-between px-5 py-4 ${i < admins.length - 1 ? 'border-b border-white/5' : ''}`}>
-                  <div>
-                    <div className="font-semibold">
-                      {admin.firstName} {admin.lastName}
-                      {admin.username && <span className="text-gray-400 text-sm ml-1">@{admin.username}</span>}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-0.5 font-mono">
-                      {admin.email ?? admin.id}
-                    </div>
+        ) : admins.length === 0 ? (
+          <EmptyState
+            icon={ShieldCheck}
+            title="Нет администраторов"
+            hint="Добавьте первого администратора по email"
+          />
+        ) : (
+          <ul className="divide-y" style={{ borderColor: 'var(--border-hairline)' }}>
+            {admins.map((admin) => (
+              <li key={admin.id} className="flex items-center justify-between gap-3" style={{ padding: 16 }}>
+                <div className="min-w-0">
+                  <div className="flex items-baseline gap-2 min-w-0">
+                    <span style={{ fontSize: 14, fontWeight: 700 }} className="truncate">
+                      {[admin.firstName, admin.lastName].filter(Boolean).join(' ') || 'Без имени'}
+                    </span>
+                    {admin.username && (
+                      <span
+                        className="truncate shrink-0"
+                        style={{ fontSize: 12, color: 'var(--color-muted)' }}
+                      >
+                        @{admin.username}
+                      </span>
+                    )}
                   </div>
-                  <button
-                    onClick={() => removeAdmin(admin.email ?? admin.id)}
-                    className="text-xs text-red-400 hover:text-red-300 border border-red-400/30 rounded-full px-3 py-1 transition-colors ml-4 flex-shrink-0"
+                  <div
+                    className="font-mono truncate"
+                    style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}
                   >
-                    Снять права
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-    </div>
+                    {admin.email ?? admin.id}
+                  </div>
+                </div>
+                <AdminButton
+                  tone="danger"
+                  size="sm"
+                  icon={UserMinus}
+                  onClick={() => removeAdmin(admin.email ?? admin.id)}
+                  style={{ flexShrink: 0 }}
+                >
+                  Снять права
+                </AdminButton>
+              </li>
+            ))}
+          </ul>
+        )}
+      </AdminCard>
+    </AdminPage>
   );
 }
