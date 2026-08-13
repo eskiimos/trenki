@@ -31,17 +31,28 @@ function getSecretKey(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
-/** Абсолютный срок жизни доступа от момента входа по коду (unix-секунды). */
-export function sessionDeadline(lgn: number): number {
-  return lgn + SESSION_MAX_AGE_SECONDS;
+/**
+ * Абсолютный срок жизни доступа от момента входа по коду (unix-секунды).
+ * `ttlSeconds` позволяет выдать более КОРОТКИЙ доступ (например, сессия,
+ * полученная переключением в админ-аккаунт, живёт часы, а не месяц).
+ */
+export function sessionDeadline(lgn: number, ttlSeconds: number = SESSION_MAX_AGE_SECONDS): number {
+  return lgn + Math.min(ttlSeconds, SESSION_MAX_AGE_SECONDS);
 }
 
 /** Сколько секунд осталось до дедлайна (0, если истёк). */
-export function sessionSecondsLeft(lgn: number, now: Date = new Date()): number {
-  return Math.max(0, sessionDeadline(lgn) - Math.floor(now.getTime() / 1000));
+export function sessionSecondsLeft(
+  lgn: number,
+  now: Date = new Date(),
+  ttlSeconds: number = SESSION_MAX_AGE_SECONDS,
+): number {
+  return Math.max(0, sessionDeadline(lgn, ttlSeconds) - Math.floor(now.getTime() / 1000));
 }
 
-export async function signSession(payload: SessionPayload): Promise<string> {
+export async function signSession(
+  payload: SessionPayload,
+  ttlSeconds: number = SESSION_MAX_AGE_SECONDS,
+): Promise<string> {
   // exp считаем от РЕАЛЬНОГО логина, а не от «сейчас»: иначе переключение
   // аккаунтов туда-обратно продлевало бы доступ без ограничений.
   return new SignJWT({ uid: payload.uid, role: payload.role, lgn: payload.lgn })
@@ -49,7 +60,7 @@ export async function signSession(payload: SessionPayload): Promise<string> {
     .setIssuer(JWT_ISSUER)
     .setAudience(JWT_AUDIENCE)
     .setIssuedAt()
-    .setExpirationTime(sessionDeadline(payload.lgn))
+    .setExpirationTime(sessionDeadline(payload.lgn, ttlSeconds))
     .sign(getSecretKey());
 }
 

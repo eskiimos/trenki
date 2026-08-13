@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSessionFromRequest } from '@/lib/session';
-import { getAccountsFromRequest, writeAccounts, sameList } from '@/lib/account-list';
+import {
+  getAccountsFromRequest,
+  writeAccounts,
+  sameList,
+  hasAdminEntry,
+  clearAccountsCookie,
+} from '@/lib/account-list';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +27,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   const session = await getSessionFromRequest(request);
   if (!session?.uid) {
-    return NextResponse.json({ activeId: null, accounts: [] }, { status: 401 });
+    return NextResponse.json({ enabled: false, activeId: null, accounts: [] }, { status: 401 });
   }
 
   const stored = await getAccountsFromRequest(request);
@@ -47,13 +53,30 @@ export async function GET(request: NextRequest) {
         email: u.email,
         role: u.role,
         isActive: u.id === session.uid,
-        // В админ-аккаунт переключиться нельзя — только вход по коду. Отдаём
-        // флаг, чтобы UI показал это заранее, а не ошибкой после тапа.
-        canSwitch: u.id !== session.uid && !u.isAdmin,
+        canSwitch: u.id !== session.uid,
       };
     });
 
-  const response = NextResponse.json({ activeId: session.uid, accounts });
+  // Мульти-аккаунт — фича ТОЛЬКО для админов приложения: либо ты сам админ,
+  // либо админ добавил тебя со своего устройства (в списке есть его запись).
+  const me = byId.get(session.uid);
+  const enabled = me?.isAdmin === true || hasAdminEntry(stored);
+
+  if (!enabled) {
+    // Фича неприменима — не отдаём ни чужих ФИО/email (аудитория
+    // несовершеннолетние), ни возможности переключения. Заодно сносим список,
+    // если он остался с прежнего владельца устройства: это одноразовая
+    // «миграция» legacy-cookie, накопленных до сужения фичи.
+    const r = NextResponse.json({
+      enabled: false,
+      activeId: session.uid,
+      accounts: accounts.filter((a) => a.isActive),
+    });
+    if (stored.length > 0) clearAccountsCookie(r);
+    return r;
+  }
+
+  const response = NextResponse.json({ enabled, activeId: session.uid, accounts });
 
   // Единственная запись здесь — вычистка исчезнувших пользователей.
   const alive = stored.filter((a) => byId.has(a.id));

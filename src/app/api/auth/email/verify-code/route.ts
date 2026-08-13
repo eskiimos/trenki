@@ -6,7 +6,11 @@ import {
   writeAccounts,
   addAccount,
   sameList,
+  clearAccountsCookie,
+  ADMIN_TTL_SECONDS,
+  ACCOUNT_TTL_SECONDS,
 } from '@/lib/account-list';
+import { readAddIntent, clearAddIntentCookie } from '@/lib/add-intent';
 import { getSessionFromRequest, sessionSecondsLeft } from '@/lib/session';
 import { isSameOrigin } from '@/lib/same-origin';
 import { rateLimit } from '@/lib/coach/rate-limit';
@@ -178,26 +182,59 @@ export async function POST(request: NextRequest) {
     // lgn — момент реального входа по коду. От него считается абсолютный
     // дедлайн доступа, в том числе для сессий, полученных переключением.
     const lgn = Math.floor(Date.now() / 1000);
-    const token = await signSession({ uid: user.id, role: user.role, lgn });
-    setSessionCookie(response, token);
+    // Админская сессия живёт КОРОТКО (рабочий день): именно «забытая» на общем
+    // устройстве админ-сессия — главный риск, 30 дней означали бы месяц доступа
+    // к админке для любого, кто сядет за это устройство.
+    const sessionTtl = user.isAdmin ? ADMIN_TTL_SECONDS : undefined;
+    const token = await signSession({ uid: user.id, role: user.role, lgn }, sessionTtl);
+    setSessionCookie(response, token, sessionSecondsLeft(lgn, new Date(), sessionTtl));
 
-    // Мульти-аккаунт: это ЕДИНСТВЕННОЕ место, где список устройства растёт —
-    // только после успешной проверки кода.
+    // ─── Мульти-аккаунт ─────────────────────────────────────────────────
+    // Фича нужна ТОЛЬКО админам приложения (переключение между админ-аккаунтом
+    // и тестовыми). Поэтому список ведём исключительно на «устройстве админа»:
+    // либо входит сам админ, либо админ добавляет второй аккаунт из своей
+    // сессии. Обычные пользователи не накапливают список вовсе — ни лишней
+    // поверхности атаки, ни их email в подписанной cookie.
+    //
+    // Это ЕДИНСТВЕННОЕ место, где список растёт, и только после проверки кода.
     const stored = await getAccountsFromRequest(request);
-
-    // Сохраняем аккаунт, из которого пришли «добавить ещё один»: иначе первый
-    // аккаунт выпадал бы из переключателя (у существующих юзеров списка ещё
-    // нет). Дедлайн у него остаётся СВОЙ (от его собственного входа по коду) —
-    // поэтому это не обмен сессии на новый долгоживущий доступ.
     const prev = await getSessionFromRequest(request);
-    const withPrev =
-      prev?.uid && prev.uid !== user.id && sessionSecondsLeft(prev.lgn) > 0
-        ? addAccount(stored, prev.uid, prev.lgn)
-        : stored;
 
-    const next = addAccount(withPrev, user.id, lgn);
-    if (!sameList(next, stored)) {
-      await writeAccounts(response, next);
+    // Наследуем предыдущий аккаунт ТОЛЬКО по явному намерению админа
+    // («+ Добавить аккаунт» выдаёт одноразовый тикет). Одного факта «в браузере
+    // лежит админская сессия» НЕДОСТАТОЧНО: под это правило попадал и
+    // посторонний, вошедший своим кодом за устройством админа — он получал бы
+    // админ-запись в свой список, то есть вход в админку в один тап.
+    const intentUid = await readAddIntent(request);
+    const prevUser =
+      intentUid && prev?.uid === intentUid && prev.uid !== user.id
+        ? await prisma.user.findUnique({
+            where: { id: prev.uid },
+            select: { id: true, isAdmin: true },
+          })
+        : null;
+    // Тикет одноразовый — гасим независимо от исхода.
+    if (intentUid) clearAddIntentCookie(response);
+
+    // Наследование действительно только от ЖИВОЙ админской записи.
+    const prevTtl = prevUser?.isAdmin ? ADMIN_TTL_SECONDS : ACCOUNT_TTL_SECONDS;
+    const prevUsable =
+      prevUser?.isAdmin === true && sessionSecondsLeft(prev!.lgn, new Date(), prevTtl) > 0;
+
+    if (user.isAdmin) {
+      // Вошёл сам админ — его устройство, список сохраняем и обновляем запись.
+      const next = addAccount(stored, user.id, lgn, true);
+      if (!sameList(next, stored)) await writeAccounts(response, next);
+    } else if (prevUsable) {
+      // Админ осознанно добавляет второй (тестовый) аккаунт.
+      const withPrev = addAccount(stored, prevUser!.id, prev!.lgn, true);
+      const next = addAccount(withPrev, user.id, lgn, false);
+      if (!sameList(next, stored)) await writeAccounts(response, next);
+    } else if (stored.length > 0) {
+      // Обычный вход на этом устройстве: списка быть не должно. Если он остался
+      // (устройство раньше принадлежало админу) — сносим, чтобы человек не
+      // получил ни чужих email в переключателе, ни кнопки входа в чужой аккаунт.
+      clearAccountsCookie(response);
     }
 
     logger.info('user login via email OTP', { userId: user.id });

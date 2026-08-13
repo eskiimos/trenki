@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clearSessionCookie } from '@/lib/session';
 import { clearAccountsCookie } from '@/lib/account-list';
+import { clearAddIntentCookie } from '@/lib/add-intent';
 import { ADMIN_COOKIE_NAME, destroyAdminSession } from '@/lib/admin-session';
 import { isSameOrigin } from '@/lib/same-origin';
 
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest) {
   const response = NextResponse.json({ success: true });
   clearSessionCookie(response);
   clearAccountsCookie(response);
+  clearAddIntentCookie(response); // «чистое устройство» — значит и без интент-тикета
   // На всякий случай чистим устаревшие cookie
   response.cookies.delete('telegramId');
 

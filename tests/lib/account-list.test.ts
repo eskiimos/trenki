@@ -9,6 +9,10 @@ import {
   verifyAccounts,
   MAX_ACCOUNTS,
   ACCOUNT_TTL_SECONDS,
+  ADMIN_TTL_SECONDS,
+  ttlFor,
+  isAccountAlive,
+  hasAdminEntry,
   type DeviceAccount,
 } from '@/lib/account-list';
 import { signSession, sessionSecondsLeft } from '@/lib/session';
@@ -91,6 +95,45 @@ describe('АБСОЛЮТНЫЙ ДЕДЛАЙН: запись живёт от ре
   it('небольшое расхождение часов допускается', async () => {
     const token = await signAccounts([{ id: 'u', lgn: nowSec() + 60 }]);
     expect((await verifyAccounts(token)).map((x) => x.id)).toEqual(['u']);
+  });
+});
+
+describe('АДМИН-ЗАПИСЬ: короткий срок (фича только для админов)', () => {
+  it('у админ-записи TTL короче обычной', () => {
+    expect(ttlFor({ adm: true })).toBe(ADMIN_TTL_SECONDS);
+    expect(ttlFor({})).toBe(ACCOUNT_TTL_SECONDS);
+    expect(ADMIN_TTL_SECONDS).toBeLessThan(ACCOUNT_TTL_SECONDS);
+  });
+
+  it('админ-запись протухает через свой короткий срок, обычная — жива', () => {
+    const old = nowSec() - ADMIN_TTL_SECONDS - 60;
+    expect(isAccountAlive({ id: 'a', lgn: old, adm: true })).toBe(false);
+    expect(isAccountAlive({ id: 'b', lgn: old })).toBe(true);
+  });
+
+  it('флаг adm переживает подпись/проверку (иначе срок стал бы 30 дней)', async () => {
+    const token = await signAccounts([{ id: 'a', lgn: nowSec(), adm: true }]);
+    const back = await verifyAccounts(token);
+    expect(back[0].adm).toBe(true);
+  });
+
+  it('протухшая админ-запись не переживает проверку', async () => {
+    const token = await signAccounts([
+      { id: 'a', lgn: nowSec() - ADMIN_TTL_SECONDS - 60, adm: true },
+    ]);
+    expect(await verifyAccounts(token)).toEqual([]);
+  });
+
+  it('addAccount проставляет adm, hasAdminEntry его видит', () => {
+    const list = addAccount([], 'a', nowSec(), true);
+    expect(list[0].adm).toBe(true);
+    expect(hasAdminEntry(list)).toBe(true);
+    expect(hasAdminEntry(addAccount([], 'b', nowSec()))).toBe(false);
+  });
+
+  it('sameList замечает смену adm (иначе cookie не переписалась бы)', () => {
+    const t = nowSec();
+    expect(sameList([{ id: 'a', lgn: t }], [{ id: 'a', lgn: t, adm: true }])).toBe(false);
   });
 });
 

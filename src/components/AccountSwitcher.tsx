@@ -24,11 +24,13 @@ interface DeviceAccount {
   email: string | null;
   role: AccountRole;
   isActive: boolean;
-  /** false — переключиться нельзя (админ-аккаунт: только вход по коду). */
+  /** false — переключиться нельзя (сейчас так только у самого активного). */
   canSwitch?: boolean;
 }
 
 interface AccountsResponse {
+  /** Применима ли фича на этом устройстве (мульти-аккаунт — только для админов). */
+  enabled: boolean;
   activeId: string | null;
   accounts: DeviceAccount[];
 }
@@ -37,6 +39,7 @@ export default function AccountSwitcher({ hideWhenSingle = false }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<DeviceAccount[]>([]);
+  const [enabled, setEnabled] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   /** id аккаунта, по которому сейчас идёт запрос (switch/remove) — блокирует повторные клики. */
@@ -56,10 +59,12 @@ export default function AccountSwitcher({ hideWhenSingle = false }: Props) {
       if (!res.ok) throw new Error(`accounts ${res.status}`);
       const data = (await res.json()) as AccountsResponse;
       setAccounts(Array.isArray(data?.accounts) ? data.accounts : []);
+      setEnabled(data?.enabled === true);
       setActiveId(data?.activeId ?? null);
     } catch {
       // Не залогинен / сеть отвалилась — просто не показываем переключатель.
       setAccounts([]);
+      setEnabled(false);
       setActiveId(null);
     } finally {
       setLoading(false);
@@ -127,16 +132,38 @@ export default function AccountSwitcher({ hideWhenSingle = false }: Props) {
     }
   };
 
-  const handleAdd = () => {
-    if (accounts.length >= MAX_ACCOUNTS) return;
-    // Никаких маркеров в sessionStorage: сервер сам добавит аккаунт в список
-    // устройства после успешного логина.
+  const handleAdd = async () => {
+    if (accounts.length >= MAX_ACCOUNTS || busyId) return;
+    setError(null);
+    // Явное намерение админа: сервер выдаёт короткоживущий тикет, и только с ним
+    // следующий вход по коду сохранит текущий аккаунт в списке устройства.
+    // Без этого шага «сел за чужое устройство и вошёл своим кодом» выглядело бы
+    // для сервера так же, как «админ добавляет второй аккаунт».
+    try {
+      const res = await fetch('/api/auth/accounts/add-intent', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => null);
+        setError(
+          typeof d?.error === 'string' ? d.error : 'Добавление аккаунта доступно администратору',
+        );
+        return;
+      }
+    } catch {
+      setError('Нет связи с сервером');
+      return;
+    }
     router.push('/login');
   };
 
   // Пока идёт первый запрос — ничего не рендерим, чтобы блок не мигал и не
   // прыгала вёрстка (компонент может вообще не показаться: hideWhenSingle).
   if (loading) return null;
+  // Мульти-аккаунт нужен только админам приложения: остальным переключатель не
+  // показываем вовсе (у них и списка устройства не заводится).
+  if (!enabled) return null;
   if (accounts.length === 0) return null;
   if (hideWhenSingle && accounts.length <= 1) return null;
 
@@ -269,11 +296,7 @@ export default function AccountSwitcher({ hideWhenSingle = false }: Props) {
                 <button
                   type="button"
                   onClick={() => handleSwitch(a.id)}
-                  /* В админ-аккаунт переключиться нельзя — только вход по коду.
-                     Сервер отдаёт canSwitch=false, показываем это заранее, а не
-                     ошибкой после тапа. */
                   disabled={busyId !== null || a.canSwitch === false}
-                  title={a.canSwitch === false ? 'В этот аккаунт нужно войти по коду' : undefined}
                   className="flex items-center gap-3 flex-1 min-w-0 text-left"
                   style={{
                     minHeight: 44,
@@ -292,14 +315,7 @@ export default function AccountSwitcher({ hideWhenSingle = false }: Props) {
                     >
                       {displayName(a)}
                     </div>
-                    {a.canSwitch === false ? (
-                      <div
-                        className="font-overpass truncate"
-                        style={{ color: 'var(--color-muted)', fontSize: 11, marginTop: 2 }}
-                      >
-                        вход по коду
-                      </div>
-                    ) : a.email && (
+                    {a.email && (
                       <div
                         className="font-overpass truncate"
                         style={{ color: 'var(--color-muted)', fontSize: 11, marginTop: 2 }}

@@ -23,6 +23,13 @@ export const ACCOUNTS_COOKIE_NAME = 'trenki_accounts';
 export const MAX_ACCOUNTS = 5;
 /** Сколько запись живёт после входа по коду — ровно как сессия (30 дней). */
 export const ACCOUNT_TTL_SECONDS = 60 * 60 * 24 * 30;
+/**
+ * Админ-запись живёт КОРОТКО (рабочий день). Переключение в админ-аккаунт без
+ * пароля — сильный креденшл: если устройство попадёт в чужие руки, 30 дней
+ * означали бы месяц доступа к админке. 12 часов дают полный день тестирования
+ * (админ → тестовый атлет → обратно) и протухают к вечеру.
+ */
+export const ADMIN_TTL_SECONDS = 60 * 60 * 12;
 /** Допуск на расхождение часов при проверке «lgn не из будущего». */
 const CLOCK_SKEW_SECONDS = 5 * 60;
 
@@ -36,6 +43,13 @@ export interface DeviceAccount {
   id: string;
   /** unix-секунды входа по коду */
   lgn: number;
+  /** админский ли аккаунт (короткий TTL). Ставится при входе по коду. */
+  adm?: boolean;
+}
+
+/** Срок жизни конкретной записи: у админской он короткий. */
+export function ttlFor(a: Pick<DeviceAccount, 'adm'>): number {
+  return a.adm ? ADMIN_TTL_SECONDS : ACCOUNT_TTL_SECONDS;
 }
 
 function getSecretKey(): Uint8Array {
@@ -56,7 +70,7 @@ function nowSec(now: Date = new Date()): number {
 
 /** Не истёк ли доступ по этой записи. */
 export function isAccountAlive(a: DeviceAccount, now: Date = new Date()): boolean {
-  return a.lgn + ACCOUNT_TTL_SECONDS > nowSec(now);
+  return a.lgn + ttlFor(a) > nowSec(now);
 }
 
 /** Убирает протухшие записи (дедлайн от реального входа). */
@@ -73,9 +87,13 @@ export function addAccount(
   list: DeviceAccount[],
   id: string,
   lgn: number,
+  adm = false,
 ): DeviceAccount[] {
-  const next = [{ id, lgn }, ...list.filter((a) => a.id !== id)];
-  return next.slice(0, MAX_ACCOUNTS);
+  const entry: DeviceAccount = adm ? { id, lgn, adm: true } : { id, lgn };
+  // Протухшие записи отсеиваем здесь же: иначе мёртвая запись занимала бы слот
+  // и вытесняла живую при обрезке до MAX_ACCOUNTS.
+  const alive = pruneExpired(list.filter((a) => a.id !== id));
+  return [entry, ...alive].slice(0, MAX_ACCOUNTS);
 }
 
 /** Убирает запись по id. */
@@ -85,7 +103,15 @@ export function removeAccount(list: DeviceAccount[], id: string): DeviceAccount[
 
 /** Совпадают ли списки (чтобы не переподписывать cookie без нужды). */
 export function sameList(a: DeviceAccount[], b: DeviceAccount[]): boolean {
-  return a.length === b.length && a.every((x, i) => x.id === b[i].id && x.lgn === b[i].lgn);
+  return (
+    a.length === b.length &&
+    a.every((x, i) => x.id === b[i].id && x.lgn === b[i].lgn && !!x.adm === !!b[i].adm)
+  );
+}
+
+/** Есть ли в списке хоть одна админ-запись — признак «устройство админа». */
+export function hasAdminEntry(list: DeviceAccount[]): boolean {
+  return list.some((a) => a.adm === true);
 }
 
 /** Запись по id (или null). */
@@ -100,7 +126,7 @@ export function findAccount(list: DeviceAccount[], id: string): DeviceAccount | 
  * бессмысленно: все записи к тому моменту протухнут.
  */
 function cookieMaxAge(list: DeviceAccount[], now: Date = new Date()): number {
-  const latest = list.reduce((max, a) => Math.max(max, a.lgn + ACCOUNT_TTL_SECONDS), 0);
+  const latest = list.reduce((max, a) => Math.max(max, a.lgn + ttlFor(a)), 0);
   return Math.max(0, latest - nowSec(now));
 }
 
@@ -147,7 +173,8 @@ export async function verifyAccounts(token: string, now: Date = new Date()): Pro
       if (lgn > nowSec(now) + CLOCK_SKEW_SECONDS) continue;
       if (seen.has(id)) continue;
       seen.add(id);
-      list.push({ id, lgn });
+      const adm = (item as { adm?: unknown })?.adm === true;
+      list.push(adm ? { id, lgn, adm: true } : { id, lgn });
     }
     return pruneExpired(list, now).slice(0, MAX_ACCOUNTS);
   } catch {
