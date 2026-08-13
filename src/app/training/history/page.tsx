@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTelegram } from '@/hooks/useTelegram';
 import CharacteristicsRadar from '@/components/CharacteristicsRadar';
+import { CharacteristicIcon } from '@/components/training/icons';
+import { Zap, BarChart3, ArrowRight, Flame, Plus, Dumbbell, Check, Pause } from 'lucide-react';
 
 interface WorkoutHistoryItem {
   id: string;
@@ -147,7 +149,7 @@ export default function TrainingHistoryPage() {
             className="w-full bg-gradient-to-r from-[#445CFF] to-[#7B61FF] rounded-xl p-4 flex items-center justify-between"
           >
             <div className="flex items-center gap-3">
-              <span className="text-2xl">⚡</span>
+              <Zap size={24} className="text-white" aria-hidden />
               <div className="text-left">
                 <p className="text-sm text-white/70">Потенциал</p>
                 <p className="text-2xl font-bold">{characteristics.potential.toFixed(1)}</p>
@@ -172,22 +174,24 @@ export default function TrainingHistoryPage() {
               
               {/* Детальные характеристики */}
               <div className="space-y-3 pt-4 border-t border-white/10">
-                <CharacteristicRow emoji="💪" label="Сила" value={characteristics.ratingPower} />
-                <CharacteristicRow emoji="⚡" label="Скорость" value={characteristics.ratingSpeed} />
-                <CharacteristicRow emoji="🫀" label="Выносливость" value={characteristics.ratingEndurance} />
-                <CharacteristicRow emoji="🎯" label="Техника" value={characteristics.ratingTechnique} />
-                <CharacteristicRow emoji="🤸" label="Гибкость" value={characteristics.ratingFlexibility} />
+                <CharacteristicRow characteristic="ratingPower" label="Сила" value={characteristics.ratingPower} />
+                <CharacteristicRow characteristic="ratingSpeed" label="Скорость" value={characteristics.ratingSpeed} />
+                <CharacteristicRow characteristic="ratingEndurance" label="Выносливость" value={characteristics.ratingEndurance} />
+                <CharacteristicRow characteristic="ratingTechnique" label="Техника" value={characteristics.ratingTechnique} />
+                <CharacteristicRow characteristic="ratingFlexibility" label="Гибкость" value={characteristics.ratingFlexibility} />
               </div>
               
               <div className="mt-4 flex gap-2">
                 <Link href="/training/characteristics-stats" className="flex-1">
-                  <button className="w-full bg-gradient-to-r from-[#445CFF] to-[#7B61FF] hover:opacity-90 text-white py-3 rounded-lg text-sm font-semibold transition-opacity">
-                    📊 Статистика
+                  <button className="w-full bg-gradient-to-r from-[#445CFF] to-[#7B61FF] hover:opacity-90 text-white py-3 rounded-lg text-sm font-semibold transition-opacity flex items-center justify-center gap-2">
+                    <BarChart3 size={20} aria-hidden />
+                    Статистика
                   </button>
                 </Link>
                 <Link href="/profile" className="flex-1">
-                  <button className="w-full bg-[#2d3448] hover:bg-[#3d4558] text-white py-3 rounded-lg text-sm font-medium transition-colors">
-                    Профиль →
+                  <button className="w-full bg-[#2d3448] hover:bg-[#3d4558] text-white py-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                    Профиль
+                    <ArrowRight size={20} aria-hidden />
                   </button>
                 </Link>
               </div>
@@ -205,7 +209,10 @@ export default function TrainingHistoryPage() {
           </div>
           <div className="bg-gradient-to-br from-purple-600 to-purple-800 p-4 rounded-xl">
             <p className="text-sm text-purple-200">Серия дней</p>
-            <p className="text-3xl font-bold">{stats.currentStreak} 🔥</p>
+            <p className="text-3xl font-bold flex items-center gap-2">
+              {stats.currentStreak}
+              <Flame size={24} className="text-orange-300" aria-hidden />
+            </p>
           </div>
           <div className="bg-gradient-to-br from-green-600 to-green-800 p-4 rounded-xl">
             <p className="text-sm text-green-200">Общее время</p>
@@ -223,15 +230,16 @@ export default function TrainingHistoryPage() {
       {/* Кнопка новой тренировки */}
       <button
         onClick={() => router.push('/training/assessment')}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-semibold transition-colors mb-6"
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-semibold transition-colors mb-6 flex items-center justify-center gap-2"
       >
-        ➕ Начать новую тренировку
+        <Plus size={20} aria-hidden />
+        Начать новую тренировку
       </button>
 
       {/* Список тренировок */}
       {workouts.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="text-6xl mb-4">🏋️</div>
+        <div className="text-center py-12 flex flex-col items-center">
+          <Dumbbell size={48} className="text-brand mb-4" aria-hidden />
           <h3 className="text-xl font-semibold mb-2">Пока нет тренировок</h3>
           <p className="text-gray-400 mb-6">
             Начните первую тренировку, чтобы увидеть статистику
@@ -263,10 +271,11 @@ export default function TrainingHistoryPage() {
                       {loadLabel.text} тренировка
                     </h3>
                   </div>
-                  <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  <div className={`px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1.5 ${
                     isCompleted ? 'bg-green-900/30 text-green-400' : 'bg-yellow-900/30 text-yellow-400'
                   }`}>
-                    {isCompleted ? '✓ Завершена' : '⏸ Пропущена'}
+                    {isCompleted ? <Check size={16} aria-hidden /> : <Pause size={16} aria-hidden />}
+                    {isCompleted ? 'Завершена' : 'Пропущена'}
                   </div>
                 </div>
 
@@ -298,7 +307,7 @@ export default function TrainingHistoryPage() {
       {stats && stats.currentStreak > 0 && (
         <div className="mt-6 p-4 bg-gradient-to-r from-orange-600/30 to-red-600/30 border border-orange-500 rounded-xl">
           <p className="text-center">
-            <span className="text-2xl">🔥</span>
+            <Flame size={24} className="inline-block text-orange-400" aria-hidden />
             <br />
             <span className="font-semibold">
               Ты на волне! {stats.currentStreak} {stats.currentStreak === 1 ? 'день' : 'дней'} подряд!
@@ -315,8 +324,8 @@ export default function TrainingHistoryPage() {
 }
 
 // Компонент для строки характеристики
-const CharacteristicRow = ({ emoji, label, value }: {
-  emoji: string;
+const CharacteristicRow = ({ characteristic, label, value }: {
+  characteristic: string;
   label: string;
   value: number;
 }) => {
@@ -333,7 +342,7 @@ const CharacteristicRow = ({ emoji, label, value }: {
     <div>
       <div className="flex justify-between items-center mb-1.5">
         <div className="flex items-center gap-2">
-          <span className="text-lg">{emoji}</span>
+          <CharacteristicIcon characteristic={characteristic} size={20} className="text-[#AEABBB]" />
           <span className="text-sm text-[#AEABBB]">{label}</span>
         </div>
         <span className="text-white font-bold">{value.toFixed(1)}</span>

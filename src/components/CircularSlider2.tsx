@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { ThumbsUp } from 'lucide-react';
 
 interface CircularSliderProps {
   value: number;
@@ -23,13 +24,15 @@ export default function CircularSlider({ value, min, max, onChange }: CircularSl
     4: 'НЕМНОГО УСТАЛ',
     5: 'НОРМАЛЬНО',
     6: 'ХОРОШО',
-    7: 'ОТЛИЧНО 👍🏻',
+    7: 'ОТЛИЧНО',
     8: 'СУПЕР',
     9: 'ОГОНЬ',
     10: 'ЗАРЯЖЕН 100%',
   };
 
   const currentLabel = energyLabels[Math.round(value)] || energyLabels[0];
+  // «Отлично» подсвечиваем иконкой вместо эмодзи в тексте
+  const showThumbsUp = Math.round(value) === 7;
 
   // Рисуем круг
   useEffect(() => {
@@ -194,8 +197,13 @@ export default function CircularSlider({ value, min, max, onChange }: CircularSl
           marginTop: '12px',
           textAlign: 'center',
           maxWidth: '180px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '6px',
         }}>
           {currentLabel}
+          {showThumbsUp && <ThumbsUp size={16} aria-hidden />}
         </div>
       </div>
     </div>

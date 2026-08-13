@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { CheckCircle2, Hourglass, PartyPopper } from 'lucide-react';
 import { invalidateSubscription } from '@/hooks/useSubscription';
 
 // Возврат после оплаты T-Bank. Опрашиваем /api/payments/status (подстраховка к
@@ -60,14 +61,14 @@ function SuccessInner() {
       <div style={card}>
         {state === 'checking' && (
           <>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>⏳</div>
+            <Hourglass size={40} color="#AEABBB" style={{ margin: '0 auto 12px' }} aria-hidden />
             <h1 className="font-overpass uppercase" style={{ fontWeight: 900, fontSize: 22 }}>Проверяем оплату…</h1>
             <p style={{ color: '#AEABBB', fontSize: 14, marginTop: 8 }}>Это займёт несколько секунд.</p>
           </>
         )}
         {state === 'paid' && (
           <>
-            <div style={{ fontSize: 44, marginBottom: 12 }}>🎉</div>
+            <PartyPopper size={44} color="#A1FF4A" style={{ margin: '0 auto 12px' }} aria-hidden />
             <h1 className="font-overpass uppercase" style={{ fontWeight: 900, fontSize: 22, color: '#A1FF4A' }}>
               Подписка активна
             </h1>
@@ -76,7 +77,7 @@ function SuccessInner() {
         )}
         {state === 'pending' && (
           <>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+            <CheckCircle2 size={40} color="#A1FF4A" style={{ margin: '0 auto 12px' }} aria-hidden />
             <h1 className="font-overpass uppercase" style={{ fontWeight: 900, fontSize: 20 }}>Оплата принята</h1>
             <p style={{ color: '#AEABBB', fontSize: 14, marginTop: 8 }}>
               Премиум появится в течение минуты. Можно обновить профиль позже.

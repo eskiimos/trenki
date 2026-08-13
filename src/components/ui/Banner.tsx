@@ -1,4 +1,5 @@
 import React from 'react';
+import { X } from 'lucide-react';
 
 // Акцентный баннер (плашка) на едином grad-accent + лайм-рамке. Иконка слева,
 // заголовок/подзаголовок, action справа, опциональный крестик (onDismiss).
@@ -51,12 +52,14 @@ export default function Banner({ icon, title, subtitle, action, onDismiss, style
             color: 'var(--color-muted)',
             background: 'none',
             border: 'none',
-            fontSize: 16,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             lineHeight: 1,
             cursor: 'pointer',
           }}
         >
-          ✕
+          <X size={20} aria-hidden />
         </button>
       )}
     </div>

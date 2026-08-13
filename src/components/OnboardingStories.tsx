@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { ChevronLeft, ChevronRight, Plus, ThumbsUp, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, ThumbsUp, Trash2, X } from 'lucide-react';
 import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay';
 
 /**
@@ -1517,13 +1517,15 @@ export default function OnboardingStories({ open, onClose, onComplete }: Props) 
           background: 'rgba(255, 255, 255, 0.10)',
           color: '#F9F8FE',
           border: 'none',
-          fontSize: 20,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           lineHeight: 1,
           cursor: 'pointer',
           zIndex: 3,
         }}
       >
-        ✕
+        <X size={20} aria-hidden />
       </button>
 
       {/* Слайд (визуал + подпись + CTA). key={idx} перезапускает анимации входа */}

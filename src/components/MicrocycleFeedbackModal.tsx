@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Smile, ThumbsUp, Flame, X, type LucideIcon } from 'lucide-react';
 
 // Опрос после цикла. Показывается, когда GET /api/microcycle/current возвращает
 // awaitingFeedback: true. После ответа закрывает цикл (PATCH .../feedback)
@@ -20,10 +21,11 @@ interface Props {
 
 type Choice = 'EASY' | 'NORMAL' | 'HARD';
 
-const CHOICES: Array<{ key: Choice; emoji: string; label: string; hint: string }> = [
-  { key: 'EASY',   emoji: '😎', label: 'Изи',    hint: 'было слишком легко' },
-  { key: 'NORMAL', emoji: '👌', label: 'Норм',   hint: 'в самый раз' },
-  { key: 'HARD',   emoji: '😮‍💨', label: 'Тяжко', hint: 'на пределе' },
+// Иконки шкалы: легко → доволен, норм → «ок», тяжко → на пределе.
+const CHOICES: Array<{ key: Choice; Icon: LucideIcon; label: string; hint: string }> = [
+  { key: 'EASY',   Icon: Smile,    label: 'Изи',   hint: 'было слишком легко' },
+  { key: 'NORMAL', Icon: ThumbsUp, label: 'Норм',  hint: 'в самый раз' },
+  { key: 'HARD',   Icon: Flame,    label: 'Тяжко', hint: 'на пределе' },
 ];
 
 export default function MicrocycleFeedbackModal({
@@ -134,10 +136,10 @@ export default function MicrocycleFeedbackModal({
             type="button"
             onClick={onClose}
             aria-label="Закрыть"
-            className="text-white/40 hover:text-white/70 text-xl leading-none"
+            className="text-white/40 hover:text-white/70"
             style={{ marginTop: -4 }}
           >
-            ✕
+            <X size={20} />
           </button>
         </div>
 
@@ -211,7 +213,12 @@ export default function MicrocycleFeedbackModal({
                   textAlign: 'left',
                 }}
               >
-                <div style={{ fontSize: 28, lineHeight: 1 }}>{c.emoji}</div>
+                <c.Icon
+                  size={24}
+                  color={isPicked ? '#A1FF4A' : '#F9F8FE'}
+                  className="shrink-0"
+                  aria-hidden
+                />
                 <div className="flex-1">
                   <div
                     className="font-overpass uppercase"

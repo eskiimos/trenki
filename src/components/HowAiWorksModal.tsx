@@ -5,7 +5,7 @@
 // подбора (цель + энергия + характеристики → модули нужной нагрузки).
 
 import { useState } from 'react';
-import { Target, BarChart3, Blocks, Zap, type LucideIcon } from 'lucide-react';
+import { Target, BarChart3, Blocks, Zap, X, type LucideIcon } from 'lucide-react';
 
 const STEPS: { Icon: LucideIcon; title: string; text: string }[] = [
   {
@@ -82,9 +82,9 @@ export default function HowAiWorksModal() {
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Закрыть"
-                style={{ background: 'none', border: 'none', color: '#AEABBB', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}
+                style={{ background: 'none', border: 'none', color: '#AEABBB', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', lineHeight: 1 }}
               >
-                ✕
+                <X size={20} aria-hidden />
               </button>
             </div>
 

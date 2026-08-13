@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Check } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useSubscriptionPricing } from '@/hooks/useSubscriptionPricing';
 import {
@@ -139,7 +140,7 @@ export default function SubscriptionModal() {
           </div>
           {PAID_FEATURES.map((f) => (
             <div key={f} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <span style={{ color: '#A1FF4A', fontWeight: 900, lineHeight: 1.4 }}>✓</span>
+              <Check size={20} color="#A1FF4A" style={{ flexShrink: 0, marginTop: 1 }} aria-hidden />
               <span style={{ color: '#F9F8FE', fontSize: 14, lineHeight: 1.4 }}>{f}</span>
             </div>
           ))}

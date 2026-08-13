@@ -7,7 +7,7 @@
 import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Flame } from 'lucide-react';
+import { ChevronDown, ChevronUp, Flame, Users } from 'lucide-react';
 import { clearAuth } from '@/lib/auth';
 import { useSubscriptionPricing } from '@/hooks/useSubscriptionPricing';
 import LeagueTable from '@/components/LeagueTable';
@@ -251,9 +251,9 @@ const ChildCardView = ({
             <span className="text-muted text-[11px] font-overpass uppercase tracking-wide">
               Потенциал
             </span>
-            <span className="text-muted text-xs" aria-hidden>
-              {potentialOpen ? '▲' : '▼'}
-            </span>
+            {potentialOpen
+              ? <ChevronUp size={16} className="text-muted" aria-hidden />
+              : <ChevronDown size={16} className="text-muted" aria-hidden />}
           </div>
           <div className="text-brand text-xl font-bold">
             {child.potential != null ? Math.round(child.potential) : '—'}
@@ -404,7 +404,7 @@ export default function ParentPage() {
 
         {!error && children.length === 0 && (
           <div className="bg-surface rounded-2xl p-8 text-center border border-white/5">
-            <div className="text-4xl mb-4" aria-hidden>🏒</div>
+            <Users size={40} className="text-muted mx-auto mb-4" aria-hidden />
             <h2 className="text-white text-lg font-bold mb-2">Пока нет привязанных детей</h2>
             <p className="text-muted text-sm leading-relaxed">
               Попроси ребёнка открыть Профиль → Родителям и прислать тебе ссылку-приглашение.

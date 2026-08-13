@@ -9,6 +9,7 @@
 // проходит к живому элементу для шагов advanceOn='tap'), а затемнённые
 // области перехватывают клики мимо.
 
+import { Pointer } from 'lucide-react';
 import { TourStep } from './types';
 
 interface Rect {
@@ -211,7 +212,7 @@ export default function TourOverlay({ step, rect, index, total, onNext }: Props)
               className="font-overpass uppercase"
               style={{ color: '#A1FF4A', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}
             >
-              <span style={{ fontSize: 16 }}>👆</span> Нажми на подсвеченное
+              <Pointer size={16} aria-hidden /> Нажми на подсвеченное
             </div>
           ) : (
             <button

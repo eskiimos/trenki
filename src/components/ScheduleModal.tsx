@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import Image from 'next/image';
 import { getTelegramId } from '@/lib/auth';
 import { Button } from '@/components/ui';
@@ -291,7 +291,7 @@ export default function ScheduleModal({ isOpen, onClose, videoId }: ScheduleModa
               const file = new File([blob], filename, { type: 'text/calendar' });
               await navigator.share({
                 files: [file],
-                title: '🏋️ Тренировка',
+                title: 'Тренировка',
                 text: `Добавить в календарь: ${videoData.title}`,
               });
             } catch (shareError) {
@@ -596,8 +596,9 @@ export default function ScheduleModal({ isOpen, onClose, videoId }: ScheduleModa
               </div>
 
               {/* Success Message */}
-              <div className="w-full py-4 rounded-full font-bold text-[14px] uppercase tracking-wider bg-[#445CFF] text-white text-center">
-                ✅ УСПЕШНО ДОБАВЛЕНО В ПРИЛОЖЕНИЕ
+              <div className="w-full py-4 rounded-full font-bold text-[14px] uppercase tracking-wider bg-[#445CFF] text-white flex items-center justify-center gap-2">
+                <CheckCircle2 size={20} className="shrink-0" />
+                УСПЕШНО ДОБАВЛЕНО В ПРИЛОЖЕНИЕ
               </div>
 
               {/* Add to Device Calendar Button */}

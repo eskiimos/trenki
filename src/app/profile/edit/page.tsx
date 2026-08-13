@@ -9,6 +9,7 @@ import { ProfileEditSkeleton } from '../../../components/Skeleton';
 import BottomNavigation from '@/components/BottomNavigation';
 import { apiCache } from '@/lib/cache';
 import ImageCropper from '@/components/ImageCropper';
+import { Check } from 'lucide-react';
 import {
   sanitizeName,
   isValidName,
@@ -675,7 +676,7 @@ const ProfileEditPage = () => {
                 className="flex-1 flex items-center gap-2 px-4 text-white"
                 style={{ background: '#AEABBB33', borderRadius: '32px', height: '44px', border: '1px solid #A1FF4A' }}
               >
-                <span className="text-[#A1FF4A]">✓</span>
+                <Check size={20} className="text-[#A1FF4A] shrink-0" aria-hidden />
                 <span className="truncate text-sm">{currentEmail}</span>
               </div>
               <button

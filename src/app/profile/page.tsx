@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Sparkles } from 'lucide-react';
 import { useTelegram } from '../../hooks/useTelegram';
 import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { ProfileSkeleton } from '../../components/Skeleton';
@@ -449,7 +450,10 @@ const ProfilePage = () => {
         {userProfile?.profile && (userProfile.profile.potential === undefined || userProfile.profile.potential < 10) && (
           <div className="mb-6">
             <Button variant="primary" fullWidth onClick={() => router.push('/onboarding/characteristics')}>
-              ✨ Узнать свой потенциал
+              <span className="inline-flex items-center justify-center gap-2">
+                <Sparkles size={20} aria-hidden />
+                Узнать свой потенциал
+              </span>
             </Button>
           </div>
         )}

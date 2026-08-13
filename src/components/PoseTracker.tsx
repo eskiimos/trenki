@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { X, Circle, Maximize2, Minimize2 } from 'lucide-react';
 
 interface Props {
   videoId: string;
@@ -294,10 +295,15 @@ export default function PoseTracker({ videoId, onClose }: Props) {
           gap: 6,
         }}
       >
-        <span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           {status === 'init' && 'Загрузка модели…'}
           {status === 'ready' && 'Готово'}
-          {status === 'tracking' && '● Запись'}
+          {status === 'tracking' && (
+            <>
+              <Circle size={10} fill="#FF6B6B" color="#FF6B6B" aria-hidden />
+              Запись
+            </>
+          )}
           {status === 'saving' && 'Сохранение…'}
           {status === 'done' && 'Готово'}
           {status === 'error' && 'Ошибка'}
@@ -306,17 +312,19 @@ export default function PoseTracker({ videoId, onClose }: Props) {
           <button
             type="button"
             onClick={() => setMinimized((v) => !v)}
-            aria-label="Свернуть"
+            aria-label={minimized ? 'Развернуть' : 'Свернуть'}
             style={{
               background: 'transparent',
               color: '#F9F8FE',
               border: 'none',
-              fontSize: 12,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               cursor: 'pointer',
               padding: '0 4px',
             }}
           >
-            {minimized ? '▢' : '–'}
+            {minimized ? <Maximize2 size={16} aria-hidden /> : <Minimize2 size={16} aria-hidden />}
           </button>
           <button
             type="button"
@@ -326,13 +334,14 @@ export default function PoseTracker({ videoId, onClose }: Props) {
               background: 'transparent',
               color: '#FF6B6B',
               border: 'none',
-              fontSize: 12,
-              fontWeight: 800,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               cursor: 'pointer',
               padding: '0 4px',
             }}
           >
-            ✕
+            <X size={16} aria-hidden />
           </button>
         </div>
       </div>

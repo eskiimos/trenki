@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { X } from 'lucide-react';
 import { registerBanner, BANNER_PRIORITY } from '@/lib/bottom-banner-registry';
 
 interface WorkoutData {
@@ -119,10 +120,10 @@ export default function WorkoutReminder() {
               event.stopPropagation();
               dismissForToday();
             }}
-            className="w-8 h-8 -m-1 inline-flex items-center justify-center text-[#A1FF4A] text-lg font-bold leading-none"
+            className="w-8 h-8 -m-1 inline-flex items-center justify-center text-[#A1FF4A] leading-none"
             aria-label="Скрыть напоминание на сегодня"
           >
-            ✕
+            <X size={20} aria-hidden />
           </button>
         </div>
         <div className="self-stretch justify-start">

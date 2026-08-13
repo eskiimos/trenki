@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 import { saveAuth } from '@/lib/auth';
 import { Button } from '@/components/ui';
 
@@ -292,9 +293,10 @@ function EmailLoginForm() {
             setCode('');
             setError(null);
           }}
-          className="text-gray-500 hover:text-white transition-colors"
+          className="text-gray-500 hover:text-white transition-colors inline-flex items-center gap-1.5"
         >
-          ← Изменить email
+          <ArrowLeft size={16} aria-hidden />
+          Изменить email
         </button>
         {countdown > 0 ? (
           <span className="text-gray-500">Повторить через {countdown}с</span>

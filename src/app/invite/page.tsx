@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Target, Trophy } from 'lucide-react';
 
 export default function InvitePage() {
   const router = useRouter();
@@ -113,7 +114,7 @@ export default function InvitePage() {
         {/* Логотип и заголовок */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-6 shadow-xl">
-            <span className="text-4xl">🏒</span>
+            <Trophy size={40} className="text-white" aria-hidden />
           </div>
           <h1 className="text-4xl font-bold text-white mb-3">
             TRENKI
@@ -199,7 +200,7 @@ export default function InvitePage() {
         {/* Дополнительная информация */}
         <div className="mt-8 text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 rounded-full border border-blue-500/20">
-            <span className="text-lg">🎯</span>
+            <Target size={20} className="text-blue-400 shrink-0" aria-hidden />
             <p className="text-sm text-blue-400">
               Закрытое бета-тестирование
             </p>

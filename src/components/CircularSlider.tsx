@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { ThumbsUp } from 'lucide-react';
 
 interface CircularSliderProps {
   value: number;
@@ -21,13 +22,15 @@ export default function CircularSlider({ value, min, max, onChange }: CircularSl
     4: 'НЕМНОГО УСТАЛ',
     5: 'СРЕДНЕНЬКО',
     6: 'НЕПЛОХО СЕБЯ ЧУВСТВУЮ',
-    7: 'ЧУВСТВУЮ СЕБЯ ХОРОШО 👍🏻',
+    7: 'ЧУВСТВУЮ СЕБЯ ХОРОШО',
     8: 'В ОТЛИЧНОЙ ФОРМЕ',
     9: 'ЧУВСТВУЮ СЕБЯ ОТЛИЧНО',
     10: 'БАТАРЕЙКА ЗАРЯЖЕНА НА 100%',
   };
 
   const currentLabel = energyLabels[Math.round(value)] || energyLabels[0];
+  // «Хорошо» подсвечиваем иконкой вместо эмодзи в тексте
+  const showThumbsUp = Math.round(value) === 7;
 
   const handleValueChange = (newValue: number) => {
     setIsTextChanging(true);
@@ -60,8 +63,12 @@ export default function CircularSlider({ value, min, max, onChange }: CircularSl
           marginTop: '12px',
           transition: 'opacity 0.3s ease-in-out',
           opacity: isTextChanging ? 0 : 1,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
         }}>
           {currentLabel}
+          {showThumbsUp && <ThumbsUp size={16} aria-hidden />}
         </div>
       </div>
 

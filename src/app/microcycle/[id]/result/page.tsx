@@ -13,6 +13,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { Check } from 'lucide-react';
+import { EnergyIcon } from '@/components/training/icons';
 
 type Intent = 'IN_TONE' | 'WARMUP' | 'CHARGED' | 'STRETCH' | 'TIRED';
 
@@ -25,13 +27,7 @@ const INTENT_LABEL: Record<Intent, string> = {
   TIRED: 'Лёгкая нагрузка',
 };
 
-const INTENT_EMOJI: Record<Intent, string> = {
-  IN_TONE: '⚡️',
-  WARMUP: '🏃',
-  CHARGED: '🔋',
-  STRETCH: '🧘',
-  TIRED: '😴',
-};
+// Иконки интентов — в @/components/training/icons (<EnergyIcon state={…} />).
 
 // Календарный день недели для относительного dayOfWeek (1..N от даты старта).
 // dayOfWeek в микроцикле — ПОРЯДКОВЫЙ день цикла, НЕ календарный (Пн=1): цикл
@@ -276,7 +272,12 @@ export default function MicrocycleResultPage() {
                   <div className="text-[#AEABBB] text-xs font-bold w-6">
                     {weekdayLabel(microcycle.weekStartDate, d.dayOfWeek)}
                   </div>
-                  <div style={{ fontSize: 20 }}>{INTENT_EMOJI[d.intent]}</div>
+                  <EnergyIcon
+                    state={d.intent}
+                    size={20}
+                    color={completed ? '#A1FF4A' : '#AEABBB'}
+                    className="shrink-0"
+                  />
                   <div className="flex-1">
                     <div className="text-white text-sm font-semibold">
                       {INTENT_LABEL[d.intent]}
@@ -288,7 +289,7 @@ export default function MicrocycleResultPage() {
                       {ws && !completed && !inProgress && 'не приступал'}
                     </div>
                   </div>
-                  {completed && <div style={{ color: '#A1FF4A', fontSize: 18 }}>✓</div>}
+                  {completed && <Check size={20} color="#A1FF4A" className="shrink-0" />}
                 </div>
               );
             })}

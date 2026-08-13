@@ -6,7 +6,7 @@
 // (следующее — с акцентом и счётчиком оставшихся уровней).
 
 import { useEffect } from 'react';
-import { Flame } from 'lucide-react';
+import { Check, Flame } from 'lucide-react';
 import {
   STATUSES,
   XP_PER_COMPLETED_MODULE,
@@ -85,9 +85,7 @@ const StatusPathModal = ({ currentLevel, open, onClose }: Props) => {
                   </div>
                 </div>
                 {passed && (
-                  <span className="text-muted text-sm shrink-0" aria-hidden>
-                    ✓
-                  </span>
+                  <Check size={20} className="text-muted shrink-0" aria-hidden />
                 )}
                 {current && (
                   <span className="text-brand text-[11px] font-bold font-overpass uppercase shrink-0">

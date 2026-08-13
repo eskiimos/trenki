@@ -4,10 +4,14 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Plus, RefreshCw } from 'lucide-react';
+import {
+  ChevronLeft, ChevronRight, Plus, RefreshCw,
+  Zap, BatteryFull, Target, PersonStanding, Dumbbell,
+} from 'lucide-react';
 import BottomNavigation from '@/components/BottomNavigation';
 import SwipeableWorkoutItem from '@/components/SwipeableWorkoutItem';
 import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay';
+import { EnergyIcon } from '@/components/training/icons';
 
 interface ScheduledWorkout {
   id: string;
@@ -77,13 +81,8 @@ const MICROCYCLE_INTENT_LABEL: Record<MicrocycleIntent, string> = {
   TIRED: 'Лёгкая нагрузка',
 };
 
-const MICROCYCLE_INTENT_EMOJI: Record<MicrocycleIntent, string> = {
-  IN_TONE: '⚡️',
-  WARMUP: '🏃',
-  CHARGED: '🔋',
-  STRETCH: '🧘',
-  TIRED: '😴',
-};
+// Иконки интентов живут в @/components/training/icons (<EnergyIcon state={…} />) —
+// локальной карты эмодзи здесь больше нет.
 
 export default function CalendarPage() {
   const router = useRouter();
@@ -488,11 +487,10 @@ export default function CalendarPage() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 20,
                 flexShrink: 0,
               }}
             >
-              ⚡️
+              <Zap size={20} color="#A1FF4A" />
             </div>
             <div className="flex-1 min-w-0 text-left">
               <div
@@ -532,7 +530,7 @@ export default function CalendarPage() {
                 className="flex items-center gap-2 mb-4 pb-3"
                 style={{ borderBottom: '1px solid rgba(255,255,255,0.10)' }}
               >
-                <span style={{ fontSize: 16, flexShrink: 0 }}>🔋</span>
+                <BatteryFull size={16} color="#A1FF4A" className="shrink-0" />
                 <div className="flex-1 min-w-0 leading-tight">
                   <span
                     style={{
@@ -654,9 +652,13 @@ export default function CalendarPage() {
                         textTransform: 'uppercase',
                         letterSpacing: 0.5,
                         marginBottom: 6,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
                       }}
                     >
-                      {MICROCYCLE_INTENT_EMOJI[d.intent]} {MICROCYCLE_INTENT_LABEL[d.intent]} · ИИ-тренер
+                      <EnergyIcon state={d.intent} size={16} color="#AEABBB" />
+                      {MICROCYCLE_INTENT_LABEL[d.intent]} · ИИ-тренер
                     </div>
                     <div className="text-[#AEABBB] text-sm">
                       Для этого дня не хватило подходящих модулей в каталоге.
@@ -679,9 +681,9 @@ export default function CalendarPage() {
                 <div className="p-4 flex gap-3 items-center">
                   <div
                     className="relative w-20 h-20 rounded-lg shrink-0 flex items-center justify-center"
-                    style={{ background: 'rgba(68, 92, 255, 0.25)', fontSize: 36 }}
+                    style={{ background: 'rgba(68, 92, 255, 0.25)' }}
                   >
-                    {MICROCYCLE_INTENT_EMOJI[d.intent]}
+                    <EnergyIcon state={d.intent} size={28} color="#A1FF4A" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div
@@ -701,7 +703,10 @@ export default function CalendarPage() {
                       Тренировка · {ws.totalVideos} модул{ws.totalVideos === 1 ? 'ь' : ws.totalVideos < 5 ? 'я' : 'ей'}
                     </div>
                     {d.goal && (
-                      <div className="text-[#A1FF4A] text-xs font-bold mt-1">🎯 {d.goal}</div>
+                      <div className="text-[#A1FF4A] text-xs font-bold mt-1 flex items-center gap-1.5">
+                        <Target size={16} className="shrink-0" />
+                        <span className="min-w-0">{d.goal}</span>
+                      </div>
                     )}
                     <div className="text-[#AEABBB] text-xs mt-1">
                       ~{ws.targetDuration} мин
@@ -735,7 +740,9 @@ export default function CalendarPage() {
                           {m.thumbnail ? (
                             <Image src={m.thumbnail} alt={m.title} fill className="object-cover" />
                           ) : (
-                            <div className="absolute inset-0 flex items-center justify-center text-[#AEABBB] text-lg">🏒</div>
+                            <div className="absolute inset-0 flex items-center justify-center text-[#AEABBB]">
+                              <Dumbbell size={20} />
+                            </div>
                           )}
                           <span
                             className="absolute top-1 left-1 text-[#A1FF4A] text-[10px] font-bold px-1.5 py-0.5 rounded-md"
@@ -759,9 +766,20 @@ export default function CalendarPage() {
                 <div className="mt-2 rounded-2xl p-3" style={{ background: 'rgba(174,171,187,0.08)' }}>
                   <div
                     className="font-overpass"
-                    style={{ color: '#AEABBB', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}
+                    style={{
+                      color: '#AEABBB',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.5,
+                      marginBottom: 8,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
                   >
-                    🧘 Куда делать растяжку?
+                    <PersonStanding size={16} />
+                    Куда делать растяжку?
                   </div>
                   <div className="flex gap-2">
                     {([['lower', 'Низ тела'], ['upper', 'Верх тела'], ['full', 'Всё тело']] as const).map(([bp, label]) => (

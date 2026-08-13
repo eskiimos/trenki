@@ -1,5 +1,7 @@
 'use client';
 
+import { CharacteristicIcon } from '@/components/training/icons';
+
 interface CharacteristicsRadarProps {
   characteristics: {
     ratingPower: number;
@@ -11,12 +13,13 @@ interface CharacteristicsRadarProps {
 }
 
 export default function CharacteristicsRadar({ characteristics }: CharacteristicsRadarProps) {
+  // key — ключ для <CharacteristicIcon /> (иконки вместо прежних эмодзи в подписях).
   const data = [
-    { label: '💪 Сила', value: characteristics.ratingPower, angle: 0 },
-    { label: '⚡ Скорость', value: characteristics.ratingSpeed, angle: 72 },
-    { label: '🫀 Выносливость', value: characteristics.ratingEndurance, angle: 144 },
-    { label: '🎯 Техника', value: characteristics.ratingTechnique, angle: 216 },
-    { label: '🤸 Гибкость', value: characteristics.ratingFlexibility, angle: 288 },
+    { key: 'ratingPower', label: 'Сила', value: characteristics.ratingPower, angle: 0 },
+    { key: 'ratingSpeed', label: 'Скорость', value: characteristics.ratingSpeed, angle: 72 },
+    { key: 'ratingEndurance', label: 'Выносливость', value: characteristics.ratingEndurance, angle: 144 },
+    { key: 'ratingTechnique', label: 'Техника', value: characteristics.ratingTechnique, angle: 216 },
+    { key: 'ratingFlexibility', label: 'Гибкость', value: characteristics.ratingFlexibility, angle: 288 },
   ];
 
   const size = 280;
@@ -116,8 +119,11 @@ export default function CharacteristicsRadar({ characteristics }: Characteristic
       {/* Легенда */}
       <div className="mt-6 grid grid-cols-2 gap-3 w-full max-w-xs">
         {data.map((d, i) => (
-          <div key={i} className="flex items-center justify-between bg-[#1a1f35] rounded-lg px-3 py-2">
-            <span className="text-sm text-[#AEABBB]">{d.label}</span>
+          <div key={i} className="flex items-center justify-between gap-2 bg-[#1a1f35] rounded-lg px-3 py-2">
+            <span className="flex items-center gap-1.5 min-w-0 text-sm text-[#AEABBB]">
+              <CharacteristicIcon characteristic={d.key} size={16} className="shrink-0" />
+              <span className="truncate">{d.label}</span>
+            </span>
             <span className="text-white font-bold text-sm">{d.value.toFixed(1)}</span>
           </div>
         ))}

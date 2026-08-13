@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTelegram } from '@/hooks/useTelegram';
+import { CharacteristicIcon } from '@/components/training/icons';
+import { BarChart3, TrendingUp, Target, ClipboardList, User } from 'lucide-react';
 
 interface CharacteristicsSummary {
   current: {
@@ -144,7 +146,7 @@ export default function CharacteristicsStatsPage() {
   if (!data || data.current.potential === 0) {
     return (
       <div className="min-h-screen bg-[#101530] text-white p-4 flex flex-col items-center justify-center">
-        <div className="text-6xl mb-4">📊</div>
+        <BarChart3 size={48} className="text-brand mb-4" aria-hidden />
         <h2 className="text-2xl font-bold mb-2">Статистика недоступна</h2>
         <p className="text-gray-400 text-center mb-6">
           Пройди стартовый опрос, чтобы начать отслеживать прогресс
@@ -175,20 +177,26 @@ export default function CharacteristicsStatsPage() {
 
       {/* Прирост по характеристикам */}
       <div className="bg-[#1a1f35] rounded-xl p-5 mb-6">
-        <h3 className="text-lg font-bold mb-4">📈 Общий прирост</h3>
+        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <TrendingUp size={20} className="text-brand" aria-hidden />
+          Общий прирост
+        </h3>
         <div className="space-y-3">
-          <GrowthRow emoji="💪" label="Сила" growth={data.totalGrowth.power} current={data.current.ratingPower} />
-          <GrowthRow emoji="⚡" label="Скорость" growth={data.totalGrowth.speed} current={data.current.ratingSpeed} />
-          <GrowthRow emoji="🫀" label="Выносливость" growth={data.totalGrowth.endurance} current={data.current.ratingEndurance} />
-          <GrowthRow emoji="🎯" label="Техника" growth={data.totalGrowth.technique} current={data.current.ratingTechnique} />
-          <GrowthRow emoji="🤸" label="Гибкость" growth={data.totalGrowth.flexibility} current={data.current.ratingFlexibility} />
+          <GrowthRow characteristic="ratingPower" label="Сила" growth={data.totalGrowth.power} current={data.current.ratingPower} />
+          <GrowthRow characteristic="ratingSpeed" label="Скорость" growth={data.totalGrowth.speed} current={data.current.ratingSpeed} />
+          <GrowthRow characteristic="ratingEndurance" label="Выносливость" growth={data.totalGrowth.endurance} current={data.current.ratingEndurance} />
+          <GrowthRow characteristic="ratingTechnique" label="Техника" growth={data.totalGrowth.technique} current={data.current.ratingTechnique} />
+          <GrowthRow characteristic="ratingFlexibility" label="Гибкость" growth={data.totalGrowth.flexibility} current={data.current.ratingFlexibility} />
         </div>
       </div>
 
       {/* Стартовые данные */}
       {data.initial && (
         <div className="bg-[#1a1f35] rounded-xl p-5 mb-6">
-          <h3 className="text-lg font-bold mb-4">🎯 Стартовые показатели</h3>
+          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <Target size={20} className="text-brand" aria-hidden />
+            Стартовые показатели
+          </h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-400">Коэффициент мастерства (k_mastery)</span>
@@ -221,13 +229,15 @@ export default function CharacteristicsStatsPage() {
       {/* Кнопки навигации */}
       <div className="space-y-3">
         <Link href="/training/history">
-          <button className="w-full bg-[#2d3448] hover:bg-[#3d4558] text-white py-4 rounded-xl font-semibold transition-colors">
-            📋 История тренировок
+          <button className="w-full bg-[#2d3448] hover:bg-[#3d4558] text-white py-4 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2">
+            <ClipboardList size={20} aria-hidden />
+            История тренировок
           </button>
         </Link>
         <Link href="/profile">
-          <button className="w-full bg-[#2d3448] hover:bg-[#3d4558] text-white py-4 rounded-xl font-semibold transition-colors">
-            👤 Мой профиль
+          <button className="w-full bg-[#2d3448] hover:bg-[#3d4558] text-white py-4 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2">
+            <User size={20} aria-hidden />
+            Мой профиль
           </button>
         </Link>
       </div>
@@ -236,8 +246,8 @@ export default function CharacteristicsStatsPage() {
 }
 
 // Компонент для строки прироста
-const GrowthRow = ({ emoji, label, growth, current }: {
-  emoji: string;
+const GrowthRow = ({ characteristic, label, growth, current }: {
+  characteristic: string;
   label: string;
   growth: number;
   current: number;
@@ -248,7 +258,7 @@ const GrowthRow = ({ emoji, label, growth, current }: {
   return (
     <div className="flex justify-between items-center">
       <div className="flex items-center gap-2">
-        <span className="text-xl">{emoji}</span>
+        <CharacteristicIcon characteristic={characteristic} size={20} className="text-[#AEABBB]" />
         <span className="text-sm text-[#AEABBB]">{label}</span>
       </div>
       <div className="flex items-center gap-3">

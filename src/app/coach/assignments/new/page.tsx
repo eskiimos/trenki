@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { Check, Lock, RotateCcw, Users } from 'lucide-react';
 import VideoSlotPicker from '@/components/coach/VideoSlotPicker';
 import PickerFilterChips from '@/components/coach/PickerFilterChips';
 
@@ -485,12 +486,13 @@ export default function CoachAssignmentNewPage() {
                         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                         background: allSelected ? '#A1FF4A' : 'transparent',
                         border: `2px solid ${allSelected ? '#A1FF4A' : '#445CFF'}`,
-                        color: '#101530', fontSize: 12, fontWeight: 900, lineHeight: 1,
+                        color: '#101530', lineHeight: 1,
                       }}
                     >
-                      {allSelected ? '✓' : ''}
+                      {allSelected && <Check size={12} strokeWidth={3} aria-hidden />}
                     </span>
-                    👥 Вся команда
+                    <Users size={16} aria-hidden />
+                    Вся команда
                   </span>
                   <span style={{ fontSize: 11, color: '#AEABBB' }}>{allSelected ? 'снять' : `все ${selectable.length}`}</span>
                 </button>
@@ -523,8 +525,12 @@ export default function CoachAssignmentNewPage() {
                       {m.firstName} {m.lastName}
                     </div>
                     {blocked ? (
-                      <div className="font-overpass" style={{ color: '#FF9F45', fontSize: 12, marginTop: 2 }}>
-                        🔒 только для подписчиков
+                      <div
+                        className="font-overpass"
+                        style={{ color: '#FF9F45', fontSize: 12, marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      >
+                        <Lock size={16} aria-hidden />
+                        только для подписчиков
                       </div>
                     ) : (
                       m.position && (
@@ -534,7 +540,7 @@ export default function CoachAssignmentNewPage() {
                       )
                     )}
                   </div>
-                  {blocked ? <span style={{ fontSize: 16 }}>🔒</span> : <Checkbox checked={checked} />}
+                  {blocked ? <Lock size={20} style={{ flexShrink: 0 }} aria-hidden /> : <Checkbox checked={checked} />}
                 </button>
               );
             })}
@@ -702,7 +708,10 @@ export default function CoachAssignmentNewPage() {
                               color: badge.tone === 'done' ? '#A1FF4A' : '#9FB2FF',
                             }}
                           >
-                            {badge.tone === 'done' ? '✓' : '↺'} {badge.text}
+                            {badge.tone === 'done'
+                              ? <Check size={12} aria-hidden />
+                              : <RotateCcw size={12} aria-hidden />}
+                            {badge.text}
                           </div>
                         )}
                       </div>

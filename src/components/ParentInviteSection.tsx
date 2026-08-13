@@ -6,6 +6,7 @@
 // Вынесена из profile/page.tsx, чтобы не раздувать страницу.
 
 import { useEffect, useState } from 'react';
+import { Check, Hourglass } from 'lucide-react';
 
 interface LinkedParent {
   linkId: string;
@@ -189,7 +190,7 @@ export default function ParentInviteSection() {
                   {p.unlinkRequestedAt && (
                     <div className="flex items-center justify-between gap-3 mt-2">
                       <span className="inline-flex items-center gap-1.5 bg-amber-400/10 text-amber-300 text-[11px] font-medium rounded-full px-2.5 py-1">
-                        <span aria-hidden>⏳</span>
+                        <Hourglass size={16} className="shrink-0" aria-hidden />
                         Запрос отправлен, ждёт родителя
                       </span>
                       <button
@@ -227,9 +228,10 @@ export default function ParentInviteSection() {
               <button
                 type="button"
                 onClick={handleCopy}
-                className="bg-white/10 text-white text-xs font-bold font-overpass uppercase tracking-wide rounded-full py-2.5 hover:bg-white/15 transition-colors"
+                className="bg-white/10 text-white text-xs font-bold font-overpass uppercase tracking-wide rounded-full py-2.5 hover:bg-white/15 transition-colors inline-flex items-center justify-center gap-1.5"
               >
-                {copied ? '✓ Скопировано' : 'Скопировать'}
+                {copied && <Check size={16} className="shrink-0" aria-hidden />}
+                {copied ? 'Скопировано' : 'Скопировать'}
               </button>
               <button
                 type="button"

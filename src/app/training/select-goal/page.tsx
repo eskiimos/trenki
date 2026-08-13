@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { TrainingGoal, EnergyState } from '@/generated/prisma';
 import { GOAL_LABELS, ENERGY_STATE_LABELS } from '@/lib/training-algorithm-v3';
 import { openSubscriptionModal } from '@/lib/subscription-modal';
+import { GoalIcon, EnergyIcon } from '@/components/training/icons';
+import { Target, Dumbbell, Check, Flame, Lightbulb } from 'lucide-react';
 
 // Преобразуем const объекты в массивы значений
 const trainingGoals = Object.values(TrainingGoal) as TrainingGoal[];
@@ -72,7 +74,10 @@ export default function SelectGoalPage() {
 
         {/* ШАГ 1: ВЫБОР ЦЕЛИ */}
         <section className="mb-8">
-          <h2 className="text-xl font-bold mb-4">🎯 Шаг 1: Выберите цель</h2>
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+            <Target size={24} className="text-brand" aria-hidden />
+            Шаг 1: Выберите цель
+          </h2>
           <div className="grid grid-cols-1 gap-3">
             {trainingGoals.map((goal) => {
               const info = GOAL_LABELS[goal];
@@ -99,13 +104,13 @@ export default function SelectGoalPage() {
                   `}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-3xl">{info.emoji}</span>
+                    <GoalIcon goal={goal} size={24} className={isSelected ? 'text-white' : 'text-brand'} />
                     <div className="flex-1">
                       <div className="font-bold text-lg">{info.label}</div>
                       <div className="text-sm text-gray-400">{info.description}</div>
                     </div>
                     {isSelected && (
-                      <div className="text-white text-2xl">✓</div>
+                      <Check size={24} className="text-white" aria-hidden />
                     )}
                   </div>
                 </button>
@@ -116,7 +121,10 @@ export default function SelectGoalPage() {
 
         {/* ШАГ 2: ОЦЕНКА СОСТОЯНИЯ */}
         <section className="mb-8">
-          <h2 className="text-xl font-bold mb-4">💪 Шаг 2: Оцените своё состояние</h2>
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+            <Dumbbell size={24} className="text-brand" aria-hidden />
+            Шаг 2: Оцените своё состояние
+          </h2>
           <p className="text-sm text-gray-400 mb-4">
             Это опционально, но помогает подобрать оптимальную нагрузку
           </p>
@@ -146,12 +154,12 @@ export default function SelectGoalPage() {
                   `}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-3xl">{info.emoji}</span>
+                    <EnergyIcon state={state} size={24} className={isSelected ? 'text-white' : 'text-brand'} />
                     <div className="flex-1">
                       <div className="font-bold text-lg">{info.label}</div>
                     </div>
                     {isSelected && (
-                      <div className="text-white text-2xl">✓</div>
+                      <Check size={24} className="text-white" aria-hidden />
                     )}
                   </div>
                 </button>
@@ -166,6 +174,7 @@ export default function SelectGoalPage() {
           disabled={!selectedGoal || !selectedEnergy || isGenerating}
           className={`
             w-full py-4 rounded-xl font-bold text-lg transition-all
+            flex items-center justify-center gap-2
             ${
               selectedGoal && selectedEnergy && !isGenerating
                 ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:scale-105 shadow-xl'
@@ -173,13 +182,21 @@ export default function SelectGoalPage() {
             }
           `}
         >
-          {isGenerating ? 'Генерируем тренировку...' : 'Сгенерировать тренировку 🔥'}
+          {isGenerating ? (
+            'Генерируем тренировку...'
+          ) : (
+            <>
+              Сгенерировать тренировку
+              <Flame size={20} aria-hidden />
+            </>
+          )}
         </button>
 
         {/* Подсказка */}
         {!selectedEnergy && selectedGoal && (
-          <p className="text-center text-sm text-gray-400 mt-4">
-            💡 Если не оценишь состояние, используем стандартную нагрузку
+          <p className="flex items-center justify-center gap-2 text-center text-sm text-gray-400 mt-4">
+            <Lightbulb size={16} className="shrink-0" aria-hidden />
+            Если не оценишь состояние, используем стандартную нагрузку
           </p>
         )}
       </div>

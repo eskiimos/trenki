@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { Star } from 'lucide-react';
 import BottomNavigation from '@/components/BottomNavigation';
 import { Skeleton } from '@/components/Skeleton';
 
@@ -261,9 +262,9 @@ const WatchHistoryPage = () => {
                       type="button"
                       onClick={() => removeWorkout(w.id)}
                       aria-label="Убрать из избранного"
-                      style={{ color: '#A1FF4A', fontSize: 18, background: 'none', border: 'none', cursor: 'pointer' }}
+                      style={{ color: '#A1FF4A', background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                     >
-                      ★
+                      <Star size={20} fill="#A1FF4A" aria-hidden />
                     </button>
                   </div>
 

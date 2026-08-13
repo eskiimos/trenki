@@ -6,6 +6,7 @@ import { useTelegram } from '@/hooks/useTelegram';
 import CharacteristicsGainModal from '@/components/CharacteristicsGainModal';
 import Toast from '@/components/Toast';
 import ModuleSelectionModal from '@/components/ModuleSelectionModal';
+import { Check, Play, Lightbulb, PartyPopper, Star } from 'lucide-react';
 
 interface WorkoutModule {
   id: string;
@@ -178,7 +179,7 @@ export default function WorkoutPage() {
       }
       setFavSaved(true);
       setToast({
-        message: data?.alreadyExists ? 'Уже в избранном' : '★ Тренировка сохранена в избранное',
+        message: data?.alreadyExists ? 'Уже в избранном' : 'Тренировка сохранена в избранное',
         type: 'success',
       });
     } catch {
@@ -293,7 +294,7 @@ export default function WorkoutPage() {
         await loadWorkout();
         
         setToast({
-          message: `✅ Модуль заменен на "${data.newModule.title}"`,
+          message: `Модуль заменен на "${data.newModule.title}"`,
           type: 'success',
         });
       } else {
@@ -341,12 +342,12 @@ export default function WorkoutPage() {
         } else if (data.limitReached) {
           // Показываем Toast о лимите
           setToast({
-            message: data.error || 'Достигнут дневной лимит тренировок. Приходи завтра! 💪',
+            message: data.error || 'Достигнут дневной лимит тренировок. Приходи завтра!',
             type: 'warning'
           });
           setTimeout(() => router.push('/'), 3000);
         } else {
-          setToast({ message: '✨ Тренировка завершена!', type: 'success' });
+          setToast({ message: 'Тренировка завершена!', type: 'success' });
           // Сначала — предложение собрать цикл (если уместно), редирект только
           // без него
           const shown = await maybeOfferCycle();
@@ -358,7 +359,7 @@ export default function WorkoutPage() {
         
         if (errorData.limitReached) {
           setToast({
-            message: errorData.error || 'Достигнут дневной лимит тренировок. Приходи завтра! 💪',
+            message: errorData.error || 'Достигнут дневной лимит тренировок. Приходи завтра!',
             type: 'warning'
           });
         } else {
@@ -450,7 +451,10 @@ export default function WorkoutPage() {
           {/* Советы */}
           <div className="bg-[#1a1f3a] rounded-lg p-4 space-y-3 text-left">
             <p className="text-sm text-gray-300">
-              <span className="text-[#A1FF4A] font-semibold">💡 Что можно сделать:</span>
+              <span className="text-brand font-semibold inline-flex items-center gap-2">
+                <Lightbulb size={16} aria-hidden />
+                Что можно сделать:
+              </span>
             </p>
             <ul className="space-y-2 text-sm text-gray-400">
               <li className="flex items-start gap-2">
@@ -831,8 +835,12 @@ export default function WorkoutPage() {
                   fontWeight: 600,
                   fontSize: '10px',
                   color: '#F9F8FE',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
                 }}>
-                  ✓ Завершено
+                  <Check size={16} aria-hidden />
+                  Завершено
                 </div>
               )}
 
@@ -850,8 +858,12 @@ export default function WorkoutPage() {
                   fontWeight: 600,
                   fontSize: '10px',
                   color: '#101530',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
                 }}>
-                  ▶ Текущий
+                  <Play size={16} fill="currentColor" aria-hidden />
+                  Текущий
                 </div>
               )}
 
@@ -1242,7 +1254,7 @@ export default function WorkoutPage() {
                 margin: '0 auto 24px',
               }}
             >
-              <span style={{ fontSize: '48px' }}>🎉</span>
+              <PartyPopper size={48} color="#A1FF4A" aria-hidden />
             </div>
 
             {/* Заголовок */}
@@ -1270,7 +1282,7 @@ export default function WorkoutPage() {
                 marginBottom: '32px',
               }}
             >
-              Отличная работа! Ты молодец, все модули пройдены успешно 💪
+              Отличная работа! Ты молодец, все модули пройдены успешно
             </p>
 
             {/* Понравилась вся тренировка? — сохраняем составленное занятие целиком */}
@@ -1317,9 +1329,20 @@ export default function WorkoutPage() {
                     textTransform: 'uppercase',
                     cursor: favSaving || favSaved ? 'default' : 'pointer',
                     opacity: favSaving ? 0.6 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
                   }}
                 >
-                  {favSaved ? '★ В избранном' : favSaving ? 'Сохраняю…' : '☆ Добавить в избранное'}
+                  {favSaving ? (
+                    'Сохраняю…'
+                  ) : (
+                    <>
+                      <Star size={20} fill={favSaved ? 'currentColor' : 'none'} aria-hidden />
+                      {favSaved ? 'В избранном' : 'Добавить в избранное'}
+                    </>
+                  )}
                 </button>
               </div>
             )}
@@ -1365,7 +1388,10 @@ export default function WorkoutPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/60" />
           <div className="relative w-full max-w-sm rounded-xl bg-[#0B0F2A] p-5 text-left shadow-lg border border-[rgba(68,92,255,0.35)]">
-            <div className="text-white text-base font-semibold">Отличная работа! 💪</div>
+            <div className="text-white text-base font-semibold flex items-center gap-2">
+              <PartyPopper size={20} className="text-brand" aria-hidden />
+              Отличная работа!
+            </div>
             <div className="mt-2 text-white/80 text-sm">
               Ты всегда можешь собрать себе цикл на неделю во вкладке{' '}
               <span className="text-[#A1FF4A] font-semibold">«Календарь»</span> — ИИ-тренер
@@ -1406,7 +1432,7 @@ export default function WorkoutPage() {
           sessionId={workout.id}
           moduleIndex={pickerIndex}
           onClose={() => setPickerIndex(null)}
-          onPicked={() => { loadWorkout(); setToast({ message: '✅ Модуль обновлён', type: 'success' }); }}
+          onPicked={() => { loadWorkout(); setToast({ message: 'Модуль обновлён', type: 'success' }); }}
         />
       )}
     </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { CheckCircle2, AlertCircle, AlertTriangle, Info } from 'lucide-react';
 
 interface ToastProps {
   message: string;
@@ -38,11 +39,13 @@ export default function Toast({
   };
 
   const icons = {
-    success: '✅',
-    error: '❌',
-    warning: '⚠️',
-    info: 'ℹ️',
+    success: CheckCircle2,
+    error: AlertCircle,
+    warning: AlertTriangle,
+    info: Info,
   };
+
+  const Icon = icons[type];
 
   return (
     <div
@@ -58,7 +61,7 @@ export default function Toast({
           setTimeout(onClose, 300);
         }}
       >
-        <span className="text-2xl">{icons[type]}</span>
+        <Icon size={24} className="text-white shrink-0" aria-hidden />
         <p className="text-white text-sm font-medium font-overpass flex-1">
           {message}
         </p>

@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { Medal } from 'lucide-react';
+import { CharacteristicIcon } from '@/components/training/icons';
 
 interface FormData {
   // Самооценка (1-10)
@@ -125,7 +127,8 @@ export default function CharacteristicsOnboardingPage() {
             <div className="p-4 bg-zinc-950/20 rounded-3xl">
               <div className="flex flex-col items-center gap-4">
                 <div className="self-stretch text-slate-50 text-xs font-bold font-['Overpass'] uppercase leading-4 tracking-wide text-center">
-                  💪🏻<br />СИЛА (броски, силовая игра, единоборства)
+                  <CharacteristicIcon characteristic="ratingPower" size={24} className="inline-block" />
+                  <br />СИЛА (броски, силовая игра, единоборства)
                 </div>
                 <div className="h-11 px-4 py-3 bg-gray-400/20 rounded-[32px] flex justify-center items-center">
                   <div className="text-slate-50 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
@@ -152,7 +155,8 @@ export default function CharacteristicsOnboardingPage() {
             <div className="p-4 bg-zinc-950/20 rounded-3xl">
               <div className="flex flex-col items-center gap-4">
                 <div className="self-stretch text-slate-50 text-xs font-bold font-['Overpass'] uppercase leading-4 tracking-wide text-center">
-                  ⚡<br />СКОРОСТЬ (скорость, маневренность и резкость)
+                  <CharacteristicIcon characteristic="ratingSpeed" size={24} className="inline-block" />
+                  <br />СКОРОСТЬ (скорость, маневренность и резкость)
                 </div>
                 <div className="h-11 px-4 py-3 bg-gray-400/20 rounded-[32px] flex justify-center items-center">
                   <div className="text-slate-50 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
@@ -179,7 +183,8 @@ export default function CharacteristicsOnboardingPage() {
             <div className="p-4 bg-zinc-950/20 rounded-3xl">
               <div className="flex flex-col items-center gap-4">
                 <div className="self-stretch text-slate-50 text-xs font-bold font-['Overpass'] uppercase leading-4 tracking-wide text-center">
-                  🫁<br />ВЫНОСЛИВОСТЬ (играть всю смену, период, матч на максимуме)
+                  <CharacteristicIcon characteristic="ratingEndurance" size={24} className="inline-block" />
+                  <br />ВЫНОСЛИВОСТЬ (играть всю смену, период, матч на максимуме)
                 </div>
                 <div className="h-11 px-4 py-3 bg-gray-400/20 rounded-[32px] flex justify-center items-center">
                   <div className="text-slate-50 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
@@ -206,7 +211,8 @@ export default function CharacteristicsOnboardingPage() {
             <div className="p-4 bg-zinc-950/20 rounded-3xl">
               <div className="flex flex-col items-center gap-4">
                 <div className="self-stretch text-slate-50 text-xs font-bold font-['Overpass'] uppercase leading-4 tracking-wide text-center">
-                  🎯<br />ТЕХНИКА (точность паса, контроль шайбы)
+                  <CharacteristicIcon characteristic="ratingTechnique" size={24} className="inline-block" />
+                  <br />ТЕХНИКА (точность паса, контроль шайбы)
                 </div>
                 <div className="h-11 px-4 py-3 bg-gray-400/20 rounded-[32px] flex justify-center items-center">
                   <div className="text-slate-50 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
@@ -233,7 +239,8 @@ export default function CharacteristicsOnboardingPage() {
             <div className="p-4 bg-zinc-950/20 rounded-3xl">
               <div className="flex flex-col items-center gap-4">
                 <div className="self-stretch text-slate-50 text-xs font-bold font-['Overpass'] uppercase leading-4 tracking-wide text-center">
-                  🐈<br />ГИБКОСТЬ (пластичность, устойчивость, маневренность)
+                  <CharacteristicIcon characteristic="ratingFlexibility" size={24} className="inline-block" />
+                  <br />ГИБКОСТЬ (пластичность, устойчивость, маневренность)
                 </div>
                 <div className="h-11 px-4 py-3 bg-gray-400/20 rounded-[32px] flex justify-center items-center">
                   <div className="text-slate-50 text-sm font-bold font-['Overpass'] uppercase leading-4 tracking-wide">
@@ -420,9 +427,9 @@ export default function CharacteristicsOnboardingPage() {
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="w-80 px-4 py-6 bg-indigo-500 rounded-2xl inline-flex flex-col justify-start items-center gap-4">
-            {/* Эмодзи медали */}
-            <div className="text-center justify-start text-black text-2xl font-bold font-['Overpass'] leading-6">
-              🥇
+            {/* Медаль */}
+            <div className="flex justify-center text-black">
+              <Medal size={28} />
             </div>
 
             {/* Текст */}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { X, WifiOff } from 'lucide-react';
 import { getAllOfflineVideos, isVideoDownloaded } from '@/lib/offlineVideos';
 
 /**
@@ -79,12 +80,13 @@ export default function OfflineHandler() {
           type="button"
           onClick={() => setDismissed(true)}
           aria-label="Закрыть"
-          className="absolute top-1/2 right-3 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-white text-lg font-bold leading-none"
+          className="absolute top-1/2 right-3 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-white leading-none"
         >
-          ✕
+          <X size={20} aria-hidden />
         </button>
-        <p className="text-sm font-semibold">
-          📡 Нет подключения к интернету
+        <p className="text-sm font-semibold flex items-center justify-center gap-2">
+          <WifiOff size={20} aria-hidden />
+          Нет подключения к интернету
         </p>
         <p className="text-xs mt-1">
           Скачайте видео для просмотра офлайн

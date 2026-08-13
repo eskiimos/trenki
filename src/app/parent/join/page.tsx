@@ -7,6 +7,7 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Frown } from 'lucide-react';
 import { Button } from '@/components/ui';
 
 const JOIN_CODE_STORAGE_KEY = 'trenki_parent_join_code';
@@ -76,7 +77,7 @@ function ParentJoinInner() {
     return (
       <div className="min-h-screen bg-night flex flex-col items-center justify-center px-6">
         <div className="w-full max-w-md bg-surface rounded-2xl p-8 text-center">
-          <div className="text-4xl mb-4" aria-hidden>😕</div>
+          <Frown size={40} className="text-muted mx-auto mb-4" aria-hidden />
           <h1 className="text-white text-xl font-bold mb-3">Не получилось</h1>
           <p className="text-muted text-sm mb-6">{error}</p>
           <Button variant="primary" fullWidth onClick={() => router.replace('/')}>

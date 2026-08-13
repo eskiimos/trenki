@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
+import { Check, RotateCcw, X } from 'lucide-react';
 import PickerFilterChips from '@/components/coach/PickerFilterChips';
 
 export interface PickerVideo {
@@ -216,14 +217,16 @@ export default function VideoSlotPicker({ slotLabel, value, options, onChange, a
                   background: 'transparent',
                   color: '#AEABBB',
                   border: 'none',
-                  fontSize: 22,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   cursor: 'pointer',
                   padding: '0 4px',
                   lineHeight: 1,
                 }}
                 aria-label="Закрыть"
               >
-                ✕
+                <X size={20} aria-hidden />
               </button>
             </div>
 
@@ -398,7 +401,10 @@ export default function VideoSlotPicker({ slotLabel, value, options, onChange, a
                                 color: badge.tone === 'done' ? '#A1FF4A' : '#9FB2FF',
                               }}
                             >
-                              {badge.tone === 'done' ? '✓' : '↺'} {badge.text}
+                              {badge.tone === 'done'
+                                ? <Check size={12} aria-hidden />
+                                : <RotateCcw size={12} aria-hidden />}
+                              {badge.text}
                             </div>
                           )}
                         </div>
