@@ -182,12 +182,15 @@ export async function POST(request: NextRequest) {
     // lgn — момент реального входа по коду. От него считается абсолютный
     // дедлайн доступа, в том числе для сессий, полученных переключением.
     const lgn = Math.floor(Date.now() / 1000);
-    // Админская сессия живёт КОРОТКО (рабочий день): именно «забытая» на общем
-    // устройстве админ-сессия — главный риск, 30 дней означали бы месяц доступа
-    // к админке для любого, кто сядет за это устройство.
-    const sessionTtl = user.isAdmin ? ADMIN_TTL_SECONDS : undefined;
-    const token = await signSession({ uid: user.id, role: user.role, lgn }, sessionTtl);
-    setSessionCookie(response, token, sessionSecondsLeft(lgn, new Date(), sessionTtl));
+    // Срок сессии одинаковый для всех, включая админов (решение владельца).
+    // ВАЖНО знать про остаточный риск: requireAdminAsync/hasAdminAccessRSC
+    // пускают в админку не только по отзываемому admin_token, но и по обычной
+    // сессии с user.isAdmin. Сессия — stateless JWT без серверного отзыва,
+    // значит забытая на чужом устройстве админская сессия открывает админку до
+    // конца своего срока. Правильное лечение — требовать для /admin именно
+    // admin_token (логин+пароль), а не укорачивать сессию всем админам.
+    const token = await signSession({ uid: user.id, role: user.role, lgn });
+    setSessionCookie(response, token);
 
     // ─── Мульти-аккаунт ─────────────────────────────────────────────────
     // Фича нужна ТОЛЬКО админам приложения (переключение между админ-аккаунтом
