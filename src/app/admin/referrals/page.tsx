@@ -371,7 +371,12 @@ export default function AdminReferralsPage() {
                   {c.isActive ? 'выключить' : 'включить'}
                 </AdminButton>
 
-                <span className="inline-flex items-center gap-2 ml-auto" style={{ fontSize: 12 }}>
+                {/* Триал — отдельная переносимая группа: на узком экране она
+                    уходит на свою строку целиком и ничего не выпихивает за край. */}
+                <span
+                  className="inline-flex flex-wrap items-center gap-2 sm:ml-auto"
+                  style={{ fontSize: 12 }}
+                >
                   <span style={{ color: 'var(--color-muted)' }}>триал</span>
                   <input type="number" min={0} max={365}
                     aria-label={`Пробный период по коду ${c.code}, дней`}
@@ -379,24 +384,27 @@ export default function AdminReferralsPage() {
                     onChange={(e) => setTrialEdit((m) => ({ ...m, [c.id]: e.target.value }))}
                     style={{ ...smallInput, width: 72 }} />
                   <span style={{ color: 'var(--color-muted)' }}>дн.</span>
-                  {/* Место под кнопку зарезервировано, чтобы строка не дёргалась */}
-                  <span style={{ minWidth: 132, display: 'inline-flex' }}>
+                  {/* Место под кнопку резервируем только на широком экране (чтобы
+                      строка не дёргалась); на мобиле резерв выталкивал «удалить». */}
+                  <span className="inline-flex sm:min-w-33">
                     {trialEdit[c.id] !== undefined && trialEdit[c.id] !== String(c.trialDays) && (
                       <AdminButton size="sm" icon={Check} onClick={() => saveTrial(c)} disabled={busy}>
                         сохранить
                       </AdminButton>
                     )}
                   </span>
-                  <AdminButton
-                    size="sm"
-                    tone="danger"
-                    icon={Trash2}
-                    onClick={() => remove(c)}
-                    disabled={busy}
-                  >
-                    удалить
-                  </AdminButton>
                 </span>
+
+                {/* Деструктивное действие — самостоятельный элемент ряда */}
+                <AdminButton
+                  size="sm"
+                  tone="danger"
+                  icon={Trash2}
+                  onClick={() => remove(c)}
+                  disabled={busy}
+                >
+                  удалить
+                </AdminButton>
               </div>
 
               {expanded === c.id && (
