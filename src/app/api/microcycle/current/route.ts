@@ -83,6 +83,10 @@ export async function GET(request: NextRequest) {
     microcycle.cycleNumber,
   );
   const goalByDay = new Map(plans.map((p) => [p.dayOfWeek, GOAL_LABELS[p.goal]?.label ?? null]));
+  // Ключ цели (POWERFUL_SHOT, AGILITY, …) — чтобы клиент рисовал СВОЮ иконку на
+  // каждую цель (GOAL_ICONS в @/components/training/icons). Раньше отдавалась
+  // только подпись, и календарь был вынужден ставить одну иконку на все цели.
+  const goalKeyByDay = new Map(plans.map((p) => [p.dayOfWeek, p.goal ?? null]));
 
   return NextResponse.json({
     microcycle: {
@@ -98,7 +102,8 @@ export async function GET(request: NextRequest) {
       days: microcycle.days.map((d) => ({
         dayOfWeek: d.dayOfWeek,
         intent: d.intent,
-        goal: goalByDay.get(d.dayOfWeek) ?? null, // направленность/цель дня
+        goal: goalByDay.get(d.dayOfWeek) ?? null, // направленность/цель дня (подпись)
+        goalKey: goalKeyByDay.get(d.dayOfWeek) ?? null, // ключ цели — для иконки
         // Модули тренировки дня с превью (id/название/картинка/длительность) —
         // чтобы календарь рисовал карточки, как в /video, а не голый список.
         modules:

@@ -838,7 +838,15 @@ const TrainingsSection = () => {
         setGeneratingCycle(true);
         const startedAt = Date.now();
         try {
-            const res = await fetch('/api/microcycle/generate', { method: 'POST' });
+            // Шлём СВОЮ локальную дату: сервер иначе возьмёт свой UTC-день и после
+            // 21:00 МСК стартует неделю со вчера.
+            const now = new Date();
+            const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const res = await fetch('/api/microcycle/generate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ localDate }),
+            });
             // 402 (напр. режим включили между загрузкой и тапом) → показать подписку.
             if (await handlePaywallResponse(res, 'microcycle')) { setGeneratingCycle(false); return; }
             if (!res.ok) {

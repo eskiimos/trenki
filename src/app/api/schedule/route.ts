@@ -13,13 +13,24 @@ export async function GET(req: NextRequest) {
     const year = searchParams.get('year');
 
     let dateFilter = {};
-    if (month && year) {
-      const startDate = new Date(parseInt(year), parseInt(month), 1);
-      const endDate = new Date(parseInt(year), parseInt(month) + 1, 0);
+    const monthNum = month === null ? NaN : parseInt(month, 10);
+    const yearNum = year === null ? NaN : parseInt(year, 10);
+    if (Number.isInteger(monthNum) && Number.isInteger(yearNum) && monthNum >= 0 && monthNum <= 11) {
+      // Окно — ПОЛУИНТЕРВАЛ [первое число месяца − 1 день; первое число следующего + 1 день).
+      //
+      // Было `lte: new Date(y, m+1, 0)` — это последний день в 00:00, поэтому
+      // тренировка, назначенная на последний день месяца на любое время кроме
+      // полуночи, в календарь не попадала вовсе.
+      //
+      // Запас в сутки с обеих сторон — на расхождение таймзоны сервера и
+      // устройства: клиент всё равно раскладывает записи по дням через isSameDay
+      // в локальном времени, лишние сутки он просто не покажет.
+      const startDate = new Date(yearNum, monthNum, 0); // = последний день предыдущего месяца, 00:00
+      const endDate = new Date(yearNum, monthNum + 1, 2); // = 2-е число следующего месяца, 00:00
       dateFilter = {
         date: {
           gte: startDate,
-          lte: endDate,
+          lt: endDate,
         },
       };
     }

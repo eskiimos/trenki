@@ -51,11 +51,29 @@ export async function POST(request: NextRequest) {
     ]);
   }
 
-  // Старт — сегодня (00:00 UTC). Структуру недели со старта посреди недели
-  // движок собирает по методичке «старт с любого дня».
-  const result = await generateMicrocycleForUser(userId, {
-    startDate: getMicrocycleStartDate(new Date()),
-  });
+  // Старт — сегодня. Сервер знает только свой UTC-день, поэтому клиент присылает
+  // СВОЮ локальную дату: для МСК после 21:00 UTC-день уже вчерашний, и неделя
+  // стартовала бы «вчера» — первый день цикла оказывался бы просроченным.
+  // Без localDate (старый клиент, cron) поведение прежнее.
+  const serverStart = getMicrocycleStartDate(new Date());
+  let startDate = serverStart;
+  const body = await request.json().catch(() => null);
+  const local = (body as { localDate?: unknown } | null)?.localDate;
+  if (typeof local === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(local)) {
+    const [y, m, d] = local.split('-').map(Number);
+    const candidate = new Date(Date.UTC(y, m - 1, d));
+    // Доверяем только правдоподобной дате: расхождение таймзон не превышает
+    // суток с небольшим (UTC-12…UTC+14). Иначе подкрученные часы на устройстве
+    // позволили бы создать цикл с произвольной датой старта.
+    const diffDays = Math.abs(candidate.getTime() - serverStart.getTime()) / 86_400_000;
+    if (!Number.isNaN(candidate.getTime()) && diffDays <= 2) {
+      startDate = candidate;
+    }
+  }
+
+  // Структуру недели со старта посреди недели движок собирает по методичке
+  // «старт с любого дня».
+  const result = await generateMicrocycleForUser(userId, { startDate });
 
   if (result.status === 'NO_PROFILE') {
     return NextResponse.json(

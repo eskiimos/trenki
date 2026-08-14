@@ -11,7 +11,7 @@ import {
 import BottomNavigation from '@/components/BottomNavigation';
 import SwipeableWorkoutItem from '@/components/SwipeableWorkoutItem';
 import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay';
-import { EnergyIcon } from '@/components/training/icons';
+import { EnergyIcon, GoalIcon } from '@/components/training/icons';
 
 interface ScheduledWorkout {
   id: string;
@@ -48,7 +48,8 @@ type MicrocycleIntent = 'IN_TONE' | 'WARMUP' | 'CHARGED' | 'STRETCH' | 'TIRED';
 interface MicrocycleDay {
   dayOfWeek: number; // порядковый день цикла 1..N от weekStartDate (НЕ календарный)
   intent: MicrocycleIntent;
-  goal: string | null; // направленность/цель дня
+  goal: string | null; // направленность/цель дня (подпись)
+  goalKey?: string | null; // ключ цели (POWERFUL_SHOT, AGILITY, …) — для иконки
   modules: {
     id: string;
     title: string;
@@ -157,7 +158,15 @@ export default function CalendarPage() {
     setGeneratingCycle(true);
     const startedAt = Date.now();
     try {
-      const res = await fetch('/api/microcycle/generate', { method: 'POST' });
+      // Шлём СВОЮ локальную дату: сервер иначе возьмёт свой UTC-день и после
+      // 21:00 МСК стартует неделю со вчера.
+      const now = new Date();
+      const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const res = await fetch('/api/microcycle/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ localDate }),
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data?.error || 'Не удалось собрать неделю');
@@ -799,7 +808,13 @@ export default function CalendarPage() {
                     </div>
                     {d.goal && (
                       <div className="text-[#A1FF4A] text-xs font-bold mt-1 flex items-center gap-1.5">
-                        <Target size={16} className="shrink-0" />
+                        {/* Своя иконка на каждую цель; Target — фолбэк для
+                            старого ответа API без goalKey. */}
+                        {d.goalKey ? (
+                          <GoalIcon goal={d.goalKey} size={16} className="shrink-0" />
+                        ) : (
+                          <Target size={16} className="shrink-0" />
+                        )}
                         <span className="min-w-0">{d.goal}</span>
                       </div>
                     )}
