@@ -407,7 +407,7 @@ export default function ParentPage() {
             <Users size={40} className="text-muted mx-auto mb-4" aria-hidden />
             <h2 className="text-white text-lg font-bold mb-2">Пока нет привязанных детей</h2>
             <p className="text-muted text-sm leading-relaxed">
-              Попроси ребёнка открыть Профиль → шестерёнка в шапке → «Близкие» → «Родителям»
+              Попроси ребёнка открыть Профиль → внизу «Настройки» → «Близкие» → «Родителям»
               и прислать тебе ссылку-приглашение.
             </p>
           </div>

@@ -159,24 +159,13 @@ const ProfilePage = () => {
           </h1>
         </div>
 
-        <div className="flex items-center gap-4 shrink-0">
-          <Link
-            href="/profile/edit"
-            aria-label="Редактировать профиль"
-            className="inline-flex hover:opacity-80 transition-opacity"
-          >
-            <Image src="/icons/icon-edit.svg" alt="" width={24} height={24} />
-          </Link>
-          {/* Настройки: всё, что не про прогресс — уведомления, родители,
-              команда, помощь, выход, админка */}
-          <Link
-            href="/profile/settings"
-            aria-label="Настройки"
-            className="inline-flex text-white hover:opacity-80 transition-opacity"
-          >
-            <Settings size={24} aria-hidden />
-          </Link>
-        </div>
+        <Link
+          href="/profile/edit"
+          aria-label="Редактировать профиль"
+          className="inline-flex shrink-0 hover:opacity-80 transition-opacity"
+        >
+          <Image src="/icons/icon-edit.svg" alt="" width={24} height={24} />
+        </Link>
       </div>
 
       {/* Основной контент */}
@@ -421,9 +410,17 @@ const ProfilePage = () => {
           <NavRow href="/profile/assignments" icon={ClipboardList} label="Задания от тренера" />
         </SettingsGroup>
 
-        {/* Настройки, помощь, аккаунт и админ-инструменты переехали на
-            /profile/settings (шестерёнка в шапке) — профиль остаётся витриной
-            прогресса. */}
+        {/* Вход в настройки — последним блоком страницы, отдельной карточкой:
+            в шапке шестерёнку не замечали. Подпись перечисляет содержимое,
+            чтобы не приходилось угадывать, что внутри. */}
+        <SettingsGroup>
+          <NavRow
+            href="/profile/settings"
+            icon={Settings}
+            label="Настройки"
+            hint="Уведомления, родителям, команда, помощь, выход"
+          />
+        </SettingsGroup>
       </div>
 
       {/* Тапбар */}
