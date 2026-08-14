@@ -152,7 +152,7 @@ const WatchHistoryPage = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#101530] pb-20">
+      <div className="min-h-screen bg-surface pb-nav">
         {/* Header */}
         <header className="flex items-center justify-between p-4 bg-[#101530]" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
           <div className="flex items-center space-x-2">
@@ -176,7 +176,7 @@ const WatchHistoryPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#101530] pb-20">
+    <div className="min-h-screen bg-surface pb-nav">
       {/* Header */}
       <header className="flex items-center justify-between p-4 bg-[#101530]" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
         <div className="flex items-center space-x-2">

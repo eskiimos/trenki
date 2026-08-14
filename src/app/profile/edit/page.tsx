@@ -389,7 +389,7 @@ const ProfileEditPage = () => {
   }
 
   return (
-    <div className="bg-[#101530] min-h-screen text-white pb-24">
+    <div className="bg-surface min-h-screen text-white pb-nav">
       {/* Кроппер логотипа — полноэкранный оверлей */}
       {cropImageSrc && (
         <ImageCropper

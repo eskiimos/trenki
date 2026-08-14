@@ -11,17 +11,12 @@ import ParentInviteSection from '@/components/ParentInviteSection';
 
 const ProfileParentsPage = () => {
   return (
-    <div
-      className="min-h-screen bg-[#101530] text-white"
-      // Тапбар фиксированный: отступ снизу = safe-area + 96px (правило проекта)
-      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)' }}
-    >
+    // Тапбар фиксированный: клиренс снизу — .pb-nav (safe-area + 96, правило проекта)
+    <div className="min-h-screen bg-surface text-white pb-nav">
       {/* Шапка */}
-      <div
-        className="flex items-center gap-4 p-4 max-w-3xl md:mx-auto md:px-8"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
-      >
-        <Link href="/profile" aria-label="Назад в профиль">
+      <div className="flex items-center gap-4 p-4 safe-top max-w-3xl md:mx-auto md:px-8">
+        {/* Вход сюда — из «Настроек», туда же и возвращаем */}
+        <Link href="/profile/settings" aria-label="Назад в настройки" className="inline-flex">
           <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
         </Link>
         <h1 className="text-white text-xs font-bold font-overpass uppercase tracking-[0.5px]">
