@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
-  ChevronLeft, ChevronRight, Plus, RefreshCw,
+  ChevronLeft, ChevronRight, Plus, RefreshCw, AlertTriangle, CalendarDays,
   Zap, BatteryFull, Target, PersonStanding, Dumbbell,
 } from 'lucide-react';
 import BottomNavigation from '@/components/BottomNavigation';
@@ -92,6 +92,16 @@ export default function CalendarPage() {
   const [coachAssignments, setCoachAssignments] = useState<CoachAssignment[]>([]);
   const [microcycle, setMicrocycle] = useState<ActiveMicrocycle | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  /** Сбой загрузки — раньше любая ошибка выглядела как «у тебя ничего не запланировано». */
+  const [loadError, setLoadError] = useState<string | null>(null);
+  /**
+   * Успел ли ответить /api/microcycle/current. Отдельно от `microcycle === null`,
+   * потому что null означает и «цикла нет», и «запрос упал», а кнопка «Собрать
+   * неделю» на бэке ПЕРЕСОБИРАЕТ существующий план — показывать её по ошибке нельзя.
+   */
+  const [cycleLoaded, setCycleLoaded] = useState(false);
+  /** Защита от гонки: ответ устаревшего месяца не должен перезаписывать актуальный. */
+  const reqIdRef = useRef(0);
   const [generatingCycle, setGeneratingCycle] = useState(false);
   const [cycleError, setCycleError] = useState<string | null>(null);
   // Пересборка дня «раскисление» под выбранную часть тела (низ/верх/всё).
@@ -117,6 +127,7 @@ export default function CalendarPage() {
         setStretchRebuilding(false);
         return;
       }
+      setStretchRebuilding(false);
       router.push(`/training/workout?id=${sessionId}`);
     } catch {
       setStretchError('Ошибка сети');
@@ -164,7 +175,9 @@ export default function CalendarPage() {
   };
 
   const fetchCalendar = async () => {
+    const myId = ++reqIdRef.current;
     setIsLoading(true);
+    setLoadError(null);
     try {
       const month = currentDate.getMonth();
       const year = currentDate.getFullYear();
@@ -174,9 +187,13 @@ export default function CalendarPage() {
         fetch('/api/assignments?role=athlete'),
         fetch('/api/microcycle/current'),
       ]);
+      // Быстро перелистали месяцы — ответ устарел, применять его нельзя.
+      if (reqIdRef.current !== myId) return;
 
       if (scheduleRes.ok) {
         setScheduledWorkouts(await scheduleRes.json());
+      } else {
+        setLoadError('Не удалось загрузить расписание');
       }
       if (assignmentsRes.ok) {
         const data = await assignmentsRes.json();
@@ -185,20 +202,36 @@ export default function CalendarPage() {
       if (microcycleRes.ok) {
         const data = await microcycleRes.json();
         setMicrocycle(data.microcycle);
+        setCycleLoaded(true);
+      } else {
+        // Не выставляем cycleLoaded: иначе покажем «Собрать неделю» и юзер
+        // случайно перезапишет существующий план.
+        setLoadError('Не удалось загрузить недельный план');
       }
     } catch (error) {
       console.error('Error fetching calendar:', error);
+      if (reqIdRef.current === myId) setLoadError('Нет связи с сервером');
     } finally {
-      setIsLoading(false);
+      if (reqIdRef.current === myId) setIsLoading(false);
     }
   };
 
+  /** При смене месяца двигаем и выбранный день — иначе внизу остаётся «Сегодня,
+   *  14 августа», пока пользователь смотрит сентябрь. */
+  const goToMonth = (next: Date) => {
+    setCurrentDate(next);
+    const today = new Date();
+    const sameMonth =
+      today.getMonth() === next.getMonth() && today.getFullYear() === next.getFullYear();
+    setSelectedDate(sameMonth ? today : new Date(next.getFullYear(), next.getMonth(), 1));
+  };
+
   const handlePrevMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    goToMonth(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
   };
 
   const handleNextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    goToMonth(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
   };
 
   const handleDateClick = (date: Date) => {
@@ -303,7 +336,7 @@ export default function CalendarPage() {
     
     // Empty cells for previous month
     for (let i = 0; i < startDay; i++) {
-      days.push(<div key={`empty-${i}`} className="h-10 w-10" />);
+      days.push(<div key={`empty-${i}`} className="w-full aspect-square" />);
     }
 
     const today = new Date();
@@ -332,24 +365,41 @@ export default function CalendarPage() {
         <button
           key={i}
           onClick={() => handleDateClick(date)}
-          className={`h-10 w-10 flex flex-col items-center justify-center rounded-full relative text-sm font-medium transition-colors
-            ${isSelected
-              ? 'bg-[#445CFF] text-white'
-              : isToday
-                ? 'text-white'
-                : 'text-white hover:bg-white/10'
-            }
+          aria-current={isToday ? 'date' : undefined}
+          aria-pressed={isSelected}
+          aria-label={
+            `${i} ${monthNamesGenitive[month]}` +
+            (isToday ? ', сегодня' : '') +
+            (isDone ? ', выполнено' : isMissed ? ', пропущено' : hasWorkouts ? ', запланировано' : '')
+          }
+          // Ширина тянется по треку сетки: фиксированные 40px не помещались на
+          // экранах 320-360px (7×40 + гэпы > доступной ширины) и кружки налезали
+          // друг на друга.
+          className={`w-full max-w-10 aspect-square mx-auto flex flex-col items-center justify-center rounded-full relative text-sm transition-colors
+            focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#A1FF4A]
+            ${isSelected ? 'bg-[#445CFF] text-white' : 'text-white hover:bg-white/10'}
+            ${hasWorkouts ? 'font-bold' : 'font-medium'}
           `}
           style={isToday && !isSelected ? {
-            background: 'linear-gradient(180deg, rgba(87, 108, 255, 0) 0%, rgba(87, 108, 255, 0.5) 100%)'
+            background: 'linear-gradient(180deg, rgba(68, 92, 255, 0) 0%, rgba(68, 92, 255, 0.5) 100%)'
           } : {}}
         >
+          {/* Число рисуем ОДИН раз. Раньше поверх белой цифры клался цветной
+              дубль — из-под него торчал белый край, а скринридер читал «14 14».
+              Синяя цифра на синей подложке ещё и не проходила по контрасту,
+              поэтому статус несёт только точка снизу. */}
           {i}
-          {hasWorkouts && !isSelected && !isToday && (
-             <span className="absolute inset-0 flex items-center justify-center font-bold" style={{ color: markColor }}>{i}</span>
-          )}
-          {hasWorkouts && !isSelected && (!isToday || isDone) && (
-            <span className="absolute bottom-1 w-1 h-1 rounded-full" style={{ background: markColor }}></span>
+          {hasWorkouts && !isSelected && (
+            <span
+              className="absolute bottom-1 w-1.5 h-1.5 rounded-full"
+              style={
+                isDone
+                  ? { background: markColor }                                  // выполнено — залитая
+                  : isMissed
+                    ? { background: markColor, opacity: 0.5, transform: 'scale(0.75)' } // пропущено — тусклая
+                    : { border: `1.5px solid ${markColor}` }                   // запланировано — контур
+              }
+            />
           )}
         </button>
       );
@@ -427,24 +477,28 @@ export default function CalendarPage() {
 
   return (
     <div
-      className="min-h-screen"
+      // .pb-nav — единый клиренс над таб-баром (safe-area + высота бара);
+      // раньше здесь был свой calc(+128), разъезжавшийся с остальными экранами.
+      className="min-h-screen pb-nav"
       style={{
         background: 'linear-gradient(182.77deg, #101530 69.24%, #060919 97.69%)',
-        // Нижний отступ = высота фиксированного тапбара + safe-area (home-indicator)
-        // + запас, иначе последние карточки прячутся под тапбаром и страница не
-        // всегда доскролливается до конца.
-        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 128px)',
       }}
     >
       {/* Header */}
-      <header className="flex items-center p-4" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
-        <button onClick={() => router.back()} className="mr-4 text-white/60 hover:text-white">
-          <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
+      <header className="flex items-center px-4 pb-4 safe-top">
+        {/* Тач-таргет 44×44: сама иконка 24, но кликать надо было ровно в неё.
+            Цветовые классы не работали (SVG-файл не наследует currentColor) —
+            отклик даём прозрачностью. */}
+        <button
+          onClick={() => router.back()}
+          aria-label="Назад"
+          className="-ml-3 mr-1 w-11 h-11 flex items-center justify-center opacity-60 hover:opacity-100 transition-opacity"
+        >
+          <Image src="/icons/icon-action-back.svg" alt="" width={24} height={24} aria-hidden />
         </button>
         <h1 
           className="text-white uppercase"
           style={{
-            fontFamily: 'Overpass',
             fontWeight: 700,
             fontSize: '12px',
             lineHeight: '120%',
@@ -458,12 +512,38 @@ export default function CalendarPage() {
       </header>
 
       <div className="px-4">
+        {/* Сбой загрузки. Раньше 401/500/обрыв сети выглядели одинаково —
+            пустой календарь и «нет запланированных тренировок». */}
+        {loadError && (
+          <div
+            role="alert"
+            className="flex items-center gap-2 mb-4 rounded-2xl px-4 py-3"
+            style={{
+              background: 'rgba(255,140,74,0.10)',
+              border: '1px solid rgba(255,140,74,0.30)',
+              color: '#FF8C4A',
+              fontSize: 13,
+            }}
+          >
+            <AlertTriangle size={20} className="shrink-0" aria-hidden />
+            <span className="flex-1 min-w-0">{loadError}</span>
+            <button
+              type="button"
+              onClick={fetchCalendar}
+              className="shrink-0 underline"
+              style={{ fontWeight: 700 }}
+            >
+              Повторить
+            </button>
+          </div>
+        )}
+
         {/* Большая кнопка сборки недели — ТОЛЬКО когда микроцикла ещё нет
             (пустое состояние + точка входа + якорь онбординг-тура). Когда неделя
             собрана, пересборка живёт компактной ссылкой внутри календаря ниже —
             большую кнопку сверху не показываем, чтобы не провоцировать случайную
             замену всего плана. */}
-        {!microcycle && (
+        {cycleLoaded && !microcycle && (
           <button
             type="button"
             data-tour="microcycle-button"
@@ -497,8 +577,7 @@ export default function CalendarPage() {
                 style={{
                   color: '#A1FF4A',
                   fontSize: 11,
-                  fontFamily: 'Overpass',
-                  fontWeight: 800,
+                        fontWeight: 800,
                   textTransform: 'uppercase',
                   letterSpacing: 0.5,
                   marginBottom: 2,
@@ -514,7 +593,7 @@ export default function CalendarPage() {
           </button>
         )}
         {cycleError && (
-          <div className="text-[#FF8C4A] text-xs text-center mb-3 font-medium">{cycleError}</div>
+          <div role="alert" className="text-[#FF8C4A] text-xs text-center mb-4 font-medium">{cycleError}</div>
         )}
 
         {/* Calendar Widget */}
@@ -536,15 +615,16 @@ export default function CalendarPage() {
                     style={{
                       color: '#A1FF4A',
                       fontSize: 10,
-                      fontFamily: 'Overpass',
-                      fontWeight: 800,
+                                fontWeight: 800,
                       textTransform: 'uppercase',
                       letterSpacing: 0.5,
                     }}
                   >
                     {microcycle.cycleNumber === 1 ? 'Первый микроцикл' : `Микроцикл №${microcycle.cycleNumber}`}
                   </span>
-                  <span className="text-[#AEABBB] text-[11px]"> · {getCycleRangeLabel()}</span>
+                  {getCycleRangeLabel() && (
+                    <span className="text-[#AEABBB] text-[11px]"> · {getCycleRangeLabel()}</span>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -558,11 +638,14 @@ export default function CalendarPage() {
                     background: 'rgba(161, 255, 74, 0.12)',
                     border: '1px solid rgba(161, 255, 74, 0.3)',
                     borderRadius: 999,
-                    padding: '5px 10px',
+                    padding: '8px 12px',
+                    minHeight: 40,
+                    display: 'inline-flex',
+                    alignItems: 'center',
                     cursor: generatingCycle ? 'wait' : 'pointer',
                   }}
                 >
-                  <RefreshCw size={12} />
+                  <RefreshCw size={16} />
                   пересобрать
                 </button>
               </div>
@@ -570,13 +653,13 @@ export default function CalendarPage() {
 
             {/* Month Navigation */}
             <div className="flex items-center justify-between mb-6 text-white">
-              <button onClick={handlePrevMonth} className="p-2 hover:bg-white/10 rounded-full">
+              <button onClick={handlePrevMonth} aria-label="Предыдущий месяц" className="w-11 h-11 flex items-center justify-center hover:bg-white/10 rounded-full">
                 <ChevronLeft size={24} />
               </button>
-              <span className="text-[14px] font-bold uppercase tracking-widest">
+              <h2 aria-live="polite" className="text-sm font-bold uppercase tracking-widest">
                 {monthNames[currentDate.getMonth()]}, {currentDate.getFullYear()}
-              </span>
-              <button onClick={handleNextMonth} className="p-2 hover:bg-white/10 rounded-full">
+              </h2>
+              <button onClick={handleNextMonth} aria-label="Следующий месяц" className="w-11 h-11 flex items-center justify-center hover:bg-white/10 rounded-full">
                 <ChevronRight size={24} />
               </button>
             </div>
@@ -584,14 +667,14 @@ export default function CalendarPage() {
             {/* Days of Week */}
             <div className="grid grid-cols-7 gap-1 mb-4 text-center">
               {['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'].map(day => (
-                <div key={day} className="text-[#AEABBB] text-[14px] font-bold italic">
+                <div key={day} className="text-[#AEABBB] text-sm font-bold">
                   {day}
                 </div>
               ))}
             </div>
 
             {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-1 place-items-center">
+            <div className="grid grid-cols-7 gap-1">
               {renderCalendar()}
             </div>
 
@@ -601,10 +684,10 @@ export default function CalendarPage() {
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#A1FF4A' }}></span>выполнено
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#445CFF' }}></span>запланировано
+                <span className="w-1.5 h-1.5 rounded-full" style={{ border: '1.5px solid #445CFF' }}></span>запланировано
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#AEABBB' }}></span>пропущено
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#AEABBB', opacity: 0.5, transform: 'scale(0.75)' }}></span>пропущено
               </span>
             </div>
           </div>
@@ -617,16 +700,30 @@ export default function CalendarPage() {
           </h2>
           <Link 
             href="/video" 
-            className="flex items-center gap-2 bg-[#2A3045] rounded-full px-4 py-2 hover:bg-[#353c57] transition-colors"
+            className="flex items-center gap-2 rounded-full px-4 py-3 transition-colors hover:brightness-125"
+            style={{ background: 'var(--color-surface)', border: '1px solid var(--border-hairline)' }}
           >
             <span className="text-[#AEABBB] text-xs font-medium">Добавить видео</span>
-            <div className="w-5 h-5 bg-[#445CFF] rounded-full flex items-center justify-center">
-              <Plus size={12} className="text-white" />
+            <div className="w-6 h-6 bg-[#445CFF] rounded-full flex items-center justify-center">
+              <Plus size={16} className="text-white" />
             </div>
           </Link>
         </div>
 
         {/* Workouts List */}
+        {isLoading ? (
+          // Раньше `isLoading` не использовался в разметке вообще: пока летели три
+          // запроса, пользователь видел «Нет запланированных тренировок».
+          <div className="space-y-4" aria-busy="true">
+            {[0, 1].map((i) => (
+              <div
+                key={i}
+                className="animate-pulse rounded-2xl"
+                style={{ height: 96, background: 'var(--color-surface)' }}
+              />
+            ))}
+          </div>
+        ) : (
         <div className="space-y-4">
           {/* Карточка дня микроцикла — отрисуется первой, если день есть */}
           {selectedMicrocycleDay && (() => {
@@ -647,8 +744,7 @@ export default function CalendarPage() {
                       style={{
                         color: '#AEABBB',
                         fontSize: 11,
-                        fontFamily: 'Overpass',
-                        fontWeight: 700,
+                                    fontWeight: 700,
                         textTransform: 'uppercase',
                         letterSpacing: 0.5,
                         marginBottom: 6,
@@ -690,8 +786,7 @@ export default function CalendarPage() {
                       style={{
                         color: '#A1FF4A',
                         fontSize: 11,
-                        fontFamily: 'Overpass',
-                        fontWeight: 700,
+                                    fontWeight: 700,
                         textTransform: 'uppercase',
                         letterSpacing: 0.5,
                         marginBottom: 6,
@@ -794,7 +889,8 @@ export default function CalendarPage() {
                           color: '#A1FF4A',
                           border: '1px solid var(--border-lime)',
                           borderRadius: 999,
-                          padding: '8px 6px',
+                          padding: '12px 8px',
+                          minHeight: 44,
                           fontSize: 11,
                           fontWeight: 800,
                           textTransform: 'uppercase',
@@ -808,7 +904,7 @@ export default function CalendarPage() {
                     ))}
                   </div>
                   {stretchError && (
-                    <div style={{ color: '#FF8C4A', fontSize: 11, marginTop: 6 }}>{stretchError}</div>
+                    <div role="alert" style={{ color: '#FF8C4A', fontSize: 12, marginTop: 8 }}>{stretchError}</div>
                   )}
                 </div>
               )}
@@ -848,8 +944,7 @@ export default function CalendarPage() {
                       style={{
                         color: '#A1FF4A',
                         fontSize: 11,
-                        fontFamily: 'Overpass',
-                        fontWeight: 700,
+                                    fontWeight: 700,
                         textTransform: 'uppercase',
                         letterSpacing: 0.5,
                         marginBottom: 6,
@@ -880,11 +975,13 @@ export default function CalendarPage() {
           ))}
 
           {!hasAnythingForSelected && (
-            <div className="text-[#AEABBB] text-sm text-center py-8">
-              Нет запланированных тренировок
+            <div className="flex flex-col items-center text-center" style={{ padding: '32px 16px' }}>
+              <CalendarDays size={24} style={{ color: 'var(--color-muted)', marginBottom: 12 }} aria-hidden />
+              <div className="text-[#AEABBB] text-sm">Нет запланированных тренировок</div>
             </div>
           )}
         </div>
+        )}
       </div>
 
       <BottomNavigation activeTab="calendar" />
