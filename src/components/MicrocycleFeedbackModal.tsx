@@ -102,8 +102,11 @@ export default function MicrocycleFeedbackModal({
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fadeIn"
       // Намеренно не закрываем по клику на backdrop — это важный опрос.
     >
+      {/* Шторка ограничена высотой экрана и прокручивается внутри: на коротких
+          и узких экранах (cover-экран Galaxy Fold) опрос не влезал, верх
+          обрезался, а пролистнуть было нельзя — ответить становилось нечем. */}
       <div
-        className="bg-[#101530] w-full rounded-t-3xl animate-slideUp"
+        className="bg-[#101530] w-full rounded-t-3xl animate-slideUp max-h-dvh overflow-y-auto overscroll-contain"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 32px)' }}
       >
         <div className="px-6 pt-6 pb-2 flex justify-between items-start">
