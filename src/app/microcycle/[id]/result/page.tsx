@@ -57,6 +57,8 @@ interface MicrocycleResponse {
     plannedCount: number;
     completedCount: number;
     inProgressCount: number;
+    /** Дни, закрытые досрочным финишем (Sprint 2). */
+    partialCount?: number;
     skippedCount: number;
     totalGain: {
       potential: number;
@@ -177,9 +179,15 @@ export default function MicrocycleResultPage() {
           >
             {formatGain(gain.potential)}
           </div>
-          <div className="text-[#AEABBB] text-xs mt-2">
+          <div className="text-muted text-xs mt-2">
             Выполнено {stats.completedCount} из {stats.plannedCount} тренировок
+            {!!stats.partialCount && ` · ${stats.partialCount} досрочно`}
             {stats.skippedCount > 0 && ` · ${stats.skippedCount} дн. без модулей в каталоге`}
+          </div>
+          {/* Прирост считается за неделю целиком: быстрые тренировки и отдельные
+              модули тоже её двигают, хотя к дням цикла не привязаны. */}
+          <div className="text-muted/70 text-[11px] mt-1">
+            Учтены все тренировки и модули за эту неделю
           </div>
         </div>
 
@@ -258,38 +266,43 @@ export default function MicrocycleResultPage() {
               const ws = d.workoutSession;
               const completed = ws?.status === 'COMPLETED';
               const inProgress = ws?.status === 'IN_PROGRESS';
+              // Досрочный финиш: день сделан не целиком, но сделан — раньше
+              // такой день подписывался «не приступал».
+              const partial = ws?.status === 'PARTIAL';
               return (
                 <div
                   key={d.dayOfWeek}
                   className="flex items-center gap-3 rounded-xl p-3"
                   style={{
-                    background: completed
+                    background: completed || partial
                       ? 'rgba(161, 255, 74, 0.08)'
                       : 'rgba(174, 171, 187, 0.06)',
-                    border: `1px solid ${completed ? 'rgba(161, 255, 74, 0.25)' : 'transparent'}`,
+                    border: `1px solid ${completed || partial ? 'rgba(161, 255, 74, 0.25)' : 'transparent'}`,
                   }}
                 >
-                  <div className="text-[#AEABBB] text-xs font-bold w-6">
+                  <div className="text-muted text-xs font-bold w-6">
                     {weekdayLabel(microcycle.weekStartDate, d.dayOfWeek)}
                   </div>
                   <EnergyIcon
                     state={d.intent}
                     size={20}
-                    color={completed ? '#A1FF4A' : '#AEABBB'}
+                    color={completed || partial ? '#A1FF4A' : '#AEABBB'}
                     className="shrink-0"
                   />
                   <div className="flex-1">
                     <div className="text-white text-sm font-semibold">
                       {INTENT_LABEL[d.intent]}
                     </div>
-                    <div className="text-[#AEABBB] text-xs mt-0.5">
+                    <div className="text-muted text-xs mt-0.5">
                       {!ws && 'нет модулей в каталоге'}
                       {ws && completed && 'выполнено'}
+                      {ws && partial && 'завершено досрочно'}
                       {ws && inProgress && 'начато'}
-                      {ws && !completed && !inProgress && 'не приступал'}
+                      {ws && !completed && !partial && !inProgress && 'не приступал'}
                     </div>
                   </div>
                   {completed && <Check size={20} color="#A1FF4A" className="shrink-0" />}
+                  {partial && <Check size={20} color="#A1FF4A" className="shrink-0 opacity-60" />}
                 </div>
               );
             })}

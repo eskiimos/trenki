@@ -58,23 +58,46 @@ export async function GET(
   }
 
   // ── Статистика по сессиям цикла ────────────────────────────────────
-  const sessionIds = cycle.days
-    .map((d) => d.workoutSession?.id)
-    .filter((id): id is string => !!id);
-
   const completedCount = cycle.days.filter(
     (d) => d.workoutSession?.status === WorkoutStatus.COMPLETED,
   ).length;
   const inProgressCount = cycle.days.filter(
     (d) => d.workoutSession?.status === WorkoutStatus.IN_PROGRESS,
   ).length;
+  // Досрочный финиш (Sprint 2): день сделан не полностью, но сделан.
+  const partialCount = cycle.days.filter(
+    (d) => d.workoutSession?.status === WorkoutStatus.PARTIAL,
+  ).length;
   const plannedCount = cycle.days.filter((d) => !!d.workoutSession).length;
 
-  // ── Прирост потенциала за период цикла ─────────────────────────────
-  // Берём все CharacteristicHistory, привязанные к сессиям цикла, и суммируем
-  // их gain*. Это honest-метрика — учитывает только то, что атлет реально
-  // выполнил (CharacteristicHistory создаётся в /api/training/complete).
-  let totalGain = {
+  // ── Прирост потенциала за НЕДЕЛЮ цикла ─────────────────────────────
+  // Считаем по ОКНУ ВРЕМЕНИ, а не по привязке к сессиям цикла.
+  //
+  // Почему: привязка `sessionId ∈ сессии цикла` теряла почти весь прирост.
+  //  · День цикла можно закрыть быстрой тренировкой — /api/microcycle/close-day
+  //    ставит сессии дня COMPLETED без начисления, а прирост уходит на сессию
+  //    быстрой, которая к циклу не привязана.
+  //  · Отдельные модули (/api/training/complete-module) пишут историю вообще
+  //    без sessionId, когда модуль запущен не из сессии.
+  // В итоге экран показывал «выполнено 2 из 5» и «прирост 0.0» одновременно.
+  // Заголовок карточки — «прирост за неделю», поэтому окно и есть честная база.
+  //
+  // Границы окна: [начало недели цикла; +7 дней), но не залезая на следующий
+  // цикл — иначе прирост посчитался бы дважды в двух отчётах.
+  const windowStart = new Date(cycle.weekStartDate);
+  const windowEnd = new Date(windowStart);
+  windowEnd.setDate(windowEnd.getDate() + 7);
+
+  const nextCycle = await prisma.microcycle.findFirst({
+    where: { userId: cycle.userId, weekStartDate: { gt: cycle.weekStartDate } },
+    orderBy: { weekStartDate: 'asc' },
+    select: { weekStartDate: true },
+  });
+  if (nextCycle && nextCycle.weekStartDate < windowEnd) {
+    windowEnd.setTime(nextCycle.weekStartDate.getTime());
+  }
+
+  const totalGain = {
     potential: 0,
     power: 0,
     speed: 0,
@@ -83,35 +106,35 @@ export async function GET(
     flexibility: 0,
   };
 
-  if (sessionIds.length > 0) {
-    const histories = await prisma.characteristicHistory.findMany({
-      where: { sessionId: { in: sessionIds } },
-      select: {
-        gainPower: true,
-        gainSpeed: true,
-        gainEndurance: true,
-        gainTechnique: true,
-        gainFlexibility: true,
-      },
-    });
+  const histories = await prisma.characteristicHistory.findMany({
+    where: {
+      userId: cycle.userId,
+      createdAt: { gte: windowStart, lt: windowEnd },
+    },
+    select: {
+      gainPower: true,
+      gainSpeed: true,
+      gainEndurance: true,
+      gainTechnique: true,
+      gainFlexibility: true,
+    },
+  });
 
-    for (const h of histories) {
-      totalGain.power += h.gainPower;
-      totalGain.speed += h.gainSpeed;
-      totalGain.endurance += h.gainEndurance;
-      totalGain.technique += h.gainTechnique;
-      totalGain.flexibility += h.gainFlexibility;
-    }
-    // Потенциал — среднее 5 характеристик, прирост ему равен среднему
-    // приростов. Это приблизительно, точная формула — в /api/training/complete.
-    totalGain.potential =
-      (totalGain.power +
-        totalGain.speed +
-        totalGain.endurance +
-        totalGain.technique +
-        totalGain.flexibility) /
-      5;
+  for (const h of histories) {
+    totalGain.power += h.gainPower;
+    totalGain.speed += h.gainSpeed;
+    totalGain.endurance += h.gainEndurance;
+    totalGain.technique += h.gainTechnique;
+    totalGain.flexibility += h.gainFlexibility;
   }
+  // Потенциал — среднее 5 характеристик, прирост ему равен среднему приростов.
+  totalGain.potential =
+    (totalGain.power +
+      totalGain.speed +
+      totalGain.endurance +
+      totalGain.technique +
+      totalGain.flexibility) /
+    5;
 
   const effectiveStatus = getEffectiveStatus(
     {
@@ -143,8 +166,12 @@ export async function GET(
       plannedCount,
       completedCount,
       inProgressCount,
+      partialCount,
       skippedCount: cycle.days.length - plannedCount, // дни, для которых AI не нашёл модулей
       totalGain,
+      // Прирост посчитан за окно недели, а не по сессиям цикла — экран об этом
+      // пишет, чтобы цифра не выглядела «взявшейся ниоткуда».
+      gainWindow: { from: windowStart.toISOString(), to: windowEnd.toISOString() },
     },
   });
 }
