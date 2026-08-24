@@ -117,13 +117,37 @@ const WatchHistoryPage = () => {
   // Сессии, по которым звёздочка уже в полёте — дабл-тап не шлёт второй POST
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
 
+  // Подвкладки избранного (правка владельца): «Треньки» (короткий формат) и
+  // «От ИИ-тренера» — раздельно, а не секциями одной ленты. ?fav= в URL, чтобы
+  // возврат «Назад» из шортса не сбрасывал выбор.
+  const favParam = searchParams.get('fav');
+  const [favTab, setFavTab] = useState<'shorts' | 'workouts'>(
+    favParam === 'workouts' ? 'workouts' : 'shorts',
+  );
+  // Явный выбор (URL или тап) — автопереключение больше не трогает подвкладку
+  const [favTabChosen, setFavTabChosen] = useState(favParam !== null);
+
+  const writeUrl = (nextTab: 'history' | 'favorites', nextFav: 'shorts' | 'workouts') => {
+    try {
+      window.history.replaceState(
+        null,
+        '',
+        nextTab === 'favorites' ? `?tab=favorites&fav=${nextFav}` : location.pathname,
+      );
+    } catch {}
+  };
+
   /** Переключение вкладки + запись в URL: возврат «Назад» из шортса/видео
    *  ремоунтит страницу, и без параметра вкладка сбрасывалась бы на «Историю». */
   const switchTab = (key: 'history' | 'favorites') => {
     setTab(key);
-    try {
-      window.history.replaceState(null, '', key === 'favorites' ? '?tab=favorites' : location.pathname);
-    } catch {}
+    writeUrl(key, favTab);
+  };
+
+  const switchFavTab = (key: 'shorts' | 'workouts') => {
+    setFavTab(key);
+    setFavTabChosen(true);
+    writeUrl('favorites', key);
   };
 
   useEffect(() => {
@@ -143,15 +167,30 @@ const WatchHistoryPage = () => {
       fetch('/api/favorites/workouts')
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => {
-          if (!cancelled) setFavorites(d?.workouts ?? []);
+          const list: FavWorkout[] = d?.workouts ?? [];
+          if (!cancelled) setFavorites(list);
+          return list;
         }),
       fetch('/api/shorts/liked')
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => {
-          if (!cancelled) setLikedShorts(d?.shorts ?? []);
+          const list: LikedShort[] = d?.shorts ?? [];
+          if (!cancelled) setLikedShorts(list);
+          return list;
         }),
-    ]).then(() => {
-      if (!cancelled) setFavLoading(false);
+    ]).then(([favRes, shortsRes]) => {
+      if (cancelled) return;
+      setFavLoading(false);
+      // Автовыбор подвкладки — только пока юзер не выбирал сам: пустые
+      // «Треньки» при непустых тренировках встречали бы пустым экраном.
+      const favList = favRes.status === 'fulfilled' ? favRes.value : [];
+      const shortsList = shortsRes.status === 'fulfilled' ? shortsRes.value : [];
+      setFavTabChosen((chosen) => {
+        if (!chosen && shortsList.length === 0 && favList.length > 0) {
+          setFavTab('workouts');
+        }
+        return chosen;
+      });
     });
 
     return () => {
@@ -321,23 +360,42 @@ const WatchHistoryPage = () => {
                 </div>
               ))}
             </div>
-          ) : favorites.length === 0 && likedShorts.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-400 text-lg">Пока пусто</p>
-              <p className="text-gray-500 text-sm mt-2">
-                Сохраняй тренировки звёздочкой, а треньки — лайком: всё появится здесь
-              </p>
-            </div>
           ) : (
             <>
-              {favorites.length > 0 && (
-                <section className="mb-6">
-                  {/* Разграничение с короткими треньками (правка владельца):
-                      у каждой секции своя иконка и полное название */}
-                  <h2 className="flex items-center gap-1.5 text-muted text-xs font-medium font-overpass uppercase tracking-wide mb-2 px-1">
-                    <Sparkles size={16} aria-hidden />
-                    Тренировки от ИИ-тренера
-                  </h2>
+              {/* Подвкладки: короткий формат отдельно от тренировок ИИ */}
+              <div className="flex gap-2 pb-3">
+                {(
+                  [
+                    ['shorts', <Clapperboard key="i" size={16} aria-hidden />, `Треньки${likedShorts.length ? ` (${likedShorts.length})` : ''}`],
+                    ['workouts', <Sparkles key="i" size={16} aria-hidden />, `От ИИ-тренера${favorites.length ? ` (${favorites.length})` : ''}`],
+                  ] as const
+                ).map(([key, icon, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => switchFavTab(key)}
+                    className="font-overpass uppercase flex-1 rounded-full font-extrabold text-[11px] tracking-[0.5px] py-2 px-3 inline-flex items-center justify-center gap-1.5 transition-colors"
+                    style={{
+                      border: `1px solid ${favTab === key ? 'var(--color-brand)' : '#2a2f4a'}`,
+                      background: favTab === key ? 'var(--lime-medium)' : 'transparent',
+                      color: favTab === key ? 'var(--color-brand)' : 'var(--color-muted)',
+                    }}
+                  >
+                    {icon}
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {favTab === 'workouts' && (
+                favorites.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-gray-400 text-lg">Пока пусто</p>
+                    <p className="text-gray-500 text-sm mt-2">
+                      Сохраняй тренировки звёздочкой в истории — они появятся здесь
+                    </p>
+                  </div>
+                ) : (
                   <div className="flex flex-col gap-3">
                     {favorites.map((w) => (
                       <div key={w.id} className="rounded-2xl p-4 bg-night border border-[#2a2f4a]">
@@ -379,17 +437,20 @@ const WatchHistoryPage = () => {
                       </div>
                     ))}
                   </div>
-                </section>
+                )
               )}
 
-              {likedShorts.length > 0 && (
-                <section className="mb-6">
-                  <h2 className="flex items-center gap-1.5 text-muted text-xs font-medium font-overpass uppercase tracking-wide mb-2 px-1">
-                    <Clapperboard size={16} aria-hidden />
-                    Треньки · короткий формат
-                  </h2>
-                  {/* Плитки без названий/описаний (правка владельца) — чистые
-                      превью, как в ленте шортсов; имя ролика остаётся в aria. */}
+              {favTab === 'shorts' && (
+                likedShorts.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-gray-400 text-lg">Пока пусто</p>
+                    <p className="text-gray-500 text-sm mt-2">
+                      Лайкай треньки в ленте — они появятся здесь
+                    </p>
+                  </div>
+                ) : (
+                  /* Плитки без названий/описаний (правка владельца) — чистые
+                     превью, как в ленте шортсов; имя ролика остаётся в aria. */
                   <div className="grid grid-cols-3 gap-2">
                     {likedShorts.map((s) => (
                       <Link
@@ -412,7 +473,7 @@ const WatchHistoryPage = () => {
                       </Link>
                     ))}
                   </div>
-                </section>
+                )
               )}
             </>
           )}
