@@ -8,6 +8,8 @@ import {
   statusFromLevel,
   computeStreak,
   STATUSES,
+  checkinXp,
+  checkinXpForDate,
   TEMPO_MIN_STREAK,
   TEMPO_MULTIPLIER,
 } from '../../src/lib/gamification';
@@ -300,5 +302,31 @@ describe('computeStreak с таймзоной пользователя', () => {
   it('битая таймзона из БД не роняет расчёт (фолбэк на таймзону процесса)', () => {
     const ats = [new Date('2026-08-06T10:00:00Z')];
     expect(() => computeStreak(ats, new Date('2026-08-06T12:00:00Z'), 'Bad/Zone')).not.toThrow();
+  });
+});
+
+// ─── Ежедневный чекин (правки «Конец августа») ───────────────────────────────
+
+describe('checkinXp', () => {
+  it('числа по дням недели: Пн-Ср 10, Чт-Пт 20, Сб-Вс 50', () => {
+    // 2026-08-24 — понедельник (UTC)
+    expect(checkinXpForDate(new Date('2026-08-24T00:00:00Z'))).toBe(10); // Пн
+    expect(checkinXpForDate(new Date('2026-08-26T00:00:00Z'))).toBe(10); // Ср
+    expect(checkinXpForDate(new Date('2026-08-27T00:00:00Z'))).toBe(20); // Чт
+    expect(checkinXpForDate(new Date('2026-08-28T00:00:00Z'))).toBe(20); // Пт
+    expect(checkinXpForDate(new Date('2026-08-29T00:00:00Z'))).toBe(50); // Сб
+    expect(checkinXpForDate(new Date('2026-08-30T00:00:00Z'))).toBe(50); // Вс
+  });
+
+  it('сумма недели полного чекина = 170', () => {
+    const week = Array.from(
+      { length: 7 },
+      (_, i) => new Date(Date.UTC(2026, 7, 24 + i)),
+    );
+    expect(checkinXp(week)).toBe(10 + 10 + 10 + 20 + 20 + 50 + 50);
+  });
+
+  it('пустой список — 0', () => {
+    expect(checkinXp([])).toBe(0);
   });
 });

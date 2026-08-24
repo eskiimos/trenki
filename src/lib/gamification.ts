@@ -18,6 +18,24 @@ export const TEMPO_MIN_STREAK = 3;
 /** «Темп ×2»: во сколько раз умножается весь XP дня при активной серии. */
 export const TEMPO_MULTIPLIER = 2;
 
+/**
+ * Ежедневный чекин: XP по дню недели (решение босса, числа обсуждаемы).
+ * Индекс = getUTCDay(): 0=Вс … 6=Сб. По выходным просадка активности —
+ * поэтому Сб/Вс дороже всего. Чекин НЕ даёт день серии и НЕ умножается
+ * «Темпом ×2» — иначе стрик/темп фармились бы одним тапом.
+ */
+export const CHECKIN_XP_BY_WEEKDAY = [50, 10, 10, 10, 20, 20, 50] as const;
+
+/** XP одного чекина по его дате (даты хранятся как @db.Date — полночь UTC). */
+export function checkinXpForDate(date: Date): number {
+  return CHECKIN_XP_BY_WEEKDAY[date.getUTCDay()];
+}
+
+/** Суммарный XP всех чекинов — плоское слагаемое к ретроактивному XP. */
+export function checkinXp(dates: Date[]): number {
+  return dates.reduce((sum, d) => sum + checkinXpForDate(d), 0);
+}
+
 export interface XpCounts {
   completedWorkouts: number;
   completedModules: number;

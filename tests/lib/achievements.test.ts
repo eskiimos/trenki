@@ -5,6 +5,7 @@ import {
   EVO1_TARGET,
   EVO2_TARGET,
   computeAchievements,
+  countCycleGoalCredits,
 } from '../../src/lib/achievements';
 import type { TrainingGoal } from '../../src/generated/prisma';
 
@@ -97,5 +98,65 @@ describe('цель без завершений и лишние ключи', () =
     expect(list.length).toBe(14);
     expect(byKey(list, 'strength_evo1').unlocked).toBe(true);
     expect(byKey(list, 'strength_evo2').unlocked).toBe(false);
+  });
+});
+
+// ─── Зачёт цикловых дней (правки «Конец августа») ────────────────────────────
+// Структура недели цикла №1: Пн IN_TONE, Вт WARMUP, Ср CHARGED, Чт STRETCH,
+// Пт TIRED. Полных дней 3 → ротация целей: Пн POWERFUL_SHOT, Ср OUTRUN_OPPONENT,
+// Пт STRENGTH_STABILITY; Вт (зарядка) → AGILITY, Чт (раскисление) →
+// SPORT_LONGEVITY — но зарядка/раскисление ачивок НЕ дают (решение владельца).
+
+describe('countCycleGoalCredits', () => {
+  type TestSession = { status: string; goal: TrainingGoal | null; hasWork: boolean; allDone: boolean };
+  const okSession: TestSession = { status: 'COMPLETED', goal: null, hasWork: true, allDone: true };
+  const week = (sessions: Record<number, typeof okSession | null>) => [
+    {
+      cycleNumber: 1,
+      days: [
+        { dayOfWeek: 1, intent: 'IN_TONE', session: sessions[1] ?? null },
+        { dayOfWeek: 2, intent: 'WARMUP', session: sessions[2] ?? null },
+        { dayOfWeek: 3, intent: 'CHARGED', session: sessions[3] ?? null },
+        { dayOfWeek: 4, intent: 'STRETCH', session: sessions[4] ?? null },
+        { dayOfWeek: 5, intent: 'TIRED', session: sessions[5] ?? null },
+      ],
+    },
+  ];
+
+  it('полный COMPLETED-день даёт зачёт своей цели', () => {
+    const counts = countCycleGoalCredits(week({ 1: okSession }));
+    expect(counts.POWERFUL_SHOT).toBe(1);
+    expect(Object.keys(counts).length).toBe(1);
+  });
+
+  it('зарядка и раскисление НЕ дают зачёта, даже завершённые', () => {
+    const counts = countCycleGoalCredits(week({ 2: okSession, 4: okSession }));
+    expect(Object.keys(counts).length).toBe(0);
+  });
+
+  it('фантом close-day (0 пройденных видео) не зачитывается', () => {
+    const counts = countCycleGoalCredits(
+      week({ 3: { ...okSession, hasWork: false, allDone: false } }),
+    );
+    expect(Object.keys(counts).length).toBe(0);
+  });
+
+  it('PARTIAL (досрочный финиш / скипы) не зачитывается', () => {
+    const counts = countCycleGoalCredits(week({ 5: { ...okSession, status: 'PARTIAL' } }));
+    expect(Object.keys(counts).length).toBe(0);
+  });
+
+  it('сессия с заполненным goal пропускается (двойной счёт с groupBy)', () => {
+    const counts = countCycleGoalCredits(
+      week({ 1: { ...okSession, goal: 'AGILITY' as TrainingGoal } }),
+    );
+    expect(Object.keys(counts).length).toBe(0);
+  });
+
+  it('ротация целей: три полных дня → три разные цели', () => {
+    const counts = countCycleGoalCredits(week({ 1: okSession, 3: okSession, 5: okSession }));
+    expect(counts.POWERFUL_SHOT).toBe(1);
+    expect(counts.OUTRUN_OPPONENT).toBe(1);
+    expect(counts.STRENGTH_STABILITY).toBe(1);
   });
 });

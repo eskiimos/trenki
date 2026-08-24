@@ -9,6 +9,7 @@
 // Чистая логика — тестируется без БД (tests/lib/achievements.test.ts).
 
 import type { TrainingGoal } from '@/generated/prisma';
+import { goalsFromStoredDays } from '@/lib/microcycle/week-plan';
 
 /** Пороги эволюций (число завершённых тренировок с данной целью). */
 export const EVO1_TARGET = 5;
@@ -154,4 +155,68 @@ export function computeAchievements(
       progress: { current: Math.min(count, def.target), target: def.target },
     };
   });
+}
+
+// ─── Зачёт ЦИКЛОВЫХ дней в ачивки ────────────────────────────────────────────
+// Цикловые WorkoutSession создаются БЕЗ goal (generate.ts), поэтому groupBy по
+// goal их не видел — «трени из цикла не дают + в ачивки» (правка владельца).
+// Цель дня восстанавливается детерминированно из intent + cycleNumber той же
+// ротацией, что при генерации (goalsFromStoredDays).
+
+/** Полные дни, дающие ачивку (решение владельца): База (IN_TONE),
+ *  Овертайм (CHARGED), Лёгкая (TIRED). Зарядка (WARMUP) и Раскисление
+ *  (STRETCH) — НЕ дают. */
+const CREDIT_INTENTS = new Set(['IN_TONE', 'CHARGED', 'TIRED']);
+
+export interface CycleForAchievements {
+  cycleNumber: number;
+  days: Array<{
+    dayOfWeek: number;
+    intent: string;
+    session: {
+      status: string;
+      goal: TrainingGoal | null;
+      /** ≥1 реально пройденного видео (отсекает дни, закрытые подстановкой). */
+      hasWork: boolean;
+      /** ВСЕ видео пройдены (скипы → сессия PARTIAL и сюда не попадает). */
+      allDone: boolean;
+    } | null;
+  }>;
+}
+
+/**
+ * Число зачтённых цикловых дней по каждой цели. Правила зачёта дня:
+ *  · intent ∈ {IN_TONE, CHARGED, TIRED};
+ *  · сессия COMPLETED (PARTIAL — консистентно с быстрыми — не считается);
+ *  · hasWork и allDone — античит от фантомов close-day (день закрыт заменой:
+ *    COMPLETED при нуле пройденных видео) — прирост дала сама замена, и она же
+ *    даёт свой goal в ачивки;
+ *  · session.goal == null — страховка от двойного счёта, если goal когда-нибудь
+ *    начнут писать в цикловые (тогда их посчитает groupBy).
+ * ВАЖНО: дни цикла передаются ЦЕЛИКОМ (ротация целей зависит от структуры всей
+ * недели) — фильтр по intent применяется здесь, а не до вызова.
+ */
+export function countCycleGoalCredits(
+  cycles: CycleForAchievements[],
+): Partial<Record<TrainingGoal, number>> {
+  const counts: Partial<Record<TrainingGoal, number>> = {};
+  for (const cycle of cycles) {
+    const plans = goalsFromStoredDays(
+      cycle.days.map((d) => ({
+        dayOfWeek: d.dayOfWeek,
+        intent: d.intent as Parameters<typeof goalsFromStoredDays>[0][number]['intent'],
+      })),
+      cycle.cycleNumber,
+    );
+    const goalByDay = new Map(plans.map((p) => [p.dayOfWeek, p.goal]));
+    for (const day of cycle.days) {
+      if (!CREDIT_INTENTS.has(day.intent)) continue;
+      const s = day.session;
+      if (!s || s.status !== 'COMPLETED' || s.goal !== null || !s.hasWork || !s.allDone) continue;
+      const goal = goalByDay.get(day.dayOfWeek);
+      if (!goal) continue;
+      counts[goal] = (counts[goal] ?? 0) + 1;
+    }
+  }
+  return counts;
 }

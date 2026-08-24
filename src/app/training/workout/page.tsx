@@ -6,7 +6,8 @@ import { useTelegram } from '@/hooks/useTelegram';
 import CharacteristicsGainModal from '@/components/CharacteristicsGainModal';
 import Toast from '@/components/Toast';
 import ModuleSelectionModal from '@/components/ModuleSelectionModal';
-import { Check, Play, Lightbulb, PartyPopper, Star } from 'lucide-react';
+import { Check, Play, Lightbulb, PartyPopper, SkipForward, Star, Zap } from 'lucide-react';
+import { CharacteristicIcon } from '@/components/training/icons';
 
 interface WorkoutModule {
   id: string;
@@ -29,6 +30,9 @@ interface WorkoutModule {
   };
   order: number;
   completed: boolean;
+  /** Осознанно пропущен («Пропустить модуль»): не блокирует финиш, но XP и
+   *  прироста не даёт; сессия со скипами завершается как PARTIAL. */
+  skipped?: boolean;
   startedAt?: string | null;
   completedAt?: string | null;
   watchedDuration?: number | null;
@@ -91,6 +95,17 @@ export default function WorkoutPage() {
   const [characteristicsGains, setCharacteristicsGains] = useState<any>(null);
   const [newCharacteristics, setNewCharacteristics] = useState<any>(null);
   const [gainXp, setGainXp] = useState<{ xp: number; mult: number }>({ xp: 0, mult: 1 });
+
+  // Пропуск модуля: индекс-цель + предпросмотр «что теряешь» (skip-preview).
+  const [skipIndex, setSkipIndex] = useState<number | null>(null);
+  const [skipPreview, setSkipPreview] = useState<{
+    xp: number;
+    /** Бонус ×100 за полную тренировку — сгорает на ПЕРВОМ скипе сессии */
+    bonusForfeited?: number;
+    gains: Record<string, number>;
+    potentialGain: number;
+  } | null>(null);
+  const [skipping, setSkipping] = useState(false);
 
   // Досрочный финиш: модалка-предупреждение + текущий множитель «Темпа ×2»
   // (нужен, чтобы показать честное «недозаработаешь X баллов»).
@@ -157,7 +172,13 @@ export default function WorkoutPage() {
     };
   }, []);
 
-  const allCompleted = !!workout && workout.modules.length > 0 && workout.modules.every(m => m.completed);
+  // «Можно завершать»: каждый модуль либо пройден, либо осознанно пропущен,
+  // и есть хотя бы один пройденный (скип ВСЕХ закрывает сессию на сервере).
+  const allCompleted =
+    !!workout &&
+    workout.modules.length > 0 &&
+    workout.modules.every(m => m.completed || m.skipped) &&
+    workout.modules.some(m => m.completed);
 
   // «Понравилась вся тренировка?» — сохранение составленного занятия целиком.
   const [favSaving, setFavSaving] = useState(false);
@@ -248,6 +269,55 @@ export default function WorkoutPage() {
     setShowInfoBlock(true);
   };
 
+  /** Открыть предупреждение о пропуске: тянем честный расчёт «что теряешь». */
+  const openSkipModal = (index: number) => {
+    if (!workout) return;
+    setSkipIndex(index);
+    setSkipPreview(null);
+    const m = workout.modules[index];
+    fetch(`/api/training/skip-preview?sessionId=${workout.id}&videoId=${m.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && typeof d.xp === 'number') setSkipPreview(d);
+      })
+      .catch(() => {});
+  };
+
+  const confirmSkip = async () => {
+    if (!workout || skipIndex === null || skipping) return;
+    const m = workout.modules[skipIndex];
+    setSkipping(true);
+    try {
+      const res = await fetch('/api/training/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: workout.id, videoId: m.id, action: 'skip' }),
+      });
+      if (!res.ok) return;
+      const d = await res.json();
+      if (d.allSkipped) {
+        // Все модули пропущены — сервер закрыл сессию как SKIPPED
+        router.push('/');
+        return;
+      }
+      setWorkout((prev) =>
+        prev
+          ? {
+              ...prev,
+              modules: prev.modules.map((mod, i) =>
+                i === skipIndex ? { ...mod, skipped: true } : mod,
+              ),
+            }
+          : prev,
+      );
+      setSkipIndex(null);
+      setSkipPreview(null);
+    } catch {
+    } finally {
+      setSkipping(false);
+    }
+  };
+
   const startOrContinueWorkout = () => {
     if (!workout || workout.modules.length === 0) return;
 
@@ -256,7 +326,7 @@ export default function WorkoutPage() {
       return;
     }
 
-    const firstIncompleteIndex = workout.modules.findIndex(m => !m.completed);
+    const firstIncompleteIndex = workout.modules.findIndex(m => !m.completed && !m.skipped);
     const targetIndex = firstIncompleteIndex === -1 ? 0 : firstIncompleteIndex;
     const targetModule = workout.modules[targetIndex];
 
@@ -698,15 +768,16 @@ export default function WorkoutPage() {
           const moduleType = getModuleType(module);
           const info = moduleTypeInfo[moduleType as keyof typeof moduleTypeInfo];
           const isCompleted = module.completed;
-          
-          // Находим первый незавершенный модуль
-          const firstIncompleteIndex = workout.modules.findIndex(m => !m.completed);
-          
+          const isSkipped = !!module.skipped && !isCompleted;
+
+          // Находим первый незавершенный модуль (пропущенные не в счёт)
+          const firstIncompleteIndex = workout.modules.findIndex(m => !m.completed && !m.skipped);
+
           // Модуль активен, если:
-          // 1. Он не завершен
+          // 1. Он не завершен и не пропущен
           // 2. Это первый незавершенный модуль (в случае рассинхронизации с currentVideoIndex)
-          const isActive = !isCompleted && index === firstIncompleteIndex;
-          const isLocked = !isCompleted && !isActive;
+          const isActive = !isCompleted && !isSkipped && index === firstIncompleteIndex;
+          const isLocked = (!isCompleted && !isActive) || isSkipped;
 
           // Незавершённый модуль, который уже начинали — покажем, с какого места
           // продолжим (сервер помнит watchedDuration, плеер туда и перемотает).
@@ -844,6 +915,29 @@ export default function WorkoutPage() {
                 </div>
               )}
 
+              {/* Индикатор пропущенного модуля */}
+              {isSkipped && (
+                <div style={{
+                  position: 'absolute',
+                  top: '12px',
+                  left: '12px',
+                  zIndex: 3,
+                  padding: '4px 8px',
+                  borderRadius: '12px',
+                  background: 'rgba(174, 171, 187, 0.75)',
+                  fontFamily: 'Overpass',
+                  fontWeight: 600,
+                  fontSize: '10px',
+                  color: '#101530',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}>
+                  <SkipForward size={14} aria-hidden />
+                  Пропущен
+                </div>
+              )}
+
               {/* Индикатор текущего модуля */}
               {isActive && !isCompleted && (
                 <div style={{
@@ -975,6 +1069,24 @@ export default function WorkoutPage() {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                   </svg>
+                </button>
+              )}
+
+              {/* Пропустить модуль (правки «Конец августа»: не у всех есть
+                  условия для каждого модуля). Маленькая, не бросается в глаза;
+                  перед скипом — предупреждение «что теряешь». */}
+              {!isCompleted && !isLocked && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); openSkipModal(index); }}
+                  title="Пропустить модуль"
+                  style={{
+                    position: 'absolute', bottom: '12px', right: '88px', zIndex: 3,
+                    width: '32px', height: '32px', borderRadius: '8px',
+                    backgroundColor: 'rgba(174, 171, 187, 0.18)', border: '1px solid rgba(174, 171, 187, 0.4)',
+                    color: '#AEABBB', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
+                  }}
+                >
+                  <SkipForward size={16} aria-hidden />
                 </button>
               )}
 
@@ -1144,6 +1256,159 @@ export default function WorkoutPage() {
           </button>
         )}
       </div>
+
+      {/* Пропуск модуля — красивое предупреждение «что теряешь» (решение
+          владельца): прирост по характеристикам с иконками, XP, потенциал.
+          Оверлей скроллится сам — урок Galaxy Fold. */}
+      {skipIndex !== null && workout && (() => {
+        const m = workout.modules[skipIndex];
+        const CHAR_LABELS: Record<string, string> = {
+          ratingPower: 'Сила',
+          ratingSpeed: 'Скорость',
+          ratingEndurance: 'Выносливость',
+          ratingTechnique: 'Техника',
+          ratingFlexibility: 'Гибкость',
+        };
+        const gainRows = skipPreview
+          ? Object.entries(skipPreview.gains).filter(([, v]) => v > 0.0005)
+          : [];
+        const xpLoss = skipPreview ? skipPreview.xp * tempoMult : null;
+        return (
+          <div
+            className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-black/80 backdrop-blur-sm"
+            onClick={() => { setSkipIndex(null); setSkipPreview(null); }}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div
+              className="min-h-full flex items-center justify-center p-4"
+              style={{
+                paddingTop: 'calc(var(--safe-top) + var(--space-4))',
+                paddingBottom: 'calc(var(--safe-bottom) + var(--space-4))',
+              }}
+            >
+              <div
+                className="w-full max-w-md rounded-3xl p-4 sm:p-6"
+                style={{ background: '#101530', border: '1px solid rgba(255,255,255,0.08)' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="text-center mb-4">
+                  <div className="w-14 h-14 mx-auto mb-3 rounded-full flex items-center justify-center bg-white/10">
+                    <SkipForward size={26} className="text-muted" aria-hidden />
+                  </div>
+                  <h2 className="text-white text-lg font-bold font-overpass">
+                    Пропустить модуль?
+                  </h2>
+                  <p className="text-muted text-sm font-overpass mt-1">
+                    {m.title}
+                  </p>
+                </div>
+
+                <p className="text-muted text-xs font-overpass mb-2">
+                  Пропуская, ты не получишь:
+                </p>
+                <div className="flex flex-col gap-2 mb-4">
+                  {gainRows.map(([key, value]) => (
+                    <div
+                      key={key}
+                      className="rounded-xl px-3 py-2.5 flex items-center justify-between gap-2"
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+                    >
+                      <span className="flex items-center gap-2 min-w-0">
+                        <CharacteristicIcon characteristic={key} size={18} className="text-brand shrink-0" />
+                        <span className="text-white text-sm font-overpass truncate">{CHAR_LABELS[key] ?? key}</span>
+                      </span>
+                      <span className="text-brand text-sm font-bold font-overpass tabular-nums shrink-0">
+                        +{value.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                  {skipPreview && skipPreview.potentialGain > 0 && (
+                    <div
+                      className="rounded-xl px-3 py-2.5 flex items-center justify-between gap-2"
+                      style={{ background: 'rgba(68,92,255,0.15)', border: '1px solid rgba(68,92,255,0.35)' }}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Zap size={18} className="text-white shrink-0" fill="currentColor" aria-hidden />
+                        <span className="text-white text-sm font-overpass">Потенциал</span>
+                      </span>
+                      <span className="text-white text-sm font-bold font-overpass tabular-nums shrink-0">
+                        +{skipPreview.potentialGain.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  {xpLoss !== null && (
+                    <div
+                      className="rounded-xl px-3 py-2.5 flex items-center justify-between gap-2"
+                      style={{ background: 'rgba(161,255,74,0.10)', border: '1px solid rgba(161,255,74,0.35)' }}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Star size={18} className="text-brand shrink-0" fill="currentColor" aria-hidden />
+                        <span className="text-white text-sm font-overpass">Опыт за модуль</span>
+                        {tempoMult > 1 && (
+                          <span className="text-danger text-[10px] font-bold font-overpass rounded-full px-1.5 py-0.5 border border-danger/40">
+                            ×{tempoMult}
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-brand text-sm font-bold font-overpass tabular-nums shrink-0">
+                        +{xpLoss} XP
+                      </span>
+                    </div>
+                  )}
+                  {/* Первый скип сжигает и бонус за ПОЛНУЮ тренировку — без
+                      этой строки цена пропуска занижалась в разы, и скип
+                      выглядел «дешевле» досрочного финиша */}
+                  {skipPreview && (skipPreview.bonusForfeited ?? 0) > 0 && (
+                    <div
+                      className="rounded-xl px-3 py-2.5 flex items-center justify-between gap-2"
+                      style={{ background: 'rgba(255,140,74,0.10)', border: '1px solid rgba(255,140,74,0.35)' }}
+                    >
+                      <span className="flex items-center gap-2 min-w-0">
+                        <PartyPopper size={18} className="text-danger shrink-0" aria-hidden />
+                        <span className="text-white text-sm font-overpass leading-tight">
+                          Бонус за полную тренировку
+                        </span>
+                        {tempoMult > 1 && (
+                          <span className="text-danger text-[10px] font-bold font-overpass rounded-full px-1.5 py-0.5 border border-danger/40 shrink-0">
+                            ×{tempoMult}
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-danger text-sm font-bold font-overpass tabular-nums shrink-0">
+                        +{(skipPreview.bonusForfeited ?? 0) * tempoMult} XP
+                      </span>
+                    </div>
+                  )}
+                  {!skipPreview && (
+                    <div className="text-muted text-xs text-center py-2">Считаем…</div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setSkipIndex(null); setSkipPreview(null); }}
+                    className="w-full rounded-full font-overpass font-extrabold uppercase text-sm py-3.5 transition-transform active:scale-95"
+                    style={{ background: '#A1FF4A', color: '#060919', border: 'none' }}
+                  >
+                    Продолжить тренировку
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmSkip}
+                    disabled={skipping}
+                    className="w-full rounded-full font-overpass font-semibold text-sm py-3 disabled:opacity-50"
+                    style={{ background: 'transparent', color: '#AEABBB', border: '1px solid rgba(174,171,187,0.35)' }}
+                  >
+                    {skipping ? 'Пропускаем…' : 'Всё равно пропустить'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Досрочный финиш — предупреждение «недозаработаешь X баллов».
           Пройденные модули засчитываются, но бонус за полную тренировку теряется. */}

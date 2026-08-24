@@ -12,6 +12,7 @@ import BottomNavigation from '@/components/BottomNavigation';
 import AddToHomeScreen from '@/components/AddToHomeScreen';
 import WorkoutReminder from '@/components/WorkoutReminder';
 import StreakChip from '@/components/StreakChip';
+import DailyCheckinCard from '@/components/DailyCheckinCard';
 import AssignmentsBanner from '@/components/AssignmentsBanner';
 import MicrocycleFeedbackModal from '@/components/MicrocycleFeedbackModal';
 import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay';
@@ -213,6 +214,10 @@ const HomePage = () => {
 
         {/* Стрик: показываем только при серии от 2 дней (геймификация, Фаза 1) */}
         <StreakChip />
+
+        {/* Ежедневный чекин: +XP за тап, по выходным больше всего (правки
+            «Конец августа»). Серию/темп не трогает. */}
+        <DailyCheckinCard />
 
         {/* Секция с короткими видео (треньки) */}
         <TrenkiSection />

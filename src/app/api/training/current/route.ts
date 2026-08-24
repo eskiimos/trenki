@@ -208,6 +208,7 @@ export async function GET(request: NextRequest) {
           },
           order: wsVideo.order,
           completed: wsVideo.completed,
+          skipped: wsVideo.skipped,
           startedAt: wsVideo.startedAt,
           completedAt: wsVideo.completedAt,
           watchedDuration: wsVideo.watchedDuration,

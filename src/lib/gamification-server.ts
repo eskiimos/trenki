@@ -9,6 +9,7 @@ import {
   levelFromXp,
   statusFromLevel,
   computeStreak,
+  checkinXp,
   TEMPO_MULTIPLIER,
 } from '@/lib/gamification';
 import { WorkoutStatus } from '@/generated/prisma';
@@ -95,9 +96,11 @@ export async function userTimezone(userId: string): Promise<string> {
 export async function getGamificationSummary(userId: string): Promise<GamificationSummary> {
   // Для «Темпа ×2» XP считается ретроактивно из ПОЛНОЙ истории дат завершений
   // (XP в БД не хранится — инвариант).
-  const [{ workoutAts, moduleAts, trainingDayAts }, tz] = await Promise.all([
+  const [{ workoutAts, moduleAts, trainingDayAts }, tz, checkins] = await Promise.all([
     fetchCompletionHistory(userId),
     userTimezone(userId),
+    // Ежедневные чекины: плоское слагаемое XP (без темпа и дней серии)
+    prisma.dailyCheckin.findMany({ where: { userId }, select: { date: true } }),
   ]);
 
   const { xpTotal, tempoActiveToday } = computeXpFromHistory(
@@ -107,7 +110,7 @@ export async function getGamificationSummary(userId: string): Promise<Gamificati
     trainingDayAts,
     tz,
   );
-  const levelInfo = levelFromXp(xpTotal);
+  const levelInfo = levelFromXp(xpTotal + checkinXp(checkins.map((c) => c.date)));
   const status = statusFromLevel(levelInfo.level);
   // Серия — по всем тренировочным дням (полным и досрочным), в таймзоне юзера.
   const streak = computeStreak(trainingDayAts, new Date(), tz);

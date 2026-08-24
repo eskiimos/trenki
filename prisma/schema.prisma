@@ -51,6 +51,7 @@ model User {
   coachProfile          CoachProfile?
   shortComments         ShortComment[]
   shortLikes            ShortLike[]
+  dailyCheckins         DailyCheckin[]
   sessions              TrainingSession[]
   videoLikes            VideoLike[]
   videoComments         VideoComment[]
@@ -245,6 +246,23 @@ model TrainingSession {
 
 // Избранная ЦЕЛИКОМ тренировка от ИИ. Состав — снапшот (videoIds фиксируются в
 // момент добавления), чтобы правки каталога молча не меняли сохранённое занятие.
+// Ежедневный чекин (правки «Конец августа»): единственное СОБЫТИЕ в контуре
+// геймификации — тап «Отметиться» на главной. XP по-прежнему не хранится:
+// хранится ФАКТ чекина с локальной (по User.timezone) датой, а XP выводится
+// из даты константой по дню недели (checkinXp в src/lib/gamification.ts).
+// Чекин НЕ даёт день серии и НЕ умножается «Темпом ×2» (иначе фарм тапом),
+// в недельную лигу не входит. Unique (userId, date) — железный лимит 1/день.
+model DailyCheckin {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date // локальная календарная дата юзера
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("daily_checkins")
+}
+
 model FavoriteWorkout {
   id          String        @id @default(cuid())
   userId      String
@@ -521,6 +539,11 @@ model WorkoutSessionVideo {
   videoId         String
   order           Int
   completed       Boolean        @default(false)
+  // Модуль пропущен осознанно (кнопка «Пропустить» в плеере): не мешает
+  // завершить тренировку, но НЕ даёт ни XP, ни прироста (completed=false).
+  // Сессия со скипами финиширует как PARTIAL — без бонуса ×100.
+  skipped         Boolean        @default(false)
+  skippedAt       DateTime?
   startedAt       DateTime?
   completedAt     DateTime?
   watchedDuration Int?

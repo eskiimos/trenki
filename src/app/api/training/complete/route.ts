@@ -94,18 +94,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Досрочный финиш (earlyFinish): засчитываем только пройденные модули, без
-    // бонуса за полную тренировку. Обычный финиш требует, чтобы были пройдены все.
+    // бонуса за полную тренировку. Обычный финиш требует, чтобы каждый модуль
+    // был либо пройден, либо ОСОЗНАННО пропущен (кнопка «Пропустить»); сессия
+    // со скипами — PARTIAL без бонуса ×100, иначе скип был бы выгоднее
+    // досрочного финиша (фарм бонуса без просмотра модулей).
     const completedVideos = session.videos.filter(v => v.completed);
     const allCompleted = session.videos.length > 0 && completedVideos.length === session.videos.length;
-    const isPartial = !!earlyFinish && !allCompleted;
+    const allDone =
+      session.videos.length > 0 && session.videos.every((v) => v.completed || v.skipped);
+    const isPartial = !allCompleted;
 
-    if (!earlyFinish && !allCompleted) {
+    if (!earlyFinish && !allDone) {
       return NextResponse.json(
         { error: 'Не все видео завершены' },
         { status: 400 }
       );
     }
-    if (earlyFinish && completedVideos.length === 0) {
+    if (completedVideos.length === 0) {
+      // Скип ВСЕХ модулей закрывает сессию как SKIPPED ещё в /api/training/update
       return NextResponse.json(
         { error: 'Пройди хотя бы один модуль, чтобы засчитать тренировку' },
         { status: 400 }

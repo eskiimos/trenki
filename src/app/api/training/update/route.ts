@@ -114,7 +114,8 @@ export async function POST(request: NextRequest) {
 
       // Увеличиваем currentVideoIndex
       const nextIndex = session.currentVideoIndex + 1;
-      const allCompleted = session.videos.every((v) => v.completed);
+      // Пропущенные модули не блокируют «все просмотрены» (скипы → PARTIAL)
+      const allCompleted = session.videos.every((v) => v.completed || v.skipped);
 
 
       // Все видео просмотрены — двигаем индекс, но НЕ ставим COMPLETED здесь.
@@ -152,6 +153,64 @@ export async function POST(request: NextRequest) {
           message: 'Видео завершено',
         });
       }
+    }
+
+    // Пропустить модуль (правки «Конец августа»): completed НЕ трогаем —
+    // пропущенный модуль не даёт ни XP, ни прироста (античит), но перестаёт
+    // блокировать завершение сессии (финиш со скипами = PARTIAL без бонуса,
+    // см. /api/training/complete). Клиент ПЕРЕД вызовом показывает
+    // предупреждение «что теряешь» (GET /api/training/skip-preview).
+    if (action === 'skip' && videoId) {
+      const row = await prisma.workoutSessionVideo.findUnique({
+        where: { sessionId_videoId: { sessionId, videoId } },
+        select: { completed: true, skipped: true },
+      });
+      if (!row) {
+        return NextResponse.json({ error: 'Модуль не найден' }, { status: 404 });
+      }
+      if (row.completed) {
+        return NextResponse.json({ error: 'Модуль уже пройден' }, { status: 400 });
+      }
+      if (!row.skipped) {
+        await prisma.workoutSessionVideo.updateMany({
+          where: { sessionId, videoId },
+          data: { skipped: true, skippedAt: new Date() },
+        });
+      }
+
+      const session = await prisma.workoutSession.findUnique({
+        where: { id: sessionId },
+        include: { videos: { orderBy: { order: 'asc' } } },
+      });
+      if (!session) {
+        return NextResponse.json({ error: 'Тренировка не найдена' }, { status: 404 });
+      }
+
+      const anyCompleted = session.videos.some((v) => v.completed);
+      const allDone = session.videos.every((v) => v.completed || v.skipped);
+
+      // Пропущены ВСЕ модули — засчитывать нечего: сессия закрывается как
+      // SKIPPED (без XP и дня серии). Идемпотентно через статусный notIn.
+      if (allDone && !anyCompleted) {
+        await prisma.workoutSession.updateMany({
+          where: {
+            id: sessionId,
+            status: { notIn: [WorkoutStatus.COMPLETED, WorkoutStatus.PARTIAL] },
+          },
+          data: { status: WorkoutStatus.SKIPPED, completedAt: new Date() },
+        });
+        return NextResponse.json({
+          success: true,
+          allSkipped: true,
+          message: 'Все модули пропущены — тренировка не засчитана',
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        completed: allDone,
+        message: allDone ? 'Остались только пропущенные — можно завершать' : 'Модуль пропущен',
+      });
     }
 
     // Обновить прогресс просмотра (для отслеживания во время просмотра)
