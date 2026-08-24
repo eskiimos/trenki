@@ -1,56 +1,88 @@
 'use client';
 
-import React, { Suspense, useState, useEffect } from 'react';
+// «История и избранное» (профиль → Мои тренировки).
+//
+// Две вкладки с РАЗНЫМ содержимым (правка владельца «история и избранное
+// показывают одно и то же»):
+//  · «История» — единая лента активности: завершённые тренировки ИИ-тренера
+//    (быстрые и цикловые, /api/profile/history) вперемешку с одиночными
+//    просмотрами видео каталога, по дате. Тренировку можно звёздочкой
+//    сохранить в избранное прямо из истории.
+//  · «Избранное» — сохранённые тренировки целиком (FavoriteWorkout) +
+//    лайкнутые треньки-шортсы (лайк = избранное, решение владельца).
+//
+// URL: ?tab=favorites (алиас workouts — старые ссылки) открывает «Избранное».
+
+import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
-import { Star } from 'lucide-react';
+import { Clapperboard, Sparkles, Star } from 'lucide-react';
 import BottomNavigation from '@/components/BottomNavigation';
 import { Skeleton } from '@/components/Skeleton';
 
-// Функция для форматирования длительности видео в YouTube формате (MM:SS или H:MM:SS)
+// Длительность видео в формате YouTube (MM:SS или H:MM:SS)
 const formatDuration = (seconds: number): string => {
   if (!seconds || seconds <= 0) return '0:00';
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
-  
   if (hours > 0) {
     return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
   return `${minutes}:${secs.toString().padStart(2, '0')}`;
 };
 
-interface Video {
+const formatDate = (iso: string): string => {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameYear = d.getFullYear() === now.getFullYear();
+  return d.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  });
+};
+
+const plural = (n: number, one: string, few: string, many: string) => {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+};
+
+// ── Типы ответов API ─────────────────────────────────────────────────────────
+
+interface WorkoutItem {
+  type: 'workout';
   id: string;
   title: string;
-  description?: string;
-  duration: number;
-  videoUrl: string;
-  thumbnail?: string;
-  category: string;
-  difficulty: string;
-  tags: string[];
-  loadTypes: string[];
-  equipment: string[];
-  level?: string;
-  viewsCount: number;
-  likesCount: number;
-  trainer: {
-    id: string;
-    name: string;
-    lastName: string;
-    avatar?: string;
-    speciality: string;
-  };
-  createdAt: string;
-  watchedAt: string;
-  isPublished: boolean;
-  rpeMin?: number;
-  rpeMax?: number;
+  cycleLabel: string | null;
+  status: 'COMPLETED' | 'PARTIAL';
+  date: string;
+  completedModules: number;
+  totalModules: number;
+  totalDuration: number;
+  modules: { id: string; title: string }[];
+  favoriteId: string | null;
 }
 
-// Избранная тренировка целиком (составленная ИИ).
+interface VideoItem {
+  type: 'video';
+  id: string;
+  title: string;
+  date: string;
+  duration: number;
+  thumbnail: string | null;
+  tags: string[];
+  equipment: string[];
+  likesCount: number;
+  trainer: { id: string; name: string; lastName: string; avatar: string };
+}
+
+type HistoryItem = WorkoutItem | VideoItem;
+
 interface FavWorkout {
   id: string;
   title: string;
@@ -60,178 +92,175 @@ interface FavWorkout {
   totalDuration: number;
 }
 
+interface LikedShort {
+  id: string;
+  title: string;
+  thumbnail: string | null;
+}
+
+// ── Страница ─────────────────────────────────────────────────────────────────
+
 const WatchHistoryPage = () => {
   const searchParams = useSearchParams();
-  // Явно запрошенная вкладка из URL: профиль ведёт сюда двумя ссылками —
-  // «История тренировок» (без tab) и «Избранные тренировки» (?tab=workouts).
-  // Раньше параметр игнорировался и обе ссылки открывали одно и то же
-  // (жалоба владельца «история и избранное показывают одно и то же»).
-  const explicitTab = searchParams.get('tab');
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  // Две вкладки: составленные тренировки и отдельные видео (решение владельца —
-  // одиночные просмотры не теряем).
-  // Стартуем с «Видео»: у большинства избранных тренировок ещё нет, и вкладка
-  // по умолчанию встречала бы пустым экраном. Переключаемся на «Тренировки»
-  // автоматически, если они есть — но только когда вкладка НЕ задана в URL.
-  const [tab, setTab] = useState<'workouts' | 'videos'>(
-    explicitTab === 'workouts' ? 'workouts' : 'videos',
+  const tabParam = searchParams.get('tab');
+  const [tab, setTab] = useState<'history' | 'favorites'>(
+    tabParam === 'favorites' || tabParam === 'workouts' ? 'favorites' : 'history',
   );
-  const [workouts, setWorkouts] = useState<FavWorkout[]>([]);
 
-  useEffect(() => {
-    fetch('/api/favorites/workouts')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        const list = d?.workouts ?? [];
-        setWorkouts(list);
-        if (list.length > 0 && !explicitTab) setTab('workouts');
-      })
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const [items, setItems] = useState<HistoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  // Отдельный флаг для «Избранного»: без него deep-link ?tab=favorites на весь
+  // срок фетча показывал финальное «Пока пусто» вместо скелетонов.
+  const [favLoading, setFavLoading] = useState(true);
+  const [favorites, setFavorites] = useState<FavWorkout[]>([]);
+  const [likedShorts, setLikedShorts] = useState<LikedShort[]>([]);
+  // Сессии, по которым звёздочка уже в полёте — дабл-тап не шлёт второй POST
+  const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
 
-  const removeWorkout = async (id: string) => {
-    setWorkouts((prev) => prev.filter((w) => w.id !== id)); // оптимистично
+  /** Переключение вкладки + запись в URL: возврат «Назад» из шортса/видео
+   *  ремоунтит страницу, и без параметра вкладка сбрасывалась бы на «Историю». */
+  const switchTab = (key: 'history' | 'favorites') => {
+    setTab(key);
     try {
-      await fetch(`/api/favorites/workouts?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
-    } catch {
-      /* при сбое список восстановится на следующей загрузке */
-    }
+      window.history.replaceState(null, '', key === 'favorites' ? '?tab=favorites' : location.pathname);
+    } catch {}
   };
 
   useEffect(() => {
-    const fetchWatchHistory = async () => {
-      try {
-        setIsLoading(true);
+    let cancelled = false;
 
-        // Сервер берёт userId из сессии
-        const historyResponse = await fetch('/api/profile/watch-history?limit=50');
+    fetch('/api/profile/history?limit=50')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled) setItems(d?.items ?? []);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
 
-        if (historyResponse.status === 401) {
-          setIsLoading(false);
-          return;
-        }
-        if (!historyResponse.ok) {
-          throw new Error('Failed to fetch watch history');
-        }
+    Promise.allSettled([
+      fetch('/api/favorites/workouts')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!cancelled) setFavorites(d?.workouts ?? []);
+        }),
+      fetch('/api/shorts/liked')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!cancelled) setLikedShorts(d?.shorts ?? []);
+        }),
+    ]).then(() => {
+      if (!cancelled) setFavLoading(false);
+    });
 
-        const historyData = await historyResponse.json();
-        setVideos(historyData.videos || []);
-      } catch (error) {
-        console.error('Error fetching watch history:', error);
-      } finally {
-        setIsLoading(false);
-      }
+    return () => {
+      cancelled = true;
     };
-
-    fetchWatchHistory();
   }, []);
 
-  // Skeleton компонент для видео карточки
-  const VideoCardSkeleton = () => (
-    <div className="mb-6">
-      {/* Превью видео */}
-      <div className="relative w-full aspect-video mb-3">
-        <Skeleton width="w-full" height="h-full" />
-      </div>
-      
-      {/* Контент */}
-      <div className="px-4 py-3">
-        {/* Аватар + Заголовок */}
-        <div className="flex items-center gap-3 mb-2">
-          <Skeleton width="w-10" height="h-10" rounded />
-          <div className="flex-1 space-y-2">
-            <Skeleton width="w-3/4" height="h-4" />
-            <Skeleton width="w-1/2" height="h-4" />
-          </div>
-        </div>
-        
-        {/* Теги */}
-        <div className="flex gap-2 mb-2">
-          <Skeleton width="w-20" height="h-6" className="rounded-full" />
-          <Skeleton width="w-24" height="h-6" className="rounded-full" />
-          <Skeleton width="w-16" height="h-6" className="rounded-full" />
-        </div>
-        
-        {/* Информация о тренере */}
-        <Skeleton width="w-full" height="h-3" />
-      </div>
-    </div>
-  );
+  /** Звёздочка на карточке истории: сохранить/убрать тренировку из избранного.
+   *  busyIds гасит дабл-тап: add-ветка не оптимистична (id даёт сервер), и без
+   *  защиты второй тап слал бы второй POST. */
+  const toggleFavorite = async (w: WorkoutItem) => {
+    if (busyIds.has(w.id)) return;
+    setBusyIds((prev) => new Set(prev).add(w.id));
+    try {
+      await doToggleFavorite(w);
+    } finally {
+      setBusyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(w.id);
+        return next;
+      });
+    }
+  };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-surface pb-nav">
-        {/* Header */}
-        <header className="flex items-center justify-between p-4 bg-[#101530]" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
-          <div className="flex items-center space-x-2">
-            <Link href="/profile" className="text-white hover:text-gray-300">
-              <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
-            </Link>
-            <Skeleton width="w-48" height="h-5" />
-          </div>
-        </header>
+  const doToggleFavorite = async (w: WorkoutItem) => {
+    if (w.favoriteId) {
+      const favId = w.favoriteId;
+      // оптимистично
+      setItems((prev) =>
+        prev.map((i) => (i.type === 'workout' && i.id === w.id ? { ...i, favoriteId: null } : i)),
+      );
+      setFavorites((prev) => prev.filter((f) => f.id !== favId));
+      try {
+        await fetch(`/api/favorites/workouts?id=${encodeURIComponent(favId)}`, {
+          method: 'DELETE',
+        });
+      } catch {}
+      return;
+    }
+    try {
+      const res = await fetch('/api/favorites/workouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: w.id }),
+      });
+      if (!res.ok) return;
+      const d = await res.json();
+      const favId = d?.workout?.id;
+      if (!favId) return;
+      setItems((prev) =>
+        prev.map((i) => (i.type === 'workout' && i.id === w.id ? { ...i, favoriteId: favId } : i)),
+      );
+      // Полный объект избранного соберёт следующая загрузка; для мгновенного
+      // отображения хватает заголовка и модулей из карточки истории.
+      setFavorites((prev) => [
+        {
+          id: favId,
+          title: w.title,
+          createdAt: new Date().toISOString(),
+          modules: w.modules,
+          missingCount: 0,
+          totalDuration: w.totalDuration,
+        },
+        ...prev.filter((f) => f.id !== favId),
+      ]);
+    } catch {}
+  };
 
-        {/* Video Cards Skeleton */}
-        <div className="mt-4">
-          {[1, 2, 3, 4].map((i) => (
-            <VideoCardSkeleton key={i} />
-          ))}
-        </div>
-
-        <BottomNavigation activeTab="profile" />
-      </div>
+  const removeFavorite = async (id: string) => {
+    setFavorites((prev) => prev.filter((f) => f.id !== id)); // оптимистично
+    setItems((prev) =>
+      prev.map((i) => (i.type === 'workout' && i.favoriteId === id ? { ...i, favoriteId: null } : i)),
     );
-  }
+    try {
+      await fetch(`/api/favorites/workouts?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    } catch {}
+  };
+
+  const favCount = favorites.length + likedShorts.length;
 
   return (
     <div className="min-h-screen bg-surface pb-nav">
-      {/* Header */}
-      <header className="flex items-center justify-between p-4 bg-[#101530]" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
-        <div className="flex items-center space-x-2">
-          <Link href="/profile" className="text-white hover:text-gray-300">
-            <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
-          </Link>
-          <h1 
-            className="text-white uppercase"
-            style={{
-              fontFamily: 'Overpass',
-              fontWeight: 700,
-              fontSize: '12px',
-              lineHeight: '120%',
-              letterSpacing: '0.5px',
-              verticalAlign: 'middle',
-              textTransform: 'uppercase'
-            }}
-          >
-            История и избранное
-          </h1>
-        </div>
+      {/* Шапка */}
+      <header className="flex items-center gap-4 p-4 safe-top">
+        <Link href="/profile" aria-label="Назад в профиль" className="inline-flex">
+          <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
+        </Link>
+        <h1 className="text-white text-xs font-bold font-overpass uppercase tracking-[0.5px]">
+          История и избранное
+        </h1>
       </header>
 
-      {/* Вкладки: составленные тренировки / отдельные видео */}
+      {/* Вкладки */}
       <div className="flex gap-2 px-4 pb-3">
-        {([
-          ['workouts', `Тренировки${workouts.length ? ` (${workouts.length})` : ''}`],
-          ['videos', 'Видео'],
-        ] as const).map(([key, label]) => (
+        {(
+          [
+            ['history', 'История'],
+            ['favorites', `Избранное${favCount ? ` (${favCount})` : ''}`],
+          ] as const
+        ).map(([key, label]) => (
           <button
             key={key}
             type="button"
-            onClick={() => setTab(key)}
-            className="font-overpass uppercase"
+            onClick={() => switchTab(key)}
+            className="font-overpass uppercase flex-1 rounded-full font-extrabold text-xs tracking-[0.5px] py-2.5 px-3 transition-colors"
             style={{
-              flex: 1,
-              padding: '10px 12px',
-              borderRadius: 999,
-              fontWeight: 800,
-              fontSize: 12,
-              letterSpacing: '0.5px',
-              border: `1px solid ${tab === key ? '#A1FF4A' : '#2a2f4a'}`,
-              background: tab === key ? 'rgba(161,255,74,0.12)' : 'transparent',
-              color: tab === key ? '#A1FF4A' : '#AEABBB',
-              cursor: 'pointer',
+              border: `1px solid ${tab === key ? 'var(--color-brand)' : '#2a2f4a'}`,
+              background: tab === key ? 'var(--lime-medium)' : 'transparent',
+              color: tab === key ? 'var(--color-brand)' : 'var(--color-muted)',
             }}
           >
             {label}
@@ -239,163 +268,246 @@ const WatchHistoryPage = () => {
         ))}
       </div>
 
-      {/* Вкладка «Тренировки» — сохранённые целиком занятия от ИИ */}
-      {tab === 'workouts' && (
+      {/* ─── История ─── */}
+      {tab === 'history' && (
         <div className="px-4">
-          {workouts.length === 0 ? (
+          {isLoading ? (
+            <div className="flex flex-col gap-3">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="rounded-2xl p-4 bg-night">
+                  <Skeleton width="w-3/4" height="h-4" />
+                  <div className="mt-3">
+                    <Skeleton width="w-1/2" height="h-3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : items.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-gray-400 text-lg">Пока пусто</p>
+              <p className="text-gray-400 text-lg">История пуста</p>
               <p className="text-gray-500 text-sm mt-2">
-                Заверши тренировку от ИИ-тренера и добавь её в избранное — она появится здесь
+                Здесь будут тренировки от ИИ-тренера и видео, которые ты смотрел
               </p>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {workouts.map((w) => (
-                <div
-                  key={w.id}
-                  className="rounded-2xl p-4"
-                  style={{ background: '#060919', border: '1px solid #2a2f4a' }}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="font-overpass" style={{ color: '#F9F8FE', fontWeight: 800, fontSize: 15 }}>
-                        {w.title}
-                      </div>
-                      <div style={{ color: '#AEABBB', fontSize: 12, marginTop: 4 }}>
-                        {w.modules.length} модул{w.modules.length === 1 ? 'ь' : w.modules.length < 5 ? 'я' : 'ей'}
-                        {w.totalDuration > 0 && ` · ${Math.round(w.totalDuration / 60)} мин`}
-                        {w.missingCount > 0 && ` · ${w.missingCount} недоступно`}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeWorkout(w.id)}
-                      aria-label="Убрать из избранного"
-                      style={{ color: '#A1FF4A', background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      <Star size={20} fill="#A1FF4A" aria-hidden />
-                    </button>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5 mt-3">
-                    {w.modules.map((m, i) => (
-                      <Link key={`${w.id}-${m.id}`} href={`/video/${m.id}`} className="flex items-center gap-2">
-                        <span style={{ color: '#445CFF', fontSize: 11, fontWeight: 800, width: 16 }}>{i + 1}</span>
-                        <span style={{ color: '#AEABBB', fontSize: 13 }} className="truncate">{m.title}</span>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              ))}
+              {items.map((item) =>
+                item.type === 'workout' ? (
+                  <WorkoutCard
+                    key={`w-${item.id}`}
+                    w={item}
+                    onToggleFavorite={() => toggleFavorite(item)}
+                  />
+                ) : (
+                  <VideoCard key={`v-${item.id}-${item.date}`} v={item} />
+                ),
+              )}
             </div>
           )}
         </div>
       )}
 
-      {/* Вкладка «Видео» — история отдельных просмотров */}
-      <div style={{ display: tab === 'videos' ? 'block' : 'none' }}>
-        {videos.length === 0 ? (
-          <div className="text-center py-12 px-4">
-            <p className="text-gray-400 text-lg">История пуста</p>
-            <p className="text-gray-500 text-sm mt-2">Здесь будут появляться видео, которые вы смотрели</p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {videos.map((video) => (
-              <Link key={video.id} href={`/video/${video.id}`}>
-                <div>
-                  {/* Video Thumbnail - 100% ширины экрана */}
-                  <div className="relative w-full aspect-video">
-                    <Image
-                      src={(video.thumbnail && video.thumbnail.trim() !== '') ? video.thumbnail : '/images/video_prew_2.png'}
-                      alt={video.title}
-                      fill
-                      className="object-cover"
-                    />
-                    {/* Duration badge */}
-                    <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm text-white text-sm font-medium px-2.5 py-1 rounded-lg">
-                      {formatDuration(video.duration)}
-                    </div>
-                  </div>
-                  
-                  {/* Video Info */}
-                  <div className="px-4 py-3">
-                    {/* Trainer Avatar + Title на одной строке */}
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-700">
-                        {video.trainer.avatar ? (
-                          <Image
-                            src={video.trainer.avatar}
-                            alt={`${video.trainer.name} ${video.trainer.lastName}`}
-                            width={40}
-                            height={40}
-                            className="object-cover w-full h-full"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-white font-bold">
-                            {video.trainer.name.charAt(0)}
-                          </div>
-                        )}
-                      </div>
-                      <h3 className="text-white text-base font-semibold line-clamp-2 leading-tight flex-1">
-                        {video.title.toUpperCase()}
-                      </h3>
-                    </div>
-                    
-                    {/* Tags - горизонтальный скролл */}
-                    <div
-                      className="overflow-x-auto -mx-4 px-4 mb-2"
-                      style={{
-                        scrollbarWidth: 'none',
-                        msOverflowStyle: 'none',
-                      }}
-                    >
-                      <div className="flex gap-2 w-max">
-                        {video.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="px-3 py-1 rounded-full text-xs whitespace-nowrap"
-                            style={{
-                              backgroundColor: '#AEABBB33',
-                              color: '#AEABBB',
-                            }}
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Trainer info - последняя строка */}
-                    <div
-                      style={{ fontSize: '12px' }}
-                      className="text-white/60 mt-2"
-                    >
-                      <span>
-                        {video.trainer.name} {video.trainer.lastName}
-                      </span>
-                      <span className="text-white/40"> | </span>
-                      <span>
-                        {video.likesCount >= 1000 
-                          ? `${(video.likesCount / 1000).toFixed(1)} тыс.` 
-                          : video.likesCount} лайков
-                      </span>
-                      <span className="text-white/40"> | </span>
-                      <span>оборудование ({video.equipment.join(' / ')})</span>
-                    </div>
+      {/* ─── Избранное ─── */}
+      {tab === 'favorites' && (
+        <div className="px-4">
+          {favLoading ? (
+            <div className="flex flex-col gap-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="rounded-2xl p-4 bg-night">
+                  <Skeleton width="w-3/4" height="h-4" />
+                  <div className="mt-3">
+                    <Skeleton width="w-1/2" height="h-3" />
                   </div>
                 </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          ) : favorites.length === 0 && likedShorts.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-400 text-lg">Пока пусто</p>
+              <p className="text-gray-500 text-sm mt-2">
+                Сохраняй тренировки звёздочкой, а треньки — лайком: всё появится здесь
+              </p>
+            </div>
+          ) : (
+            <>
+              {favorites.length > 0 && (
+                <section className="mb-6">
+                  <h2 className="text-muted text-xs font-medium font-overpass uppercase tracking-wide mb-2 px-1">
+                    Тренировки
+                  </h2>
+                  <div className="flex flex-col gap-3">
+                    {favorites.map((w) => (
+                      <div key={w.id} className="rounded-2xl p-4 bg-night border border-[#2a2f4a]">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-ink font-overpass font-extrabold text-[15px]">
+                              {w.title}
+                            </div>
+                            <div className="text-muted text-xs mt-1">
+                              {w.modules.length}{' '}
+                              {plural(w.modules.length, 'модуль', 'модуля', 'модулей')}
+                              {w.totalDuration > 0 && ` · ${Math.round(w.totalDuration / 60)} мин`}
+                              {w.missingCount > 0 && ` · ${w.missingCount} недоступно`}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeFavorite(w.id)}
+                            aria-label="Убрать из избранного"
+                            className="inline-flex text-brand shrink-0"
+                          >
+                            <Star size={20} fill="currentColor" aria-hidden />
+                          </button>
+                        </div>
+                        <div className="flex flex-col gap-1.5 mt-3">
+                          {w.modules.map((m, i) => (
+                            <Link
+                              key={`${w.id}-${m.id}`}
+                              href={`/video/${m.id}`}
+                              className="flex items-center gap-2"
+                            >
+                              <span className="text-brand-blue text-[11px] font-extrabold w-4">
+                                {i + 1}
+                              </span>
+                              <span className="text-muted text-[13px] truncate">{m.title}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {likedShorts.length > 0 && (
+                <section className="mb-6">
+                  <h2 className="text-muted text-xs font-medium font-overpass uppercase tracking-wide mb-2 px-1">
+                    Треньки
+                  </h2>
+                  <div className="grid grid-cols-3 gap-2">
+                    {likedShorts.map((s) => (
+                      <Link
+                        key={s.id}
+                        href={`/shorts/${s.id}`}
+                        className="relative rounded-xl overflow-hidden bg-night"
+                        style={{ aspectRatio: '9 / 16' }}
+                      >
+                        {s.thumbnail ? (
+                          <Image src={s.thumbnail} alt={s.title} fill className="object-cover" />
+                        ) : (
+                          <span
+                            className="absolute inset-0 flex items-center justify-center text-muted"
+                            aria-hidden
+                          >
+                            <Clapperboard size={24} />
+                          </span>
+                        )}
+                        <span className="absolute inset-x-0 bottom-0 p-2 text-white text-[11px] leading-tight line-clamp-2 bg-linear-to-t from-black/80 to-transparent pt-6">
+                          {s.title}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       <BottomNavigation activeTab="profile" />
     </div>
   );
 };
+
+// ── Карточки ленты истории ───────────────────────────────────────────────────
+
+const WorkoutCard = ({
+  w,
+  onToggleFavorite,
+}: {
+  w: WorkoutItem;
+  onToggleFavorite: () => void;
+}) => (
+  <div className="rounded-2xl p-4 bg-night border border-[#2a2f4a]">
+    <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start gap-3 min-w-0">
+        <span
+          className="flex items-center justify-center bg-brand/15 text-brand shrink-0 rounded-full"
+          style={{ width: 40, height: 40 }}
+          aria-hidden
+        >
+          <Sparkles size={20} />
+        </span>
+        <div className="min-w-0">
+          <div className="text-ink font-overpass font-extrabold text-[15px]">{w.title}</div>
+          <div className="text-muted text-xs mt-1">
+            {formatDate(w.date)}
+            {w.cycleLabel && ` · ${w.cycleLabel}`}
+          </div>
+          <div className="text-muted text-xs mt-0.5">
+            {w.completedModules} из {w.totalModules}{' '}
+            {plural(w.totalModules, 'модуля', 'модулей', 'модулей')}
+            {w.totalDuration > 0 && ` · ${Math.round(w.totalDuration / 60)} мин`}
+            {w.status === 'PARTIAL' && ' · досрочный финиш'}
+          </div>
+        </div>
+      </div>
+      {/* Сохранить тренировку целиком — потом можно повторить из «Избранного» */}
+      <button
+        type="button"
+        onClick={onToggleFavorite}
+        aria-label={w.favoriteId ? 'Убрать из избранного' : 'В избранное'}
+        aria-pressed={!!w.favoriteId}
+        className={`inline-flex shrink-0 ${w.favoriteId ? 'text-brand' : 'text-muted'}`}
+      >
+        <Star size={20} fill={w.favoriteId ? 'currentColor' : 'none'} aria-hidden />
+      </button>
+    </div>
+  </div>
+);
+
+const VideoCard = ({ v }: { v: VideoItem }) => (
+  <Link href={`/video/${v.id}`} className="rounded-2xl overflow-hidden bg-night">
+    <div className="relative w-full aspect-video">
+      <Image
+        src={v.thumbnail && v.thumbnail.trim() !== '' ? v.thumbnail : '/images/video_prew_2.png'}
+        alt={v.title}
+        fill
+        className="object-cover"
+      />
+      <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm text-white text-sm font-medium px-2.5 py-1 rounded-lg">
+        {formatDuration(v.duration)}
+      </div>
+    </div>
+    <div className="p-4">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-gray-700">
+          {v.trainer.avatar ? (
+            <Image
+              src={v.trainer.avatar}
+              alt={`${v.trainer.name} ${v.trainer.lastName}`}
+              width={40}
+              height={40}
+              className="object-cover w-full h-full"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-white font-bold">
+              {v.trainer.name.charAt(0)}
+            </div>
+          )}
+        </div>
+        <h3 className="text-white text-base font-semibold line-clamp-2 leading-tight flex-1">
+          {v.title.toUpperCase()}
+        </h3>
+      </div>
+      <div className="text-white/60 text-xs mt-2">
+        {formatDate(v.date)} · {v.trainer.name} {v.trainer.lastName}
+        {v.equipment.length > 0 && ` · ${v.equipment.join(' / ')}`}
+      </div>
+    </div>
+  </Link>
+);
 
 // useSearchParams в клиентской странице требует Suspense-границу (App Router:
 // без неё пререндер страницы падает с ошибкой сборки).

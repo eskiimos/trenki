@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
 import { workoutTitle } from '@/lib/training/workout-title';
+import { goalsFromStoredDays } from '@/lib/microcycle/week-plan';
 
 /**
  * Избранные тренировки целиком (составленные ИИ).
@@ -68,12 +69,37 @@ export async function POST(request: NextRequest) {
       userId: true,
       goal: true,
       energyState: true,
+      coachId: true,
       videos: { orderBy: { order: 'asc' }, select: { videoId: true } },
+      microcycleDay: {
+        select: {
+          dayOfWeek: true,
+          microcycle: {
+            select: { cycleNumber: true, days: { select: { dayOfWeek: true, intent: true } } },
+          },
+        },
+      },
     },
   });
   if (!session) return NextResponse.json({ error: 'Тренировка не найдена' }, { status: 404 });
   if (session.userId !== auth.user.id) {
     return NextResponse.json({ error: 'Доступ запрещён' }, { status: 403 });
+  }
+
+  // Название — как в /api/profile/history (клиентскому title не доверяем):
+  // у цикловых goal/energyState пусты, и без этого несколько сохранённых дней
+  // цикла превращались в неотличимые «Тренировка от ИИ-тренера».
+  let title = workoutTitle(session.goal, session.energyState);
+  const mday = session.microcycleDay;
+  if (mday?.microcycle && !session.goal) {
+    const plans = goalsFromStoredDays(
+      mday.microcycle.days.map((d) => ({ dayOfWeek: d.dayOfWeek, intent: d.intent })),
+      mday.microcycle.cycleNumber,
+    );
+    const plan = plans.find((p) => p.dayOfWeek === mday.dayOfWeek);
+    if (plan) title = `${plan.label} · Цикл №${mday.microcycle.cycleNumber}`;
+  } else if (!mday && session.coachId) {
+    title = 'Задание от тренера';
   }
 
   const videoIds = session.videos.map((v) => v.videoId);
@@ -90,19 +116,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ workout: { id: existing.id }, alreadyExists: true });
   }
 
-  const created = await prisma.favoriteWorkout.create({
-    data: {
-      userId: auth.user.id,
-      title: workoutTitle(session.goal, session.energyState),
-      goal: session.goal,
-      energyState: session.energyState,
-      videoIds,
-      sourceSessionId: sessionId,
-    },
-    select: { id: true, title: true },
-  });
-
-  return NextResponse.json({ workout: created });
+  try {
+    const created = await prisma.favoriteWorkout.create({
+      data: {
+        userId: auth.user.id,
+        title,
+        goal: session.goal,
+        energyState: session.energyState,
+        videoIds,
+        sourceSessionId: sessionId,
+      },
+      select: { id: true, title: true },
+    });
+    return NextResponse.json({ workout: created });
+  } catch (e: unknown) {
+    // Гонка дабл-тапа: параллельный POST успел создать запись между findFirst
+    // и create — уникальный индекс (userId, sourceSessionId) вернул P2002.
+    // Отдаём существующую, как в ветке alreadyExists.
+    if (e && typeof e === 'object' && (e as { code?: string }).code === 'P2002') {
+      const dup = await prisma.favoriteWorkout.findFirst({
+        where: { userId: auth.user.id, sourceSessionId: sessionId },
+        select: { id: true },
+      });
+      if (dup) return NextResponse.json({ workout: { id: dup.id }, alreadyExists: true });
+    }
+    throw e;
+  }
 }
 
 export async function DELETE(request: NextRequest) {

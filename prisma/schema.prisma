@@ -256,6 +256,10 @@ model FavoriteWorkout {
   createdAt   DateTime      @default(now())
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Гонка дабл-тапа по звёздочке: два POST могли пройти findFirst до create
+  // друг друга и создать дубль. NULL'ы (legacy без sourceSessionId) уникальность
+  // не нарушают (Postgres NULLS DISTINCT).
+  @@unique([userId, sourceSessionId])
   @@index([userId, createdAt])
   @@map("favorite_workouts")
 }

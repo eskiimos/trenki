@@ -399,13 +399,18 @@ const ProfilePage = () => {
 
         {/* ─── Мои тренировки ─── */}
         <SettingsGroup title="Мои тренировки">
-          <NavRow href="/profile/watch-history" icon={History} label="История тренировок" />
-          {/* Избранные тренировки — видимый вход (список живёт во вкладке
-              «Тренировки» истории; открываем сразу на ней) */}
           <NavRow
-            href="/profile/watch-history?tab=workouts"
+            href="/profile/watch-history"
+            icon={History}
+            label="История тренировок"
+            hint="Тренировки от ИИ-тренера и просмотренные видео"
+          />
+          {/* Избранное — вкладка того же экрана (тренировки + лайкнутые треньки) */}
+          <NavRow
+            href="/profile/watch-history?tab=favorites"
             icon={Star}
-            label="Избранные тренировки"
+            label="Избранное"
+            hint="Сохранённые тренировки и треньки"
           />
           <NavRow href="/profile/assignments" icon={ClipboardList} label="Задания от тренера" />
         </SettingsGroup>
