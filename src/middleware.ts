@@ -49,6 +49,16 @@ function generateNonce(): string {
  * — style-src 'unsafe-inline' нужен для Tailwind/next/font, в dev — ещё 'unsafe-eval'.
  */
 function buildCsp(nonce: string, isDev: boolean): string {
+  // Собственное S3-хранилище (reg.ru): presigned GET играется в <video>
+  // (media-src), публичные превью — <img> (img-src), админ-заливка — XHR PUT
+  // (connect-src). Без этих хостов браузер молча блокировал весь S3-флоу.
+  // Origin берём из env (фолбэк — боевой endpoint, чтобы CSP не зависела от
+  // порядка выкладки env).
+  let s3Origin = 'https://s3.regru.cloud';
+  try {
+    if (process.env.S3_ENDPOINT) s3Origin = new URL(process.env.S3_ENDPOINT).origin;
+  } catch {}
+
   const directives: Record<string, string[]> = {
     'default-src': ["'self'"],
     'script-src': [
@@ -73,6 +83,7 @@ function buildCsp(nonce: string, isDev: boolean): string {
       'https://placehold.co',
       'https://mc.yandex.ru',
       'https://mc.webvisor.com',
+      s3Origin,
     ],
     'media-src': [
       "'self'",
@@ -81,6 +92,7 @@ function buildCsp(nonce: string, isDev: boolean): string {
       'https://kinescope.io',
       'https://*.kinescope.io',
       'https://kinescopecdn.net',
+      s3Origin,
     ],
     'connect-src': [
       "'self'",
@@ -93,6 +105,7 @@ function buildCsp(nonce: string, isDev: boolean): string {
       'https://mc.yandex.ru',
       'https://mc.webvisor.com',
       'wss://mc.webvisor.com',
+      s3Origin,
     ],
     'frame-src': ["'self'", 'https://kinescope.io', 'https://*.kinescope.io', 'https://mc.yandex.ru'],
     'worker-src': ["'self'", 'blob:'],

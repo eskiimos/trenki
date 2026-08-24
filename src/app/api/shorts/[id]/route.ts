@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireAdminAsync } from '@/lib/admin-session';
 import { getSessionUserId } from '@/lib/auth-server';
 import { rateLimit } from '@/lib/coach/rate-limit';
+import { deleteS3ObjectsByUrls } from '@/lib/s3';
 
 // GET - получить short по ID (публичное, isLiked при наличии сессии)
 export async function GET(
@@ -101,9 +102,21 @@ export async function DELETE(
   try {
     const { id } = await context.params;
 
+    // URL файлов снимаем до удаления записи: если шортс лежит в нашем S3
+    // (публичный https бакета), объект надо удалить — иначе мусор копится, а
+    // осиротевший публичный файл остаётся доступен навсегда.
+    const fileUrls = await prisma.short.findUnique({
+      where: { id },
+      select: { videoUrl: true, thumbnail: true },
+    });
+
     await prisma.short.delete({
       where: { id },
     });
+
+    if (fileUrls) {
+      await deleteS3ObjectsByUrls([fileUrls.videoUrl, fileUrls.thumbnail]);
+    }
 
     return NextResponse.json({ message: 'Short deleted successfully' });
   } catch (error: any) {

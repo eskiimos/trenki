@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAuthUser } from '@/lib/coach/guards';
 
 // Функция для форматирования продолжительности в YouTube формате (MM:SS или H:MM:SS)
 function formatDuration(seconds: number): string {
@@ -16,6 +17,15 @@ function formatDuration(seconds: number): string {
 
 export async function GET(request: NextRequest) {
   try {
+    // Роут был ВООБЩЕ без auth и отдавал сырые videoUrl всего каталога
+    // (включая неопубликованный) — анонимный обход paywall. Потребители:
+    // админка (videos, training-modules) и тренерский конструктор заданий
+    // (coach/assignments/new) — всем достаточно requireAuthUser; сырой
+    // videoUrl нужен только админ-формам редактирования.
+    const auth = await requireAuthUser(request);
+    if ('response' in auth) return auth.response;
+    const includeVideoUrl = auth.user.isAdmin === true;
+
     // Получаем ВСЕ видео, включая неопубликованные
     const videos = await prisma.video.findMany({
       include: {
@@ -59,7 +69,9 @@ export async function GET(request: NextRequest) {
       description: video.description,
       duration: video.duration, // Число для админки
       durationFormatted: formatDuration(video.duration), // Строка для отображения
-      videoUrl: video.videoUrl,
+      // Сырой URL — только админам (формы редактирования); тренеру для
+      // выбора видео в задание он не нужен.
+      videoUrl: includeVideoUrl ? video.videoUrl : undefined,
       thumbnail: video.thumbnail,
       category: video.category,
       difficulty: video.difficulty,

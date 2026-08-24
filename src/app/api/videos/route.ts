@@ -83,7 +83,9 @@ export async function GET(request: NextRequest) {
         description: video.description,
         duration: video.duration, // Возвращаем как число (секунды)
         durationFormatted: formatDuration(video.duration), // Форматированная строка для отображения
-        videoUrl: video.videoUrl,
+        // Сырой videoUrl каталогу НЕ отдаём: плеер получает играбельный URL из
+        // гейтированного /api/videos/[id] (paywall + presigned для s3://), а
+        // здесь прямые Kinescope-ссылки текли мимо гейта любому залогиненному.
         thumbnail: video.thumbnail,
         category: video.category,
         difficulty: video.difficulty,

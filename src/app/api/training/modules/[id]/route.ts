@@ -3,10 +3,14 @@ import prisma from '@/lib/prisma';
 import { requireAdminAsync } from '@/lib/admin-session';
 
 // GET /api/training/modules/:id - Получить модуль по ID
+// Только админ (см. комментарий в ../route.ts): без auth роут отдавал сырой
+// videoUrl анониму.
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireAdminAsync(request);
+  if (denied) return denied;
   try {
     const { id } = await params;
     const module = await prisma.trainingModule.findUnique({

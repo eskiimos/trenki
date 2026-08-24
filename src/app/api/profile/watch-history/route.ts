@@ -61,7 +61,8 @@ export async function GET(request: NextRequest) {
         title: video.title,
         description: video.description,
         duration: video.duration,
-        videoUrl: video.videoUrl,
+        // Сырой videoUrl не отдаём: страница истории навигирует на /video/[id],
+        // играбельный URL выдаёт гейтированный /api/videos/[id]
         thumbnail: video.thumbnail,
         category: video.category,
         difficulty: video.difficulty,

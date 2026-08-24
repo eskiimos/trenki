@@ -3,7 +3,11 @@ import prisma from '@/lib/prisma';
 import { requireAdminAsync } from '@/lib/admin-session';
 
 // GET /api/training/modules - Получить все модули
+// Только админ (единственный потребитель — /admin/training-modules): раньше
+// роут был без auth и отдавал полный ряд Video с сырым videoUrl анониму.
 export async function GET(request: NextRequest) {
+  const denied = await requireAdminAsync(request);
+  if (denied) return denied;
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type'); // Фильтр по типу модуля

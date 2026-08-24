@@ -1,4 +1,4 @@
-import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { logger } from '@/lib/logger';
 
@@ -112,6 +112,46 @@ export async function presignPutUrl(
  * При отсутствии конфига или ошибке подписи возвращаем сырой s3:// (неиграбельно,
  * но без 500 — деградируем мягко, как и остальные интеграции).
  */
+/**
+ * Ключ объекта из ПУБЛИЧНОГО https-URL нашего бакета
+ * (`<endpoint>/<bucket>/<key>` — path-style reg.ru; так пишутся превью и
+ * шортсы). null для чужих URL (Kinescope, Cloudinary) — их не трогаем.
+ */
+export function s3KeyFromPublicUrl(url: string | null | undefined): string | null {
+  const config = getS3Config();
+  if (!config || !url) return null;
+  const prefix = `${config.endpoint}/${config.bucket}/`;
+  if (!url.startsWith(prefix)) return null;
+  const key = url.slice(prefix.length).split('?')[0];
+  return key.length > 0 ? decodeURIComponent(key) : null;
+}
+
+/**
+ * Best-effort удаление объектов при удалении/замене контента: без него бакет
+ * бесконечно копит мусор (оплачиваемое место), а осиротевшие ПУБЛИЧНЫЕ превью
+ * остаются доступны по прямым URL навсегда. Ошибки логируем и глотаем —
+ * удаление записи в БД важнее файла.
+ * Принимает наши url-формы: s3://<key> и публичный https нашего бакета.
+ */
+export async function deleteS3ObjectsByUrls(urls: Array<string | null | undefined>): Promise<void> {
+  const config = getS3Config();
+  if (!config) return; // S3 не сконфигурирован — удалять нечего
+  const keys = urls
+    .map((u) => (u ? s3KeyFromUrl(u) ?? s3KeyFromPublicUrl(u) : null))
+    .filter((k): k is string => !!k);
+  await Promise.all(
+    keys.map(async (key) => {
+      try {
+        await getClient(config).send(
+          new DeleteObjectCommand({ Bucket: config.bucket, Key: key }),
+        );
+      } catch (error) {
+        logger.error('deleteS3ObjectsByUrls: не удалось удалить объект', { key, error: String(error) });
+      }
+    }),
+  );
+}
+
 export async function resolveVideoUrl(url: string): Promise<string> {
   const key = s3KeyFromUrl(url);
   if (!key) return url;

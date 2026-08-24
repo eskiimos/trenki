@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireAdminAsync } from '@/lib/admin-session';
 import { gatePaidContent } from '@/lib/coach/guards';
 import { getFreeLessonVideoId } from '@/lib/settings';
-import { resolveVideoUrl } from '@/lib/s3';
+import { resolveVideoUrl, deleteS3ObjectsByUrls } from '@/lib/s3';
 
 export async function GET(
   request: NextRequest,
@@ -352,6 +352,14 @@ export async function DELETE(
   try {
     const { id } = await params;
 
+    // Файлы в S3 (видео s3://, превью — публичный https нашего бакета) чистим
+    // после удаления записи: иначе бакет копит мусор навсегда. URL снимаем до
+    // удаления строки.
+    const fileUrls = await prisma.video.findUnique({
+      where: { id },
+      select: { videoUrl: true, thumbnail: true },
+    });
+
     // Удаляем/отвязываем все связанные записи, чтобы не падать на ограничениях FK
     await prisma.$transaction([
       // Лайки к видео
@@ -372,6 +380,11 @@ export async function DELETE(
 
     // И только после этого удаляем саму запись видео
     await prisma.video.delete({ where: { id } });
+
+    // Файлы — best-effort после успешного удаления записи
+    if (fileUrls) {
+      await deleteS3ObjectsByUrls([fileUrls.videoUrl, fileUrls.thumbnail]);
+    }
 
     return NextResponse.json({ success: true, message: 'Video deleted successfully' });
   } catch (error: any) {
