@@ -256,12 +256,14 @@ export default function TrainingHistoryPage() {
           {workouts.map((workout) => {
             const loadLabel = loadDirectionLabels[workout.loadDirection as keyof typeof loadDirectionLabels] || loadDirectionLabels.MEDIUM;
             const isCompleted = workout.status === 'COMPLETED';
+            // Досрочный финиш: часть модулей пройдена и засчитана — это не «пропущена»
+            const isPartial = workout.status === 'PARTIAL';
             
             return (
               <div
                 key={workout.id}
                 className={`p-4 rounded-xl ${
-                  isCompleted ? 'bg-gray-800' : 'bg-gray-800/50 border-2 border-gray-700'
+                  isCompleted || isPartial ? 'bg-gray-800' : 'bg-gray-800/50 border-2 border-gray-700'
                 }`}
               >
                 <div className="flex justify-between items-start mb-3">
@@ -272,10 +274,10 @@ export default function TrainingHistoryPage() {
                     </h3>
                   </div>
                   <div className={`px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1.5 ${
-                    isCompleted ? 'bg-green-900/30 text-green-400' : 'bg-yellow-900/30 text-yellow-400'
+                    isCompleted || isPartial ? 'bg-green-900/30 text-green-400' : 'bg-yellow-900/30 text-yellow-400'
                   }`}>
-                    {isCompleted ? <Check size={16} aria-hidden /> : <Pause size={16} aria-hidden />}
-                    {isCompleted ? 'Завершена' : 'Пропущена'}
+                    {isCompleted || isPartial ? <Check size={16} aria-hidden /> : <Pause size={16} aria-hidden />}
+                    {isCompleted ? 'Завершена' : isPartial ? 'Досрочный финиш' : 'Пропущена'}
                   </div>
                 </div>
 

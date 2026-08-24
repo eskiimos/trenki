@@ -1407,7 +1407,10 @@ export default function VideoPage({ params }: VideoPageProps) {
           <button
             onClick={() => {
               if (fromWorkout) {
-                router.push('/training/workout');
+                // ОБЯЗАТЕЛЬНО с ?id: плеер без id берёт «самую свежую висящую»
+                // сессию, а у активного цикла их 5 — возврат приводил к ДРУГОЙ
+                // тренировке с другой целью и модулями (баг «назад → рандомная»).
+                router.push(sessionId ? `/training/workout?id=${sessionId}` : '/training/workout');
               } else {
                 router.back();
               }

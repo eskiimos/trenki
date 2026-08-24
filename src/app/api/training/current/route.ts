@@ -39,22 +39,73 @@ export async function GET(request: NextRequest) {
     }
 
     if (!workout) {
-      workout = await prisma.workoutSession.findFirst({
-        where: {
-          userId,
-          status: { in: [WorkoutStatus.PENDING, WorkoutStatus.IN_PROGRESS] },
-        },
-        include: {
-          videos: {
-            include: {
-              video: { include: { trainer: true } },
-            },
-            orderBy: { order: 'asc' },
+      // Фолбэк без workoutId. Раньше брали просто «самую свежую висящую»
+      // (createdAt desc) — но у активного микроцикла 5 PENDING-сессий, созданных
+      // одной транзакцией, и выпадала фактически произвольная (баг «назад →
+      // рандомная тренировка»). Приоритет:
+      //   1) реально НАЧАТАЯ (IN_PROGRESS) — человек к ней и возвращается;
+      //   2) самая свежая PENDING, если она НЕ цикловая (осознанная быстрая,
+      //      в т.ч. только что созданная замена дня — как раньше);
+      //   3) если свежайшая — цикловая (их 5 с одинаковым createdAt):
+      //      СЕГОДНЯШНИЙ день цикла, а не произвольный.
+      const include = {
+        videos: {
+          include: {
+            video: { include: { trainer: true } },
           },
-          microcycleDay: { include: { microcycle: { include: { days: true } } } },
+          orderBy: { order: 'asc' as const },
         },
-        orderBy: { createdAt: 'desc' },
+        microcycleDay: { include: { microcycle: { include: { days: true } } } },
+      };
+
+      workout = await prisma.workoutSession.findFirst({
+        where: { userId, status: WorkoutStatus.IN_PROGRESS },
+        include,
+        orderBy: { startedAt: 'desc' },
       });
+
+      if (!workout) {
+        const freshest = await prisma.workoutSession.findFirst({
+          where: { userId, status: WorkoutStatus.PENDING },
+          include,
+          orderBy: { createdAt: 'desc' },
+        });
+        workout = freshest;
+
+        if (freshest?.microcycleDay) {
+          // «Сегодня» считаем в UTC-днях — в ТОЙ ЖЕ системе координат, что
+          // хранимый якорь weekStartDate (UTC-полночь, см. week-start.ts и
+          // todayCycleDayIndex в offer.ts). Смешение с МСК давало бы другой
+          // «сегодняшний» день, чем остальные точки входа.
+          const DAY_MS = 24 * 60 * 60 * 1000;
+          const todayIdx = Math.floor(Date.now() / DAY_MS);
+          const activeDays = await prisma.microcycleDay.findMany({
+            where: {
+              workoutSessionId: { not: null },
+              microcycle: { userId, status: { not: MicrocycleStatus.ARCHIVED } },
+              workoutSession: { status: WorkoutStatus.PENDING },
+            },
+            select: {
+              dayOfWeek: true,
+              workoutSessionId: true,
+              microcycle: { select: { weekStartDate: true } },
+            },
+          });
+          const todays = activeDays.find(
+            (d) =>
+              Math.floor(
+                (d.microcycle.weekStartDate.getTime() + (d.dayOfWeek - 1) * DAY_MS) / DAY_MS,
+              ) === todayIdx,
+          );
+          if (todays?.workoutSessionId && todays.workoutSessionId !== freshest.id) {
+            workout =
+              (await prisma.workoutSession.findUnique({
+                where: { id: todays.workoutSessionId },
+                include,
+              })) ?? freshest;
+          }
+        }
+      }
 
       if (workout) {
         // Сессии, входящие в активный микроцикл, НЕ помечаем SKIPPED — иначе
@@ -72,11 +123,17 @@ export async function GET(request: NextRequest) {
           .map((d) => d.workoutSessionId)
           .filter((id): id is string => id !== null);
 
+        // Гасим только хвосты СТРОГО СТАРШЕ выбранной: cleanup писался под
+        // инвариант «выбрана самая свежая», а теперь выбранной может оказаться
+        // IN_PROGRESS/сегодняшний день цикла — без неравенства свежесозданная
+        // быстрая (в т.ч. замена дня) помечалась бы SKIPPED при заходе на
+        // главную.
         await prisma.workoutSession.updateMany({
           where: {
             userId,
             status: { in: [WorkoutStatus.PENDING, WorkoutStatus.IN_PROGRESS] },
             id: { not: workout.id, notIn: protectedIds },
+            createdAt: { lt: workout.createdAt },
           },
           data: { status: WorkoutStatus.SKIPPED },
         });

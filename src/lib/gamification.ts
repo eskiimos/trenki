@@ -36,21 +36,41 @@ export function computeXp(c: XpCounts): number {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Ключ календарного дня — локальная полночь (как в computeStreak). */
-function dayKey(d: Date): number {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x.getTime();
+/**
+ * Календарный день как ПОРЯДКОВЫЙ НОМЕР (дней с эпохи) в таймзоне tz.
+ *
+ * Без tz — таймзона процесса, как раньше. Прод-контейнер жил в UTC, и «день»
+ * серии переключался в 03:00 МСК: тренировка в 00:30 ночи ложилась во
+ * вчерашний день, в серии возникала дырка и стрик «внезапно» сбрасывался
+ * (жалоба владельца «было 3 — стало 1»). Поэтому боевые вызовы передают
+ * таймзону ПОЛЬЗОВАТЕЛЯ (User.timezone, фолбэк Europe/Moscow).
+ *
+ * Номер дня вместо «миллисекунд полуночи»: арифметика серий идёт шагом 1, а не
+ * −24ч — в таймзонах с DST сутки бывают 23/25 часов, и шаг −24ч там ломается.
+ */
+export function calendarDayIndex(d: Date, tz?: string | null): number {
+  if (tz) {
+    try {
+      // en-CA → 'YYYY-MM-DD'
+      const s = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(d);
+      const [y, m, dd] = s.split('-').map(Number);
+      return Date.UTC(y, m - 1, dd) / DAY_MS;
+    } catch {
+      // невалидная tz из БД — тихо падаем на таймзону процесса
+    }
+  }
+  return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY_MS;
 }
 
 /**
  * Множитель дня D по правилу «Темп ×2»: runLength(D) ≥ TEMPO_MIN_STREAK ⇔
  * дни D, D-1, D-2 все «тренировочные» — проверять глубже не нужно, ведь
  * наличие трёх последних дней уже означает серию длиной ≥ 3, заканчивающуюся D.
+ * day — номер календарного дня (calendarDayIndex).
  */
 function tempoMultiplierForDay(day: number, workoutDays: ReadonlySet<number>): number {
   for (let i = 0; i < TEMPO_MIN_STREAK; i += 1) {
-    if (!workoutDays.has(day - i * DAY_MS)) return 1;
+    if (!workoutDays.has(day - i)) return 1;
   }
   return TEMPO_MULTIPLIER;
 }
@@ -60,9 +80,13 @@ function tempoMultiplierForDay(day: number, workoutDays: ReadonlySet<number>): n
  * Нужен, чтобы показать реальный начисленный XP сразу после тренировки (тот же
  * множитель, что применяет ретроактивный расчёт к сегодняшнему дню).
  */
-export function tempoMultiplierToday(workoutCompletedAts: Date[], now: Date = new Date()): number {
-  const days = new Set(workoutCompletedAts.map(dayKey));
-  return tempoMultiplierForDay(dayKey(now), days);
+export function tempoMultiplierToday(
+  workoutCompletedAts: Date[],
+  now: Date = new Date(),
+  tz?: string | null,
+): number {
+  const days = new Set(workoutCompletedAts.map((d) => calendarDayIndex(d, tz)));
+  return tempoMultiplierForDay(calendarDayIndex(now, tz), days);
 }
 
 export interface XpFromHistory {
@@ -90,21 +114,24 @@ export function computeXpFromHistory(
   moduleCompletedAts: Date[],
   now: Date = new Date(),
   trainingDayAts: Date[] = workoutCompletedAts,
+  tz?: string | null,
 ): XpFromHistory {
-  const workoutDays: ReadonlySet<number> = new Set(trainingDayAts.map(dayKey));
+  const workoutDays: ReadonlySet<number> = new Set(
+    trainingDayAts.map((d) => calendarDayIndex(d, tz)),
+  );
 
   let xpTotal = 0;
   for (const w of workoutCompletedAts) {
-    xpTotal += XP_PER_COMPLETED_WORKOUT * tempoMultiplierForDay(dayKey(w), workoutDays);
+    xpTotal += XP_PER_COMPLETED_WORKOUT * tempoMultiplierForDay(calendarDayIndex(w, tz), workoutDays);
   }
   for (const m of moduleCompletedAts) {
-    xpTotal += XP_PER_COMPLETED_MODULE * tempoMultiplierForDay(dayKey(m), workoutDays);
+    xpTotal += XP_PER_COMPLETED_MODULE * tempoMultiplierForDay(calendarDayIndex(m, tz), workoutDays);
   }
 
   // Для «активен ли темп» серию считаем честно через computeStreak (якорь —
   // сегодня либо вчера: сегодня ещё можно успеть, темп не потерян). Серия — по
   // всем тренировочным дням, включая досрочные.
-  const tempoActiveToday = computeStreak(trainingDayAts, now) >= TEMPO_MIN_STREAK;
+  const tempoActiveToday = computeStreak(trainingDayAts, now, tz) >= TEMPO_MIN_STREAK;
 
   return { xpTotal, tempoActiveToday };
 }
@@ -121,25 +148,32 @@ export interface DayActivityCount {
  * lookback-дни (2 дня ДО weekStart): они участвуют только в определении
  * множителя (правило D, D-1, D-2), но в сумму XP не входят — суммируются
  * только дни D ≥ weekStart. Так серия Пт-Сб-Вс честно даёт ×2 с понедельника.
+ *
+ * `trainingDayCounts` — тренировочные дни для множителя темпа (COMPLETED ∪
+ * PARTIAL): досрочный финиш держит серию/темп, хотя бонус ×100 не даёт — так
+ * лига сходится с профильным XP. По умолчанию = workoutDayCounts (старое
+ * поведение). tz — таймзона календарного дня (лига живёт в единой МСК).
  */
 export function computeWeeklyXp(
   workoutDayCounts: DayActivityCount[],
   moduleDayCounts: DayActivityCount[],
   weekStart: Date,
+  trainingDayCounts: DayActivityCount[] = workoutDayCounts,
+  tz?: string | null,
 ): number {
   const workoutDays: ReadonlySet<number> = new Set(
-    workoutDayCounts.filter((c) => c.count > 0).map((c) => dayKey(c.day)),
+    trainingDayCounts.filter((c) => c.count > 0).map((c) => calendarDayIndex(c.day, tz)),
   );
-  const start = dayKey(weekStart);
+  const start = calendarDayIndex(weekStart, tz);
 
   let xp = 0;
   for (const c of workoutDayCounts) {
-    const day = dayKey(c.day);
+    const day = calendarDayIndex(c.day, tz);
     if (day < start) continue; // lookback — только для множителя
     xp += c.count * XP_PER_COMPLETED_WORKOUT * tempoMultiplierForDay(day, workoutDays);
   }
   for (const c of moduleDayCounts) {
-    const day = dayKey(c.day);
+    const day = calendarDayIndex(c.day, tz);
     if (day < start) continue;
     // День без тренировки автоматически даёт ×1 (его нет в workoutDays)
     xp += c.count * XP_PER_COMPLETED_MODULE * tempoMultiplierForDay(day, workoutDays);
@@ -202,27 +236,26 @@ export function statusFromLevel(level: number) {
 }
 
 /**
- * Стрик по датам завершённых тренировок (локальная полночь). Серия жива, если
- * последняя тренировка сегодня или вчера; считаем подряд идущие дни назад.
- * Дни передаются как timestamps завершений (в любом порядке).
+ * Стрик по датам завершённых тренировок. Серия жива, если последняя тренировка
+ * сегодня или вчера; считаем подряд идущие дни назад. Дни передаются как
+ * timestamps завершений (в любом порядке). tz — таймзона, в которой лежит
+ * граница календарного дня (см. calendarDayIndex); без tz — таймзона процесса.
  */
-export function computeStreak(completedAts: Date[], now: Date = new Date()): number {
+export function computeStreak(
+  completedAts: Date[],
+  now: Date = new Date(),
+  tz?: string | null,
+): number {
   if (completedAts.length === 0) return 0;
-  const day = (d: Date) => {
-    const x = new Date(d);
-    x.setHours(0, 0, 0, 0);
-    return x.getTime();
-  };
-  const days = new Set(completedAts.map(day));
-  const DAY_MS = 24 * 60 * 60 * 1000;
-  const today = day(now);
+  const days = new Set(completedAts.map((d) => calendarDayIndex(d, tz)));
+  const today = calendarDayIndex(now, tz);
   // Якорь: сегодня, либо вчера (сегодня ещё можно успеть — серия не потеряна)
   let anchor: number;
   if (days.has(today)) anchor = today;
-  else if (days.has(today - DAY_MS)) anchor = today - DAY_MS;
+  else if (days.has(today - 1)) anchor = today - 1;
   else return 0;
 
   let streak = 0;
-  while (days.has(anchor - streak * DAY_MS)) streak += 1;
+  while (days.has(anchor - streak)) streak += 1;
   return streak;
 }

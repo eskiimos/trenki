@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
         where: {
           userId,
           status: {
-            in: [WorkoutStatus.COMPLETED, WorkoutStatus.SKIPPED],
+            in: [WorkoutStatus.COMPLETED, WorkoutStatus.PARTIAL, WorkoutStatus.SKIPPED],
           },
         },
         include: {
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
         where: {
           userId,
           status: {
-            in: [WorkoutStatus.COMPLETED, WorkoutStatus.SKIPPED],
+            in: [WorkoutStatus.COMPLETED, WorkoutStatus.PARTIAL, WorkoutStatus.SKIPPED],
           },
         },
       }),

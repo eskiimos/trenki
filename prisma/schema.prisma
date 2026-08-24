@@ -492,6 +492,13 @@ model WorkoutSession {
   // («Убегаем от соперника · Лёгкая нагрузка»).
   goal                  TrainingGoal?
   energyState           EnergyState?
+  // C-4 «засчитать быструю в цикл»: эта быстрая тренировка — ЗАМЕНА циклового
+  // дня; его сессия закрывается сервером при ЗАВЕРШЕНИИ быстрой (раньше клиент
+  // закрывал день авансом в момент создания замены — дни считались выполненными
+  // без единой тренировки). SetNull: пересборка цикла удаляет его сессии.
+  closesCycleSessionId  String?
+  closesCycleSession    WorkoutSession?         @relation("CycleReplacement", fields: [closesCycleSessionId], references: [id], onDelete: SetNull)
+  replacedByQuick       WorkoutSession[]        @relation("CycleReplacement")
   videos                WorkoutSessionVideo[]
   characteristicHistory CharacteristicHistory[]
   coach                 User?                   @relation("CoachWorkoutSessions", fields: [coachId], references: [id], onDelete: SetNull)

@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useSearchParams } from 'next/navigation';
 import { Star } from 'lucide-react';
 import BottomNavigation from '@/components/BottomNavigation';
 import { Skeleton } from '@/components/Skeleton';
@@ -60,14 +61,22 @@ interface FavWorkout {
 }
 
 const WatchHistoryPage = () => {
+  const searchParams = useSearchParams();
+  // Явно запрошенная вкладка из URL: профиль ведёт сюда двумя ссылками —
+  // «История тренировок» (без tab) и «Избранные тренировки» (?tab=workouts).
+  // Раньше параметр игнорировался и обе ссылки открывали одно и то же
+  // (жалоба владельца «история и избранное показывают одно и то же»).
+  const explicitTab = searchParams.get('tab');
   const [videos, setVideos] = useState<Video[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   // Две вкладки: составленные тренировки и отдельные видео (решение владельца —
   // одиночные просмотры не теряем).
   // Стартуем с «Видео»: у большинства избранных тренировок ещё нет, и вкладка
   // по умолчанию встречала бы пустым экраном. Переключаемся на «Тренировки»
-  // автоматически, если они есть.
-  const [tab, setTab] = useState<'workouts' | 'videos'>('videos');
+  // автоматически, если они есть — но только когда вкладка НЕ задана в URL.
+  const [tab, setTab] = useState<'workouts' | 'videos'>(
+    explicitTab === 'workouts' ? 'workouts' : 'videos',
+  );
   const [workouts, setWorkouts] = useState<FavWorkout[]>([]);
 
   useEffect(() => {
@@ -76,9 +85,10 @@ const WatchHistoryPage = () => {
       .then((d) => {
         const list = d?.workouts ?? [];
         setWorkouts(list);
-        if (list.length > 0) setTab('workouts');
+        if (list.length > 0 && !explicitTab) setTab('workouts');
       })
       .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const removeWorkout = async (id: string) => {
@@ -387,4 +397,12 @@ const WatchHistoryPage = () => {
   );
 };
 
-export default WatchHistoryPage;
+// useSearchParams в клиентской странице требует Suspense-границу (App Router:
+// без неё пререндер страницы падает с ошибкой сборки).
+export default function WatchHistoryPageWrapper() {
+  return (
+    <Suspense fallback={null}>
+      <WatchHistoryPage />
+    </Suspense>
+  );
+}

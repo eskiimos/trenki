@@ -67,13 +67,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { goal, energyState } = await request.json();
+    const { goal, energyState, replacesCycleSessionId } = await request.json();
 
     if (!goal || !energyState) {
       return NextResponse.json(
         { error: 'goal и energyState обязательны' },
         { status: 400 }
       );
+    }
+
+    // C-4: быстрая тренировка вместо циклового дня. Раньше клиент закрывал день
+    // отдельным вызовом close-day СРАЗУ после генерации — день считался
+    // выполненным авансом, даже если быструю бросили. Теперь связь пишется в
+    // сессию, а закрывает день сервер при её ЗАВЕРШЕНИИ (/api/training/complete).
+    // Невалидная ссылка не роняет генерацию — просто игнорируется.
+    let closesCycleSessionId: string | null = null;
+    if (typeof replacesCycleSessionId === 'string' && replacesCycleSessionId) {
+      const cycleSession = await prisma.workoutSession.findUnique({
+        where: { id: replacesCycleSessionId },
+        select: {
+          userId: true,
+          status: true,
+          microcycleDay: {
+            select: { dayOfWeek: true, microcycle: { select: { weekStartDate: true } } },
+          },
+        },
+      });
+      if (
+        cycleSession &&
+        cycleSession.userId === auth.user.id &&
+        cycleSession.microcycleDay && // только цикловые дни, не произвольные сессии
+        cycleSession.status !== WorkoutStatus.COMPLETED &&
+        cycleSession.status !== WorkoutStatus.PARTIAL
+      ) {
+        // Античит (как в close-day): закрыть можно только НАСТУПИВШИЙ день —
+        // иначе одна подмена закрывала бы будущие дни недели.
+        const dayDate = new Date(cycleSession.microcycleDay.microcycle.weekStartDate);
+        dayDate.setDate(dayDate.getDate() + (cycleSession.microcycleDay.dayOfWeek - 1));
+        dayDate.setHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+        if (dayDate.getTime() <= todayEnd.getTime()) {
+          closesCycleSessionId = replacesCycleSessionId;
+        }
+      }
     }
 
     const user = await prisma.user.findUnique({
@@ -173,6 +210,8 @@ export async function POST(request: NextRequest) {
         // Параметры сборки — для названия в истории и избранном
         goal: goal as TrainingGoal,
         energyState: energyState as EnergyState,
+        // Замена циклового дня: закроется при завершении этой быстрой
+        closesCycleSessionId,
         videos: {
           create: workout.modules.map((module: any, index: number) => ({
             videoId: module.id,

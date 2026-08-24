@@ -62,11 +62,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // C-4: эта быстрая — замена циклового дня; закрываем его по факту
+    // выполненной работы (и полной, и досрочной PARTIAL). Идемпотентно
+    // (статусный notIn) — поэтому зовётся и из ретрай-веток alreadyCompleted:
+    // захват сессии и закрытие дня не атомарны, и обрыв между ними иначе
+    // оставлял бы день цикла PENDING навсегда (быстрая уже COMPLETED, повторный
+    // вызов уходил в ранний return до закрытия).
+    const closeLinkedCycleDay = async (finishedAt: Date) => {
+      if (!session.closesCycleSessionId) return;
+      try {
+        await prisma.workoutSession.updateMany({
+          where: {
+            id: session.closesCycleSessionId,
+            userId: session.userId,
+            status: { notIn: [WorkoutStatus.COMPLETED, WorkoutStatus.PARTIAL] },
+          },
+          data: { status: WorkoutStatus.COMPLETED, completedAt: finishedAt },
+        });
+      } catch (e) {
+        console.error('close linked cycle day failed:', e);
+      }
+    };
+
     // Идемпотентность: уже начисленную сессию (полную COMPLETED или досрочную
     // PARTIAL) повторно НЕ начисляем. Важно особенно для цикловых — у них больше
     // нет дневного лимита-бэкстопа, и двойной вызов (ретрай/дабл-тап) иначе
     // начислил бы прибавку дважды.
     if (session.status === WorkoutStatus.COMPLETED || session.status === WorkoutStatus.PARTIAL) {
+      await closeLinkedCycleDay(session.completedAt ?? new Date());
       return NextResponse.json({ success: true, alreadyCompleted: true });
     }
 
@@ -203,8 +226,14 @@ export async function POST(request: NextRequest) {
       data: { status: targetStatus, completedAt: finishedAt },
     });
     if (captured.count === 0) {
+      await closeLinkedCycleDay(new Date());
       return NextResponse.json({ success: true, alreadyCompleted: true });
     }
+
+    // C-4: замена циклового дня → закрываем день СЕЙЧАС, по факту выполненной
+    // работы. Раньше клиент закрывал день при СОЗДАНИИ замены, и дни числились
+    // выполненными без единой тренировки.
+    await closeLinkedCycleDay(finishedAt);
 
     // Обновляем профиль
     await prisma.profile.update({
@@ -272,7 +301,11 @@ export async function POST(request: NextRequest) {
       },
       select: { completedAt: true },
     });
-    const tempoMultiplier = tempoMultiplierToday(trainingDates.map((w) => w.completedAt!));
+    const tempoMultiplier = tempoMultiplierToday(
+      trainingDates.map((w) => w.completedAt!),
+      new Date(),
+      user.timezone || 'Europe/Moscow',
+    );
     const workoutBonus = isPartial ? 0 : XP_PER_COMPLETED_WORKOUT;
     const xpEarned =
       (workoutBonus + completedModuleCount * XP_PER_COMPLETED_MODULE) * tempoMultiplier;

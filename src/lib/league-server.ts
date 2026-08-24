@@ -14,12 +14,24 @@ import { computeWeeklyXp, TEMPO_MIN_STREAK, type DayActivityCount } from '@/lib/
 /** Кап когорты: защита от гигантских выборок, для лиги хватает 300 сверстников. */
 const COHORT_CAP = 300;
 
-/** Понедельник 00:00 локального серверного времени — старт текущей ISO-недели. */
-function currentWeekStart(now: Date = new Date()): Date {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - ((start.getDay() + 6) % 7)); // Пн=0 ... Вс=6
-  return start;
+/**
+ * Лига живёт в ЕДИНОЙ таймзоне — Москве: неделя и граница дня общие для всей
+ * когорты, иначе соревнование нечестное (у каждого своя полночь). Раньше неделя
+ * стартовала в полночь ТАЙМЗОНЫ СЕРВЕРА (в проде UTC → понедельник начинался в
+ * 03:00 МСК, и воскресные вечерние тренировки уезжали в новую неделю).
+ * МСК = UTC+3 без переходов на летнее время (отменены в 2014) — константа
+ * безопасна; SQL режет дни тем же 'Europe/Moscow'.
+ */
+const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Старт текущей лиговой недели: МОМЕНТ (UTC-instant) московского понедельника 00:00. */
+function currentWeekStartInstant(now: Date = new Date()): Date {
+  // now в московской шкале → полночь текущего дня → назад до понедельника
+  const msk = new Date(now.getTime() + MSK_OFFSET_MS);
+  const mskMidnight = Date.UTC(msk.getUTCFullYear(), msk.getUTCMonth(), msk.getUTCDate());
+  const monday = mskMidnight - ((new Date(mskMidnight).getUTCDay() + 6) % 7) * DAY_MS;
+  return new Date(monday - MSK_OFFSET_MS);
 }
 
 export type LeagueForUser =
@@ -76,15 +88,44 @@ export async function buildLeagueForUser(userId: string): Promise<LeagueForUser>
   // недели: серия Пт-Сб-Вс должна давать ×2 уже с понедельника. Lookback-дни
   // участвуют только в определении множителя, в сумму XP не входят
   // (см. computeWeeklyXp).
-  const weekStart = currentWeekStart();
+  //
+  // Формула сведена с профильным XP (рассинхрон «в профиле растёт, в лиге нет»):
+  //  · PARTIAL-сессии дают свои модули и день темпа (но не бонус ×100);
+  //  · бонус ×100 — только за COMPLETED с ≥1 реально пройденным модулем:
+  //    день цикла, закрытый подстановкой (close-day), становится COMPLETED при
+  //    нуле видео — второй +100 за тот же реальный день не начисляем.
+  // Осознанное расхождение: synthetic-накрутка видна в профиле (демо), но в
+  // честную лигу не попадает.
+  //
+  // Дни режем по Москве и в SQL, и в JS. В SQL обязательна ДВОЙНАЯ форма
+  // (ts AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow': колонка naive-UTC,
+  // и одинарный AT TIME ZONE её НЕ конвертирует, а интерпретирует как
+  // московскую (классическая ловушка Postgres) — день уезжал бы на сутки.
+  // Двойная форма даёт naive московское «стеночное» время, детерминированно
+  // (не зависит от TimeZone сессии БД); Prisma парсит его как UTC — поэтому
+  // в computeWeeklyXp передаём tz='UTC', чтобы взять календарный день без
+  // второго сдвига.
+  const weekStartInstant = currentWeekStartInstant();
+  // Московская дата понедельника, закодированная как UTC-полночь — в одной
+  // системе координат с d из SQL.
+  const weekStartDay = new Date(weekStartInstant.getTime() + MSK_OFFSET_MS);
   const lookbackStart = new Date(
-    weekStart.getTime() - (TEMPO_MIN_STREAK - 1) * 24 * 60 * 60 * 1000,
+    weekStartInstant.getTime() - (TEMPO_MIN_STREAK - 1) * DAY_MS,
   );
   const [sessionDayCounts, moduleDayCounts] = await Promise.all([
-    prisma.$queryRaw<{ userId: string; d: Date; cnt: number }[]>(Prisma.sql`
-      SELECT ws."userId", date_trunc('day', ws."completedAt") AS d, COUNT(*)::int AS cnt
+    prisma.$queryRaw<{ userId: string; d: Date; completedCnt: number; trainingCnt: number }[]>(Prisma.sql`
+      SELECT ws."userId",
+             date_trunc('day', (ws."completedAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow') AS d,
+             COUNT(*) FILTER (
+               WHERE ws.status = 'COMPLETED'
+                 AND EXISTS (
+                   SELECT 1 FROM "workout_session_videos" v
+                   WHERE v."sessionId" = ws.id AND v.completed = true
+                 )
+             )::int AS "completedCnt",
+             COUNT(*)::int AS "trainingCnt"
       FROM "workout_sessions" ws
-      WHERE ws.status = 'COMPLETED'
+      WHERE ws.status IN ('COMPLETED', 'PARTIAL')
         AND ws.synthetic = false
         AND ws."completedAt" >= ${lookbackStart}
         AND ws."userId" IN (${Prisma.join(cohortIds)})
@@ -92,11 +133,13 @@ export async function buildLeagueForUser(userId: string): Promise<LeagueForUser>
     `),
     // У workout_session_videos нет userId — JOIN к workout_sessions
     prisma.$queryRaw<{ userId: string; d: Date; cnt: number }[]>(Prisma.sql`
-      SELECT ws."userId", date_trunc('day', wsv."completedAt") AS d, COUNT(*)::int AS cnt
+      SELECT ws."userId",
+             date_trunc('day', (wsv."completedAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow') AS d,
+             COUNT(*)::int AS cnt
       FROM "workout_session_videos" wsv
       JOIN "workout_sessions" ws ON ws.id = wsv."sessionId"
       WHERE wsv.completed = true
-        AND ws.status = 'COMPLETED'
+        AND ws.status IN ('COMPLETED', 'PARTIAL')
         AND ws.synthetic = false
         AND wsv."completedAt" >= ${lookbackStart}
         AND ws."userId" IN (${Prisma.join(cohortIds)})
@@ -104,24 +147,29 @@ export async function buildLeagueForUser(userId: string): Promise<LeagueForUser>
     `),
   ]);
 
-  const groupByUser = (rows: { userId: string; d: Date; cnt: number }[]) => {
-    const by = new Map<string, DayActivityCount[]>();
-    for (const r of rows) {
-      let list = by.get(r.userId);
-      if (!list) {
-        list = [];
-        by.set(r.userId, list);
-      }
-      list.push({ day: r.d, count: r.cnt });
-    }
-    return by;
-  };
-  const workoutsBy = groupByUser(sessionDayCounts);
-  const modulesBy = groupByUser(moduleDayCounts);
+  const workoutsBy = new Map<string, DayActivityCount[]>();
+  const trainingDaysBy = new Map<string, DayActivityCount[]>();
+  for (const r of sessionDayCounts) {
+    if (!workoutsBy.has(r.userId)) workoutsBy.set(r.userId, []);
+    if (!trainingDaysBy.has(r.userId)) trainingDaysBy.set(r.userId, []);
+    workoutsBy.get(r.userId)!.push({ day: r.d, count: r.completedCnt });
+    trainingDaysBy.get(r.userId)!.push({ day: r.d, count: r.trainingCnt });
+  }
+  const modulesBy = new Map<string, DayActivityCount[]>();
+  for (const r of moduleDayCounts) {
+    if (!modulesBy.has(r.userId)) modulesBy.set(r.userId, []);
+    modulesBy.get(r.userId)!.push({ day: r.d, count: r.cnt });
+  }
   // Нулевые тоже включаются — когорта целиком, ранги честные
   const entries: LeagueEntry[] = cohortIds.map((id) => ({
     userId: id,
-    weeklyXp: computeWeeklyXp(workoutsBy.get(id) ?? [], modulesBy.get(id) ?? [], weekStart),
+    weeklyXp: computeWeeklyXp(
+      workoutsBy.get(id) ?? [],
+      modulesBy.get(id) ?? [],
+      weekStartDay,
+      trainingDaysBy.get(id) ?? [],
+      'UTC',
+    ),
   }));
 
   const weekLabel = isoWeekLabel();

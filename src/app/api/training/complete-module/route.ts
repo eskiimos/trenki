@@ -245,7 +245,11 @@ export async function POST(request: NextRequest) {
         where: { userId: user.id, status: 'COMPLETED', completedAt: { not: null } },
         select: { completedAt: true },
       });
-      tempoMultiplier = tempoMultiplierToday(workoutDates.map((w) => w.completedAt!));
+      tempoMultiplier = tempoMultiplierToday(
+        workoutDates.map((w) => w.completedAt!),
+        new Date(),
+        user.timezone || 'Europe/Moscow',
+      );
       xpEarned = (XP_PER_COMPLETED_WORKOUT + XP_PER_COMPLETED_MODULE) * tempoMultiplier;
     }
 

@@ -807,6 +807,11 @@ const TrainingsSection = () => {
     const [generatingCycle, setGeneratingCycle] = useState(false);
     const [cycleError, setCycleError] = useState<string | null>(null);
     const [hasActiveCycle, setHasActiveCycle] = useState(false);
+    // Проверка «есть ли активный цикл» УСПЕШНО завершилась. Пока false, слепо
+    // генерить нельзя: POST /api/microcycle/generate при активном цикле молча
+    // УДАЛЯЕТ его и собирает новую неделю — тап до резолва проверки (или при
+    // упавшем запросе) сносил готовый план без подтверждения.
+    const [cycleChecked, setCycleChecked] = useState(false);
     const { paywalled, freeLessonVideoId } = useSubscription();
 
     // Узнаём, есть ли уже собранный активный цикл. Если есть — кнопка НЕ
@@ -819,9 +824,11 @@ const TrainingsSection = () => {
                 const res = await fetch('/api/microcycle/current');
                 if (!res.ok) return;
                 const data = await res.json();
-                if (!cancelled && data?.microcycle?.effectiveStatus === 'ACTIVE') {
+                if (cancelled) return;
+                if (data?.microcycle?.effectiveStatus === 'ACTIVE') {
                     setHasActiveCycle(true);
                 }
+                setCycleChecked(true);
             } catch {}
         })();
         return () => { cancelled = true; };
@@ -831,7 +838,29 @@ const TrainingsSection = () => {
     // собираем неделю (экран сборки ~5с) и ведём в календарь. Идемпотентно.
     const handleMicrocycleClick = async () => {
         if (generatingCycle) return;
-        if (hasActiveCycle) { router.push('/calendar'); return; }
+        let active = hasActiveCycle;
+        let checked = cycleChecked;
+        if (!active && !checked) {
+            // Фоновая проверка не успела/упала — перепроверяем прямо сейчас,
+            // прежде чем что-то генерить.
+            try {
+                const res = await fetch('/api/microcycle/current');
+                if (res.ok) {
+                    const data = await res.json();
+                    active = data?.microcycle?.effectiveStatus === 'ACTIVE';
+                    checked = true;
+                    setHasActiveCycle(active);
+                    setCycleChecked(true);
+                }
+            } catch {}
+        }
+        if (active) { router.push('/calendar'); return; }
+        if (!checked) {
+            // Обе проверки провалились (сеть/500). Генерить вслепую НЕЛЬЗЯ:
+            // generate при активном цикле молча сносит неделю с прогрессом.
+            setCycleError('Не удалось проверить текущий цикл. Проверь связь и попробуй ещё раз.');
+            return;
+        }
         // Микроцикл — платная фича целиком: при активном paywall сразу зовём подписку.
         if (paywalled) { openSubscriptionModal('microcycle'); return; }
         setCycleError(null);

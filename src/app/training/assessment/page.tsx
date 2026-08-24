@@ -131,6 +131,9 @@ export default function TrainingAssessmentPage() {
         body: JSON.stringify({
           goal: formData.goal,
           energyState: formData.energyState,
+          // C-4: быстрая вместо циклового дня. Сервер запомнит связь и закроет
+          // день цикла при ЗАВЕРШЕНИИ быстрой — не авансом при создании.
+          replacesCycleSessionId: declinedCycleSessionRef.current ?? undefined,
         }),
       });
 
@@ -150,20 +153,9 @@ export default function TrainingAssessmentPage() {
       const generateData = await generateResponse.json();
 
       if (generateData.success) {
-        // C-4: спортсмен отказался от цикла в пользу быстрой — теперь, когда
-        // быстрая реально создана, закрываем предложенный день цикла.
-        if (declinedCycleSessionRef.current) {
-          try {
-            await fetch('/api/microcycle/close-day', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ sessionId: declinedCycleSessionRef.current }),
-            });
-          } catch {
-            // не критично — просто не закрыли день цикла
-          }
-          declinedCycleSessionRef.current = null;
-        }
+        // День цикла больше НЕ закрываем здесь: связь ушла в generate-v3, и
+        // сервер закроет день при завершении быстрой (не авансом).
+        declinedCycleSessionRef.current = null;
         router.push(`/training/workout?id=${generateData.workoutId}`);
         return;
       }

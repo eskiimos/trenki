@@ -30,6 +30,11 @@ services:
         condition: service_completed_successfully
     environment:
       - NODE_ENV=production
+      # Граница календарного дня (стрик/темп/лига) — Москва, не UTC: без TZ
+      # контейнер живёт в UTC и «день» переключается в 03:00 МСК (стрик
+      # сбрасывался при ночных тренировках). Основная math уже ходит по
+      # User.timezone, TZ — страховка для остатков серверной «полуночи».
+      - TZ=Europe/Moscow
       - DATABASE_URL=${DATABASE_URL}
       # JWT-сессии. >=32 символа. openssl rand -base64 48.
       - SESSION_SECRET=${SESSION_SECRET}

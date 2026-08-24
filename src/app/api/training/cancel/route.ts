@@ -41,9 +41,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (session.status === WorkoutStatus.COMPLETED) {
+    // PARTIAL тоже нельзя отменять: досрочный финиш уже начислен (XP, день
+    // серии, прирост) — отмена задним числом удаляла бы день из стрика/лиги.
+    if (session.status === WorkoutStatus.COMPLETED || session.status === WorkoutStatus.PARTIAL) {
       return NextResponse.json(
-        { error: 'Тренировка уже завершена' },
+        { error: 'Тренировка уже засчитана' },
         { status: 400 }
       );
     }
