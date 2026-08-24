@@ -332,8 +332,11 @@ const WatchHistoryPage = () => {
             <>
               {favorites.length > 0 && (
                 <section className="mb-6">
-                  <h2 className="text-muted text-xs font-medium font-overpass uppercase tracking-wide mb-2 px-1">
-                    Тренировки
+                  {/* Разграничение с короткими треньками (правка владельца):
+                      у каждой секции своя иконка и полное название */}
+                  <h2 className="flex items-center gap-1.5 text-muted text-xs font-medium font-overpass uppercase tracking-wide mb-2 px-1">
+                    <Sparkles size={16} aria-hidden />
+                    Тренировки от ИИ-тренера
                   </h2>
                   <div className="flex flex-col gap-3">
                     {favorites.map((w) => (
@@ -381,19 +384,23 @@ const WatchHistoryPage = () => {
 
               {likedShorts.length > 0 && (
                 <section className="mb-6">
-                  <h2 className="text-muted text-xs font-medium font-overpass uppercase tracking-wide mb-2 px-1">
-                    Треньки
+                  <h2 className="flex items-center gap-1.5 text-muted text-xs font-medium font-overpass uppercase tracking-wide mb-2 px-1">
+                    <Clapperboard size={16} aria-hidden />
+                    Треньки · короткий формат
                   </h2>
+                  {/* Плитки без названий/описаний (правка владельца) — чистые
+                      превью, как в ленте шортсов; имя ролика остаётся в aria. */}
                   <div className="grid grid-cols-3 gap-2">
                     {likedShorts.map((s) => (
                       <Link
                         key={s.id}
                         href={`/shorts/${s.id}`}
+                        aria-label={`Открыть треньку «${s.title}»`}
                         className="relative rounded-xl overflow-hidden bg-night"
                         style={{ aspectRatio: '9 / 16' }}
                       >
                         {s.thumbnail ? (
-                          <Image src={s.thumbnail} alt={s.title} fill className="object-cover" />
+                          <Image src={s.thumbnail} alt="" fill className="object-cover" />
                         ) : (
                           <span
                             className="absolute inset-0 flex items-center justify-center text-muted"
@@ -402,9 +409,6 @@ const WatchHistoryPage = () => {
                             <Clapperboard size={24} />
                           </span>
                         )}
-                        <span className="absolute inset-x-0 bottom-0 p-2 text-white text-[11px] leading-tight line-clamp-2 bg-linear-to-t from-black/80 to-transparent pt-6">
-                          {s.title}
-                        </span>
                       </Link>
                     ))}
                   </div>
