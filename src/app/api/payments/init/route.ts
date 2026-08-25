@@ -3,9 +3,11 @@ import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
 import { getTbankConfig, initPayment } from '@/lib/payments/tbank';
-import { getSubscriptionPricing, getReceiptSettings } from '@/lib/settings';
+import { getReceiptSettings } from '@/lib/settings';
+import { resolveUserPricing } from '@/lib/payments/user-pricing';
 import { buildReceipt } from '@/lib/payments/receipt';
 import { SUBSCRIPTION_PERIOD_DAYS } from '@/lib/payments/grant';
+import { rateLimit } from '@/lib/coach/rate-limit';
 import { logger } from '@/lib/logger';
 
 // POST /api/payments/init — старт оплаты доступа. Оплата РАЗОВАЯ: списание один
@@ -50,8 +52,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Оплата пока не настроена' }, { status: 503 });
   }
 
-  const pricing = await getSubscriptionPricing();
-  const amountKopecks = pricing.priceMonthlyRub * 100;
+  // Гигиена: массовое создание платёжных ссылок — единственный способ фармить
+  // интро-цену, режем на корню.
+  if (!rateLimit(`pay-init:${user.id}`, 10, 10 * 60 * 1000).ok) {
+    return NextResponse.json({ error: 'Слишком много попыток. Подожди пару минут.' }, { status: 429 });
+  }
+
+  // Цена — ПЕРСОНАЛЬНАЯ для получателя премиума (промокод тренера принадлежит
+  // атлету: при оплате родителем скидка считается по ребёнку). Раньше здесь
+  // всегда списывалась базовая цена — скидка по промокоду существовала только
+  // в тексте модалки. forCharge резервирует интро-слоты под незавершённые
+  // ссылки (антифарм).
+  const userPricing = await resolveUserPricing(childId ?? user.id, { forCharge: true });
+  if (userPricing.pendingIntroHold) {
+    // НЕ списываем молча базовую вместо показанной интро — показанная цена
+    // обязана совпадать со списанной.
+    return NextResponse.json(
+      { error: 'Предыдущая ссылка на оплату ещё активна. Открой её или попробуй через полчаса.' },
+      { status: 409 },
+    );
+  }
+  const amountKopecks = userPricing.amountRub * 100;
 
   // Чек 54-ФЗ. Включается в админке — только когда подключена облачная касса и
   // подтверждена система налогообложения. Пока выключен, платёж идёт без чека
@@ -105,6 +126,11 @@ export async function POST(request: NextRequest) {
       successURL: `${origin}/subscription/success?orderId=${orderId}${backParam}`,
       failURL: `${origin}/subscription/fail?orderId=${orderId}${backParam}`,
       receipt, // не участвует в подписи Token (см. tbank.ts)
+      // Ссылка живёт 30 минут (дефолт банка — сутки): протухшие ссылки не
+      // держат интро-слоты и не дают копить оплаты по старой цене.
+      redirectDueDate: new Date(Date.now() + 30 * 60 * 1000)
+        .toISOString()
+        .replace(/\.\d{3}Z$/, '+00:00'),
     });
   } catch (e) {
     logger.error('tbank Init failed', e);

@@ -79,8 +79,10 @@ export async function PATCH(request: NextRequest) {
       if (!okInt(priceMonthlyRub, 1, 1_000_000)) {
         return NextResponse.json({ error: 'Цена ₽/мес — целое от 1 до 1 000 000' }, { status: 400 });
       }
-      if (!okInt(introDiscountPercent, 0, 100)) {
-        return NextResponse.json({ error: 'Скидка — целое от 0 до 100 (%)' }, { status: 400 });
+      // Максимум 99: скидка 100% давала бы Init на 0 копеек — T-Bank такой
+      // платёж отклоняет, а чек 54-ФЗ на ноль не собирается.
+      if (!okInt(introDiscountPercent, 0, 99)) {
+        return NextResponse.json({ error: 'Скидка — целое от 0 до 99 (%)' }, { status: 400 });
       }
       if (!okInt(introMonths, 0, 36)) {
         return NextResponse.json({ error: 'Месяцев интро — целое от 0 до 36' }, { status: 400 });

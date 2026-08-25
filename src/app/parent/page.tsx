@@ -79,6 +79,27 @@ const ChildCardView = ({
   const pricing = useSubscriptionPricing();
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+  // Персональная цена РЕБЁНКА (его промокод тренера): init с childId спишет
+  // именно её — на кнопке должна стоять та же сумма, а не базовая.
+  const [childPricing, setChildPricing] = useState<{
+    amountRub: number;
+    isIntro: boolean;
+    introPaymentsLeft: number;
+    basePriceRub: number;
+  } | null>(null);
+  useEffect(() => {
+    if (child.premium.active) return; // кнопки оплаты нет — цена не нужна
+    let cancelled = false;
+    fetch(`/api/subscription/pricing/me?childId=${encodeURIComponent(child.id)}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d && typeof d.amountRub === 'number') setChildPricing(d);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [child.id, child.premium.active]);
   // Кольцо потенциала (как в профиле ребёнка) — раскрывается по тапу на карточку
   const [potentialOpen, setPotentialOpen] = useState(false);
   // Модалка «Путь хоккеиста» ребёнка — по тапу на бейдж звания
@@ -289,8 +310,17 @@ const ChildCardView = ({
               disabled={paying}
               className="w-full bg-brand text-night rounded-full py-2.5 px-4 text-sm font-bold font-overpass uppercase transition-transform active:scale-95 disabled:opacity-70"
             >
-              {paying ? 'Переходим к оплате…' : `Оформить подписку — ${pricing.priceMonthlyRub} ₽/мес`}
+              {paying
+                ? 'Переходим к оплате…'
+                : `Оформить подписку — ${childPricing?.amountRub ?? pricing.priceMonthlyRub} ₽/мес`}
             </button>
+            {childPricing?.isIntro && (
+              <p className="text-muted text-xs text-center mt-2">
+                Цена по промокоду тренера (вместо {childPricing.basePriceRub} ₽) — осталось{' '}
+                {childPricing.introPaymentsLeft}{' '}
+                {childPricing.introPaymentsLeft === 1 ? 'оплата' : childPricing.introPaymentsLeft < 5 ? 'оплаты' : 'оплат'}
+              </p>
+            )}
             {payError && (
               <p className="text-red-400 text-xs text-center mt-2">{payError}</p>
             )}

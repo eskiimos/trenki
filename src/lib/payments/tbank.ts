@@ -105,6 +105,8 @@ export interface InitParams {
   failURL?: string;
   receipt?: Record<string, unknown>; // 54-ФЗ, не участвует в подписи Token
   data?: Record<string, unknown>; // DATA, не участвует в подписи Token
+  /** ISO8601 с таймзоной: до какого момента жива платёжная ссылка (дефолт банка — сутки). */
+  redirectDueDate?: string;
 }
 
 export interface InitResult {
@@ -131,6 +133,7 @@ export async function initPayment(config: TbankConfig, p: InitParams): Promise<I
   if (p.failURL) body.FailURL = p.failURL;
   if (p.receipt) body.Receipt = p.receipt;
   if (p.data) body.DATA = p.data;
+  if (p.redirectDueDate) body.RedirectDueDate = p.redirectDueDate;
   return callApi<InitResult>(config, 'Init', body);
 }
 

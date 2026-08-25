@@ -29,10 +29,83 @@ export default function SubscriptionModal() {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<PaywallReason>('generic');
   const [promo, setPromo] = useState('');
+  const [promoBusy, setPromoBusy] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [promoApplied, setPromoApplied] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
   const { referralCode } = useSubscription();
   const pricing = useSubscriptionPricing();
+
+  // Персональная цена (промокод + сколько интро-оплат осталось) — ровно то,
+  // что спишет /api/payments/init. Раньше модалка всегда показывала базовую
+  // цену, и юзер с промокодом видел «стандартные» 1200 ₽ (жалоба владельца).
+  const [me, setMe] = useState<{
+    amountRub: number;
+    isIntro: boolean;
+    introPaymentsLeft: number;
+    basePriceRub: number;
+  } | null>(null);
+
+  // meError: персональная цена НЕ загрузилась — показываем базовую с оговоркой
+  // (итог — на странице банка), но оплату не блокируем: упавший pricing/me не
+  // должен останавливать выручку.
+  const [meError, setMeError] = useState(false);
+
+  const loadMyPricing = async (): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/subscription/pricing/me', { cache: 'no-store' });
+      if (!res.ok) throw new Error();
+      const d = await res.json();
+      if (d && typeof d.amountRub === 'number') {
+        setMe(d);
+        setMeError(false);
+        return true;
+      }
+      throw new Error();
+    } catch {
+      setMeError(true);
+      return false;
+    }
+  };
+  useEffect(() => {
+    if (open) {
+      setMe(null);
+      setMeError(false);
+      loadMyPricing();
+    }
+  }, [open]);
+
+  const applyPromo = async () => {
+    const code = promo.trim();
+    if (!code || promoBusy) return;
+    setPromoBusy(true);
+    setPromoError(null);
+    try {
+      const res = await fetch('/api/referral/attach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json().catch(() => ({}));
+      // 409 = код уже привязан — для юзера это тоже «применён»
+      if (!res.ok && res.status !== 409) {
+        setPromoError(data?.error || 'Не удалось применить промокод');
+        return;
+      }
+      // Сначала пересчитываем цену, потом показываем «применён» — иначе при
+      // сбое перезагрузки зелёная плашка соседствовала бы со старой ценой.
+      const reloaded = await loadMyPricing();
+      setPromoApplied(data?.label || data?.code || code);
+      if (!reloaded) {
+        setPromoError('Код привязан; цена обновится на странице оплаты');
+      }
+    } catch {
+      setPromoError('Сетевая ошибка');
+    } finally {
+      setPromoBusy(false);
+    }
+  };
 
   const handleSubscribe = async () => {
     if (paying) return;
@@ -167,43 +240,107 @@ export default function SubscriptionModal() {
             border: '1px solid #2d3448',
           }}
         >
-          <div style={{ color: '#F9F8FE', fontSize: 22, fontWeight: 900 }}>
-            {pricing.priceMonthlyRub} ₽<span style={{ fontSize: 14, color: '#AEABBB', fontWeight: 700 }}> / 30 дней</span>
-          </div>
-          {pricing.introDiscountPercent > 0 && pricing.introMonths > 0 && (
-            <div style={{ color: '#AEABBB', fontSize: 13, marginTop: 2 }}>
-              по промокоду тренера — до −{pricing.introDiscountPercent}% на первые {pricing.introMonths} мес.
-              (от {pricing.introPriceRub} ₽/мес)
+          {me?.isIntro ? (
+            <>
+              {/* Интро-цена по промокоду: показываем ровно то, что спишется */}
+              <div style={{ color: '#F9F8FE', fontSize: 22, fontWeight: 900 }}>
+                <span style={{ color: '#A1FF4A' }}>{me.amountRub} ₽</span>
+                <span style={{ fontSize: 15, color: '#6E6B7B', fontWeight: 700, textDecoration: 'line-through', marginLeft: 8 }}>
+                  {me.basePriceRub} ₽
+                </span>
+                <span style={{ fontSize: 14, color: '#AEABBB', fontWeight: 700 }}> / 30 дней</span>
+              </div>
+              <div style={{ color: '#AEABBB', fontSize: 13, marginTop: 2 }}>
+                Цена по промокоду тренера — осталось {me.introPaymentsLeft}{' '}
+                {me.introPaymentsLeft === 1 ? 'оплата' : me.introPaymentsLeft < 5 ? 'оплаты' : 'оплат'} по
+                этой цене, дальше {me.basePriceRub} ₽/мес
+              </div>
+            </>
+          ) : me === null && !meError ? (
+            /* Персональная цена грузится: базовую как «твою» не показываем —
+               у юзера с промокодом спишется другая (жалоба владельца) */
+            <div style={{ color: '#AEABBB', fontSize: 22, fontWeight: 900 }}>
+              … ₽<span style={{ fontSize: 14, fontWeight: 700 }}> / 30 дней</span>
             </div>
+          ) : (
+            <>
+              <div style={{ color: '#F9F8FE', fontSize: 22, fontWeight: 900 }}>
+                {me?.amountRub ?? pricing.priceMonthlyRub} ₽
+                <span style={{ fontSize: 14, color: '#AEABBB', fontWeight: 700 }}> / 30 дней</span>
+              </div>
+              {meError && (
+                <div style={{ color: '#AEABBB', fontSize: 12, marginTop: 2 }}>
+                  Итоговая цена (с учётом промокода) — на странице оплаты
+                </div>
+              )}
+              {pricing.introDiscountPercent > 0 && pricing.introMonths > 0 && !referralCode && !promoApplied && (
+                <div style={{ color: '#AEABBB', fontSize: 13, marginTop: 2 }}>
+                  по промокоду тренера — до −{pricing.introDiscountPercent}% на первые {pricing.introMonths} мес.
+                  (от {pricing.introPriceRub} ₽/мес)
+                </div>
+              )}
+            </>
           )}
         </div>
 
-        {/* Промокод тренера — только если канал ещё не привязан */}
-        {!referralCode && (
+        {/* Промокод тренера — только если канал ещё не привязан. Поле раньше
+            было декорацией (значение никуда не уходило) — теперь «Применить»
+            привязывает код и пересчитывает цену. */}
+        {!referralCode && !promoApplied && (
           <div style={{ marginTop: 14 }}>
             <div style={{ color: '#AEABBB', fontSize: 12, marginBottom: 6 }}>Промокод тренера (если есть)</div>
-            <input
-              value={promo}
-              onChange={(e) => setPromo(e.target.value)}
-              placeholder="Например, ЛЕТО26"
-              style={{
-                width: '100%',
-                background: '#060919',
-                border: '1px solid #26252F',
-                borderRadius: 10,
-                padding: '12px 14px',
-                color: '#F9F8FE',
-                fontSize: 15,
-                outline: 'none',
-              }}
-            />
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 8 }}>
+              <input
+                value={promo}
+                onChange={(e) => { setPromo(e.target.value); setPromoError(null); }}
+                placeholder="Например, ЛЕТО26"
+                style={{
+                  minWidth: 0,
+                  background: '#060919',
+                  border: '1px solid #26252F',
+                  borderRadius: 10,
+                  padding: '12px 14px',
+                  color: '#F9F8FE',
+                  fontSize: 15,
+                  outline: 'none',
+                }}
+              />
+              <button
+                type="button"
+                onClick={applyPromo}
+                disabled={promoBusy || !promo.trim()}
+                className="font-overpass uppercase"
+                style={{
+                  background: 'transparent',
+                  border: '1px solid rgba(161,255,74,0.5)',
+                  color: '#A1FF4A',
+                  borderRadius: 10,
+                  padding: '0 16px',
+                  fontWeight: 800,
+                  fontSize: 12,
+                  letterSpacing: 0.4,
+                  cursor: promoBusy || !promo.trim() ? 'default' : 'pointer',
+                  opacity: promoBusy || !promo.trim() ? 0.5 : 1,
+                }}
+              >
+                {promoBusy ? '…' : 'Применить'}
+              </button>
+            </div>
+            {promoError && (
+              <div style={{ color: '#FF8C4A', fontSize: 12, marginTop: 6 }}>{promoError}</div>
+            )}
+          </div>
+        )}
+        {promoApplied && (
+          <div style={{ marginTop: 14, color: '#A1FF4A', fontSize: 13 }}>
+            Промокод «{promoApplied}» применён
           </div>
         )}
 
         {/* Оформить → T-Bank Init → редирект на оплату */}
         <button
           onClick={handleSubscribe}
-          disabled={paying}
+          disabled={paying || (me === null && !meError)}
           className="font-overpass uppercase transition-transform active:scale-95"
           style={{
             width: '100%',
