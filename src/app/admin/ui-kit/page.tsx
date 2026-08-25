@@ -11,7 +11,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 // lucide — демо размеров иконок в секции «Иконки» + иконки самой витрины.
-import { Bell, Play, Home, Lock, Palette, Flame, type LucideIcon } from 'lucide-react';
+import { Bell, Play, Home, Lock, Palette, Flame, Film, type LucideIcon } from 'lucide-react';
 
 // ── Живые UI-примитивы (единственный источник правды по вариантам) ──────────
 import { Button, Card, Badge, Chip, Banner, Input } from '@/components/ui';
@@ -163,6 +163,14 @@ export default function UiKitPage() {
             <Palette size={24} className="text-brand" aria-hidden />
             UI-кит
           </h1>
+          {/* Парный кит анимаций — движение живёт там */}
+          <Link
+            href="/admin/animation-kit"
+            className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400 hover:text-brand transition-colors shrink-0"
+          >
+            <Film size={16} aria-hidden />
+            Анимации
+          </Link>
         </div>
         <p className="text-sm text-muted mb-4">
           Живые токены и компоненты «Треньки» — единый ориентир для команды. Всё ниже импортируется

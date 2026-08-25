@@ -371,6 +371,7 @@ export default function AdminDashboardPage() {
               desc="Целостность данных"
             />
             <NavCard href="/admin/ui-kit" icon={Palette} title="UI-кит" desc="Токены и компоненты" />
+            <NavCard href="/admin/animation-kit" icon={Film} title="Кит анимаций" desc="Движение и живость" />
           </div>
         </div>
       </div>

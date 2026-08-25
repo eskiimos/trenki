@@ -108,9 +108,15 @@ export default function DailyCheckinCard() {
             </span>
           </div>
           {justEarned !== null && (
-            <span className="inline-flex items-center gap-1 text-brand text-sm font-black font-overpass shrink-0">
-              <Star size={16} fill="currentColor" aria-hidden />
-              +{justEarned} XP
+            /* Кит анимаций: награда всплывает и тает, потом остаётся пружинный бейдж */
+            <span className="relative shrink-0 inline-flex items-center">
+              <span className="anim-float-up absolute right-0 -top-4 inline-flex items-center gap-1 text-brand text-sm font-black font-overpass whitespace-nowrap">
+                +{justEarned} XP
+              </span>
+              <span className="anim-pop-success inline-flex items-center gap-1 text-brand text-sm font-black font-overpass">
+                <Star size={16} fill="currentColor" aria-hidden />
+                +{justEarned} XP
+              </span>
             </span>
           )}
         </div>
@@ -140,7 +146,12 @@ export default function DailyCheckinCard() {
                 {WEEKDAY_SHORT[day.weekday]}
               </span>
               {day.checked ? (
-                <Check size={14} className="text-brand mt-0.5" aria-hidden />
+                /* anim-pop-success: свежепоставленная галочка «чпокает» */
+                <Check
+                  size={14}
+                  className={`text-brand mt-0.5 ${day.isToday && justEarned !== null ? 'anim-pop-success' : ''}`}
+                  aria-hidden
+                />
               ) : (
                 <span className="text-[10px] text-muted mt-0.5 tabular-nums">+{day.xp}</span>
               )}

@@ -347,13 +347,103 @@ input:focus, button:focus, textarea:focus, select:focus {
   animation: fadeInDown 0.35s ease-out forwards;
 }
 
+/* ─── Кит анимаций (витрина: /admin/animation-kit) ─────────────────────────
+   Токены движения — как токены цвета/отступов: не выдумывать длительности и
+   изинги на месте, брать отсюда. Роли:
+     fast  120ms — отклик на тап (press, переключатели);
+     base  200ms — ховеры, смена состояний;
+     slow  300ms — появление модалок/шторок (существующие animate-*);
+     enter 400ms — въезд контента (списки, карточки).
+   Изинги: out — «прилетел и мягко встал» (дефолт появления);
+   spring — лёгкий overshoot, игривость (геймификация, успехи).             */
+:root {
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 300ms;
+  --dur-enter: 400ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Въезд снизу с проявлением — карточки, секции. */
+@keyframes animRise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.anim-rise {
+  animation: animRise var(--dur-enter) var(--ease-out) both;
+}
+
+/* Каскад для списков: детям .anim-stagger возрастающая задержка (до 8 шт;
+   дальше — без задержки, чтобы хвост длинного списка не «жевался»). */
+.anim-stagger > * {
+  animation: animRise var(--dur-enter) var(--ease-out) both;
+}
+.anim-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.anim-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.anim-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.anim-stagger > *:nth-child(4) { animation-delay: 120ms; }
+.anim-stagger > *:nth-child(5) { animation-delay: 160ms; }
+.anim-stagger > *:nth-child(6) { animation-delay: 200ms; }
+.anim-stagger > *:nth-child(7) { animation-delay: 240ms; }
+.anim-stagger > *:nth-child(8) { animation-delay: 280ms; }
+
+/* Успех: пружинный «чпок» — галочки, звёздочки, зачёт дня. */
+@keyframes animPopSuccess {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.anim-pop-success {
+  animation: animPopSuccess var(--dur-slow) var(--ease-spring) both;
+}
+
+/* Ошибка: короткая тряска поля/кнопки. */
+@keyframes animShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+.anim-shake {
+  animation: animShake var(--dur-slow) var(--ease-in-out);
+}
+
+/* Награда: «+10 XP» всплывает и тает (геймификация). */
+@keyframes animFloatUp {
+  0% { opacity: 0; transform: translateY(4px); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-22px); }
+}
+.anim-float-up {
+  animation: animFloatUp 900ms var(--ease-out) both;
+}
+
+/* Мягкий пульс лаймового свечения — «сюда стоит нажать» (CTA). Не вешать на
+   несколько элементов одного экрана: пульсирует ровно одна кнопка. */
+@keyframes animGlowPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(161, 255, 74, 0.35); }
+  50% { box-shadow: 0 0 0 8px rgba(161, 255, 74, 0); }
+}
+.anim-glow-pulse {
+  animation: animGlowPulse 2s var(--ease-in-out) infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-slideUp,
   .animate-slideDown,
   .animate-fadeIn,
   .animate-fadeOut,
   .animate-popIn,
-  .animate-fadeInDown {
+  .animate-fadeInDown,
+  .anim-rise,
+  .anim-stagger > *,
+  .anim-pop-success,
+  .anim-shake,
+  .anim-float-up,
+  .anim-glow-pulse {
     animation: none;
   }
 }
