@@ -19,6 +19,10 @@ const publicRoutes = [
   '/api/auth/logout',
   '/api/admin/auth',
   '/api/health',
+  // Подтверждение прав на домен для Яндекса (Метрика/Вебвизор): робот ходит
+  // анонимно, matcher .html не исключает — без этой строки его редиректило
+  // бы на /login и верификация не проходила.
+  '/yandex_6b3347a71fea8b82.html',
 ];
 
 function isPublicRoute(pathname: string): boolean {

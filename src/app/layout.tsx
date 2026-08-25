@@ -7,6 +7,7 @@ import OnboardingWrapper from "@/components/OnboardingWrapper";
 import PWAInit from "@/components/PWAInit";
 import OfflineHandler from "@/components/OfflineHandler";
 import AppLoader from "@/components/AppLoader";
+import MetrikaHits from "@/components/MetrikaHits";
 import SubscriptionModal from "@/components/SubscriptionModal";
 
 const overpass = Overpass({
@@ -80,18 +81,31 @@ export default async function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
       <body className={`${overpass.variable} antialiased mobile-layout`}>
+        {/* Яндекс.Метрика: ДВА счётчика.
+            111857547 — счётчик владельца (2026-08-25), с Вебвизором (домен
+            верифицирован файлом /yandex_6b3347a71fea8b82.html).
+            107768196 — исторический (с 2026-03), оставлен ради непрерывности
+            статистики, но Вебвизор на нём ВЫКЛЮЧЕН: два рекордера на одной
+            странице конфликтуют и дублируют трафик записи.
+            SPA-переходы шлёт MetrikaHits — сам init считает только первую
+            загрузку. */}
         <Script id="yandex-metrika" strategy="afterInteractive" nonce={nonce}>
           {`(function(m,e,t,r,i,k,a){
             m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
             m[i].l=1*new Date();
             for(var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r){return;}}
             k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
-          })(window,document,'script','https://mc.yandex.ru/metrika/tag.js?id=107768196','ym');
-          ym(107768196,'init',{ssr:true,webvisor:true,clickmap:true,ecommerce:'dataLayer',referrer:document.referrer,url:location.href,accurateTrackBounce:true,trackLinks:true});`}
+          })(window,document,'script','https://mc.yandex.ru/metrika/tag.js?id=111857547','ym');
+          ym(111857547,'init',{ssr:true,webvisor:true,clickmap:true,ecommerce:'dataLayer',referrer:document.referrer,url:location.href,accurateTrackBounce:true,trackLinks:true});
+          ym(107768196,'init',{ssr:true,webvisor:false,clickmap:true,ecommerce:'dataLayer',referrer:document.referrer,url:location.href,accurateTrackBounce:true,trackLinks:true});`}
         </Script>
         <noscript>
-          <div><img src="https://mc.yandex.ru/watch/107768196" style={{position:'absolute',left:'-9999px'}} alt="" /></div>
+          <div>
+            <img src="https://mc.yandex.ru/watch/111857547" style={{position:'absolute',left:'-9999px'}} alt="" />
+            <img src="https://mc.yandex.ru/watch/107768196" style={{position:'absolute',left:'-9999px'}} alt="" />
+          </div>
         </noscript>
+        <MetrikaHits />
         <AppLoader />
         <PWAInit />
         <OfflineHandler />
