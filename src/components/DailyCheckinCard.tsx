@@ -93,7 +93,9 @@ export default function DailyCheckinCard() {
   if (!week) return null;
 
   return (
-    <section className="px-4" style={{ paddingBottom: 'var(--space-3)' }}>
+    {/* Отступ сверху — как у StreakChip (12): без него карточка прилипала к
+        блоку серии (правка владельца) */}
+    <section className="px-4" style={{ paddingTop: 'var(--space-3)', paddingBottom: 'var(--space-3)' }}>
       <div
         className="rounded-2xl p-4"
         style={{ background: 'var(--color-surface)', border: '1px solid var(--border-hairline)' }}
