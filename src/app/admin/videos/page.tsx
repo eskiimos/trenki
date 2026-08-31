@@ -816,7 +816,28 @@ const AdminVideosPage = () => {
         setFormData(prev => ({ ...prev, videoUrl }));
       }
       setS3UploadProgress(null);
-      alert(kind === 'thumbnail' ? 'Превью загружено в хранилище' : 'Файл загружен в хранилище');
+
+      // Шаг 4 (видео): серверная проверка faststart — файл без него на
+      // телефонах «вечно грузится», и лучше узнать об этом сейчас, а не из
+      // жалоб пользователей.
+      let warned = false;
+      if (kind === 'video') {
+        try {
+          const v = await fetch('/api/admin/s3/verify-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ videoUrl }),
+          });
+          const check = await v.json().catch(() => ({}));
+          if (v.ok && check.ok === false && check.warning) {
+            warned = true;
+            alert(`Файл загружен, НО: ${check.warning}`);
+          }
+        } catch { /* проверка — не повод ломать загрузку */ }
+      }
+      if (!warned) {
+        alert(kind === 'thumbnail' ? 'Превью загружено в хранилище' : 'Файл загружен в хранилище');
+      }
     } catch (error: any) {
       console.error('S3 upload error:', error);
       alert(`Ошибка загрузки в хранилище: ${error.message}`);

@@ -322,7 +322,22 @@ export default function AdminShortsPage() {
       if (!title) setTitle(videoName);
       setUploadProgress(null);
 
-      alert('Тренька успешно загружена');
+      // Проверка faststart: шортс без него в ленте «вечно грузится»
+      // (реальный случай — moov в конце файла, см. /api/admin/s3/verify-video)
+      let warned = false;
+      try {
+        const v = await fetch('/api/admin/s3/verify-video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoUrl: publicUrl }),
+        });
+        const check = await v.json().catch(() => ({}));
+        if (v.ok && check.ok === false && check.warning) {
+          warned = true;
+          alert(`Тренька загружена, НО: ${check.warning}`);
+        }
+      } catch { /* проверка — не повод ломать загрузку */ }
+      if (!warned) alert('Тренька успешно загружена');
     } catch (error: any) {
       console.error('Video upload error:', error);
       alert(`Ошибка загрузки: ${error.message}`);

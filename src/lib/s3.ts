@@ -127,6 +127,20 @@ export function s3KeyFromPublicUrl(url: string | null | undefined): string | nul
 }
 
 /**
+ * Первые байты объекта (для серверных проверок формата, напр. faststart).
+ * Бросает при отсутствии конфига/объекта — вызывающий решает, что делать.
+ */
+export async function readObjectRange(key: string, start: number, end: number): Promise<Buffer> {
+  const config = getS3Config();
+  if (!config) throw new Error('S3 не сконфигурирован');
+  const res = await getClient(config).send(
+    new GetObjectCommand({ Bucket: config.bucket, Key: key, Range: `bytes=${start}-${end}` }),
+  );
+  const body = await res.Body?.transformToByteArray();
+  return Buffer.from(body ?? []);
+}
+
+/**
  * Best-effort удаление объектов при удалении/замене контента: без него бакет
  * бесконечно копит мусор (оплачиваемое место), а осиротевшие ПУБЛИЧНЫЕ превью
  * остаются доступны по прямым URL навсегда. Ошибки логируем и глотаем —
