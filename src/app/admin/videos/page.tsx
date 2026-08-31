@@ -763,6 +763,29 @@ const AdminVideosPage = () => {
   // PUT у нашего сервера и грузим файл напрямую в бакет через XHR (с прогрессом).
   // В поле videoUrl пишется внутренний URL вида s3://videos/<id>.mp4 — плеер
   // получит подписанную ссылку от API при просмотре.
+  // Длительность файла ДО заливки — через скрытый <video> с objectURL.
+  // Для Kinescope длительность приходила из их API; у S3-загрузок её никто не
+  // проставлял, и каталог показывал «0:00» (правка владельца).
+  const probeVideoDuration = (file: File): Promise<number | null> =>
+    new Promise((resolve) => {
+      try {
+        const url = URL.createObjectURL(file);
+        const v = document.createElement('video');
+        v.preload = 'metadata';
+        const done = (val: number | null) => {
+          URL.revokeObjectURL(url);
+          resolve(val);
+        };
+        v.onloadedmetadata = () =>
+          done(Number.isFinite(v.duration) && v.duration > 0 ? Math.round(v.duration) : null);
+        v.onerror = () => done(null);
+        setTimeout(() => done(null), 10000); // страховка от зависшего decode
+        v.src = url;
+      } catch {
+        resolve(null);
+      }
+    });
+
   // Общая загрузка в S3: kind=video → приватный файл, s3:// в поле videoUrl;
   // kind=thumbnail → публичное превью (x-amz-acl из подписи), https в thumbnail.
   const uploadToS3 = async (file: File, kind: 'video' | 'thumbnail') => {
@@ -809,11 +832,19 @@ const AdminVideosPage = () => {
         xhr.send(file);
       });
 
-      // Шаг 3: записываем URL в нужное поле формы
+      // Шаг 3: записываем URL в нужное поле формы; для видео — заодно
+      // длительность из самого файла (иначе в каталоге «0:00»)
       if (kind === 'thumbnail') {
         setFormData(prev => ({ ...prev, thumbnail: videoUrl }));
       } else {
-        setFormData(prev => ({ ...prev, videoUrl }));
+        const durationSec = await probeVideoDuration(file);
+        setFormData(prev => ({
+          ...prev,
+          videoUrl,
+          ...(durationSec && (!prev.duration || prev.duration <= 0)
+            ? { duration: durationSec }
+            : {}),
+        }));
       }
       setS3UploadProgress(null);
 
