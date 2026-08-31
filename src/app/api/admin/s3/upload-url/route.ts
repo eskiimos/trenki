@@ -19,8 +19,19 @@ export const dynamic = 'force-dynamic';
 
 // Расширение берём из имени файла и пропускаем только известные форматы,
 // чтобы в бакет не попадали произвольные ключи.
-const VIDEO_EXTENSIONS = new Set(['mp4', 'mov', 'webm', 'm4v']);
+//
+// mov/m4v УБРАНЫ (2026-08-31): у нас нет транскодинга — что залито, то и
+// раздаётся плеерам. Исходник .mov с камеры (реальный случай: 2.7K H.264
+// High@5.0, 12 Мбит/с, 804 МБ за 9 минут) мобильные не тянут — «видео не
+// грузится». Kinescope пережимал за нас; свой S3 — нет. Принимаем только
+// готовые к вебу mp4/webm, требования — в подсказке формы.
+const VIDEO_EXTENSIONS = new Set(['mp4', 'webm']);
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp']);
+
+// Максимальный размер видеофайла: при ~5 Мбит/с это ~25 минут — с запасом
+// больше любого модуля. Файл крупнее почти наверняка сырой исходник.
+// (Не export: route-файлы App Router не терпят посторонних экспортов.)
+const MAX_VIDEO_BYTES = 800 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
   const denied = await requireAdminAsync(request);
@@ -49,8 +60,26 @@ export async function POST(request: NextRequest) {
     const allowed = kind === 'thumbnail' ? IMAGE_EXTENSIONS : VIDEO_EXTENSIONS;
     const ext = fileName.includes('.') ? fileName.split('.').pop()!.toLowerCase() : '';
     if (!allowed.has(ext)) {
+      const hint =
+        kind === 'thumbnail'
+          ? ''
+          : ext === 'mov' || ext === 'm4v'
+            ? ' Исходники с камеры (.mov) мобильные не проигрывают — экспортируй как MP4 (H.264, 1080p).'
+            : '';
       return NextResponse.json(
-        { error: `Недопустимое расширение файла. Разрешены: ${[...allowed].join(', ')}` },
+        { error: `Недопустимое расширение файла. Разрешены: ${[...allowed].join(', ')}.${hint}` },
+        { status: 400 },
+      );
+    }
+
+    // Размер (клиент присылает file.size; лгать может, но это админ-гигиена,
+    // а не безопасность): гигантский файл — признак сырого исходника.
+    const fileSize = Number(body?.fileSize);
+    if (kind !== 'thumbnail' && Number.isFinite(fileSize) && fileSize > MAX_VIDEO_BYTES) {
+      return NextResponse.json(
+        {
+          error: `Файл ${Math.round(fileSize / 1024 / 1024)} МБ — слишком большой. Пережми в MP4 (H.264 1080p, ~4-5 Мбит/с): модуль на 10 минут — это ~300-400 МБ.`,
+        },
         { status: 400 },
       );
     }

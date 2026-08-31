@@ -771,11 +771,12 @@ const AdminVideosPage = () => {
     try {
       setS3UploadProgress(0);
 
-      // Шаг 1: presigned PUT от нашего сервера
+      // Шаг 1: presigned PUT от нашего сервера (fileSize — для проверки на
+      // сырой исходник: транскодинга нет, что залито — то и раздаётся)
       const initRes = await fetch('/api/admin/s3/upload-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName: file.name, contentType, kind }),
+        body: JSON.stringify({ fileName: file.name, contentType, kind, fileSize: file.size }),
       });
       const init = await initRes.json().catch(() => ({}));
       if (!initRes.ok) {
@@ -1598,7 +1599,7 @@ const AdminVideosPage = () => {
                       <input
                         id="s3FileUpload"
                         type="file"
-                        accept="video/*"
+                        accept="video/mp4,video/webm"
                         onChange={handleS3FileUpload}
                         disabled={s3UploadProgress !== null}
                         className="hidden"
@@ -1607,7 +1608,10 @@ const AdminVideosPage = () => {
                         <ProgressBar value={s3UploadProgress} label="Загрузка в хранилище" />
                       )}
                       <p style={hintStyle}>
-                        Файл зальётся в собственное S3, в поле URL запишется s3://-ссылка
+                        Только готовый к вебу MP4 (H.264, до 1080p, ~4-5 Мбит/с): транскодинга
+                        нет — что залито, то и получат телефоны. Исходник .mov с камеры
+                        (гигабайтный, 2.7K) у пользователей НЕ играется — сначала экспортируй
+                        в MP4. Модуль на 10 минут ≈ 300-400 МБ.
                       </p>
                     </div>
                   </div>
