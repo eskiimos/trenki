@@ -2074,6 +2074,35 @@ export default function VideoPage({ params }: VideoPageProps) {
         </div>
       </div>
 
+  {/* В тренировке полный ряд действий скрыт (мешает флоу), но лайкнуть занятие
+      возможность нужна: лайк = избранное, а изнутри ИИ-тренировки его было не
+      поставить вовсе (правка владельца «добавить занятия в избранное»). */}
+  {fromWorkout && !isLandscape && (
+    <div className="bg-surface px-4 pb-3">
+      <button
+        onClick={toggleLike}
+        aria-pressed={isLiked}
+        className="w-full rounded-full py-2.5 flex items-center justify-center gap-2 transition-opacity hover:opacity-80"
+        style={{
+          background: isLiked ? 'rgba(161,255,74,0.14)' : 'rgba(174,171,187,0.14)',
+          border: `1px solid ${isLiked ? 'rgba(161,255,74,0.45)' : 'rgba(174,171,187,0.3)'}`,
+        }}
+      >
+        <Heart
+          size={18}
+          className={isLiked ? 'text-brand' : 'text-muted'}
+          fill={isLiked ? 'currentColor' : 'none'}
+        />
+        <span
+          className="font-overpass font-bold text-[13px]"
+          style={{ color: isLiked ? 'var(--color-brand)' : 'var(--color-muted)' }}
+        >
+          {isLiked ? 'В избранном' : 'В избранное'}
+        </span>
+      </button>
+    </div>
+  )}
+
   {/* Пилюли действий (скрываем в ландшафтном режиме на мобилках и в тренировке —
       там ряд пуст). «Скачать» и «Камера» убраны по решению владельца 2026-07-31:
       функционал пока не используется (логика скачивания/PoseTracker сохранена —

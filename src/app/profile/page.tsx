@@ -410,7 +410,7 @@ const ProfilePage = () => {
             href="/profile/favorites"
             icon={Star}
             label="Избранное"
-            hint="Сохранённые тренировки и треньки"
+            hint="Треньки, занятия и тренировки от ИИ"
           />
           <NavRow href="/profile/assignments" icon={ClipboardList} label="Задания от тренера" />
         </SettingsGroup>

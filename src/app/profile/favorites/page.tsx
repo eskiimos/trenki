@@ -1,10 +1,11 @@
 'use client';
 
 // «Избранное» — ОТДЕЛЬНАЯ страница (правка владельца: история и избранное не
-// должны жить на одном экране). Две подвкладки:
+// должны жить на одном экране). Три подвкладки:
 //  · «Треньки» — лайкнутые шортсы (лайк = избранное), чистые превью без
 //    названий, тап открывает шортс;
-//  · «От ИИ-тренера» — сохранённые звёздочкой тренировки целиком
+//  · «Занятия» — лайкнутые занятия каталога (лайк = избранное, как у шортсов);
+//  · «ИИ-тренер» — сохранённые звёздочкой тренировки целиком
 //    (FavoriteWorkout), звёздочка ставится в истории (/profile/watch-history).
 // Подвкладка пишется в URL (?fav=), возврат «Назад» из шортса её не сбрасывает.
 
@@ -12,7 +13,7 @@ import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
-import { Clapperboard, Sparkles, Star } from 'lucide-react';
+import { Clapperboard, Dumbbell, Sparkles, Star } from 'lucide-react';
 import BottomNavigation from '@/components/BottomNavigation';
 import { Skeleton } from '@/components/Skeleton';
 
@@ -33,17 +34,27 @@ interface FavWorkout {
   totalDuration: number;
 }
 
+interface LikedVideo {
+  id: string;
+  title: string;
+  thumbnail: string | null;
+  duration: number;
+  trainer: string;
+}
+
 interface LikedShort {
   id: string;
   title: string;
   thumbnail: string | null;
 }
 
+type FavTab = 'shorts' | 'videos' | 'workouts';
+
 const FavoritesPage = () => {
   const searchParams = useSearchParams();
   const favParam = searchParams.get('fav');
-  const [favTab, setFavTab] = useState<'shorts' | 'workouts'>(
-    favParam === 'workouts' ? 'workouts' : 'shorts',
+  const [favTab, setFavTab] = useState<FavTab>(
+    favParam === 'workouts' || favParam === 'videos' ? favParam : 'shorts',
   );
   // Явный выбор (URL или тап) — автопереключение больше не трогает подвкладку
   const [favTabChosen, setFavTabChosen] = useState(favParam !== null);
@@ -51,8 +62,9 @@ const FavoritesPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [favorites, setFavorites] = useState<FavWorkout[]>([]);
   const [likedShorts, setLikedShorts] = useState<LikedShort[]>([]);
+  const [likedVideos, setLikedVideos] = useState<LikedVideo[]>([]);
 
-  const switchFavTab = (key: 'shorts' | 'workouts') => {
+  const switchFavTab = (key: FavTab) => {
     setFavTab(key);
     setFavTabChosen(true);
     try {
@@ -77,16 +89,26 @@ const FavoritesPage = () => {
           if (!cancelled) setLikedShorts(list);
           return list;
         }),
-    ]).then(([favRes, shortsRes]) => {
+      fetch('/api/videos/liked')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          const list: LikedVideo[] = d?.videos ?? [];
+          if (!cancelled) setLikedVideos(list);
+          return list;
+        }),
+    ]).then(([favRes, shortsRes, videosRes]) => {
       if (cancelled) return;
       setIsLoading(false);
       // Автовыбор подвкладки — только пока юзер не выбирал сам: пустые
       // «Треньки» при непустых тренировках встречали бы пустым экраном.
       const favList = favRes.status === 'fulfilled' ? favRes.value : [];
       const shortsList = shortsRes.status === 'fulfilled' ? shortsRes.value : [];
+      const videoList = videosRes.status === 'fulfilled' ? videosRes.value : [];
       setFavTabChosen((chosen) => {
-        if (!chosen && shortsList.length === 0 && favList.length > 0) {
-          setFavTab('workouts');
+        // Открываем первую НЕпустую вкладку, чтобы не встречать пустым экраном
+        if (!chosen && shortsList.length === 0) {
+          if (videoList.length > 0) setFavTab('videos');
+          else if (favList.length > 0) setFavTab('workouts');
         }
         return chosen;
       });
@@ -115,19 +137,25 @@ const FavoritesPage = () => {
         </h1>
       </header>
 
-      {/* Подвкладки: короткий формат отдельно от тренировок ИИ */}
-      <div className="flex gap-2 px-4 pb-3">
+      {/* Подвкладки: короткий формат, занятия каталога и тренировки ИИ.
+          grid auto-fit — на узком экране третья переносится, а не сжимается
+          до нечитаемого. */}
+      <div
+        className="px-4 pb-3"
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(104px, 1fr))', gap: 8 }}
+      >
         {(
           [
             ['shorts', <Clapperboard key="i" size={16} aria-hidden />, `Треньки${likedShorts.length ? ` (${likedShorts.length})` : ''}`],
-            ['workouts', <Sparkles key="i" size={16} aria-hidden />, `От ИИ-тренера${favorites.length ? ` (${favorites.length})` : ''}`],
+            ['videos', <Dumbbell key="i" size={16} aria-hidden />, `Занятия${likedVideos.length ? ` (${likedVideos.length})` : ''}`],
+            ['workouts', <Sparkles key="i" size={16} aria-hidden />, `ИИ-тренер${favorites.length ? ` (${favorites.length})` : ''}`],
           ] as const
         ).map(([key, icon, label]) => (
           <button
             key={key}
             type="button"
             onClick={() => switchFavTab(key)}
-            className="font-overpass uppercase flex-1 rounded-full font-extrabold text-[11px] tracking-[0.5px] py-2 px-3 inline-flex items-center justify-center gap-1.5 transition-colors"
+            className="font-overpass uppercase rounded-full font-extrabold text-[11px] tracking-[0.5px] py-2 px-3 inline-flex items-center justify-center gap-1.5 transition-colors"
             style={{
               border: `1px solid ${favTab === key ? 'var(--color-brand)' : '#2a2f4a'}`,
               background: favTab === key ? 'var(--lime-medium)' : 'transparent',
@@ -184,6 +212,51 @@ const FavoritesPage = () => {
                           <Clapperboard size={24} />
                         </span>
                       )}
+                    </Link>
+                  ))}
+                </div>
+              ))}
+
+            {favTab === 'videos' &&
+              (likedVideos.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-400 text-lg">Пока пусто</p>
+                  <p className="text-gray-500 text-sm mt-2">
+                    Ставь лайк занятию в каталоге — оно появится здесь
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {likedVideos.map((v) => (
+                    <Link
+                      key={v.id}
+                      href={`/video/${v.id}`}
+                      className="flex gap-3 rounded-2xl overflow-hidden bg-night border border-[#2a2f4a] p-3"
+                    >
+                      <span
+                        className="relative rounded-xl overflow-hidden bg-surface shrink-0"
+                        style={{ width: 104, aspectRatio: '16 / 9' }}
+                      >
+                        {v.thumbnail ? (
+                          <Image src={v.thumbnail} alt="" fill className="object-cover" />
+                        ) : (
+                          <span
+                            className="absolute inset-0 flex items-center justify-center text-muted"
+                            aria-hidden
+                          >
+                            <Dumbbell size={20} />
+                          </span>
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-ink font-overpass font-bold text-sm leading-tight line-clamp-2">
+                          {v.title}
+                        </span>
+                        <span className="block text-muted text-xs mt-1">
+                          {v.trainer}
+                          {v.duration > 0 && ` · ${Math.round(v.duration / 60)} мин`}
+                        </span>
+                      </span>
                     </Link>
                   ))}
                 </div>
