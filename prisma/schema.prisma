@@ -32,6 +32,10 @@ model User {
   accessTier            AccessTier              @default(FREE)
   premiumUntil          DateTime? // null + tier=PREMIUM = бессрочно; иначе — срок действия
   premiumNote           String? // Кто/за что выдал (ручная выдача, аудит)
+  // Награда, закреплённая под фотографией в профиле (правка владельца
+  // «конец августа»). Хранится КЛЮЧ ачивки (streak-achievements или древо) —
+  // сама награда, как и XP, выводится из истории, тут только выбор витрины.
+  pinnedAchievement     String?
   expiryReminderSentFor String? // premiumUntil (ISO), о котором уже слали «скоро кончится» — дедуп, переармится при продлении
   // Вовлекающие пуши (нудж «гантели запылились» и онбординг-дрип).
   lastNudgeOn           String? // локальная дата YYYY-MM-DD последнего нуджа — не чаще раза в день

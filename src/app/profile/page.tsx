@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ClipboardList, Flame, History, Settings, Sparkles, Star } from 'lucide-react';
+import { ClipboardList, Flame, History, Settings, Sparkles, Star, Zap } from 'lucide-react';
 import { useTelegram } from '../../hooks/useTelegram';
 import { ProfileSkeleton } from '../../components/Skeleton';
 import { Button } from '@/components/ui';
@@ -14,7 +14,7 @@ import SubscriptionExpiryCard from '@/components/SubscriptionExpiryCard';
 import EvolutionModal from '@/components/EvolutionModal';
 import StatusPathModal from '@/components/StatusPathModal';
 import TempoBadge from '@/components/TempoBadge';
-import { StatusIcon } from '@/components/gamification/icons';
+import { AchievementIcon, StatusIcon } from '@/components/gamification/icons';
 import LeagueTable from '@/components/LeagueTable';
 import { NavRow, SettingsGroup } from '@/components/profile/SettingsList';
 import { calculateAge } from '@/lib/age-utils';
@@ -43,6 +43,7 @@ const ProfilePage = () => {
   // Модалка «Путь хоккеиста» — открывается тапом по бейджу статуса
   const [statusPathOpen, setStatusPathOpen] = useState(false);
   // Счётчики наград для двух карточек-категорий
+  const pinnedKey: string | null = userProfile?.pinnedAchievement ?? null;
   const [awards, setAwards] = useState<{
     streakUnlocked: number;
     streakTotal: number;
@@ -198,67 +199,71 @@ const ProfilePage = () => {
       <div className="px-4 pb-nav max-w-3xl md:mx-auto md:px-8">
         {/* Верхний блок: на планшете аватар и потенциал — в 2 колонки */}
         <div className="md:grid md:grid-cols-2 md:gap-6 md:items-start">
-        {/* Профиль игрока - новый дизайн */}
+        {/* Карточка игрока (правка владельца: аватар меньше и слева, номер и
+            позиция убраны как лишние цифры, справа — имя, возраст-рост-вес и
+            общий потенциал). Под фото — закреплённая награда. */}
         <div className="mb-6 md:mb-0">
-          {/* Карточка аватара */}
-          <div className="bg-[#060919] rounded-lg overflow-hidden">
-            {/* Аватар пользователя */}
-            <div className="w-full aspect-square relative">
-              <Image 
-                src={userProfile?.profile?.avatarUrl || "/avatars/Avatar.png"}
-                alt="Игрок" 
-                width={400} 
-                height={400} 
-                className="w-full h-full object-cover"
-              />
-              
-              {/* Номер и позиция - левый верхний угол */}
-              <div className="absolute top-3 left-3 w-16 h-16 bg-[#445CFF] rounded-lg flex flex-col items-center justify-center">
-                <div className="text-white text-2xl font-black font-overpass leading-none">
-                  {userProfile?.profile?.number || '-'}
+          <div className="bg-[#060919] rounded-lg p-4">
+            <div className="flex items-start gap-4">
+              {/* Аватар ~96px вместо прежних 358 на всю ширину */}
+              <div className="shrink-0">
+                <div className="relative w-24 h-24 rounded-xl overflow-hidden bg-surface">
+                  <Image
+                    src={userProfile?.profile?.avatarUrl || '/avatars/Avatar.png'}
+                    alt="Игрок"
+                    fill
+                    className="object-cover"
+                  />
+                  {/* Логотип клуба — небольшим бейджем в углу фото */}
+                  {userProfile?.profile?.clubLogoUrl && (
+                    <span className="absolute bottom-1 right-1 w-7 h-7 rounded-md bg-white flex items-center justify-center overflow-hidden">
+                      <Image
+                        src={userProfile.profile.clubLogoUrl}
+                        alt=""
+                        width={28}
+                        height={28}
+                        className="w-full h-full object-contain"
+                      />
+                    </span>
+                  )}
                 </div>
-                <div className="text-white text-xs font-medium font-overpass uppercase leading-none mt-1">
-                  {userProfile?.profile?.position ? 
-                    (userProfile.profile.position === 'GOALTENDER' ? 'ВР' :
-                     userProfile.profile.position === 'DEFENSEMAN' ? 'ЗЩ' :
-                     userProfile.profile.position === 'LEFT_WING' ? 'ЛК' :
-                     userProfile.profile.position === 'CENTER' ? 'ЦН' :
-                     userProfile.profile.position === 'RIGHT_WING' ? 'ПК' : '-')
-                    : '-'
-                  }
+
+                {/* Закреплённая награда — «под фотографией спортсмена» */}
+                {pinnedKey && (
+                  <Link
+                    href="/achievements"
+                    aria-label="Закреплённая награда"
+                    className="mt-2 w-24 rounded-lg py-1.5 flex items-center justify-center gap-1"
+                    style={{
+                      background: 'var(--lime-subtle)',
+                      border: '1px solid var(--border-lime)',
+                    }}
+                  >
+                    <span className="text-brand" aria-hidden>
+                      <AchievementIcon achievementKey={pinnedKey} size={18} />
+                    </span>
+                  </Link>
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="text-[#445CFF] text-lg font-bold font-overpass uppercase leading-tight break-words">
+                  {isLoading ? 'Загрузка…' : `${displayName || 'ИМЯ'} ${displayLastName || ''}`.trim()}
                 </div>
-              </div>
-              
-              {/* Логотип клуба - правый верхний угол */}
-              <div className="absolute top-3 right-3 w-16 h-16 bg-white rounded-lg flex items-center justify-center overflow-hidden">
-                <Image 
-                  src={userProfile?.profile?.clubLogoUrl || "/icons/icon-app.svg"}
-                  alt="Логотип клуба" 
-                  width={64} 
-                  height={64} 
-                  className="w-full h-full object-contain"
-                />
-              </div>
-            </div>
-            
-            {/* Имя */}
-            <div className="h-10 px-4 flex items-center border-b border-[#26252F]">
-              <div className="text-[#445CFF] text-base font-medium font-overpass uppercase">
-                {isLoading ? 'Загрузка...' : (displayName || 'ИМЯ')}
-              </div>
-            </div>
-            
-            {/* Фамилия */}
-            <div className="h-10 px-4 flex items-center border-b border-[#26252F]">
-              <div className="text-[#445CFF] text-base font-medium font-overpass uppercase">
-                {isLoading ? '' : (displayLastName || 'ФАМИЛИЯ')}
-              </div>
-            </div>
-            
-            {/* Возраст, рост, вес */}
-            <div className="h-10 px-4 flex items-center">
-              <div className="text-[#AEABBB] text-sm font-medium font-overpass uppercase">
-                {displayAge ?? '-'} ЛЕТ | {userProfile?.profile?.height || '-'} СМ | {userProfile?.profile?.weight || '-'} КГ
+                <div className="text-[#AEABBB] text-sm font-medium font-overpass uppercase mt-2">
+                  {displayAge ?? '-'} лет · {userProfile?.profile?.height || '-'} см ·{' '}
+                  {userProfile?.profile?.weight || '-'} кг
+                </div>
+                {/* Общий потенциал числом — за подпиской он скрыт кольцом */}
+                {!paywalled && typeof userProfile?.profile?.potential === 'number' && (
+                  <div className="mt-2 inline-flex items-center gap-1.5">
+                    <Zap size={16} className="text-brand" aria-hidden />
+                    <span className="text-ink font-overpass font-black text-base tabular-nums">
+                      {userProfile.profile.potential.toFixed(1)}
+                    </span>
+                    <span className="text-muted text-xs uppercase">потенциал</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

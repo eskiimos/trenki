@@ -14,6 +14,7 @@ import { useEffect, useState, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { Pin } from 'lucide-react';
 import BottomNavigation from '@/components/BottomNavigation';
 import { AchievementIcon } from '@/components/gamification/icons';
 import { SKILL_TREE } from '@/lib/achievements';
@@ -97,6 +98,9 @@ const AchievementsPage = () => {
   const [items, setItems] = useState<AchievementItem[] | null>(null);
   const [streaks, setStreaks] = useState<StreakItem[] | null>(null);
   const [error, setError] = useState(false);
+  // Закреплённая под фото награда: показываем на профиле (правка владельца)
+  const [pinned, setPinned] = useState<string | null>(null);
+  const [pinBusy, setPinBusy] = useState(false);
   // Две категории (правка владельца): «Ачивки» = серии и вехи,
   // «Достижения» = древо навыков.
   // Вкладка из URL: с профиля ведут две отдельные карточки-категории
@@ -117,8 +121,35 @@ const AchievementsPage = () => {
       .catch(() => {
         if (!cancelled) setError(true);
       });
+    fetch('/api/profile')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled) setPinned(d?.user?.pinnedAchievement ?? null);
+      })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, []);
+
+  /** Тап по полученной награде — закрепить/снять. Сервер проверяет, что она
+   *  реально получена: иначе в витрине висела бы чужая ачивка. */
+  const togglePin = async (key: string) => {
+    if (pinBusy) return;
+    const next = pinned === key ? null : key;
+    setPinBusy(true);
+    setPinned(next); // оптимистично
+    try {
+      const res = await fetch('/api/gamification/pinned', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: next }),
+      });
+      if (!res.ok) setPinned(pinned); // откат
+    } catch {
+      setPinned(pinned);
+    } finally {
+      setPinBusy(false);
+    }
+  };
 
   const byKey = new Map((items ?? []).map((a) => [a.key, a]));
   const unlockedCount = items?.filter((a) => a.unlocked).length ?? 0;
@@ -181,14 +212,29 @@ const AchievementsPage = () => {
 
         {/* «Ачивки»: серии, вехи, поведение */}
         {tab === 'streaks' && streaks && (
+          <>
+            <p className="text-muted text-xs mb-3">
+              Тапни по полученной награде, чтобы закрепить её в профиле под фото.
+            </p>
           <div className="grid grid-cols-2 gap-3">
             {streaks.map((a) => (
-              <div
+              <button
                 key={a.key}
-                className="rounded-2xl p-4 flex flex-col items-center text-center"
+                type="button"
+                disabled={!a.unlocked}
+                onClick={() => togglePin(a.key)}
+                aria-pressed={pinned === a.key}
+                title={a.unlocked ? 'Закрепить в профиле' : undefined}
+                className="rounded-2xl p-4 flex flex-col items-center text-center transition-transform active:scale-95 disabled:active:scale-100"
                 style={{
                   background: a.unlocked ? 'var(--lime-subtle)' : 'rgba(174,171,187,0.06)',
-                  border: `1px solid ${a.unlocked ? 'var(--border-lime)' : 'transparent'}`,
+                  border: `1px solid ${
+                    pinned === a.key
+                      ? 'var(--color-brand)'
+                      : a.unlocked
+                        ? 'var(--border-lime)'
+                        : 'transparent'
+                  }`,
                 }}
               >
                 <span className={a.unlocked ? 'text-brand' : 'text-muted opacity-50'} aria-hidden>
@@ -216,9 +262,16 @@ const AchievementsPage = () => {
                     </span>
                   </span>
                 )}
-              </div>
+                {pinned === a.key && (
+                  <span className="text-brand text-[10px] font-bold uppercase mt-2 inline-flex items-center gap-1">
+                    <Pin size={12} aria-hidden />
+                    в профиле
+                  </span>
+                )}
+              </button>
             ))}
           </div>
+          </>
         )}
 
         {tab === 'skills' && items && (
