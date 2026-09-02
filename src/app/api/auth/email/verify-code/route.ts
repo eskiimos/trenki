@@ -15,6 +15,7 @@ import { getSessionFromRequest, sessionSecondsLeft } from '@/lib/session';
 import { isSameOrigin } from '@/lib/same-origin';
 import { rateLimit } from '@/lib/coach/rate-limit';
 import { grantPremiumDays } from '@/lib/payments/grant';
+import { getGlobalTrialDays } from '@/lib/settings';
 import { sendWelcomeEmail } from '@/lib/email-campaigns';
 import { logger } from '@/lib/logger';
 
@@ -121,16 +122,34 @@ export async function POST(request: NextRequest) {
       });
       needsOnboarding = true;
 
-      // Пробный период по промокоду. Отдельным шагом после создания: сбой выдачи
-      // триала НЕ должен ломать регистрацию/логин — в худшем случае юзер остаётся
-      // FREE, и это чинится вручную. Валидируем срок, чтобы битое значение из БД
-      // не выдало абсурдный премиум.
-      if (referralCode && Number.isInteger(trialDays) && trialDays > 0 && trialDays <= 365) {
+      // Пробный период. Отдельным шагом после создания: сбой выдачи триала НЕ
+      // должен ломать регистрацию/логин — в худшем случае юзер остаётся FREE,
+      // и это чинится вручную. Валидируем срок, чтобы битое значение из БД не
+      // выдало абсурдный премиум.
+      //
+      // Дни ДЛЯ ВСЕХ (trial.days, по умолчанию 7 — как обещает оферта) и дни
+      // промокода НЕ складываются: берём больший из двух. Иначе пришедший по
+      // коду получал бы 7 + 7 = 14 дней, а промокод с trialDays=7 переставал
+      // быть «привилегией канала».
+      const globalTrialDays = await getGlobalTrialDays();
+      const codeTrialDays = referralCode && Number.isInteger(trialDays) ? trialDays : 0;
+      const effectiveTrialDays = Math.max(globalTrialDays, codeTrialDays);
+      if (effectiveTrialDays > 0 && effectiveTrialDays <= 365) {
+        const source =
+          codeTrialDays >= globalTrialDays && referralCode
+            ? `промокоду ${referralCode}`
+            : 'регистрации';
         try {
-          await grantPremiumDays(user.id, trialDays, {
-            note: `Пробный период ${trialDays} дн. по промокоду ${referralCode}`,
+          await grantPremiumDays(user.id, effectiveTrialDays, {
+            note: `Пробный период ${effectiveTrialDays} дн. по ${source}`,
           });
-          logger.info('trial granted on signup', { userId: user.id, referralCode, trialDays });
+          logger.info('trial granted on signup', {
+            userId: user.id,
+            referralCode,
+            trialDays: effectiveTrialDays,
+            globalTrialDays,
+            codeTrialDays,
+          });
         } catch (e) {
           logger.error('trial grant failed on signup', { userId: user.id, referralCode, error: String(e) });
         }

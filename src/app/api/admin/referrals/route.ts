@@ -35,6 +35,20 @@ function parseTrialDays(input: unknown): number | null {
   return n;
 }
 
+// Персональные условия скидки канала. Пустая строка/null = НАСЛЕДОВАТЬ
+// глобальные настройки подписки (в БД пишем null); число = своё значение.
+// Возвращает undefined, если ввод некорректен (вызывающий отдаёт 400).
+function parseNullableInt(input: unknown, min: number, max: number): number | null | undefined {
+  if (input === null || input === '' || input === undefined) return null;
+  const n = Number(input);
+  if (!Number.isInteger(n) || n < min || n > max) return undefined;
+  return n;
+}
+// 99, а не 100: скидка 100% дала бы Init на 0 ₽ — T-Bank такой платёж
+// отклоняет, а чек 54-ФЗ на ноль не собирается.
+const MAX_DISCOUNT_PERCENT = 99;
+const MAX_DISCOUNT_MONTHS = 36;
+
 export async function GET(request: NextRequest) {
   const denied = await requireAdminAsync(request);
   if (denied) return denied;
@@ -125,6 +139,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Укажите название (label)' }, { status: 400 });
     }
     // trialDays необязателен при создании; по умолчанию 0 (без триала).
+    const discountPercent = parseNullableInt(body?.discountPercent, 0, MAX_DISCOUNT_PERCENT);
+    if (discountPercent === undefined) {
+      return NextResponse.json(
+        { error: `Скидка — пусто (общая) или целое 0..${MAX_DISCOUNT_PERCENT}` },
+        { status: 400 },
+      );
+    }
+    const discountMonths = parseNullableInt(body?.discountMonths, 0, MAX_DISCOUNT_MONTHS);
+    if (discountMonths === undefined) {
+      return NextResponse.json(
+        { error: `Месяцев скидки — пусто (общее) или целое 0..${MAX_DISCOUNT_MONTHS}` },
+        { status: 400 },
+      );
+    }
     const trialDays = body?.trialDays === undefined ? 0 : parseTrialDays(body.trialDays);
     if (trialDays === null) {
       return NextResponse.json({ error: `Пробный период — целое от 0 до ${MAX_TRIAL_DAYS} дней` }, { status: 400 });
@@ -136,7 +164,7 @@ export async function POST(request: NextRequest) {
     }
 
     const created = await prisma.referralCode.create({
-      data: { code, label, note, aliases: parseAliases(body?.aliases), trialDays },
+      data: { code, label, note, aliases: parseAliases(body?.aliases), trialDays, discountPercent, discountMonths },
     });
     return NextResponse.json({ success: true, code: created }, { status: 201 });
   } catch (error) {
@@ -153,7 +181,15 @@ export async function PATCH(request: NextRequest) {
     const id = String(body?.id || '');
     if (!id) return NextResponse.json({ error: 'id обязателен' }, { status: 400 });
 
-    const data: { isActive?: boolean; label?: string; note?: string | null; aliases?: string[]; trialDays?: number } = {};
+    const data: {
+      isActive?: boolean;
+      label?: string;
+      note?: string | null;
+      aliases?: string[];
+      trialDays?: number;
+      discountPercent?: number | null;
+      discountMonths?: number | null;
+    } = {};
     if (typeof body.isActive === 'boolean') data.isActive = body.isActive;
     if (typeof body.label === 'string' && body.label.trim()) data.label = body.label.trim();
     if (typeof body.note === 'string') data.note = body.note.trim() || null;
@@ -164,6 +200,26 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: `Пробный период — целое от 0 до ${MAX_TRIAL_DAYS} дней` }, { status: 400 });
       }
       data.trialDays = td;
+    }
+    if (body.discountPercent !== undefined) {
+      const dp = parseNullableInt(body.discountPercent, 0, MAX_DISCOUNT_PERCENT);
+      if (dp === undefined) {
+        return NextResponse.json(
+          { error: `Скидка — пусто (общая) или целое 0..${MAX_DISCOUNT_PERCENT}` },
+          { status: 400 },
+        );
+      }
+      data.discountPercent = dp;
+    }
+    if (body.discountMonths !== undefined) {
+      const dm = parseNullableInt(body.discountMonths, 0, MAX_DISCOUNT_MONTHS);
+      if (dm === undefined) {
+        return NextResponse.json(
+          { error: `Месяцев скидки — пусто (общее) или целое 0..${MAX_DISCOUNT_MONTHS}` },
+          { status: 400 },
+        );
+      }
+      data.discountMonths = dm;
     }
 
     const updated = await prisma.referralCode.update({ where: { id }, data });

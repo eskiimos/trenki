@@ -835,6 +835,13 @@ model ReferralCode {
   isActive  Boolean  @default(true)
   note      String? // заметка для админа
   trialDays Int      @default(0) // сколько дней премиума выдать при регистрации по этому коду (0 = без триала)
+  // Персональные условия скидки канала (правка владельца «конец августа»).
+  // NULL = наследовать глобальные subscription.introDiscountPercent/introMonths;
+  // 0 = у этого канала скидки нет вовсе (в отличие от NULL).
+  // Период — в ОПЛАТАХ (первые N платежей), как и глобальный introMonths:
+  // решение владельца «первые 3 месяца со скидкой, потом по полной».
+  discountPercent Int? // 0..99; 100% невозможен — T-Bank не примет Init на 0 ₽
+  discountMonths  Int? // сколько первых оплат по льготной цене
   createdAt DateTime @default(now())
 
   @@map("referral_codes")

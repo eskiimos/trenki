@@ -27,6 +27,7 @@ export const SETTING_KEYS = {
   introDiscountPercent: 'subscription.introDiscountPercent', // макс. скидка по промо, %
   introMonths: 'subscription.introMonths', // на сколько месяцев действует интро-скидка
   emailCampaignsEnabled: 'emailCampaigns.enabled', // общий рубильник триггерных email-кампаний (default FALSE)
+  trialDays: 'trial.days', // пробный период ДЛЯ ВСЕХ новых, дней (0 = выключен)
 } as const;
 
 export const REMINDER_DEFAULTS = {
@@ -195,6 +196,26 @@ function parseIntInRange(v: string | undefined | null, def: number, min: number,
   const n = Number(v);
   if (!Number.isFinite(n) || !Number.isInteger(n) || n < min || n > max) return def;
   return n;
+}
+
+/** Пробный период по умолчанию для ВСЕХ новых пользователей, дней.
+ *  0 = выключен. Оферта (legal/offer) обещает 7 дней — держать в согласии. */
+export const TRIAL_DAYS_DEFAULT = 7;
+
+/**
+ * Сколько дней премиума выдавать каждому новому пользователю без промокода.
+ * Пусто/битое/нет таблицы — TRIAL_DAYS_DEFAULT (как обещает оферта).
+ */
+export async function getGlobalTrialDays(): Promise<number> {
+  try {
+    const row = await prisma.appSetting.findUnique({
+      where: { key: SETTING_KEYS.trialDays },
+      select: { value: true },
+    });
+    return parseIntInRange(row?.value, TRIAL_DAYS_DEFAULT, 0, 365);
+  } catch {
+    return TRIAL_DAYS_DEFAULT;
+  }
 }
 
 /**

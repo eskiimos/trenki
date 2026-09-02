@@ -26,6 +26,7 @@ import {
   PowerOff,
   Trash2,
   Gift,
+  Percent,
   Star,
   UserPlus,
   Activity,
@@ -50,6 +51,8 @@ interface RefCode {
   isActive: boolean;
   note: string | null;
   trialDays: number;
+  discountPercent: number | null;
+  discountMonths: number | null;
   createdAt: string;
   stats: { registrations: number; onboarded: number; active7d: number; premium: number };
   users: RefUser[];
@@ -97,6 +100,8 @@ export default function AdminReferralsPage() {
   const [copied, setCopied] = useState<string | null>(null);
   // Черновики поля «триал» по каждому коду (ключ — id). Пусто — показываем текущее.
   const [trialEdit, setTrialEdit] = useState<Record<string, string>>({});
+  // Правка условий скидки канала: пусто = наследовать общие настройки
+  const [discEdit, setDiscEdit] = useState<Record<string, { percent: string; months: string }>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -154,6 +159,35 @@ export default function AdminReferralsPage() {
       const d = await res.json();
       if (!res.ok) { alert(d?.error || 'Ошибка'); return; }
       setTrialEdit((m) => { const { [c.id]: _, ...rest } = m; return rest; });
+      await load();
+    } finally { setBusy(false); }
+  };
+
+  // Персональные условия скидки канала. Пустое поле = наследовать глобальные
+  // настройки подписки (шлём null), 0 = у канала скидки нет вовсе.
+  const saveDiscount = async (c: RefCode) => {
+    const edit = discEdit[c.id];
+    if (!edit) return;
+    const toValue = (raw: string, max: number, label: string): number | null | undefined => {
+      const t = raw.trim();
+      if (t === '') return null;
+      const n = Number(t);
+      if (!Number.isInteger(n) || n < 0 || n > max) { alert(`${label} — пусто (общее) или целое 0..${max}`); return undefined; }
+      return n;
+    };
+    const percent = toValue(edit.percent, 99, 'Скидка');
+    if (percent === undefined) return;
+    const months = toValue(edit.months, 36, 'Месяцев скидки');
+    if (months === undefined) return;
+    setBusy(true);
+    try {
+      const res = await fetch('/api/admin/referrals', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: c.id, discountPercent: percent, discountMonths: months }),
+      });
+      const d = await res.json();
+      if (!res.ok) { alert(d?.error || 'Ошибка'); return; }
+      setDiscEdit((m) => { const { [c.id]: _, ...rest } = m; return rest; });
       await load();
     } finally { setBusy(false); }
   };
@@ -309,6 +343,24 @@ export default function AdminReferralsPage() {
                         триал {c.trialDays} дн.
                       </span>
                     )}
+                    {(c.discountPercent !== null || c.discountMonths !== null) && (
+                      <span
+                        className="inline-flex items-center gap-1"
+                        style={{
+                          fontSize: 12,
+                          padding: '2px 8px',
+                          borderRadius: 'var(--radius-pill)',
+                          background: 'var(--lime-medium)',
+                          color: 'var(--color-brand)',
+                        }}
+                        title="Персональные условия скидки этого канала (иначе — общие настройки подписки)"
+                      >
+                        <Percent size={16} aria-hidden />
+                        {c.discountPercent === null ? 'общая' : `${c.discountPercent}%`}
+                        {' × '}
+                        {c.discountMonths === null ? 'общий срок' : `${c.discountMonths} мес.`}
+                      </span>
+                    )}
                   </div>
                   <div className="font-mono" style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 4 }}>
                     {c.code}
@@ -389,6 +441,56 @@ export default function AdminReferralsPage() {
                   <span className="inline-flex sm:min-w-33">
                     {trialEdit[c.id] !== undefined && trialEdit[c.id] !== String(c.trialDays) && (
                       <AdminButton size="sm" icon={Check} onClick={() => saveTrial(c)} disabled={busy}>
+                        сохранить
+                      </AdminButton>
+                    )}
+                  </span>
+                </span>
+
+                {/* Персональные условия скидки канала (правка владельца).
+                    Пусто = берём общие настройки подписки, 0 = скидки нет. */}
+                <span
+                  className="inline-flex flex-wrap items-center gap-2"
+                  style={{ fontSize: 12 }}
+                >
+                  <span style={{ color: 'var(--color-muted)' }}>скидка</span>
+                  <input
+                    type="number" min={0} max={99}
+                    aria-label={`Скидка по коду ${c.code}, %`}
+                    placeholder="общая"
+                    value={discEdit[c.id]?.percent ?? (c.discountPercent === null ? '' : String(c.discountPercent))}
+                    onChange={(e) =>
+                      setDiscEdit((m) => ({
+                        ...m,
+                        [c.id]: {
+                          percent: e.target.value,
+                          months: m[c.id]?.months ?? (c.discountMonths === null ? '' : String(c.discountMonths)),
+                        },
+                      }))
+                    }
+                    style={{ ...smallInput, width: 80 }}
+                  />
+                  <span style={{ color: 'var(--color-muted)' }}>% ×</span>
+                  <input
+                    type="number" min={0} max={36}
+                    aria-label={`Месяцев скидки по коду ${c.code}`}
+                    placeholder="общее"
+                    value={discEdit[c.id]?.months ?? (c.discountMonths === null ? '' : String(c.discountMonths))}
+                    onChange={(e) =>
+                      setDiscEdit((m) => ({
+                        ...m,
+                        [c.id]: {
+                          percent: m[c.id]?.percent ?? (c.discountPercent === null ? '' : String(c.discountPercent)),
+                          months: e.target.value,
+                        },
+                      }))
+                    }
+                    style={{ ...smallInput, width: 80 }}
+                  />
+                  <span style={{ color: 'var(--color-muted)' }}>мес.</span>
+                  <span className="inline-flex sm:min-w-33">
+                    {discEdit[c.id] && (
+                      <AdminButton size="sm" icon={Check} onClick={() => saveDiscount(c)} disabled={busy}>
                         сохранить
                       </AdminButton>
                     )}

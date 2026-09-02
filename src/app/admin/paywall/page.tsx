@@ -84,6 +84,11 @@ export default function PaywallAdminPage() {
   const [savingPrice, setSavingPrice] = useState(false);
   const [priceMsg, setPriceMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
+  // Пробный период ДЛЯ ВСЕХ новых пользователей (оферта обещает 7 дней)
+  const [trialDays, setTrialDays] = useState('7');
+  const [savingTrial, setSavingTrial] = useState(false);
+  const [trialMsg, setTrialMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
   // «Бесплатное занятие недели» — выбирается вручную из списка опубликованных видео.
   const [freeLesson, setFreeLesson] = useState<{ id: string; title: string } | null>(null);
   const [videos, setVideos] = useState<Array<{ id: string; title: string }>>([]);
@@ -167,6 +172,9 @@ export default function PaywallAdminPage() {
             setDiscount(String(d.pricing.introDiscountPercent ?? 75));
             setMonths(String(d.pricing.introMonths ?? 3));
           }
+          if (typeof d.trialDays === 'number') {
+            setTrialDays(String(d.trialDays));
+          }
           setFreeLesson(d?.freeLesson ?? null);
           if (d?.receipt) {
             setRcEnabled(Boolean(d.receipt.enabled));
@@ -183,6 +191,29 @@ export default function PaywallAdminPage() {
   }, []);
 
   const introPreview = Math.round(Number(priceMonthly) * (1 - Number(discount) / 100));
+
+  const saveTrial = async () => {
+    setSavingTrial(true);
+    setTrialMsg(null);
+    try {
+      const res = await fetch('/api/admin/paywall', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trialDays: Number(trialDays) }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setTrialMsg({ type: 'err', text: d?.error || 'Не удалось сохранить' });
+        return;
+      }
+      setTrialDays(String(d.trialDays));
+      setTrialMsg({ type: 'ok', text: 'Сохранено' });
+    } catch {
+      setTrialMsg({ type: 'err', text: 'Сетевая ошибка' });
+    } finally {
+      setSavingTrial(false);
+    }
+  };
 
   const savePricing = async () => {
     setSavingPrice(true);
@@ -364,6 +395,35 @@ export default function PaywallAdminPage() {
             <div style={{ marginTop: 16 }}>
               <AdminButton type="button" icon={Save} onClick={savePricing} disabled={savingPrice}>
                 {savingPrice ? 'Сохраняю…' : 'Сохранить цены'}
+              </AdminButton>
+            </div>
+          </AdminCard>
+
+          {/* Пробный период для ВСЕХ новых (правка владельца «конец августа»).
+              Держать в согласии с офертой: legal/offer обещает 7 дней. */}
+          <AdminCard>
+            <SectionTitle icon={Gift}>Пробный период</SectionTitle>
+            <div style={{ color: 'var(--color-muted)', fontSize: 12, lineHeight: 1.5, marginBottom: 16 }}>
+              Сколько дней премиума получает КАЖДЫЙ новый пользователь при регистрации.
+              0 — выключить. Если человек пришёл по промокоду со своим пробным периодом,
+              берётся больший из двух (дни не складываются).
+            </div>
+            <label style={labelStyle}>Дней премиума новым</label>
+            <input
+              value={trialDays}
+              onChange={(e) => setTrialDays(e.target.value.replace(/[^0-9]/g, ''))}
+              inputMode="numeric"
+              style={{ ...inputStyle, maxWidth: 160 }}
+            />
+            <div style={{ color: 'var(--color-muted)', fontSize: 12, marginTop: 8 }}>
+              {Number(trialDays) > 0
+                ? `Новый пользователь сразу получает ${trialDays} дн. полного доступа.`
+                : 'Пробный период выключен — новые пользователи сразу упираются в paywall.'}
+            </div>
+            <StatusMsg msg={trialMsg} />
+            <div style={{ marginTop: 16 }}>
+              <AdminButton type="button" icon={Save} onClick={saveTrial} disabled={savingTrial}>
+                {savingTrial ? 'Сохраняю…' : 'Сохранить пробный период'}
               </AdminButton>
             </div>
           </AdminCard>

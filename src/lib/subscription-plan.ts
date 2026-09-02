@@ -22,6 +22,30 @@ export function computeIntroPrice(priceMonthlyRub: number, introDiscountPercent:
   return Math.round(priceMonthlyRub * (1 - pct / 100));
 }
 
+/**
+ * Эффективные условия интро-скидки: у канала свои или глобальные.
+ *
+ * NULL у промокода = НАСЛЕДОВАТЬ глобальную настройку; 0 = у канала скидки нет
+ * вовсе (решение владельца 2026-09-02). Проверка глобальных значений идёт
+ * ПОСЛЕ подстановки кодовых — иначе персональная скидка канала не работала бы,
+ * пока общая выключена.
+ *
+ * active=false означает «интро не действует» — платим базовую цену.
+ * Чистая функция: тестируется без БД (tests/lib/subscription-plan.test.ts).
+ */
+export function effectiveIntro(
+  code: { discountPercent: number | null; discountMonths: number | null },
+  global: { priceMonthlyRub: number; introDiscountPercent: number; introMonths: number },
+): { percent: number; months: number; introPriceRub: number; active: boolean } {
+  const percent = code.discountPercent ?? global.introDiscountPercent;
+  const months = code.discountMonths ?? global.introMonths;
+  const introPriceRub = computeIntroPrice(global.priceMonthlyRub, percent);
+  // introPriceRub <= 0 (скидка 100%): T-Bank не примет Init на 0 ₽, а чек
+  // 54-ФЗ на ноль не собирается — такая конфигурация не действует.
+  const active = percent > 0 && months > 0 && introPriceRub > 0;
+  return { percent, months, introPriceRub, active };
+}
+
 // «Что входит в подписку» — копирайт из Figma-макета.
 export const PAID_FEATURES: string[] = [
   'Полный доступ к тренировкам от лучших специалистов',

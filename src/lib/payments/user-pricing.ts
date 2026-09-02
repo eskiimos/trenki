@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getSubscriptionPricing } from '@/lib/settings';
+import { effectiveIntro } from '@/lib/subscription-plan';
 
 // Персональная цена подписки С УЧЁТОМ ПРОМОКОДА — единый источник и для показа
 // (/api/subscription/pricing/me), и для списания (/api/payments/init).
@@ -59,11 +60,6 @@ export async function resolveUserPricing(
     introMonths: pricing.introMonths,
     introDiscountPercent: pricing.introDiscountPercent,
   };
-  // introPriceRub <= 0 (скидка 100%): T-Bank не примет Init на 0 коп., а чек
-  // 54-ФЗ на 0 не собирается — интро в таком конфиге не действует.
-  if (pricing.introDiscountPercent <= 0 || pricing.introMonths <= 0 || pricing.introPriceRub <= 0) {
-    return base;
-  }
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -75,9 +71,28 @@ export async function resolveUserPricing(
   // скидку не даёт (атрибуция канала при этом остаётся).
   const rc = await prisma.referralCode.findFirst({
     where: { code: user.referralCode, isActive: true },
-    select: { id: true },
+    select: { id: true, discountPercent: true, discountMonths: true },
   });
   if (!rc) return base;
+
+  // Условия скидки: свои у канала, иначе глобальные (чистая логика — в
+  // effectiveIntro, покрыта тестами).
+  const {
+    percent: effPercent,
+    months: effMonths,
+    introPriceRub: effIntroRub,
+    active,
+  } = effectiveIntro(rc, pricing);
+  if (!active) return base;
+
+  // Эффективные условия отдаём наружу: их показывают модалка и родительский
+  // кабинет («вместо 1200 ₽», «осталось N оплат»).
+  const effBase: UserPricing = {
+    ...base,
+    introPriceRub: effIntroRub,
+    introMonths: effMonths,
+    introDiscountPercent: effPercent,
+  };
 
   // Сколько периодов уже УСПЕШНО оплачено этим получателем: считаем по
   // premiumGrantedAt (атомарный флаг «премиум по этому заказу выдан») — статусы
@@ -85,8 +100,8 @@ export async function resolveUserPricing(
   const paidCount = await prisma.payment.count({
     where: { userId, premiumGrantedAt: { not: null } },
   });
-  const slotsLeft = pricing.introMonths - paidCount;
-  if (slotsLeft <= 0) return base;
+  const slotsLeft = effMonths - paidCount;
+  if (slotsLeft <= 0) return effBase;
 
   if (opts.forCharge) {
     // Незавершённые интро-ссылки (сумма ниже базовой, премиум не выдан, созданы
@@ -100,13 +115,13 @@ export async function resolveUserPricing(
       },
     });
     if (pendingIntro >= slotsLeft) {
-      return { ...base, pendingIntroHold: true };
+      return { ...effBase, pendingIntroHold: true };
     }
   }
 
   return {
-    ...base,
-    amountRub: pricing.introPriceRub,
+    ...effBase,
+    amountRub: effIntroRub,
     isIntro: true,
     introPaymentsLeft: slotsLeft,
   };

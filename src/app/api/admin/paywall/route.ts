@@ -5,6 +5,7 @@ import {
   getSubscriptionPricing,
   getFreeLessonVideoId,
   getReceiptSettings,
+  getGlobalTrialDays,
   setAppSetting,
   SETTING_KEYS,
 } from '@/lib/settings';
@@ -23,11 +24,12 @@ export async function GET(request: NextRequest) {
   const denied = await requireAdminAsync(request);
   if (denied) return denied;
   try {
-    const [mode, pricing, freeLessonVideoId, receipt] = await Promise.all([
+    const [mode, pricing, freeLessonVideoId, receipt, trialDays] = await Promise.all([
       getPaywallMode(),
       getSubscriptionPricing(),
       getFreeLessonVideoId(),
       getReceiptSettings(),
+      getGlobalTrialDays(),
     ]);
     // Название текущего бесплатного занятия — чтобы админ видел, что выбрано.
     const freeLesson = freeLessonVideoId
@@ -43,6 +45,7 @@ export async function GET(request: NextRequest) {
       freeLesson,
       receipt,
       receiptOptions: { taxations: TAXATION_VALUES, vats: VAT_VALUES },
+      trialDays,
     });
   } catch (error) {
     logger.error('admin/paywall GET failed', error);
@@ -136,7 +139,18 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ receipt: await getReceiptSettings() });
     }
 
-    return NextResponse.json({ error: 'Нужен mode, pricing, freeLessonVideoId или receipt' }, { status: 400 });
+    // Ветка 5: пробный период для ВСЕХ новых пользователей, дней (0 = выключен).
+    if (body.trialDays !== undefined) {
+      const days = Number(body.trialDays);
+      if (!Number.isInteger(days) || days < 0 || days > 365) {
+        return NextResponse.json({ error: 'Пробный период — целое от 0 до 365 дней' }, { status: 400 });
+      }
+      await setAppSetting(SETTING_KEYS.trialDays, String(days));
+      logger.info('admin set global trial', { days });
+      return NextResponse.json({ trialDays: days });
+    }
+
+    return NextResponse.json({ error: 'Нужен mode, pricing, freeLessonVideoId, receipt или trialDays' }, { status: 400 });
   } catch (error) {
     logger.error('admin/paywall PATCH failed', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
