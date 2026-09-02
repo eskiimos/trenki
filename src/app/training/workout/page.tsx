@@ -6,7 +6,7 @@ import { useTelegram } from '@/hooks/useTelegram';
 import CharacteristicsGainModal from '@/components/CharacteristicsGainModal';
 import Toast from '@/components/Toast';
 import ModuleSelectionModal from '@/components/ModuleSelectionModal';
-import { Check, Play, Lightbulb, PartyPopper, SkipForward, Star, Zap } from 'lucide-react';
+import { Check, Play, Lightbulb, PartyPopper, RefreshCw, Search, SkipForward, Star, Zap } from 'lucide-react';
 import { CharacteristicIcon } from '@/components/training/icons';
 
 interface WorkoutModule {
@@ -88,7 +88,6 @@ export default function WorkoutPage() {
     const dismissed = localStorage.getItem('workout_info_dismissed');
     if (!dismissed) setShowInfoBlock(true);
   }, []);
-  const [showCompletionModal, setShowCompletionModal] = useState(false);
   
   // Состояние для модалки прироста характеристик
   const [showGainsModal, setShowGainsModal] = useState(false);
@@ -135,6 +134,9 @@ export default function WorkoutPage() {
   const [isReplacingModule, setIsReplacingModule] = useState(false);
   // Ручной подбор модуля (поиск/фильтр) — индекс открытого слота
   const [pickerIndex, setPickerIndex] = useState<number | null>(null);
+  // Выбранное направление растяжки для заминки (подсветка в панели действий:
+  // раньше активного состояния не было вовсе — не понять, что уже выбрано)
+  const [stretchDir, setStretchDir] = useState<'FULL' | 'UPPER' | 'LOWER' | null>(null);
 
   useEffect(() => {
     if (webApp) {
@@ -223,6 +225,9 @@ export default function WorkoutPage() {
       const data = await response.json();
 
       if (data.workout) {
+        // Подсветка направления растяжки относится к КОНКРЕТНОЙ тренировке —
+        // при загрузке другой сбрасываем, иначе покажет чужой выбор.
+        setStretchDir(null);
         console.log('📊 Loaded workout data:', {
           id: data.workout.id,
           currentVideoIndex: data.workout.currentVideoIndex,
@@ -621,7 +626,15 @@ export default function WorkoutPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#101530] text-white p-4" style={{ paddingBottom: '100px', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
+    // Клиренс снизу: в фикс-баре теперь до трёх кнопок (завершить + избранное
+    // + досрочный финиш) — 100px не хватало, последний блок уезжал под бар.
+    <div
+      className="min-h-screen bg-surface text-white p-4"
+      style={{
+        paddingBottom: 'calc(var(--safe-bottom) + 220px)',
+        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)',
+      }}
+    >
       {/* Заголовок с кнопкой назад */}
       <div className="mb-6 flex items-center gap-3">
         <button onClick={() => router.back()} className="flex-shrink-0">
@@ -1007,138 +1020,6 @@ export default function WorkoutPage() {
                 </div>
               )}
 
-              {/* Кнопка замены модуля (нижний правый угол) */}
-              {(() => {
-                const canReplace = !isCompleted && !isLocked && module.equipment && module.equipment.length > 0;
-                return canReplace && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleReplaceModule(index);
-                    }}
-                    disabled={replacingModuleIndex === index && isReplacingModule}
-                    style={{
-                      position: 'absolute',
-                      bottom: '12px',
-                      right: '12px',
-                      zIndex: 3,
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '8px',
-                      backgroundColor: 'rgba(161, 255, 74, 0.2)',
-                      border: '1px solid rgba(161, 255, 74, 0.4)',
-                      color: '#A1FF4A',
-                      cursor: replacingModuleIndex === index && isReplacingModule ? 'wait' : 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.2s ease',
-                      padding: 0,
-                      fontSize: '16px',
-                      fontWeight: 'bold',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(161, 255, 74, 0.3)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(161, 255, 74, 0.2)';
-                    }}
-                    title="Заменить видео"
-                  >
-                    {replacingModuleIndex === index && isReplacingModule ? (
-                      <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</span>
-                    ) : (
-                      '⟳'
-                    )}
-                  </button>
-                );
-              })()}
-
-              {/* Ручной подбор модуля: поиск/фильтр видео (лупа рядом с авто-заменой) */}
-              {!isCompleted && !isLocked && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setPickerIndex(index); }}
-                  title="Выбрать вручную (поиск и фильтр)"
-                  style={{
-                    position: 'absolute', bottom: '12px', right: '50px', zIndex: 3,
-                    width: '32px', height: '32px', borderRadius: '8px',
-                    backgroundColor: 'rgba(68, 92, 255, 0.22)', border: '1px solid rgba(68, 92, 255, 0.45)',
-                    color: '#A9B6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
-                  }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
-                </button>
-              )}
-
-              {/* Пропустить модуль (правки «Конец августа»: не у всех есть
-                  условия для каждого модуля). Маленькая, не бросается в глаза;
-                  перед скипом — предупреждение «что теряешь». */}
-              {!isCompleted && !isLocked && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); openSkipModal(index); }}
-                  title="Пропустить модуль"
-                  style={{
-                    position: 'absolute', bottom: '12px', right: '88px', zIndex: 3,
-                    width: '32px', height: '32px', borderRadius: '8px',
-                    backgroundColor: 'rgba(174, 171, 187, 0.18)', border: '1px solid rgba(174, 171, 187, 0.4)',
-                    color: '#AEABBB', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
-                  }}
-                >
-                  <SkipForward size={16} aria-hidden />
-                </button>
-              )}
-
-              {/* C-8: выбор направления растяжки для заминки (дня растяжки).
-                  Подменяет стретч-видео через replace-module. «Рандом» —
-                  это просто уже подобранное видео (по умолчанию). */}
-              {module.moduleType === 'COOLDOWN' && !isCompleted && !isLocked && (
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    position: 'absolute',
-                    left: '8px',
-                    right: '8px',
-                    bottom: '8px',
-                    zIndex: 3,
-                    display: 'flex',
-                    gap: '4px',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {([
-                    { dir: 'FULL', label: 'Всё тело' },
-                    { dir: 'UPPER', label: 'Верх' },
-                    { dir: 'LOWER', label: 'Низ' },
-                  ] as const).map(({ dir, label }) => (
-                    <button
-                      key={dir}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleReplaceModule(index, dir);
-                      }}
-                      disabled={replacingModuleIndex === index && isReplacingModule}
-                      style={{
-                        flex: 1,
-                        padding: '6px 2px',
-                        borderRadius: '8px',
-                        backgroundColor: 'rgba(161, 255, 74, 0.18)',
-                        border: '1px solid rgba(161, 255, 74, 0.4)',
-                        color: '#A1FF4A',
-                        fontFamily: 'Overpass',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        whiteSpace: 'nowrap',
-                        cursor: replacingModuleIndex === index && isReplacingModule ? 'wait' : 'pointer',
-                      }}
-                      title={`Растяжка: ${label}`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           );
         })}
@@ -1166,8 +1047,10 @@ export default function WorkoutPage() {
         </h3>
         <div className="space-y-3">
           {(() => {
-            // Получаем текущий активный модуль (первый незавершенный)
-            const currentModule = workout?.modules?.find(m => !m.completed);
+            // Текущий активный модуль — тот же, что подсвечен в сетке:
+            // пропущенные не в счёт (раньше find(!completed) брал скипнутый
+            // модуль, и оборудование расходилось с карточкой «Текущий»).
+            const currentModule = workout?.modules?.find(m => !m.completed && !m.skipped);
             const equipment = currentModule?.equipment || [];
             
             return equipment.length > 0 ? (
@@ -1201,8 +1084,185 @@ export default function WorkoutPage() {
         </div>
       </div>
 
+      {/* Панель действий над ТЕКУЩИМ модулем (правка владельца: «использовать
+          свободное место между инвентарём и кнопкой продолжить»).
+          Раньше все эти контролы висели абсолютом поверх карточки модуля, и на
+          заминке ряд «Всё тело/Верх/Низ» ложился прямо на кнопки замены —
+          пилюли перехватывали клики, и заменить/пропустить было невозможно.
+          Все они и так относились только к активному модулю, поэтому вынос
+          сюда ничего не ломает и заодно даёт нормальные тач-таргеты. */}
+      {(() => {
+        const activeIndex = workout.modules.findIndex((m) => !m.completed && !m.skipped);
+        if (activeIndex === -1) return null;
+        const activeModule = workout.modules[activeIndex];
+        const busy = replacingModuleIndex === activeIndex && isReplacingModule;
+        const canReplace = !!activeModule.equipment && activeModule.equipment.length > 0;
+        const actionStyle: React.CSSProperties = {
+          flex: 1,
+          minHeight: 44,
+          borderRadius: 12,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+          fontFamily: 'Overpass',
+          fontWeight: 700,
+          fontSize: 12,
+          letterSpacing: '0.3px',
+          cursor: busy ? 'wait' : 'pointer',
+        };
+        return (
+          <div
+            style={{
+              width: '100%',
+              marginTop: 16,
+              padding: 16,
+              borderRadius: 16,
+              background: 'rgba(39, 42, 60, 0.5)',
+              backdropFilter: 'blur(10px)',
+            }}
+          >
+            <div
+              style={{
+                fontFamily: 'Overpass',
+                fontWeight: 700,
+                fontSize: 11,
+                letterSpacing: '0.5px',
+                textTransform: 'uppercase',
+                color: '#AEABBB',
+                marginBottom: 4,
+              }}
+            >
+              Сейчас
+            </div>
+            {/* Название текущего модуля — на карточке его нет вообще */}
+            <div
+              style={{
+                fontFamily: 'Overpass',
+                fontWeight: 700,
+                fontSize: 14,
+                lineHeight: '120%',
+                color: '#F9F8FE',
+                marginBottom: 12,
+              }}
+            >
+              {activeModule.title}
+            </div>
+
+            {/* auto-fit, а не flex: на 320px три подписи с иконками в один ряд
+                не помещаются — лишняя кнопка переносится на вторую строку */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
+                gap: 8,
+              }}
+            >
+              {canReplace && (
+                <button
+                  type="button"
+                  onClick={() => handleReplaceModule(activeIndex)}
+                  disabled={busy}
+                  style={{
+                    ...actionStyle,
+                    backgroundColor: 'rgba(161, 255, 74, 0.18)',
+                    border: '1px solid rgba(161, 255, 74, 0.4)',
+                    color: '#A1FF4A',
+                  }}
+                >
+                  <RefreshCw size={16} aria-hidden className={busy ? 'animate-spin' : ''} />
+                  Заменить
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setPickerIndex(activeIndex)}
+                style={{
+                  ...actionStyle,
+                  backgroundColor: 'rgba(68, 92, 255, 0.22)',
+                  border: '1px solid rgba(68, 92, 255, 0.45)',
+                  color: '#A9B6FF',
+                }}
+              >
+                <Search size={16} aria-hidden />
+                Выбрать
+              </button>
+              <button
+                type="button"
+                onClick={() => openSkipModal(activeIndex)}
+                style={{
+                  ...actionStyle,
+                  backgroundColor: 'rgba(174, 171, 187, 0.14)',
+                  border: '1px solid rgba(174, 171, 187, 0.35)',
+                  color: '#AEABBB',
+                }}
+              >
+                <SkipForward size={16} aria-hidden />
+                Пропустить
+              </button>
+            </div>
+
+            {/* Направление растяжки — только для заминки. Теперь на всю ширину
+                панели, а не в 155px карточки: подписи наконец помещаются. */}
+            {activeModule.moduleType === 'COOLDOWN' && (
+              <div style={{ marginTop: 12 }}>
+                <div
+                  style={{
+                    fontFamily: 'Overpass',
+                    fontWeight: 700,
+                    fontSize: 11,
+                    letterSpacing: '0.5px',
+                    textTransform: 'uppercase',
+                    color: '#AEABBB',
+                    marginBottom: 8,
+                  }}
+                >
+                  Растяжка на
+                </div>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(84px, 1fr))',
+                    gap: 8,
+                  }}
+                >
+                  {([
+                    { dir: 'FULL', label: 'Всё тело' },
+                    { dir: 'UPPER', label: 'Верх' },
+                    { dir: 'LOWER', label: 'Низ' },
+                  ] as const).map(({ dir, label }) => {
+                    const selected = stretchDir === dir;
+                    return (
+                      <button
+                        key={dir}
+                        type="button"
+                        onClick={() => {
+                          setStretchDir(dir);
+                          handleReplaceModule(activeIndex, dir);
+                        }}
+                        disabled={busy}
+                        style={{
+                          ...actionStyle,
+                          backgroundColor: selected
+                            ? 'rgba(161, 255, 74, 0.28)'
+                            : 'rgba(161, 255, 74, 0.12)',
+                          border: `1px solid rgba(161, 255, 74, ${selected ? 0.7 : 0.3})`,
+                          color: '#A1FF4A',
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Фиксированная кнопка управления тренировкой */}
-      <div 
+      <div
         className="fixed bottom-0 left-0 right-0 p-4"
         style={{
           backgroundColor: '#101530',
@@ -1232,6 +1292,39 @@ export default function WorkoutPage() {
               ? 'Продолжить тренировку'
               : 'Начать тренировку'}
         </button>
+
+        {/* «В избранное» — правка владельца: «между модулями и завершить
+            тренировку можно добавить ⭐ добавить тренировку в избранное».
+            Кнопка существовала, но жила внутри модалки showCompletionModal,
+            вызов которой удалили ещё 29.01 (ce403e4) — на экране её не было
+            вовсе, отсюда «я не понял как лайкнуть тренировку». Теперь она в
+            живом баре и видна, как только пройден хотя бы один модуль. */}
+        {workout && workout.modules.some((m) => m.completed) && (
+          <button
+            type="button"
+            onClick={saveWorkoutToFavorites}
+            disabled={favSaving || favSaved}
+            className="w-full mt-2 rounded-full transition-transform active:scale-95"
+            style={{
+              backgroundColor: favSaved ? 'rgba(161, 255, 74, 0.16)' : 'transparent',
+              border: `1px solid ${favSaved ? 'rgba(161,255,74,0.5)' : 'rgba(174,171,187,0.35)'}`,
+              color: favSaved ? '#A1FF4A' : '#F9F8FE',
+              fontFamily: 'Overpass, sans-serif',
+              fontWeight: 700,
+              fontSize: '14px',
+              cursor: favSaving || favSaved ? 'default' : 'pointer',
+              height: '44px',
+              padding: '0 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+          >
+            <Star size={18} fill={favSaved ? 'currentColor' : 'none'} aria-hidden />
+            {favSaved ? 'В избранном' : favSaving ? 'Сохраняем…' : 'Добавить в избранное'}
+          </button>
+        )}
 
         {/* Досрочный финиш: доступен, когда пройден хотя бы один модуль, но не
             все. Засчитываем пройденные модули, но без бонуса за полную тренировку
@@ -1478,164 +1571,6 @@ export default function WorkoutPage() {
         );
       })()}
 
-      {/* Модальное окно завершения тренировки */}
-      {showCompletionModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '20px',
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: '#1A1F3A',
-              borderRadius: '24px',
-              padding: '32px 24px',
-              maxWidth: '400px',
-              width: '100%',
-              textAlign: 'center',
-              border: '1px solid rgba(161, 255, 74, 0.2)',
-            }}
-          >
-            {/* Иконка успеха */}
-            <div
-              style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(161, 255, 74, 0.1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 24px',
-              }}
-            >
-              <PartyPopper size={48} color="#A1FF4A" aria-hidden />
-            </div>
-
-            {/* Заголовок */}
-            <h2
-              style={{
-                fontFamily: 'Overpass, sans-serif',
-                fontWeight: 700,
-                fontSize: '24px',
-                lineHeight: '120%',
-                color: '#F9F8FE',
-                marginBottom: '12px',
-              }}
-            >
-              Тренировка завершена!
-            </h2>
-
-            {/* Текст поздравления */}
-            <p
-              style={{
-                fontFamily: 'Overpass, sans-serif',
-                fontWeight: 400,
-                fontSize: '16px',
-                lineHeight: '150%',
-                color: 'rgba(249, 248, 254, 0.7)',
-                marginBottom: '32px',
-              }}
-            >
-              Отличная работа! Ты молодец, все модули пройдены успешно
-            </p>
-
-            {/* Понравилась вся тренировка? — сохраняем составленное занятие целиком */}
-            {workout && (
-              <div
-                style={{
-                  background: 'rgba(174, 171, 187, 0.08)',
-                  border: '1px solid rgba(174, 171, 187, 0.2)',
-                  borderRadius: '16px',
-                  padding: '16px',
-                  marginBottom: '20px',
-                  textAlign: 'left',
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: 'Overpass, sans-serif',
-                    fontWeight: 700,
-                    fontSize: '14px',
-                    color: '#F9F8FE',
-                    marginBottom: 4,
-                  }}
-                >
-                  Понравилась вся тренировка?
-                </div>
-                <div style={{ fontFamily: 'Overpass, sans-serif', fontSize: '12px', color: '#AEABBB', marginBottom: 12 }}>
-                  Сохрани её целиком — сможешь повторить в любой момент из избранного.
-                </div>
-                <button
-                  type="button"
-                  disabled={favSaving || favSaved}
-                  onClick={saveWorkoutToFavorites}
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    borderRadius: '22px',
-                    background: favSaved ? 'rgba(161,255,74,0.15)' : 'transparent',
-                    border: `1.5px solid ${favSaved ? '#A1FF4A' : 'rgba(161,255,74,0.5)'}`,
-                    color: '#A1FF4A',
-                    fontFamily: 'Overpass, sans-serif',
-                    fontWeight: 800,
-                    fontSize: '13px',
-                    letterSpacing: '0.5px',
-                    textTransform: 'uppercase',
-                    cursor: favSaving || favSaved ? 'default' : 'pointer',
-                    opacity: favSaving ? 0.6 : 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                  }}
-                >
-                  {favSaving ? (
-                    'Сохраняю…'
-                  ) : (
-                    <>
-                      <Star size={20} fill={favSaved ? 'currentColor' : 'none'} aria-hidden />
-                      {favSaved ? 'В избранном' : 'Добавить в избранное'}
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
-
-            {/* Кнопка завершения */}
-            <button
-              type="button"
-              onClick={() => completeWorkout()}
-              style={{
-                width: '100%',
-                height: '56px',
-                borderRadius: '28px',
-                backgroundColor: '#A1FF4A',
-                color: '#060919',
-                fontFamily: 'Overpass, sans-serif',
-                fontWeight: 700,
-                fontSize: '16px',
-                letterSpacing: '0.5px',
-                cursor: 'pointer',
-                border: 'none',
-                textTransform: 'uppercase',
-              }}
-            >
-              Завершить тренировку
-            </button>
-          </div>
-        </div>
-      )}
       
       {/* Модалка прироста характеристик */}
       {showGainsModal && characteristicsGains && newCharacteristics && (
