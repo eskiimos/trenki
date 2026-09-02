@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   calculateAge,
   calculateAgeData,
+  clampDay,
+  daysInMonth,
+  parseDateString,
+  toDateString,
   formatDateForInput,
   getAgeGroup,
   getAgeGroupLabel,
@@ -86,5 +90,64 @@ describe('getAgeGroupLabel', () => {
     expect(getAgeGroupLabel('TEEN')).toContain('Подростки');
     expect(getAgeGroupLabel('YOUNG_ADULT')).toContain('Молодые');
     expect(getAgeGroupLabel('ADULT')).toContain('Взрослые');
+  });
+});
+
+// ─── Колёсики даты рождения ────────────────────────────────────────────────
+
+describe('daysInMonth / clampDay', () => {
+  it('обычные месяцы', () => {
+    expect(daysInMonth(2026, 1)).toBe(31);
+    expect(daysInMonth(2026, 4)).toBe(30);
+  });
+
+  it('февраль: високосный и обычный год', () => {
+    expect(daysInMonth(2024, 2)).toBe(29);
+    expect(daysInMonth(2026, 2)).toBe(28);
+    expect(daysInMonth(2000, 2)).toBe(29); // делится на 400
+    expect(daysInMonth(1900, 2)).toBe(28); // делится на 100, но не на 400
+  });
+
+  it('31 марта → февраль клампится в 28/29', () => {
+    expect(clampDay(2026, 2, 31)).toBe(28);
+    expect(clampDay(2024, 2, 31)).toBe(29);
+  });
+
+  it('31 мая → июнь клампится в 30', () => {
+    expect(clampDay(2026, 6, 31)).toBe(30);
+  });
+
+  it('29 февраля високосного → обычный год даёт 28', () => {
+    expect(clampDay(2026, 2, 29)).toBe(28);
+  });
+
+  it('корректный день не трогается', () => {
+    expect(clampDay(2026, 3, 15)).toBe(15);
+  });
+});
+
+describe('toDateString / parseDateString', () => {
+  it('формат с ведущими нулями', () => {
+    expect(toDateString(2013, 3, 7)).toBe('2013-03-07');
+    expect(toDateString(2013, 12, 31)).toBe('2013-12-31');
+  });
+
+  it('без таймзонного сдвига: строка не уезжает на день', () => {
+    // toISOString у локальной даты в UTC+3 дал бы предыдущий день
+    expect(toDateString(2013, 1, 1)).toBe('2013-01-01');
+  });
+
+  it('круговой разбор', () => {
+    expect(parseDateString(toDateString(2010, 8, 24))).toEqual({ year: 2010, month: 8, day: 24 });
+  });
+
+  it('мусор и несуществующие даты → null', () => {
+    expect(parseDateString('')).toBeNull();
+    expect(parseDateString(null)).toBeNull();
+    expect(parseDateString('24.08.2010')).toBeNull();
+    expect(parseDateString('2026-13-01')).toBeNull();
+    expect(parseDateString('2026-02-30')).toBeNull();
+    expect(parseDateString('2026-02-29')).toBeNull(); // не високосный
+    expect(parseDateString('2024-02-29')).toEqual({ year: 2024, month: 2, day: 29 });
   });
 });

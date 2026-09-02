@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import DateWheelPicker from '@/components/DateWheelPicker';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -518,21 +519,13 @@ const ProfileEditPage = () => {
         {/* Дата рождения */}
         <div>
           <label className="text-white text-sm mb-2 block uppercase">ДАТА РОЖДЕНИЯ</label>
-          <input
-            type="date"
-            max={new Date().toISOString().split('T')[0]}
-            value={formData.birthDate}
-            onChange={(e) => handleInputChange('birthDate', e.target.value)}
-            className="w-full text-white placeholder-gray-400 px-4 border focus:outline-none transition-colors"
-            style={{
-              background: '#AEABBB33',
-              borderRadius: '32px',
-              border: '1px solid transparent',
-              height: '44px',
-            }}
-            onFocus={(e) => (e.target.style.border = '1px solid #A1FF4A')}
-            onBlur={(e) => (e.target.style.border = '1px solid transparent')}
-          />
+          {/* Колёсики гггг-мм-дд вместо системного пикера (правка владельца) */}
+          <div style={{ background: '#AEABBB33', borderRadius: 20, padding: '4px 8px' }}>
+            <DateWheelPicker
+              value={formData.birthDate || null}
+              onChange={(next) => handleInputChange('birthDate', next)}
+            />
+          </div>
         </div>
 
         {/* Пол */}

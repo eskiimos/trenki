@@ -75,3 +75,32 @@ export function getAgeGroupLabel(ageGroup: AgeGroup): string {
   
   return labels[ageGroup];
 }
+
+// ─── Хелперы колёсиков даты рождения (правка владельца: «гггг-мм-дд») ───────
+// Чистые функции — тестируются без DOM (tests/lib/age-utils.test.ts).
+
+/** Сколько дней в месяце (month: 1..12), с учётом високосных лет. */
+export function daysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/** День, обрезанный по длине месяца: 31 января → февраль даёт 28/29. */
+export function clampDay(year: number, month: number, day: number): number {
+  return Math.min(Math.max(1, day), daysInMonth(year, month));
+}
+
+/** 'YYYY-MM-DD' без таймзонных сдвигов (toISOString у локальной даты может дать вчера). */
+export function toDateString(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/** Разбор 'YYYY-MM-DD'. null, если формат не тот или дата не существует. */
+export function parseDateString(
+  value: string | null | undefined,
+): { year: number; month: number; day: number } | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split('-').map(Number);
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > daysInMonth(year, month)) return null;
+  return { year, month, day };
+}

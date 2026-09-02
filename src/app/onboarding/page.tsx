@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import DateWheelPicker from '@/components/DateWheelPicker';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { getTelegramId } from '@/lib/auth';
@@ -183,26 +184,19 @@ export default function OnboardingProfilePage() {
               )}
             </div>
 
-            {/* Дата рождения */}
+            {/* Дата рождения — колёсики гггг-мм-дд (правка владельца):
+                системный пикер в тёмной теме выглядел инородно */}
             <div>
               <label className="text-white text-sm mb-2 block">ДАТА РОЖДЕНИЯ</label>
-              <input
-                type="date"
-                placeholder="Дата рождения"
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
-                max={new Date().toISOString().split('T')[0]}
-                className="w-full text-white placeholder-gray-400 px-4 border focus:outline-none transition-colors"
+              <div
                 style={{
                   background: '#AEABBB33',
-                  borderRadius: '32px',
-                  border: '1px solid transparent',
-                  height: '44px',
-                  colorScheme: 'dark',
+                  borderRadius: 20,
+                  padding: '4px 8px',
                 }}
-                onFocus={(e) => (e.target.style.border = '1px solid #A1FF4A')}
-                onBlur={(e) => (e.target.style.border = '1px solid transparent')}
-              />
+              >
+                <DateWheelPicker value={birthDate || null} onChange={setBirthDate} />
+              </div>
             </div>
 
             {/* Пол */}
