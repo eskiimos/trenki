@@ -1,14 +1,19 @@
 'use client';
 
-// «Древо навыков» (вместо старых счётчиковых ачивок): по каждой из 7 целей
-// тренировок — две ступени-«эволюции» (5 и 10 завершённых тренировок с этой
-// целью). Данные — /api/gamification/achievements (считаются ретроактивно из
-// истории завершений). Полученные ступени — яркие с lime-рамкой, будущие —
-// приглушённые с амбер-прогрессом.
+// «Награды» — две категории (правка владельца «Самый конец августа»):
+//  · «Ачивки» — поведенческие: серии дней подряд, ранняя пташка, воин
+//    выходных, вехи объёма (восстановленный набор, удалённый при переходе на
+//    древо, — 9 из прежних 16);
+//  · «Достижения» — древо навыков: по каждой из 7 целей две ступени-«эволюции»
+//    (5 и 10 завершённых тренировок с этой целью).
+// Данные — /api/gamification/achievements (обе группы считаются ретроактивно
+// из истории завершений). Полученные — яркие с lime-рамкой, будущие —
+// приглушённые с прогрессом.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import BottomNavigation from '@/components/BottomNavigation';
 import { AchievementIcon } from '@/components/gamification/icons';
 import { SKILL_TREE } from '@/lib/achievements';
@@ -79,16 +84,35 @@ function emptyItem(key: string, tier: 1 | 2, title: string): AchievementItem {
   };
 }
 
+/** Награда из группы «Ачивки» (серии/вехи) — плоский список, без эволюций. */
+interface StreakItem {
+  key: string;
+  title: string;
+  description: string;
+  unlocked: boolean;
+  progress: { current: number; target: number };
+}
+
 const AchievementsPage = () => {
   const [items, setItems] = useState<AchievementItem[] | null>(null);
+  const [streaks, setStreaks] = useState<StreakItem[] | null>(null);
   const [error, setError] = useState(false);
+  // Две категории (правка владельца): «Ачивки» = серии и вехи,
+  // «Достижения» = древо навыков.
+  // Вкладка из URL: с профиля ведут две отдельные карточки-категории
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<'streaks' | 'skills'>(
+    searchParams.get('tab') === 'skills' ? 'skills' : 'streaks',
+  );
 
   useEffect(() => {
     let cancelled = false;
     fetch('/api/gamification/achievements')
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => {
-        if (!cancelled) setItems(d.achievements || []);
+        if (cancelled) return;
+        setItems(d.achievements || []);
+        setStreaks(d.streakAchievements || []);
       })
       .catch(() => {
         if (!cancelled) setError(true);
@@ -99,6 +123,8 @@ const AchievementsPage = () => {
   const byKey = new Map((items ?? []).map((a) => [a.key, a]));
   const unlockedCount = items?.filter((a) => a.unlocked).length ?? 0;
   const total = items?.length ?? SKILL_TREE.length * 2;
+  const streakUnlocked = streaks?.filter((a) => a.unlocked).length ?? 0;
+  const streakTotal = streaks?.length ?? 9;
 
   return (
     <div
@@ -115,21 +141,87 @@ const AchievementsPage = () => {
           <Image src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
         </Link>
         <h1 className="text-white text-xs font-bold font-overpass uppercase tracking-[0.5px]">
-          Древо навыков{items ? ` (${unlockedCount}/${total})` : ''}
+          Награды
         </h1>
       </div>
 
       <div className="px-4 max-w-3xl md:mx-auto md:px-8">
+        {/* Две категории наград */}
+        <div className="flex gap-2 pb-4">
+          {(
+            [
+              ['streaks', `Ачивки${streaks ? ` ${streakUnlocked}/${streakTotal}` : ''}`],
+              ['skills', `Достижения${items ? ` ${unlockedCount}/${total}` : ''}`],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTab(key)}
+              className="font-overpass uppercase flex-1 rounded-full font-extrabold text-[11px] tracking-[0.5px] py-2.5 px-3 transition-colors"
+              style={{
+                border: `1px solid ${tab === key ? 'var(--color-brand)' : '#2a2f4a'}`,
+                background: tab === key ? 'var(--lime-medium)' : 'transparent',
+                color: tab === key ? 'var(--color-brand)' : 'var(--color-muted)',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         {error && (
           <div className="text-muted text-sm text-center py-10">
-            Не удалось загрузить древо навыков — попробуй обновить страницу
+            Не удалось загрузить награды — попробуй обновить страницу
           </div>
         )}
         {!items && !error && (
           <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto my-12" />
         )}
 
-        {items && (
+        {/* «Ачивки»: серии, вехи, поведение */}
+        {tab === 'streaks' && streaks && (
+          <div className="grid grid-cols-2 gap-3">
+            {streaks.map((a) => (
+              <div
+                key={a.key}
+                className="rounded-2xl p-4 flex flex-col items-center text-center"
+                style={{
+                  background: a.unlocked ? 'var(--lime-subtle)' : 'rgba(174,171,187,0.06)',
+                  border: `1px solid ${a.unlocked ? 'var(--border-lime)' : 'transparent'}`,
+                }}
+              >
+                <span className={a.unlocked ? 'text-brand' : 'text-muted opacity-50'} aria-hidden>
+                  <AchievementIcon achievementKey={a.key} size={28} />
+                </span>
+                <span
+                  className={`font-overpass font-bold text-sm mt-2 ${a.unlocked ? 'text-ink' : 'text-muted'}`}
+                >
+                  {a.title}
+                </span>
+                <span className="text-muted text-[11px] leading-snug mt-1">{a.description}</span>
+                {/* Прогресс — только у счётчиков (у boolean-наград target=1) */}
+                {!a.unlocked && a.progress.target > 1 && (
+                  <span className="w-full mt-2">
+                    <span className="block h-1.5 rounded-full bg-white/10 overflow-hidden">
+                      <span
+                        className="block h-full rounded-full bg-brand/60"
+                        style={{
+                          width: `${Math.round((a.progress.current / a.progress.target) * 100)}%`,
+                        }}
+                      />
+                    </span>
+                    <span className="block text-muted text-[10px] mt-1 tabular-nums">
+                      {a.progress.current}/{a.progress.target}
+                    </span>
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tab === 'skills' && items && (
           <div className="flex flex-col gap-6">
             {SKILL_TREE.map((branch) => {
               const evo1 = byKey.get(branch.evo1.key) ?? emptyItem(branch.evo1.key, 1, branch.evo1.title);
@@ -155,4 +247,12 @@ const AchievementsPage = () => {
   );
 };
 
-export default AchievementsPage;
+// useSearchParams в клиентской странице требует Suspense-границу (App Router:
+// без неё пререндер падает с ошибкой сборки).
+export default function AchievementsPageWrapper() {
+  return (
+    <Suspense fallback={null}>
+      <AchievementsPage />
+    </Suspense>
+  );
+}

@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ClipboardList, History, Settings, Sparkles, Star } from 'lucide-react';
+import { ClipboardList, Flame, History, Settings, Sparkles, Star } from 'lucide-react';
 import { useTelegram } from '../../hooks/useTelegram';
 import { ProfileSkeleton } from '../../components/Skeleton';
 import { Button } from '@/components/ui';
@@ -42,6 +42,32 @@ const ProfilePage = () => {
   } | null>(null);
   // Модалка «Путь хоккеиста» — открывается тапом по бейджу статуса
   const [statusPathOpen, setStatusPathOpen] = useState(false);
+  // Счётчики наград для двух карточек-категорий
+  const [awards, setAwards] = useState<{
+    streakUnlocked: number;
+    streakTotal: number;
+    skillUnlocked: number;
+    skillTotal: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/gamification/achievements')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d) return;
+        setAwards({
+          streakUnlocked: d.streakUnlockedCount ?? 0,
+          streakTotal: d.streakTotal ?? 0,
+          skillUnlocked: d.unlockedCount ?? 0,
+          skillTotal: d.total ?? 0,
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -359,6 +385,37 @@ const ProfilePage = () => {
             endpoint="/api/league"
             noBirthYearText="Укажи дату рождения в профиле, чтобы участвовать в лиге."
           />
+        </div>
+
+        {/* Награды: две категории (правка владельца) — «Ачивки» (серии,
+            выходные, ранняя пташка) и «Достижения» (древо навыков).
+            Обе ведут на /achievements с нужной вкладкой. */}
+        <div className="mb-6">
+          <h2 className="text-muted text-xs font-medium font-overpass uppercase tracking-wide mb-2 px-1">
+            Награды
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            <Link
+              href="/achievements?tab=streaks"
+              className="rounded-2xl p-4 bg-night border border-[#26252F] flex flex-col items-center text-center transition-transform active:scale-95"
+            >
+              <Flame size={24} className="text-brand" aria-hidden />
+              <span className="text-ink font-overpass font-bold text-sm mt-2">Ачивки</span>
+              <span className="text-muted text-[11px] mt-0.5">
+                {awards ? `${awards.streakUnlocked} из ${awards.streakTotal}` : 'серии и вехи'}
+              </span>
+            </Link>
+            <Link
+              href="/achievements?tab=skills"
+              className="rounded-2xl p-4 bg-night border border-[#26252F] flex flex-col items-center text-center transition-transform active:scale-95"
+            >
+              <Sparkles size={24} className="text-brand" aria-hidden />
+              <span className="text-ink font-overpass font-bold text-sm mt-2">Достижения</span>
+              <span className="text-muted text-[11px] mt-0.5">
+                {awards ? `${awards.skillUnlocked} из ${awards.skillTotal}` : 'древо навыков'}
+              </span>
+            </Link>
+          </div>
         </div>
 
         {/* Модалка «Путь хоккеиста» — вся лестница званий, по тапу на бейдж */}

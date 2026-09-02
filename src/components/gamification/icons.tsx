@@ -9,6 +9,7 @@ import {
   Zap, Target, Flame, Rocket, Swords, Medal,
   Crosshair, Bomb, Axe, Wand2, Drama, HeartPulse, Footprints,
   Cat, Wind, ShieldCheck, Bot,
+  Dumbbell, Hand, CalendarCheck, Sunrise,
   type LucideIcon,
 } from 'lucide-react';
 import type { SVGProps } from 'react';
@@ -77,6 +78,18 @@ export const ACHIEVEMENT_ICONS: Record<string, LucideIcon> = {
   agility_evo2: Wind,       // Вихрь
   longevity_evo1: ShieldCheck, // Под защитой
   longevity_evo2: Bot,      // Терминатор
+
+  // Группа «Ачивки» (поведенческие: серии, вехи объёма, время суток).
+  // Правило проекта: в UI атлета иконки, не эмодзи.
+  workouts_1: Snowflake,    // Первый лёд
+  workouts_30: Dumbbell,    // Тридцатка
+  workouts_100: Trophy,     // Сотня
+  streak_3: Flame,          // Ударный темп
+  streak_5: Hand,           // Пять подряд
+  streak_7: CalendarCheck,  // Неделя огня
+  streak_14: Rocket,        // Две недели подряд
+  early_bird: Sunrise,      // Ранняя пташка
+  weekend_warrior: Swords,  // Воин выходных
 };
 
 // ── Аватары лиги ─────────────────────────────────────────────────────────────

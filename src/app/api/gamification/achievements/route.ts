@@ -9,6 +9,8 @@ import { requireAuthUser } from '@/lib/coach/guards';
 import { prisma } from '@/lib/prisma';
 import { WorkoutStatus, type TrainingGoal } from '@/generated/prisma';
 import { computeAchievements, countCycleGoalCredits } from '@/lib/achievements';
+import { computeStreakAchievements } from '@/lib/streak-achievements';
+import { fetchCompletionHistory, userTimezone } from '@/lib/gamification-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,8 +79,27 @@ export async function GET(request: NextRequest) {
     goalCounts[g] = (goalCounts[g] ?? 0) + (count ?? 0);
   }
 
+  // Вторая группа наград — «Ачивки» (поведенческие: серии, ранняя пташка,
+  // воин выходных). Правка владельца: развести награды на две категории.
+  // Считаются из той же истории завершений и в таймзоне игрока — раньше
+  // «до 08:00» означало 08:00 серверного времени.
+  const [{ trainingDayAts }, tz] = await Promise.all([
+    fetchCompletionHistory(auth.user.id),
+    userTimezone(auth.user.id),
+  ]);
+  const streakAchievements = computeStreakAchievements(trainingDayAts, tz);
+
   const achievements = computeAchievements(goalCounts);
   const unlockedCount = achievements.filter((a) => a.unlocked).length;
 
-  return NextResponse.json({ achievements, unlockedCount, total: achievements.length });
+  return NextResponse.json({
+    // «Достижения» — древо навыков (совместимость: поле не переименовано)
+    achievements,
+    unlockedCount,
+    total: achievements.length,
+    // «Ачивки» — серии и вехи
+    streakAchievements,
+    streakUnlockedCount: streakAchievements.filter((a) => a.unlocked).length,
+    streakTotal: streakAchievements.length,
+  });
 }
