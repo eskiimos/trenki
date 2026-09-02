@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { ClipboardList, Flame, History, Settings, Sparkles, Star, Zap } from 'lucide-react';
 import { useTelegram } from '../../hooks/useTelegram';
@@ -18,6 +18,7 @@ import { AchievementIcon, StatusIcon } from '@/components/gamification/icons';
 import LeagueTable from '@/components/LeagueTable';
 import { NavRow, SettingsGroup } from '@/components/profile/SettingsList';
 import { calculateAge } from '@/lib/age-utils';
+import { pickTopAwards } from '@/lib/award-rarity';
 import { useSubscription } from '@/hooks/useSubscription';
 import { openSubscriptionModal } from '@/lib/subscription-modal';
 
@@ -49,6 +50,8 @@ const ProfilePage = () => {
     streakTotal: number;
     skillUnlocked: number;
     skillTotal: number;
+    /** Обе группы целиком: витрина собирается на рендере (см. topAwards) */
+    all: Array<{ key: string; title: string; unlocked: boolean }>;
   } | null>(null);
 
   useEffect(() => {
@@ -62,6 +65,7 @@ const ProfilePage = () => {
           streakTotal: d.streakTotal ?? 0,
           skillUnlocked: d.unlockedCount ?? 0,
           skillTotal: d.total ?? 0,
+          all: [...(d.streakAchievements ?? []), ...(d.achievements ?? [])],
         });
       })
       .catch(() => {});
@@ -167,6 +171,13 @@ const ProfilePage = () => {
     ? calculateAge(new Date(userProfile.profile.birthDate))
     : null;
 
+  // Витрина наград считается на рендере, а не в момент загрузки: профиль и
+  // награды приезжают параллельно, и закреплённый ключ мог опоздать к сборке.
+  const topAwards = useMemo(
+    () => (awards ? pickTopAwards(awards.all, 5, pinnedKey) : []),
+    [awards, pinnedKey],
+  );
+
   // Показываем скелетон во время загрузки
   if (isLoading) {
     return <ProfileSkeleton />;
@@ -227,23 +238,6 @@ const ProfilePage = () => {
                     </span>
                   )}
                 </div>
-
-                {/* Закреплённая награда — «под фотографией спортсмена» */}
-                {pinnedKey && (
-                  <Link
-                    href="/achievements"
-                    aria-label="Закреплённая награда"
-                    className="mt-2 w-24 rounded-lg py-1.5 flex items-center justify-center gap-1"
-                    style={{
-                      background: 'var(--lime-subtle)',
-                      border: '1px solid var(--border-lime)',
-                    }}
-                  >
-                    <span className="text-brand" aria-hidden>
-                      <AchievementIcon achievementKey={pinnedKey} size={18} />
-                    </span>
-                  </Link>
-                )}
               </div>
 
               <div className="min-w-0 flex-1">
@@ -263,6 +257,45 @@ const ProfilePage = () => {
                     </span>
                     <span className="text-muted text-xs uppercase">потенциал</span>
                   </div>
+                )}
+
+                {/* Витрина наград под потенциалом (правка владельца): до 5
+                    значков стаком. Наград больше — показываем САМЫЕ СЛОЖНЫЕ
+                    (см. pickTopAwards), а не первые попавшиеся. Стак с
+                    перекрытием: в правой колонке на 320px ряд из пяти
+                    кружков по 28px иначе не помещается. */}
+                {topAwards.length > 0 && (
+                  <Link
+                    href="/achievements"
+                    aria-label={`Награды: ${topAwards.map((t) => t.title).join(', ')}`}
+                    className="mt-3 flex items-center"
+                  >
+                    {topAwards.map((t, i) => (
+                      <span
+                        key={t.key}
+                        title={t.title}
+                        className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                        style={{
+                          background: t.key === pinnedKey ? 'var(--lime-medium)' : 'var(--lime-subtle)',
+                          border: `1px solid ${
+                            t.key === pinnedKey ? 'var(--color-brand)' : 'var(--border-lime)'
+                          }`,
+                          color: 'var(--color-brand)',
+                          marginLeft: i === 0 ? 0 : -6,
+                          // Ближние к началу (более сложные) — поверх соседей
+                          zIndex: topAwards.length - i,
+                        }}
+                      >
+                        <AchievementIcon achievementKey={t.key} size={15} />
+                      </span>
+                    ))}
+                    {/* Сколько наград ещё не поместилось */}
+                    {awards && awards.streakUnlocked + awards.skillUnlocked > topAwards.length && (
+                      <span className="text-muted text-[11px] font-bold ml-2 tabular-nums">
+                        +{awards.streakUnlocked + awards.skillUnlocked - topAwards.length}
+                      </span>
+                    )}
+                  </Link>
                 )}
               </div>
             </div>
