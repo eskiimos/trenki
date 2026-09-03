@@ -35,6 +35,9 @@ export interface StreakAchievementState extends StreakAchievementDef {
 const WORKOUT_COUNT_DEFS: Array<StreakAchievementDef & { target: number }> = [
   { key: 'workouts_1', title: 'Первый лёд', description: '1 завершённая тренировка', target: 1 },
   { key: 'workouts_30', title: 'Тридцатка', description: '30 завершённых тренировок', target: 30 },
+  // «67» — эпическая (правка владельца «Начало сентября»): фиолетовый тир,
+  // см. award-tier. Число — мем, потому и название просто «67».
+  { key: 'workouts_67', title: '67', description: '67 завершённых тренировок — эпическая награда', target: 67 },
   { key: 'workouts_100', title: 'Сотня', description: '100 завершённых тренировок', target: 100 },
 ];
 

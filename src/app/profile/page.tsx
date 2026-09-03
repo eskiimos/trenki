@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { ClipboardList, Flame, History, Settings, Sparkles, Star, Zap } from 'lucide-react';
+import { ClipboardList, Flame, History, Plus, Settings, Sparkles, Star, Zap } from 'lucide-react';
 import { useTelegram } from '../../hooks/useTelegram';
 import { ProfileSkeleton } from '../../components/Skeleton';
 import { Button } from '@/components/ui';
@@ -18,7 +18,8 @@ import { AchievementIcon, StatusIcon } from '@/components/gamification/icons';
 import LeagueTable from '@/components/LeagueTable';
 import { NavRow, SettingsGroup } from '@/components/profile/SettingsList';
 import { calculateAge } from '@/lib/age-utils';
-import { pickTopAwards } from '@/lib/award-rarity';
+import { awardTier, SHOWCASE_SLOTS, TIER_STYLE } from '@/lib/award-tier';
+import { positionShort } from '@/lib/positions';
 import { useSubscription } from '@/hooks/useSubscription';
 import { openSubscriptionModal } from '@/lib/subscription-modal';
 
@@ -43,8 +44,12 @@ const ProfilePage = () => {
   } | null>(null);
   // Модалка «Путь хоккеиста» — открывается тапом по бейджу статуса
   const [statusPathOpen, setStatusPathOpen] = useState(false);
+  // Награды в шапке — ручной выбор игрока на /achievements (до SHOWCASE_SLOTS)
+  const pinnedKeys: string[] = useMemo(
+    () => (Array.isArray(userProfile?.pinnedAchievements) ? userProfile.pinnedAchievements : []),
+    [userProfile],
+  );
   // Счётчики наград для двух карточек-категорий
-  const pinnedKey: string | null = userProfile?.pinnedAchievement ?? null;
   const [awards, setAwards] = useState<{
     streakUnlocked: number;
     streakTotal: number;
@@ -154,29 +159,24 @@ const ProfilePage = () => {
   const displayName = userProfile?.firstName || user?.first_name || 'ТРЕНЬКИ';
   const displayLastName = userProfile?.lastName || user?.last_name || 'ТРЕНЬКИ';
   
-  // Мапинг позиций
-  const positionMap: Record<string, string> = {
-    'GOALTENDER': 'Вратарь',
-    'DEFENSEMAN': 'Защитник',
-    'LEFT_WING': 'Левый крайний',
-    'CENTER': 'Центральный нападающий',
-    'RIGHT_WING': 'Правый крайний'
-  };
-
-  const displayPosition = userProfile?.profile?.position ? 
-    positionMap[userProfile.profile.position] || userProfile.profile.position :
-    'Позиция не указана';
+  // Позиция сокращением (ЦН/ЛН/ПН/ЛЗ/ПЗ/ВР) — общий справочник
+  const positionAbbr = positionShort(userProfile?.profile?.position);
 
   const displayAge = userProfile?.profile?.birthDate
     ? calculateAge(new Date(userProfile.profile.birthDate))
     : null;
 
-  // Витрина наград считается на рендере, а не в момент загрузки: профиль и
-  // награды приезжают параллельно, и закреплённый ключ мог опоздать к сборке.
-  const topAwards = useMemo(
-    () => (awards ? pickTopAwards(awards.all, 5, pinnedKey) : []),
-    [awards, pinnedKey],
-  );
+  // Витрина наград: ТОЛЬКО то, что игрок сам выбрал (правка владельца «Начало
+  // сентября»). Считается на рендере: профиль и награды приезжают параллельно.
+  // Ключ, который больше не «получен» (история изменилась), молча пропускаем.
+  const showcase = useMemo(() => {
+    if (!awards) return [] as Array<{ key: string; title: string }>;
+    const byKey = new Map(awards.all.map((a) => [a.key, a]));
+    return pinnedKeys
+      .map((k) => byKey.get(k))
+      .filter((a): a is { key: string; title: string; unlocked: boolean } => !!a && a.unlocked)
+      .slice(0, SHOWCASE_SLOTS);
+  }, [awards, pinnedKeys]);
 
   // Показываем скелетон во время загрузки
   if (isLoading) {
@@ -212,7 +212,7 @@ const ProfilePage = () => {
         <div className="md:grid md:grid-cols-2 md:gap-6 md:items-start">
         {/* Карточка игрока (правка владельца: аватар меньше и слева, номер и
             позиция убраны как лишние цифры, справа — имя, возраст-рост-вес и
-            общий потенциал). Под фото — закреплённая награда. */}
+            общий потенциал). Под фото — выбранные игроком награды. */}
         <div className="mb-6 md:mb-0">
           <div className="bg-[#060919] rounded-lg p-4">
             <div className="flex items-start gap-4">
@@ -244,9 +244,21 @@ const ProfilePage = () => {
                 <div className="text-[#445CFF] text-lg font-bold font-overpass uppercase leading-tight break-words">
                   {isLoading ? 'Загрузка…' : `${displayName || 'ИМЯ'} ${displayLastName || ''}`.trim()}
                 </div>
-                <div className="text-[#AEABBB] text-sm font-medium font-overpass uppercase mt-2">
-                  {displayAge ?? '-'} лет · {userProfile?.profile?.height || '-'} см ·{' '}
-                  {userProfile?.profile?.weight || '-'} кг
+                <div className="text-[#AEABBB] text-sm font-medium font-overpass uppercase mt-2 flex items-center gap-2 flex-wrap">
+                  {/* Позиция сокращением — правка владельца «Начало сентября» */}
+                  {positionAbbr && (
+                    <span
+                      className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-black text-ink leading-none"
+                      style={{ background: 'rgba(249,248,254,0.12)' }}
+                      title="Игровое амплуа"
+                    >
+                      {positionAbbr}
+                    </span>
+                  )}
+                  <span>
+                    {displayAge ?? '-'} лет · {userProfile?.profile?.height || '-'} см ·{' '}
+                    {userProfile?.profile?.weight || '-'} кг
+                  </span>
                 </div>
                 {/* Общий потенциал числом — за подпиской он скрыт кольцом */}
                 {!paywalled && typeof userProfile?.profile?.potential === 'number' && (
@@ -259,45 +271,49 @@ const ProfilePage = () => {
                   </div>
                 )}
 
-                {/* Витрина наград под потенциалом (правка владельца): до 5
-                    значков стаком. Наград больше — показываем САМЫЕ СЛОЖНЫЕ
-                    (см. pickTopAwards), а не первые попавшиеся. Стак с
-                    перекрытием: в правой колонке на 320px ряд из пяти
-                    кружков по 28px иначе не помещается. */}
-                {topAwards.length > 0 && (
-                  <Link
-                    href="/achievements"
-                    aria-label={`Награды: ${topAwards.map((t) => t.title).join(', ')}`}
-                    className="mt-3 flex items-center"
-                  >
-                    {topAwards.map((t, i) => (
-                      <span
-                        key={t.key}
-                        title={t.title}
-                        className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
-                        style={{
-                          background: t.key === pinnedKey ? 'var(--lime-medium)' : 'var(--lime-subtle)',
-                          border: `1px solid ${
-                            t.key === pinnedKey ? 'var(--color-brand)' : 'var(--border-lime)'
-                          }`,
-                          color: 'var(--color-brand)',
-                          marginLeft: i === 0 ? 0 : -6,
-                          // Ближние к началу (более сложные) — поверх соседей
-                          zIndex: topAwards.length - i,
-                        }}
-                      >
-                        <AchievementIcon achievementKey={t.key} size={15} />
-                      </span>
-                    ))}
-                    {/* Сколько наград ещё не поместилось */}
-                    {awards && awards.streakUnlocked + awards.skillUnlocked > topAwards.length && (
-                      <span className="text-muted text-[11px] font-bold ml-2 tabular-nums">
-                        +{awards.streakUnlocked + awards.skillUnlocked - topAwards.length}
-                      </span>
-                    )}
-                  </Link>
-                )}
               </div>
+            </div>
+
+            {/* Витрина наград — под фото, ряд из SHOWCASE_SLOTS кружков без
+                наложения (правка владельца «Начало сентября»: значки залезали
+                друг на друга). Состав выбирает сам игрок на /achievements;
+                пустой слот — серый кружок с плюсом, тап ведёт выбирать. Цвет
+                значка — тир награды (серый/серебро/золото/эпик). */}
+            <div className="mt-3 flex items-center gap-2" aria-label="Награды в шапке">
+              {showcase.map((t) => {
+                const st = TIER_STYLE[awardTier(t.key)];
+                return (
+                  <Link
+                    key={t.key}
+                    href="/achievements"
+                    title={t.title}
+                    aria-label={t.title}
+                    className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-transform active:scale-95"
+                    style={{
+                      background: st.background,
+                      border: `1px solid ${st.border}`,
+                      color: st.color,
+                      boxShadow: st.shadow,
+                    }}
+                  >
+                    <AchievementIcon achievementKey={t.key} size={18} />
+                  </Link>
+                );
+              })}
+              {Array.from({ length: Math.max(0, SHOWCASE_SLOTS - showcase.length) }).map((_, i) => (
+                <Link
+                  key={`empty-${i}`}
+                  href="/achievements"
+                  aria-label="Добавить награду в шапку"
+                  className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-muted transition-transform active:scale-95"
+                  style={{
+                    background: 'rgba(174,171,187,0.12)',
+                    border: '1px solid rgba(174,171,187,0.25)',
+                  }}
+                >
+                  <Plus size={16} aria-hidden />
+                </Link>
+              ))}
             </div>
           </div>
         </div>

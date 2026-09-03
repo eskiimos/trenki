@@ -4,17 +4,19 @@ import { requireAuthUser } from '@/lib/coach/guards';
 import { computeAchievements, countCycleGoalCredits } from '@/lib/achievements';
 import { computeStreakAchievements } from '@/lib/streak-achievements';
 import { fetchCompletionHistory, userTimezone } from '@/lib/gamification-server';
+import { SHOWCASE_SLOTS } from '@/lib/award-tier';
 import { WorkoutStatus, type TrainingGoal } from '@/generated/prisma';
 
 /**
- * PUT /api/gamification/pinned { key: string | null }
+ * PUT /api/gamification/pinned { keys: string[] }
  *
- * Закрепить награду под фотографией в профиле (правка владельца). Хранится
- * только ключ — сама награда выводится из истории, как XP.
+ * Витрина наград в шапке профиля — до SHOWCASE_SLOTS ключей в порядке показа
+ * (правка владельца «Начало сентября»: добавлять и убирать самому). Хранятся
+ * только ключи — сами награды выводятся из истории, как XP.
  *
- * Закрепить можно ТОЛЬКО полученную награду: иначе в витрине профиля висела бы
- * ачивка, которой у человека нет. Проверяем по тем же расчётам, что отдаёт
- * /api/gamification/achievements (обе группы).
+ * В шапку можно поставить ТОЛЬКО полученную награду: иначе в витрине висела
+ * бы ачивка, которой у человека нет. Проверяем по тем же расчётам, что отдаёт
+ * /api/gamification/achievements (обе группы). Список заменяется целиком.
  */
 export const dynamic = 'force-dynamic';
 
@@ -23,13 +25,29 @@ export async function PUT(request: NextRequest) {
   if ('response' in auth) return auth.response;
 
   const body = await request.json().catch(() => ({}));
-  const raw = body?.key;
-  const key = typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+  const raw: unknown = body?.keys;
+  if (!Array.isArray(raw)) {
+    return NextResponse.json({ error: 'keys — массив ключей наград' }, { status: 400 });
+  }
+  // Дедуп с сохранением порядка: порядок = порядок в шапке
+  const keys = Array.from(
+    new Set(
+      raw
+        .filter((k): k is string => typeof k === 'string' && k.trim().length > 0)
+        .map((k) => k.trim()),
+    ),
+  );
+  if (keys.length > SHOWCASE_SLOTS) {
+    return NextResponse.json(
+      { error: `В шапке помещается не больше ${SHOWCASE_SLOTS} наград` },
+      { status: 400 },
+    );
+  }
 
-  // Снять закрепление — всегда можно
-  if (key === null) {
-    await prisma.user.update({ where: { id: auth.user.id }, data: { pinnedAchievement: null } });
-    return NextResponse.json({ pinnedAchievement: null });
+  // Очистить витрину — всегда можно, без пересчёта
+  if (keys.length === 0) {
+    await prisma.user.update({ where: { id: auth.user.id }, data: { pinnedAchievements: [] } });
+    return NextResponse.json({ pinnedAchievements: [] });
   }
 
   // Собираем ПОЛУЧЕННЫЕ награды обеих групп
@@ -87,21 +105,21 @@ export async function PUT(request: NextRequest) {
   }
 
   const unlocked = new Set(
-    [
-      ...computeStreakAchievements(trainingDayAts, tz),
-      ...computeAchievements(goalCounts),
-    ]
+    [...computeStreakAchievements(trainingDayAts, tz), ...computeAchievements(goalCounts)]
       .filter((a) => a.unlocked)
       .map((a) => a.key),
   );
 
-  if (!unlocked.has(key)) {
+  if (keys.some((k) => !unlocked.has(k))) {
     return NextResponse.json(
-      { error: 'Эту награду ещё не получил — закрепить нельзя' },
+      { error: 'Эту награду ещё не получил — в шапку поставить нельзя' },
       { status: 400 },
     );
   }
 
-  await prisma.user.update({ where: { id: auth.user.id }, data: { pinnedAchievement: key } });
-  return NextResponse.json({ pinnedAchievement: key });
+  await prisma.user.update({
+    where: { id: auth.user.id },
+    data: { pinnedAchievements: keys },
+  });
+  return NextResponse.json({ pinnedAchievements: keys });
 }

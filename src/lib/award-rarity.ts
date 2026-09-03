@@ -18,6 +18,7 @@ const RARITY: Record<string, number> = {
   weekend_warrior: 14,
   streak_5: 20,
   workouts_30: 30,
+  workouts_67: 67, // эпическая
   streak_7: 35,
   streak_14: 70,
   workouts_100: 100, // месяцы регулярных тренировок

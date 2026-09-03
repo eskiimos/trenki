@@ -1,5 +1,6 @@
 'use client';
 
+import { POSITION_LABEL } from '@/lib/positions';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
@@ -332,13 +333,7 @@ export default function AdminStatsPage() {
     });
   };
 
-  const positionNames: Record<string, string> = {
-    GOALTENDER: 'Вратарь',
-    DEFENSEMAN: 'Защитник',
-    LEFT_WING: 'Левый крайний',
-    CENTER: 'Центр',
-    RIGHT_WING: 'Правый крайний',
-  };
+  const positionNames: Record<string, string> = POSITION_LABEL;
 
   const categoryNames: Record<string, string> = {
     STRENGTH: 'Сила',

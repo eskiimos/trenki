@@ -9,7 +9,7 @@ import {
   Zap, Target, Flame, Rocket, Swords, Medal,
   Crosshair, Bomb, Axe, Wand2, Drama, HeartPulse, Footprints,
   Cat, Wind, ShieldCheck, Bot,
-  Dumbbell, Hand, CalendarCheck, Sunrise,
+  Dumbbell, Hand, CalendarCheck, Sunrise, Gem,
   type LucideIcon,
 } from 'lucide-react';
 import type { SVGProps } from 'react';
@@ -83,6 +83,7 @@ export const ACHIEVEMENT_ICONS: Record<string, LucideIcon> = {
   // Правило проекта: в UI атлета иконки, не эмодзи.
   workouts_1: Snowflake,    // Первый лёд
   workouts_30: Dumbbell,    // Тридцатка
+  workouts_67: Gem,         // «67» — эпическая
   workouts_100: Trophy,     // Сотня
   streak_3: Flame,          // Ударный темп
   streak_5: Hand,           // Пять подряд

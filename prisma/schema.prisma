@@ -35,7 +35,7 @@ model User {
   // Награда, закреплённая под фотографией в профиле (правка владельца
   // «конец августа»). Хранится КЛЮЧ ачивки (streak-achievements или древо) —
   // сама награда, как и XP, выводится из истории, тут только выбор витрины.
-  pinnedAchievement     String?
+  pinnedAchievements    String[]                @default([]) // Награды в шапке профиля (до 5 ключей, порядок = порядок показа); валидность проверяет API
   expiryReminderSentFor String? // premiumUntil (ISO), о котором уже слали «скоро кончится» — дедуп, переармится при продлении
   // Вовлекающие пуши (нудж «гантели запылились» и онбординг-дрип).
   lastNudgeOn           String? // локальная дата YYYY-MM-DD последнего нуджа — не чаще раза в день
@@ -642,7 +642,9 @@ enum VideoDifficulty {
 
 enum HockeyPosition {
   GOALTENDER
-  DEFENSEMAN
+  DEFENSEMAN // устаревшее общее «защитник» — в пикере не предлагаем, старые профили показывают «З»
+  LEFT_DEFENSEMAN
+  RIGHT_DEFENSEMAN
   LEFT_WING
   CENTER
   RIGHT_WING

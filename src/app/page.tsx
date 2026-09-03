@@ -1,6 +1,7 @@
 
 'use client';
 
+import { positionShort } from '@/lib/positions';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
@@ -415,17 +416,10 @@ const Header = () => {
           
           // Если профиль полностью заполнен, добавляем дополнительные данные
           if (cachedData.hasCompleteProfile && cachedData.user.profile) {
-            const positionMap: Record<string, string> = {
-              'GOALTENDER': 'ВР',
-              'DEFENSEMAN': 'ЗАЩ',
-              'LEFT_WING': 'ЛК',
-              'CENTER': 'Ц',
-              'RIGHT_WING': 'ПК'
-            };
             
             profileData.overall = cachedData.user.profile.overall;
             profileData.number = cachedData.user.profile.number;
-            profileData.position = positionMap[cachedData.user.profile.position] || cachedData.user.profile.position;
+            profileData.position = positionShort(cachedData.user.profile.position) || cachedData.user.profile.position;
             profileData.potential = 'высокий';
             profileData.clubLogoUrl = cachedData.user.profile.clubLogoUrl;
           } else if (cachedData.user.profile) {
@@ -477,17 +471,10 @@ const Header = () => {
           
           // Если профиль полностью заполнен, добавляем дополнительные данные
           if (data.hasCompleteProfile && data.user.profile) {
-            const positionMap: Record<string, string> = {
-              'GOALTENDER': 'ВР',
-              'DEFENSEMAN': 'ЗАЩ',
-              'LEFT_WING': 'ЛК',
-              'CENTER': 'Ц',
-              'RIGHT_WING': 'ПК'
-            };
             
             profileData.overall = data.user.profile.overall;
             profileData.number = data.user.profile.number;
-            profileData.position = positionMap[data.user.profile.position] || data.user.profile.position;
+            profileData.position = positionShort(data.user.profile.position) || data.user.profile.position;
             profileData.potential = 'высокий';
             profileData.clubLogoUrl = data.user.profile.clubLogoUrl;
             console.log('🏢 Club logo URL from API:', data.user.profile.clubLogoUrl);

@@ -1,5 +1,6 @@
 'use client';
 
+import { POSITION_LABEL, POSITION_OPTIONS } from '@/lib/positions';
 import Image from 'next/image';
 import DateWheelPicker from '@/components/DateWheelPicker';
 import Link from 'next/link';
@@ -762,51 +763,25 @@ const ProfileEditPage = () => {
         <div>
           <label className="text-white text-sm mb-2 block uppercase">ИГРОВОЕ АМПЛУА</label>
           <div className="flex gap-3 flex-wrap">
-            <button 
-              type="button"
-              onClick={() => handleInputChange('position', 'LEFT_WING')}
-              className={`px-6 py-3 rounded-full font-medium transition-all ${
-                formData.position === 'LEFT_WING' ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#AEABBB33] text-white'
-              }`}
-            >
-              Левый край
-            </button>
-            <button 
-              type="button"
-              onClick={() => handleInputChange('position', 'CENTER')}
-              className={`px-6 py-3 rounded-full font-medium transition-all ${
-                formData.position === 'CENTER' ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#AEABBB33] text-white'
-              }`}
-            >
-              Центр
-            </button>
-            <button 
-              type="button"
-              onClick={() => handleInputChange('position', 'RIGHT_WING')}
-              className={`px-6 py-3 rounded-full font-medium transition-all ${
-                formData.position === 'RIGHT_WING' ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#AEABBB33] text-white'
-              }`}
-            >
-              Правый край
-            </button>
-            <button 
-              type="button"
-              onClick={() => handleInputChange('position', 'DEFENSEMAN')}
-              className={`px-6 py-3 rounded-full font-medium transition-all ${
-                formData.position === 'DEFENSEMAN' ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#AEABBB33] text-white'
-              }`}
-            >
-              Защитник
-            </button>
-            <button 
-              type="button"
-              onClick={() => handleInputChange('position', 'GOALTENDER')}
-              className={`px-6 py-3 rounded-full font-medium transition-all ${
-                formData.position === 'GOALTENDER' ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#AEABBB33] text-white'
-              }`}
-            >
-              Вратарь
-            </button>
+            {/* Амплуа из общего справочника (src/lib/positions.ts): ВР, ЛЗ, ПЗ,
+                ЛН, ЦН, ПН — правка владельца «Начало сентября». Старое общее
+                «Защитник» (DEFENSEMAN) в пикере не предлагаем, но если оно уже
+                выбрано — показываем, чтобы не терять выбор. */}
+            {[
+              ...POSITION_OPTIONS,
+              ...(formData.position === 'DEFENSEMAN' ? (['DEFENSEMAN'] as const) : []),
+            ].map((pos) => (
+              <button
+                key={pos}
+                type="button"
+                onClick={() => handleInputChange('position', pos)}
+                className={`px-6 py-3 rounded-full font-medium transition-all ${
+                  formData.position === pos ? 'bg-[#A1FF4A] text-[#060919]' : 'bg-[#AEABBB33] text-white'
+                }`}
+              >
+                {POSITION_LABEL[pos]}
+              </button>
+            ))}
             <button 
               type="button"
               onClick={() => handleInputChange('position', '')}

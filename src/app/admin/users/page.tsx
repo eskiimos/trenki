@@ -1,5 +1,6 @@
 'use client';
 
+import { POSITION_LABEL } from '@/lib/positions';
 import React, { useState, useEffect } from 'react';
 import {
   AdminPage,
@@ -552,13 +553,7 @@ export default function AdminUsersPage() {
     return diffMins < 2; // Онлайн если активность менее 2 минут назад
   };
 
-  const positionMap: Record<string, string> = {
-    'GOALTENDER': 'Вратарь',
-    'DEFENSEMAN': 'Защитник',
-    'LEFT_WING': 'Левый крайний',
-    'CENTER': 'Центр',
-    'RIGHT_WING': 'Правый крайний'
-  };
+  const positionMap: Record<string, string> = POSITION_LABEL;
 
   // Плейсхолдер загрузки повторяет геометрию реального экрана (4 KPI + 5 строк),
   // чтобы после отрисовки данных не было прыжка вёрстки.

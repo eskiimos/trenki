@@ -18,9 +18,11 @@ const msk = (day: string, hour: number) =>
   new Date(new Date(`${day}T00:00:00Z`).getTime() + (hour - 3) * 3_600_000);
 
 describe('набор «Ачивки»', () => {
-  it('9 наград, ключи уникальны, у всех есть описание', () => {
-    expect(STREAK_ACHIEVEMENT_DEFS.length).toBe(9);
-    expect(new Set(STREAK_ACHIEVEMENT_DEFS.map((d) => d.key)).size).toBe(9);
+  it('10 наград, ключи уникальны, у всех есть описание', () => {
+    expect(STREAK_ACHIEVEMENT_DEFS.length).toBe(10);
+    expect(new Set(STREAK_ACHIEVEMENT_DEFS.map((d) => d.key)).size).toBe(10);
+    // «67» — эпическая, правка «Начало сентября»
+    expect(STREAK_ACHIEVEMENT_DEFS.map((d) => d.key)).toContain('workouts_67');
     for (const d of STREAK_ACHIEVEMENT_DEFS) {
       expect(d.title.length).toBeGreaterThan(0);
       expect(d.description.length).toBeGreaterThan(0);
@@ -120,7 +122,7 @@ describe('вехи объёма', () => {
 
   it('пустая история — всё закрыто, ничего не падает', () => {
     const list = computeStreakAchievements([], MSK);
-    expect(list.length).toBe(9);
+    expect(list.length).toBe(10);
     expect(list.every((a) => !a.unlocked)).toBe(true);
   });
 });

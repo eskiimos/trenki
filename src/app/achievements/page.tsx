@@ -2,22 +2,27 @@
 
 // «Награды» — две категории (правка владельца «Самый конец августа»):
 //  · «Ачивки» — поведенческие: серии дней подряд, ранняя пташка, воин
-//    выходных, вехи объёма (восстановленный набор, удалённый при переходе на
-//    древо, — 9 из прежних 16);
+//    выходных, вехи объёма (в т.ч. эпическая «67»);
 //  · «Достижения» — древо навыков: по каждой из 7 целей две ступени-«эволюции»
 //    (5 и 10 завершённых тренировок с этой целью).
 // Данные — /api/gamification/achievements (обе группы считаются ретроактивно
-// из истории завершений). Полученные — яркие с lime-рамкой, будущие —
-// приглушённые с прогрессом.
+// из истории завершений).
+//
+// Витрина в шапке профиля (правка «Начало сентября»): игрок сам собирает до
+// SHOWCASE_SLOTS наград тапом по полученной; пустые слоты в профиле — серые
+// «+». Тиры (цвет значка): ачивки серые, эволюция 1 — серебро, эволюция 2 —
+// золото, «67» — фиолетовая эпическая (src/lib/award-tier.ts).
 
 import { useEffect, useState, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Pin } from 'lucide-react';
+import { Pin, Sparkles } from 'lucide-react';
 import BottomNavigation from '@/components/BottomNavigation';
 import { AchievementIcon } from '@/components/gamification/icons';
 import { SKILL_TREE } from '@/lib/achievements';
+import { awardTier, SHOWCASE_SLOTS, TIER_LABEL, TIER_STYLE } from '@/lib/award-tier';
+import { pickTopAwards } from '@/lib/award-rarity';
 
 interface AchievementItem {
   key: string;
@@ -31,48 +36,109 @@ interface AchievementItem {
   progress: { current: number; target: number };
 }
 
-/** Карточка одной эволюции. tierLabel — «Эволюция 1» / «Эволюция 2». */
-function EvolutionCard({ item, tierLabel }: { item: AchievementItem; tierLabel: string }) {
+/** Награда из группы «Ачивки» (серии/вехи) — плоский список, без эволюций. */
+interface StreakItem {
+  key: string;
+  title: string;
+  description: string;
+  unlocked: boolean;
+  progress: { current: number; target: number };
+}
+
+/** Кружок-значок в цвете тира; закрытая награда — приглушённая. */
+function AwardPuck({ awardKey, unlocked, size }: { awardKey: string; unlocked: boolean; size: 56 | 48 }) {
+  const st = TIER_STYLE[awardTier(awardKey)];
+  const cls = size === 56 ? 'w-14 h-14' : 'w-12 h-12';
+  return (
+    <span
+      className={`${cls} rounded-full flex items-center justify-center shrink-0`}
+      style={
+        unlocked
+          ? { background: st.background, border: `1px solid ${st.border}`, color: st.color, boxShadow: st.shadow }
+          : { background: 'rgba(255,255,255,0.08)', color: 'var(--color-muted)', opacity: 0.6 }
+      }
+      aria-hidden
+    >
+      <AchievementIcon achievementKey={awardKey} size={size === 56 ? 28 : 24} />
+    </span>
+  );
+}
+
+/** Подпись «в шапке» под выбранной наградой. */
+function PinnedMark() {
+  return (
+    <span className="text-brand text-[10px] font-bold uppercase mt-2 inline-flex items-center gap-1">
+      <Pin size={12} aria-hidden />
+      в шапке
+    </span>
+  );
+}
+
+/** Рамка карточки: выбранная — лаймовая, полученная — в цвете тира, закрытая — без. */
+function cardBorder(unlocked: boolean, pinned: boolean, key: string): string {
+  if (pinned) return '1px solid var(--color-brand)';
+  if (unlocked) return `1px solid ${TIER_STYLE[awardTier(key)].border}66`;
+  return '1px solid transparent';
+}
+
+/** Карточка одной эволюции древа. tierLabel — «Эволюция 1» / «Эволюция 2». */
+function EvolutionCard({
+  item,
+  tierLabel,
+  pinned,
+  onToggle,
+}: {
+  item: AchievementItem;
+  tierLabel: string;
+  pinned: boolean;
+  onToggle: () => void;
+}) {
   const pct = Math.min(
     100,
     Math.round((item.progress.current / Math.max(1, item.progress.target)) * 100),
   );
+  const tier = awardTier(item.key);
   return (
-    <div
-      className={`rounded-2xl p-4 flex flex-col items-center text-center border ${
-        item.unlocked ? 'bg-brand/10 border-brand/40' : 'bg-white/[0.04] border-white/10 opacity-70'
-      }`}
+    <button
+      type="button"
+      disabled={!item.unlocked}
+      onClick={onToggle}
+      aria-pressed={pinned}
+      title={item.unlocked ? (pinned ? 'Убрать из шапки' : 'Поставить в шапку профиля') : undefined}
+      className="rounded-2xl p-4 flex flex-col items-center text-center transition-transform active:scale-95 disabled:active:scale-100"
+      style={{
+        background: item.unlocked ? 'rgba(255,255,255,0.05)' : 'rgba(174,171,187,0.06)',
+        border: cardBorder(item.unlocked, pinned, item.key),
+        opacity: item.unlocked ? 1 : 0.8,
+      }}
     >
-      <div
-        className={`text-[9px] font-bold font-overpass uppercase tracking-[0.5px] mb-2 ${
-          item.tier === 2 ? 'text-[#FF8C4A]' : 'text-muted'
-        }`}
+      <span
+        className="text-[9px] font-bold font-overpass uppercase tracking-[0.5px] mb-2"
+        style={{ color: item.unlocked ? TIER_STYLE[tier].border : 'var(--color-muted)' }}
       >
-        {tierLabel}
-      </div>
-      <div
-        className={`w-14 h-14 rounded-full flex items-center justify-center mb-3 ${
-          item.unlocked ? 'bg-brand/20 text-brand' : 'bg-white/10 text-muted'
-        }`}
-      >
-        <AchievementIcon achievementKey={item.key} size={28} />
-      </div>
-      <div className={`text-sm font-bold ${item.unlocked ? 'text-brand' : 'text-white'}`}>
+        {tierLabel} · {TIER_LABEL[tier]}
+      </span>
+      <span className="mb-3">
+        <AwardPuck awardKey={item.key} unlocked={item.unlocked} size={56} />
+      </span>
+      <span className={`text-sm font-bold ${item.unlocked ? 'text-ink' : 'text-white'}`}>
         {item.title}
-      </div>
+      </span>
       {!item.unlocked ? (
-        <div className="w-full mt-3">
-          <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-            <div className="h-full bg-[#FF8C4A]" style={{ width: `${pct}%` }} />
-          </div>
-          <div className="text-muted text-[10px] mt-1">
+        <span className="w-full mt-3">
+          <span className="block h-1.5 bg-white/10 rounded-full overflow-hidden">
+            <span className="block h-full bg-[#FF8C4A]" style={{ width: `${pct}%` }} />
+          </span>
+          <span className="block text-muted text-[10px] mt-1">
             {item.progress.current}/{item.progress.target}
-          </div>
-        </div>
+          </span>
+        </span>
+      ) : pinned ? (
+        <PinnedMark />
       ) : (
-        <div className="text-brand text-[10px] font-bold font-overpass uppercase mt-2">Получено</div>
+        <span className="text-muted text-[10px] font-bold font-overpass uppercase mt-2">Получено</span>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -85,24 +151,15 @@ function emptyItem(key: string, tier: 1 | 2, title: string): AchievementItem {
   };
 }
 
-/** Награда из группы «Ачивки» (серии/вехи) — плоский список, без эволюций. */
-interface StreakItem {
-  key: string;
-  title: string;
-  description: string;
-  unlocked: boolean;
-  progress: { current: number; target: number };
-}
-
 const AchievementsPage = () => {
   const [items, setItems] = useState<AchievementItem[] | null>(null);
   const [streaks, setStreaks] = useState<StreakItem[] | null>(null);
   const [error, setError] = useState(false);
-  // Закреплённая под фото награда: показываем на профиле (правка владельца)
-  const [pinned, setPinned] = useState<string | null>(null);
+  // Витрина в шапке профиля: до SHOWCASE_SLOTS ключей в порядке показа
+  const [pinned, setPinned] = useState<string[]>([]);
   const [pinBusy, setPinBusy] = useState(false);
-  // Две категории (правка владельца): «Ачивки» = серии и вехи,
-  // «Достижения» = древо навыков.
+  // Короткое сообщение (лимит слотов / ошибка сервера), само гаснет
+  const [notice, setNotice] = useState<string | null>(null);
   // Вкладка из URL: с профиля ведут две отдельные карточки-категории
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<'streaks' | 'skills'>(
@@ -124,38 +181,78 @@ const AchievementsPage = () => {
     fetch('/api/profile')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (!cancelled) setPinned(d?.user?.pinnedAchievement ?? null);
+        if (cancelled) return;
+        const list = d?.user?.pinnedAchievements;
+        setPinned(Array.isArray(list) ? list.filter((k: unknown) => typeof k === 'string') : []);
       })
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
-  /** Тап по полученной награде — закрепить/снять. Сервер проверяет, что она
-   *  реально получена: иначе в витрине висела бы чужая ачивка. */
-  const togglePin = async (key: string) => {
-    if (pinBusy) return;
-    const next = pinned === key ? null : key;
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 2500);
+    return () => clearTimeout(t);
+  }, [notice]);
+
+  /** Сохранить витрину целиком; при ошибке — откат и текст причины. */
+  const savePinned = async (next: string[]) => {
+    const prev = pinned;
     setPinBusy(true);
     setPinned(next); // оптимистично
     try {
       const res = await fetch('/api/gamification/pinned', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: next }),
+        body: JSON.stringify({ keys: next }),
       });
-      if (!res.ok) setPinned(pinned); // откат
+      if (!res.ok) {
+        setPinned(prev);
+        const d = await res.json().catch(() => ({}));
+        setNotice(d?.error || 'Не удалось сохранить');
+      }
     } catch {
-      setPinned(pinned);
+      setPinned(prev);
+      setNotice('Нет связи — попробуй ещё раз');
     } finally {
       setPinBusy(false);
     }
+  };
+
+  /** Тап по полученной награде — поставить в шапку / убрать. Сервер проверяет,
+   *  что она реально получена: иначе в витрине висела бы чужая ачивка. */
+  const togglePin = (key: string) => {
+    if (pinBusy) return;
+    if (pinned.includes(key)) {
+      void savePinned(pinned.filter((k) => k !== key));
+      return;
+    }
+    if (pinned.length >= SHOWCASE_SLOTS) {
+      setNotice(`В шапке уже ${SHOWCASE_SLOTS} наград — сначала убери одну`);
+      return;
+    }
+    void savePinned([...pinned, key]);
+  };
+
+  /** Добить свободные слоты самыми сложными из полученных (award-rarity). */
+  const fillBest = () => {
+    if (pinBusy) return;
+    const all = [...(streaks ?? []), ...(items ?? [])];
+    const rest = pickTopAwards(
+      all.filter((a) => !pinned.includes(a.key)),
+      SHOWCASE_SLOTS - pinned.length,
+    );
+    if (rest.length > 0) void savePinned([...pinned, ...rest.map((a) => a.key)]);
   };
 
   const byKey = new Map((items ?? []).map((a) => [a.key, a]));
   const unlockedCount = items?.filter((a) => a.unlocked).length ?? 0;
   const total = items?.length ?? SKILL_TREE.length * 2;
   const streakUnlocked = streaks?.filter((a) => a.unlocked).length ?? 0;
-  const streakTotal = streaks?.length ?? 9;
+  const streakTotal = streaks?.length ?? 10;
+  const unlockedNotPinned =
+    [...(streaks ?? []), ...(items ?? [])].filter((a) => a.unlocked && !pinned.includes(a.key)).length;
+  const loaded = !!items && !!streaks;
 
   return (
     <div
@@ -201,6 +298,48 @@ const AchievementsPage = () => {
           ))}
         </div>
 
+        {/* Состояние витрины + подсказка */}
+        {loaded && (
+          <div
+            className="rounded-2xl px-4 py-3 mb-4 flex items-center gap-3"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+          >
+            <div className="min-w-0 flex-1">
+              <div className="text-ink text-sm font-bold font-overpass">
+                В шапке профиля: {pinned.length} из {SHOWCASE_SLOTS}
+              </div>
+              <div className="text-muted text-[11px] leading-snug mt-0.5">
+                Тапни по полученной награде, чтобы поставить её в шапку или убрать.
+              </div>
+            </div>
+            {pinned.length < SHOWCASE_SLOTS && unlockedNotPinned > 0 && (
+              <button
+                type="button"
+                onClick={fillBest}
+                disabled={pinBusy}
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-extrabold font-overpass uppercase transition-transform active:scale-95"
+                style={{
+                  background: 'var(--lime-medium)',
+                  border: '1px solid var(--color-brand)',
+                  color: 'var(--color-brand)',
+                }}
+              >
+                <Sparkles size={14} aria-hidden />
+                Лучшие
+              </button>
+            )}
+          </div>
+        )}
+        {notice && (
+          <div
+            role="status"
+            className="rounded-xl px-4 py-2.5 mb-4 text-[13px] font-bold font-overpass"
+            style={{ background: 'rgba(255,140,74,0.12)', color: '#FF8C4A' }}
+          >
+            {notice}
+          </div>
+        )}
+
         {error && (
           <div className="text-muted text-sm text-center py-10">
             Не удалось загрузить награды — попробуй обновить страницу
@@ -212,66 +351,61 @@ const AchievementsPage = () => {
 
         {/* «Ачивки»: серии, вехи, поведение */}
         {tab === 'streaks' && streaks && (
-          <>
-            <p className="text-muted text-xs mb-3">
-              Тапни по полученной награде, чтобы закрепить её в профиле под фото.
-            </p>
           <div className="grid grid-cols-2 gap-3">
-            {streaks.map((a) => (
-              <button
-                key={a.key}
-                type="button"
-                disabled={!a.unlocked}
-                onClick={() => togglePin(a.key)}
-                aria-pressed={pinned === a.key}
-                title={a.unlocked ? 'Закрепить в профиле' : undefined}
-                className="rounded-2xl p-4 flex flex-col items-center text-center transition-transform active:scale-95 disabled:active:scale-100"
-                style={{
-                  background: a.unlocked ? 'var(--lime-subtle)' : 'rgba(174,171,187,0.06)',
-                  border: `1px solid ${
-                    pinned === a.key
-                      ? 'var(--color-brand)'
-                      : a.unlocked
-                        ? 'var(--border-lime)'
-                        : 'transparent'
-                  }`,
-                }}
-              >
-                <span className={a.unlocked ? 'text-brand' : 'text-muted opacity-50'} aria-hidden>
-                  <AchievementIcon achievementKey={a.key} size={28} />
-                </span>
-                <span
-                  className={`font-overpass font-bold text-sm mt-2 ${a.unlocked ? 'text-ink' : 'text-muted'}`}
+            {streaks.map((a) => {
+              const isPinned = pinned.includes(a.key);
+              const tier = awardTier(a.key);
+              return (
+                <button
+                  key={a.key}
+                  type="button"
+                  disabled={!a.unlocked}
+                  onClick={() => togglePin(a.key)}
+                  aria-pressed={isPinned}
+                  title={a.unlocked ? (isPinned ? 'Убрать из шапки' : 'Поставить в шапку профиля') : undefined}
+                  className="rounded-2xl p-4 flex flex-col items-center text-center transition-transform active:scale-95 disabled:active:scale-100"
+                  style={{
+                    background: a.unlocked ? 'rgba(255,255,255,0.05)' : 'rgba(174,171,187,0.06)',
+                    border: cardBorder(a.unlocked, isPinned, a.key),
+                  }}
                 >
-                  {a.title}
-                </span>
-                <span className="text-muted text-[11px] leading-snug mt-1">{a.description}</span>
-                {/* Прогресс — только у счётчиков (у boolean-наград target=1) */}
-                {!a.unlocked && a.progress.target > 1 && (
-                  <span className="w-full mt-2">
-                    <span className="block h-1.5 rounded-full bg-white/10 overflow-hidden">
-                      <span
-                        className="block h-full rounded-full bg-brand/60"
-                        style={{
-                          width: `${Math.round((a.progress.current / a.progress.target) * 100)}%`,
-                        }}
-                      />
+                  {/* Подпись тира — только у эпической: остальные ачивки все серые */}
+                  {tier === 'epic' && (
+                    <span
+                      className="text-[9px] font-bold font-overpass uppercase tracking-[0.5px] mb-2"
+                      style={{ color: TIER_STYLE.epic.border }}
+                    >
+                      {TIER_LABEL.epic}
                     </span>
-                    <span className="block text-muted text-[10px] mt-1 tabular-nums">
-                      {a.progress.current}/{a.progress.target}
+                  )}
+                  <AwardPuck awardKey={a.key} unlocked={a.unlocked} size={48} />
+                  <span
+                    className={`font-overpass font-bold text-sm mt-2 ${a.unlocked ? 'text-ink' : 'text-muted'}`}
+                  >
+                    {a.title}
+                  </span>
+                  <span className="text-muted text-[11px] leading-snug mt-1">{a.description}</span>
+                  {/* Прогресс — только у счётчиков (у boolean-наград target=1) */}
+                  {!a.unlocked && a.progress.target > 1 && (
+                    <span className="w-full mt-2">
+                      <span className="block h-1.5 rounded-full bg-white/10 overflow-hidden">
+                        <span
+                          className="block h-full rounded-full bg-brand/60"
+                          style={{
+                            width: `${Math.round((a.progress.current / a.progress.target) * 100)}%`,
+                          }}
+                        />
+                      </span>
+                      <span className="block text-muted text-[10px] mt-1 tabular-nums">
+                        {a.progress.current}/{a.progress.target}
+                      </span>
                     </span>
-                  </span>
-                )}
-                {pinned === a.key && (
-                  <span className="text-brand text-[10px] font-bold uppercase mt-2 inline-flex items-center gap-1">
-                    <Pin size={12} aria-hidden />
-                    в профиле
-                  </span>
-                )}
-              </button>
-            ))}
+                  )}
+                  {isPinned && <PinnedMark />}
+                </button>
+              );
+            })}
           </div>
-          </>
         )}
 
         {tab === 'skills' && items && (
@@ -285,8 +419,18 @@ const AchievementsPage = () => {
                     {branch.goalTitle}
                   </h2>
                   <div className="grid grid-cols-2 gap-3">
-                    <EvolutionCard item={evo1} tierLabel="Эволюция 1" />
-                    <EvolutionCard item={evo2} tierLabel="Эволюция 2" />
+                    <EvolutionCard
+                      item={evo1}
+                      tierLabel="Эволюция 1"
+                      pinned={pinned.includes(evo1.key)}
+                      onToggle={() => togglePin(evo1.key)}
+                    />
+                    <EvolutionCard
+                      item={evo2}
+                      tierLabel="Эволюция 2"
+                      pinned={pinned.includes(evo2.key)}
+                      onToggle={() => togglePin(evo2.key)}
+                    />
                   </div>
                 </div>
               );
