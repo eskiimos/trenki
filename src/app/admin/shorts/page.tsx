@@ -225,6 +225,7 @@ export default function AdminShortsPage() {
 
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('kind', 'short'); // вертикальная обложка 9:16 (см. /api/upload)
 
     try {
       const response = await fetch('/api/upload', {
@@ -532,14 +533,26 @@ export default function AdminShortsPage() {
                   style={{ ...inputStyle, padding: '8px 12px' }}
                   className="file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:cursor-pointer file:font-bold file:text-[13px] file:bg-brand file:text-night"
                 />
+                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 6 }}>
+                  Обложка приводится к 9:16 (1080×1920) — загружай вертикальную картинку,
+                  горизонтальную обрежет по центру.
+                </div>
+                {/* Превью в той же геометрии, что лента и каталог (9:16, object-cover):
+                    раньше width/height без object-fit сплющивали 16:9-файл. */}
                 {thumbnail && (
-                  <Image
-                    src={thumbnail}
-                    alt="Preview"
-                    width={180}
-                    height={320}
-                    style={{ borderRadius: 'var(--radius-md)' }}
-                  />
+                  <div
+                    style={{
+                      position: 'relative',
+                      width: 180,
+                      height: 320,
+                      marginTop: 8,
+                      borderRadius: 'var(--radius-md)',
+                      overflow: 'hidden',
+                      background: 'var(--color-night)',
+                    }}
+                  >
+                    <Image src={thumbnail} alt="Preview" fill sizes="180px" className="object-cover" />
+                  </div>
                 )}
               </div>
             </div>

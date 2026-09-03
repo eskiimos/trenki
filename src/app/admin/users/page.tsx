@@ -1,6 +1,7 @@
 'use client';
 
 import { POSITION_LABEL } from '@/lib/positions';
+import { premiumStatus } from '@/lib/premium-status';
 import React, { useState, useEffect } from 'react';
 import {
   AdminPage,
@@ -58,6 +59,11 @@ interface User {
   lastActivity: string;
   accessTier?: 'FREE' | 'PREMIUM';
   premiumUntil?: string | null;
+  premiumNote?: string | null;
+  /** Заказы, по которым выдан премиум (см. /api/admin/users) */
+  paidCount?: number;
+  firstPaidAt?: string | null;
+  lastPaidAt?: string | null;
   isTester?: boolean;
   isAdmin?: boolean;
   profile: UserProfile | null;
@@ -77,7 +83,14 @@ interface TotalStats {
 
 /* ─── Локальные примитивы страницы ─────────────────────────────────────── */
 
-/** Бейдж-статус (Online / Новый / Push / PREMIUM). Всегда одна строка. */
+/** Бейдж-статус (Online / Новый / Push / подписка). Всегда одна строка.
+ *  warn — янтарный: действующий пробный период. */
+const BADGE_TONES = {
+  brand: { color: 'var(--color-brand)', bg: 'var(--lime-subtle)', border: 'var(--border-lime)' },
+  warn: { color: 'var(--color-danger)', bg: 'rgba(255,140,74,0.12)', border: 'rgba(255,140,74,0.4)' },
+  muted: { color: 'var(--color-muted)', bg: 'transparent', border: 'var(--border-hairline)' },
+} as const;
+
 function Badge({
   icon: Icon,
   children,
@@ -85,9 +98,9 @@ function Badge({
 }: {
   icon?: LucideIcon;
   children: React.ReactNode;
-  tone?: 'muted' | 'brand';
+  tone?: keyof typeof BADGE_TONES;
 }) {
-  const brand = tone === 'brand';
+  const t = BADGE_TONES[tone];
   return (
     <span
       className="inline-flex items-center gap-1 shrink-0 whitespace-nowrap"
@@ -96,14 +109,41 @@ function Badge({
         fontWeight: 700,
         padding: '4px 8px',
         borderRadius: 'var(--radius-pill)',
-        color: brand ? 'var(--color-brand)' : 'var(--color-muted)',
-        background: brand ? 'var(--lime-subtle)' : 'transparent',
-        border: `1px solid ${brand ? 'var(--border-lime)' : 'var(--border-hairline)'}`,
+        color: t.color,
+        background: t.bg,
+        border: `1px solid ${t.border}`,
       }}
     >
       {Icon && <Icon size={16} aria-hidden />}
       {children}
     </span>
+  );
+}
+
+/** Статус подписки пользователя (платил / пробный / вручную / истёк). */
+function subscriptionOf(u: {
+  accessTier?: string;
+  premiumUntil?: string | null;
+  premiumNote?: string | null;
+  paidCount?: number;
+}) {
+  return premiumStatus({
+    accessTier: u.accessTier ?? 'FREE',
+    premiumUntil: u.premiumUntil ?? null,
+    premiumNote: u.premiumNote ?? null,
+    paidCount: u.paidCount ?? 0,
+  });
+}
+
+/** Бейдж подписки: Премиум (лайм) / Пробный период (янтарь) / истёк (серый). */
+function SubscriptionBadge({ user }: { user: Parameters<typeof subscriptionOf>[0] }) {
+  const s = subscriptionOf(user);
+  if (!s.label) return null;
+  const tone = s.active ? (s.kind === 'trial' ? 'warn' : 'brand') : 'muted';
+  return (
+    <Badge icon={Crown} tone={tone}>
+      {s.label}
+    </Badge>
   );
 }
 
@@ -348,7 +388,8 @@ export default function AdminUsersPage() {
 
   // Выдать / снять премиум-доступ (фундамент под платежи; пока ручной рычаг).
   const handleSetAccess = async (user: User) => {
-    const isPremium = user.accessTier === 'PREMIUM';
+    // Действующий премиум (с учётом срока): истёкшему предлагаем выдать заново
+    const isPremium = subscriptionOf(user).active;
     let until: string | null = null;
     let note: string | null = null;
     if (isPremium) {
@@ -375,6 +416,7 @@ export default function AdminUsersPage() {
       const patch = {
         accessTier: data.user.accessTier as 'FREE' | 'PREMIUM',
         premiumUntil: (data.user.premiumUntil ?? null) as string | null,
+        premiumNote: (data.user.premiumNote ?? note ?? null) as string | null,
       };
       setUsers(prev => prev.map(u => (u.id === user.id ? { ...u, ...patch } : u)));
       if (selectedUser?.id === user.id) {
@@ -777,9 +819,7 @@ export default function AdminUsersPage() {
                       {user.firstName || user.username || `User ${user.telegramId.slice(0, 8)}`}
                       {user.lastName && ` ${user.lastName}`}
                     </span>
-                    {user.accessTier === 'PREMIUM' && (
-                      <Badge icon={Crown} tone="brand">PREMIUM</Badge>
-                    )}
+                    <SubscriptionBadge user={user} />
                   </span>
 
                   <span
@@ -888,9 +928,7 @@ export default function AdminUsersPage() {
                     )}
                     {isNewUser(selectedUser.createdAt) && <Badge icon={UserPlus}>Новый</Badge>}
                     {selectedUser.pushNotifications.isSubscribed && <Badge icon={Bell}>Push</Badge>}
-                    {selectedUser.accessTier === 'PREMIUM' && (
-                      <Badge icon={Crown} tone="brand">PREMIUM</Badge>
-                    )}
+                    <SubscriptionBadge user={selectedUser} />
                   </div>
                 </div>
 
@@ -929,12 +967,16 @@ export default function AdminUsersPage() {
                       tone="secondary"
                       size="sm"
                       icon={Crown}
-                      aria-pressed={selectedUser.accessTier === 'PREMIUM'}
-                      style={toggleOn(selectedUser.accessTier === 'PREMIUM')}
+                      aria-pressed={subscriptionOf(selectedUser).active}
+                      style={toggleOn(subscriptionOf(selectedUser).active)}
                       onClick={() => handleSetAccess(selectedUser)}
                       title="Ручная выдача/снятие премиум-доступа"
                     >
-                      {selectedUser.accessTier === 'PREMIUM' ? 'Снять PREMIUM' : 'Выдать PREMIUM'}
+                      {subscriptionOf(selectedUser).active
+                        ? 'Снять PREMIUM'
+                        : subscriptionOf(selectedUser).expired
+                          ? 'Продлить PREMIUM'
+                          : 'Выдать PREMIUM'}
                     </AdminButton>
 
                     {/* Состояние — через aria-pressed и заливку, а не глифами ✓/✗ */}
@@ -1012,6 +1054,31 @@ export default function AdminUsersPage() {
                 <SectionTitle icon={Activity}>Активность</SectionTitle>
                 <AdminCard>
                   <Row label="Последняя активность" value={getTimeSince(selectedUser.lastActivity)} />
+                  {/* Подписка: кто платил, когда оформил, до какого числа
+                      (правка владельца «Начало сентября») */}
+                  {(() => {
+                    const s = subscriptionOf(selectedUser);
+                    if (s.kind === 'none' && !selectedUser.premiumUntil) return null;
+                    return (
+                      <>
+                        <Row label="Подписка" value={s.label ?? '—'} />
+                        {selectedUser.firstPaidAt && (
+                          <Row
+                            label="Оформил"
+                            value={`${formatDate(selectedUser.firstPaidAt)} · оплат: ${selectedUser.paidCount ?? 0}`}
+                          />
+                        )}
+                        {selectedUser.lastPaidAt && selectedUser.lastPaidAt !== selectedUser.firstPaidAt && (
+                          <Row label="Последняя оплата" value={formatDate(selectedUser.lastPaidAt)} />
+                        )}
+                        <Row
+                          label={s.expired ? 'Истёк' : 'Действует до'}
+                          value={selectedUser.premiumUntil ? formatDate(selectedUser.premiumUntil) : 'бессрочно'}
+                        />
+                        {selectedUser.premiumNote && <Row label="Пометка" value={selectedUser.premiumNote} />}
+                      </>
+                    );
+                  })()}
                   <Row label="Дата регистрации" value={formatDate(selectedUser.createdAt)} />
                 </AdminCard>
               </div>

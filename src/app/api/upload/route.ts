@@ -15,6 +15,11 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
+    // kind=short — обложка шортса: вертикальная 9:16. По умолчанию (видео
+    // каталога) — 16:9. Правка владельца «Начало сентября»: раньше ВСЁ резалось
+    // в 1280×720, а шортсы везде показываются 9:16 — от вертикальной картинки
+    // оставалась узкая полоска по центру, и обложка «не подбиралась».
+    const kind = formData.get('kind') === 'short' ? 'short' : 'video';
 
 
     if (!file) {
@@ -42,10 +47,12 @@ export async function POST(request: NextRequest) {
     const uploadResponse = await new Promise<any>((resolve, reject) => {
       cloudinary.uploader.upload_stream(
         {
-          folder: 'trenki/thumbnails',
+          folder: kind === 'short' ? 'trenki/thumbnails/shorts' : 'trenki/thumbnails',
           resource_type: 'image',
           transformation: [
-            { width: 1280, height: 720, crop: 'fill' }
+            kind === 'short'
+              ? { width: 1080, height: 1920, crop: 'fill' }
+              : { width: 1280, height: 720, crop: 'fill' },
           ]
         },
         (error, result) => {

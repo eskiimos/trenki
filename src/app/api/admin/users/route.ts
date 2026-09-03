@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     // фактически пустая). Считаем всего и завершённых по каждому пользователю двумя
     // groupBy-запросами, без N+1 count() в цикле.
     const userIds = users.map((u) => u.id);
-    const [totalByUser, completedByUser] = await Promise.all([
+    const [totalByUser, completedByUser, paidByUser] = await Promise.all([
       prisma.workoutSession.groupBy({
         by: ['userId'],
         where: { userId: { in: userIds } },
@@ -41,7 +41,19 @@ export async function GET(request: NextRequest) {
         where: { userId: { in: userIds }, status: 'COMPLETED' },
         _count: { _all: true },
       }),
+      // Реальные оплаты: заказы, по которым выдан премиум (premiumGrantedAt) —
+      // единственный надёжный признак, статусы T-Bank шумные. Нужны админке,
+      // чтобы отличать «Премиум» (платил) от «Пробный период» и показывать
+      // когда оформил (правка владельца «Начало сентября»).
+      prisma.payment.groupBy({
+        by: ['userId'],
+        where: { userId: { in: userIds }, premiumGrantedAt: { not: null } },
+        _count: { _all: true },
+        _min: { premiumGrantedAt: true },
+        _max: { premiumGrantedAt: true },
+      }),
     ]);
+    const paidByUserMap = new Map(paidByUser.map((r) => [r.userId, r]));
     const totalSessionsByUser = new Map(totalByUser.map((r) => [r.userId, r._count._all]));
     const completedSessionsByUser = new Map(
       completedByUser.map((r) => [r.userId, r._count._all]),
@@ -76,6 +88,9 @@ export async function GET(request: NextRequest) {
           accessTier: user.accessTier,
           premiumUntil: user.premiumUntil,
           premiumNote: user.premiumNote,
+          paidCount: paidByUserMap.get(user.id)?._count._all ?? 0,
+          firstPaidAt: paidByUserMap.get(user.id)?._min.premiumGrantedAt ?? null,
+          lastPaidAt: paidByUserMap.get(user.id)?._max.premiumGrantedAt ?? null,
 
           // Тест-режим (читер-обход лимитов без админ-прав)
           isTester: user.isTester,
