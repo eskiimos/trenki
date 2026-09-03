@@ -267,7 +267,7 @@ export default function ReviewModal({
 
                 {/* Кнопка */}
                 <Button variant="primary" fullWidth onClick={handleClose}>
-                  к тренеровкам
+                  К тренировкам
                 </Button>
               </>
             )}
