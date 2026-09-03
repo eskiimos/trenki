@@ -20,7 +20,7 @@ import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay'
 import PotentialIslandBanner from '@/components/PotentialIslandBanner';
 // import HowAiWorksModal from '@/components/HowAiWorksModal'; // временно скрыто на главной
 import PushOptInBanner from '@/components/PushOptInBanner';
-import { Play, Zap, Lock, Compass } from 'lucide-react';
+import { Play, Zap, Lock, Compass, ChevronRight } from 'lucide-react';
 import { openSubscriptionModal, handlePaywallResponse } from '@/lib/subscription-modal';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTour } from '@/components/tour/TourProvider';
@@ -736,14 +736,32 @@ const ShortVideoSkeleton = () => (
   </div>
 );
 
+// Сколько шортсов показываем на главной (правка владельца «Начало сентября»:
+// раньше грузились ВСЕ — десятки карточек и запросов обложек на первом экране).
+// Остальное — в каталоге: последняя карточка ленты и прокрутка до конца ведут туда.
+const HOME_SHORTS_LIMIT = 7;
+
 const TrenkiSection = () => {
+  const router = useRouter();
   const [shorts, setShorts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Переход в каталог по докрутке до конца — один раз, чтобы не дёргать роутер
+  // на каждом scroll-событии у края.
+  const navigatedRef = useRef(false);
+
+  const onRailScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (navigatedRef.current) return;
+    if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 4) {
+      navigatedRef.current = true;
+      router.push('/shorts-catalog');
+    }
+  };
 
   useEffect(() => {
     const fetchShorts = async () => {
       try {
-        const response = await fetch('/api/shorts');
+        const response = await fetch(`/api/shorts?limit=${HOME_SHORTS_LIMIT}`);
         const data = await response.json();
         setShorts(data.shorts || []);
       } catch (error) {
@@ -774,8 +792,18 @@ const TrenkiSection = () => {
 
   return (
     <section style={{ paddingTop: '12px', paddingBottom: '12px' }}>
-      <h2 className="px-4 text-white font-semibold mb-3" style={{ fontSize: '12px' }}>КОРОТКИЕ ВИДЕО</h2>
-      <div className="flex space-x-4 overflow-x-auto pb-4 px-4">
+      <div className="flex items-center justify-between px-4 mb-3">
+        <h2 className="text-white font-semibold" style={{ fontSize: '12px' }}>КОРОТКИЕ ВИДЕО</h2>
+        <Link
+          href="/shorts-catalog"
+          className="inline-flex items-center gap-0.5 text-brand font-overpass font-bold uppercase"
+          style={{ fontSize: '11px', letterSpacing: '0.5px' }}
+        >
+          Все
+          <ChevronRight size={14} aria-hidden />
+        </Link>
+      </div>
+      <div className="flex space-x-4 overflow-x-auto pb-4 px-4" onScroll={onRailScroll}>
         {shorts.map((short) => (
           <ShortVideoPlayer 
             key={short.id} 
@@ -789,6 +817,22 @@ const TrenkiSection = () => {
             } : undefined}
           />
         ))}
+        {/* Хвост ленты — вход в каталог: и по тапу, и по докрутке до конца */}
+        <Link
+          href="/shorts-catalog"
+          className="flex-shrink-0 w-36 aspect-[9/16] rounded flex flex-col items-center justify-center gap-2 text-brand"
+          style={{
+            borderRadius: '4px',
+            background: 'var(--lime-subtle)',
+            border: '1px solid var(--border-lime)',
+          }}
+          aria-label="Все короткие видео"
+        >
+          <span className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--lime-medium)' }}>
+            <ChevronRight size={22} aria-hidden />
+          </span>
+          <span className="font-overpass font-extrabold uppercase text-[11px] tracking-[0.5px]">Все видео</span>
+        </Link>
       </div>
     </section>
   );

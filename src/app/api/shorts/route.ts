@@ -11,6 +11,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const trainerId = searchParams.get('trainerId');
     const audience = searchParams.get('audience'); // HOCKEY | ADAPTIVE
+    // limit — для ленты на главной (правка владельца: там нужны только первые
+    // несколько, остальное в каталоге). Без параметра — как раньше, всё.
+    const limitRaw = Number(searchParams.get('limit'));
+    const limit = Number.isInteger(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : undefined;
 
     const whereClause: any = { isPublished: true };
     if (audience === 'ADAPTIVE') {
@@ -28,7 +32,8 @@ export async function GET(request: NextRequest) {
         { isPinned: 'desc' }, // закреплённый тренёк — первым
         { order: 'asc' },
         { createdAt: 'desc' }
-      ]
+      ],
+      ...(limit ? { take: limit } : {}),
     });
 
     const shortsWithData = await Promise.all(
