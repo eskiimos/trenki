@@ -277,3 +277,129 @@ export function computeStreak(
   while (days.has(anchor - streak)) streak += 1;
   return streak;
 }
+
+// ── История начислений XP (правка владельца «Начало сентября»: «добавить
+// историю получения XP — сколько с тренировок, за чек-ин, с бустерами»).
+// XP в БД по-прежнему не хранится: события выводятся из той же истории
+// завершений, что и computeXpFromHistory, поэтому сумма событий всегда равна
+// итоговому XP (тест на инвариант — tests/lib/xp-history.test.ts). Единственный
+// «бустер» в игре — «Темп ×2»: его вклад показываем отдельной строкой. ──
+
+export type XpSource = 'workout' | 'module' | 'checkin';
+
+export interface XpEvent {
+  at: Date;
+  /** Календарный день начисления: calendarDayIndex в tz игрока; чекин — по UTC-дате (@db.Date). */
+  day: number;
+  source: XpSource;
+  base: number;
+  /** Множитель «Темпа ×2» (чекин — всегда 1). */
+  multiplier: number;
+  amount: number;
+}
+
+export function xpEventsFromHistory(
+  workoutCompletedAts: Date[],
+  moduleCompletedAts: Date[],
+  trainingDayAts: Date[],
+  checkinDates: Date[],
+  tz?: string | null,
+): XpEvent[] {
+  const workoutDays: ReadonlySet<number> = new Set(
+    trainingDayAts.map((d) => calendarDayIndex(d, tz)),
+  );
+  const events: XpEvent[] = [];
+  const push = (at: Date, source: 'workout' | 'module', base: number) => {
+    const day = calendarDayIndex(at, tz);
+    const multiplier = tempoMultiplierForDay(day, workoutDays);
+    events.push({ at, day, source, base, multiplier, amount: base * multiplier });
+  };
+  for (const w of workoutCompletedAts) push(w, 'workout', XP_PER_COMPLETED_WORKOUT);
+  for (const m of moduleCompletedAts) push(m, 'module', XP_PER_COMPLETED_MODULE);
+  for (const c of checkinDates) {
+    const day = Date.UTC(c.getUTCFullYear(), c.getUTCMonth(), c.getUTCDate()) / DAY_MS;
+    const base = checkinXpForDate(c);
+    events.push({ at: c, day, source: 'checkin', base, multiplier: 1, amount: base });
+  }
+  return events.sort((a, b) => b.at.getTime() - a.at.getTime());
+}
+
+export interface XpDaySummary {
+  /** Номер дня (calendarDayIndex) — для ключей и сортировки. */
+  day: number;
+  /** 'YYYY-MM-DD' */
+  date: string;
+  workouts: number;
+  modules: number;
+  /** XP чекина в этот день (0 — не отмечался). */
+  checkin: number;
+  /** Действовал ли «Темп ×2». */
+  tempo: boolean;
+  /** Сколько XP добавил множитель сверх базы. */
+  tempoBonus: number;
+  total: number;
+}
+
+export interface XpHistorySummary {
+  /** Разбивка ИТОГО: база по источникам + отдельно вклад множителя. Сумма = total. */
+  totals: { workouts: number; modules: number; checkins: number; tempoBonus: number; total: number };
+  /** Дни, новые сверху. */
+  days: XpDaySummary[];
+  /** Модули без даты (legacy до миграции completedAt) — отдельной строкой. */
+  legacy: { modules: number; amount: number };
+}
+
+/** 'YYYY-MM-DD' по номеру дня (обратная к calendarDayIndex). */
+export function dayIndexToISO(day: number): string {
+  return new Date(day * DAY_MS).toISOString().slice(0, 10);
+}
+
+/** Legacy-модули приходят с датой-эпохой; всё раньше 2000 года — «без даты». */
+const LEGACY_BEFORE_MS = Date.UTC(2000, 0, 1);
+
+export function summarizeXpHistory(events: XpEvent[]): XpHistorySummary {
+  const totals = { workouts: 0, modules: 0, checkins: 0, tempoBonus: 0, total: 0 };
+  const legacy = { modules: 0, amount: 0 };
+  const byDay = new Map<number, XpDaySummary>();
+
+  for (const e of events) {
+    totals.total += e.amount;
+    totals.tempoBonus += e.amount - e.base;
+    if (e.source === 'workout') totals.workouts += e.base;
+    else if (e.source === 'module') totals.modules += e.base;
+    else totals.checkins += e.base;
+
+    if (e.at.getTime() < LEGACY_BEFORE_MS) {
+      legacy.modules += 1;
+      legacy.amount += e.amount;
+      continue;
+    }
+
+    let d = byDay.get(e.day);
+    if (!d) {
+      d = {
+        day: e.day,
+        date: dayIndexToISO(e.day),
+        workouts: 0,
+        modules: 0,
+        checkin: 0,
+        tempo: false,
+        tempoBonus: 0,
+        total: 0,
+      };
+      byDay.set(e.day, d);
+    }
+    if (e.source === 'workout') d.workouts += 1;
+    else if (e.source === 'module') d.modules += 1;
+    else d.checkin += e.amount;
+    if (e.multiplier > 1) d.tempo = true;
+    d.tempoBonus += e.amount - e.base;
+    d.total += e.amount;
+  }
+
+  return {
+    totals,
+    days: [...byDay.values()].sort((a, b) => b.day - a.day),
+    legacy,
+  };
+}

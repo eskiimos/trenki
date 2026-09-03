@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { ClipboardList, Flame, History, Plus, Settings, Sparkles, Star, Zap } from 'lucide-react';
+import { ClipboardList, Flame, History, Plus, Settings, Smartphone, Sparkles, Star, Zap } from 'lucide-react';
 import { useTelegram } from '../../hooks/useTelegram';
 import { ProfileSkeleton } from '../../components/Skeleton';
 import { Button } from '@/components/ui';
@@ -16,7 +16,9 @@ import StatusPathModal from '@/components/StatusPathModal';
 import TempoBadgeButton from '@/components/TempoBadgeButton';
 import { AchievementIcon, StatusIcon } from '@/components/gamification/icons';
 import LeagueTable from '@/components/LeagueTable';
-import { NavRow, SettingsGroup } from '@/components/profile/SettingsList';
+import { ActionRow, NavRow, SettingsGroup } from '@/components/profile/SettingsList';
+import InstallGuideSheet from '@/components/InstallGuideSheet';
+import { isStandalone } from '@/lib/platform';
 import { calculateAge } from '@/lib/age-utils';
 import { awardTier, SHOWCASE_SLOTS, TIER_STYLE } from '@/lib/award-tier';
 import { positionShort } from '@/lib/positions';
@@ -44,6 +46,13 @@ const ProfilePage = () => {
   } | null>(null);
   // Модалка «Путь хоккеиста» — открывается тапом по бейджу статуса
   const [statusPathOpen, setStatusPathOpen] = useState(false);
+  // Инструкция «на экран Домой»: плашки на главной показываются один раз на
+  // устройство, поэтому нужна постоянная точка входа. В установленном PWA не нужна.
+  const [installOpen, setInstallOpen] = useState(false);
+  const [installed, setInstalled] = useState(true);
+  useEffect(() => {
+    setInstalled(isStandalone());
+  }, []);
   // Награды в шапке — ручной выбор игрока на /achievements (до SHOWCASE_SLOTS)
   const pinnedKeys: string[] = useMemo(
     () => (Array.isArray(userProfile?.pinnedAchievements) ? userProfile.pinnedAchievements : []),
@@ -416,8 +425,14 @@ const ProfilePage = () => {
                 }}
               />
             </div>
-            <div className="text-muted text-xs mt-2">
-              XP: {gamification.xpIntoLevel}/{gamification.xpForNext} · до следующего уровня
+            <div className="flex items-center justify-between gap-3 mt-2">
+              <span className="text-muted text-xs">
+                XP: {gamification.xpIntoLevel}/{gamification.xpForNext} · до следующего уровня
+              </span>
+              {/* Откуда опыт: тренировки / модули / чек-ины / темп ×2 (правка владельца) */}
+              <Link href="/profile/xp" className="text-brand text-xs font-bold font-overpass shrink-0">
+                История XP
+              </Link>
             </div>
             {gamification.nextStatus && (
               <div className="text-muted/70 text-xs mt-1">
@@ -531,7 +546,16 @@ const ProfilePage = () => {
             label="Настройки"
             hint="Уведомления, родителям, команда, помощь, выход"
           />
+          {!installed && (
+            <ActionRow
+              icon={Smartphone}
+              label="Установить на телефон"
+              hint="Иконка на экране «Домой» и напоминания"
+              onClick={() => setInstallOpen(true)}
+            />
+          )}
         </SettingsGroup>
+        <InstallGuideSheet open={installOpen} onClose={() => setInstallOpen(false)} />
       </div>
 
       {/* Тапбар */}

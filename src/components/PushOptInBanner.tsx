@@ -10,27 +10,12 @@
 // установленной PWA — там вместо кнопки подсказка «добавь на экран Домой».
 
 import { useEffect, useState } from 'react';
-import { X, Bell, Share } from 'lucide-react';
+import { X, Bell, Share, ChevronRight } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { isIOS as detectIOS, isStandalone as detectStandalone } from '@/lib/platform';
+import InstallGuideSheet from '@/components/InstallGuideSheet';
 
 const DISMISS_KEY = 'push_optin_dismissed';
-
-function detectIOS(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  const ua = navigator.userAgent || '';
-  const iOSDevice = /iPad|iPhone|iPod/.test(ua);
-  // iPadOS 13+ маскируется под Mac — ловим по числу тач-точек.
-  const iPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
-  return iOSDevice || iPadOS;
-}
-
-function detectStandalone(): boolean {
-  if (typeof window === 'undefined') return false;
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    (window.navigator as any).standalone === true
-  );
-}
 
 const SURFACE = {
   background: '#101530',
@@ -44,6 +29,8 @@ export default function PushOptInBanner() {
   const [dismissed, setDismissed] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
+  // Инструкция «на экран Домой» (правка владельца: плашка была инертной)
+  const [guideOpen, setGuideOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -80,10 +67,19 @@ export default function PushOptInBanner() {
       return (
         <section className="px-4" style={{ paddingTop: 12 }}>
           <div className="flex items-center gap-3 rounded-2xl px-4 py-3" style={SURFACE}>
-            <Share size={20} className="shrink-0 text-[#A1FF4A]" aria-hidden />
-            <span className="text-white text-sm font-medium font-overpass flex-1 min-w-0">
-              Добавь Треньки на экран «Домой», чтобы включить напоминания
-            </span>
+            {/* Тап по тексту — мини-инструкция с вкладками iOS / Android */}
+            <button
+              type="button"
+              onClick={() => setGuideOpen(true)}
+              className="flex items-center gap-3 flex-1 min-w-0 text-left bg-transparent border-0 p-0 cursor-pointer"
+            >
+              <Share size={20} className="shrink-0 text-[#A1FF4A]" aria-hidden />
+              <span className="text-white text-sm font-medium font-overpass flex-1 min-w-0">
+                Добавь Треньки на экран «Домой», чтобы включить напоминания
+              </span>
+              <ChevronRight size={18} className="shrink-0 text-white/40" aria-hidden />
+            </button>
+            <InstallGuideSheet open={guideOpen} onClose={() => setGuideOpen(false)} />
             <button
               type="button"
               onClick={dismiss}
