@@ -265,8 +265,16 @@ const ProfilePage = () => {
                   {/* Позиция сокращением — правка владельца «Начало сентября» */}
                   {positionAbbr && (
                     <span
-                      className="inline-flex items-center rounded-md px-2.5 py-1 text-[11px] font-black text-ink leading-none tracking-[0.5px]"
-                      style={{ background: 'rgba(249,248,254,0.12)' }}
+                      className="inline-flex items-center rounded-md px-2.5 text-[11px] font-black text-ink tracking-[0.5px]"
+                      // «ПН» — одни заглавные, выносных элементов нет, поэтому при
+                      // line-height 1 свободное место уходит вниз и текст сидит выше
+                      // центра. Сверху даём на 2px больше — оптически ровно.
+                      style={{
+                        background: 'rgba(249,248,254,0.12)',
+                        lineHeight: 1,
+                        paddingTop: 6,
+                        paddingBottom: 4,
+                      }}
                       title="Игровое амплуа"
                     >
                       {positionAbbr}
