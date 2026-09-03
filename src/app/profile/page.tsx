@@ -283,11 +283,11 @@ const ProfilePage = () => {
               </div>
             </div>
 
-            {/* Витрина наград — под фото, ряд из SHOWCASE_SLOTS кружков без
+            {/* Витрина наград — под фото, до SHOWCASE_SLOTS кружков без
                 наложения (правка владельца «Начало сентября»: значки залезали
                 друг на друга). Состав выбирает сам игрок на /achievements;
-                пустой слот — серый кружок с плюсом, тап ведёт выбирать. Цвет
-                значка — тир награды (серый/серебро/золото/эпик). */}
+                справа один серый «+», пока есть место. Цвет значка — тир
+                награды (серый/серебро/золото/эпик). */}
             <div className="mt-3 flex items-center gap-2" aria-label="Награды в шапке">
               {showcase.map((t) => {
                 const st = TIER_STYLE[awardTier(t.key)];
@@ -309,9 +309,10 @@ const ProfilePage = () => {
                   </Link>
                 );
               })}
-              {Array.from({ length: Math.max(0, SHOWCASE_SLOTS - showcase.length) }).map((_, i) => (
+              {/* Один «+», пока есть свободный слот (правка владельца: ряд из
+                  пустых кружков занимал место) */}
+              {showcase.length < SHOWCASE_SLOTS && (
                 <Link
-                  key={`empty-${i}`}
                   href="/achievements"
                   aria-label="Добавить награду в шапку"
                   className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-muted transition-transform active:scale-95"
@@ -322,7 +323,7 @@ const ProfilePage = () => {
                 >
                   <Plus size={16} aria-hidden />
                 </Link>
-              ))}
+              )}
             </div>
           </div>
         </div>
