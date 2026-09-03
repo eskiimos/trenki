@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
   // у цикловых goal/energyState пусты, и без этого несколько сохранённых дней
   // цикла превращались в неотличимые «Тренировка от ИИ-тренера».
   let title = workoutTitle(session.goal, session.energyState);
+  let goal = session.goal;
   const mday = session.microcycleDay;
   if (mday?.microcycle && !session.goal) {
     const plans = goalsFromStoredDays(
@@ -97,7 +98,12 @@ export async function POST(request: NextRequest) {
       mday.microcycle.cycleNumber,
     );
     const plan = plans.find((p) => p.dayOfWeek === mday.dayOfWeek);
-    if (plan) title = `${plan.label} · Цикл №${mday.microcycle.cycleNumber}`;
+    if (plan) {
+      // Цель дня цикла восстанавливается из intent + номера цикла (как в
+      // ачивках) — правка владельца «в избранном для трени из цикла добавить цель».
+      goal = plan.goal;
+      title = `${workoutTitle(plan.goal, null)} · ${plan.label} · Цикл №${mday.microcycle.cycleNumber}`;
+    }
   } else if (!mday && session.coachId) {
     title = 'Задание от тренера';
   }
@@ -121,7 +127,7 @@ export async function POST(request: NextRequest) {
       data: {
         userId: auth.user.id,
         title,
-        goal: session.goal,
+        goal,
         energyState: session.energyState,
         videoIds,
         sourceSessionId: sessionId,

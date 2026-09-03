@@ -28,10 +28,19 @@ describe('microcycle/offer — pickCycleDayToOffer', () => {
     expect(pickCycleDayToOffer(days, 3)?.dayOfWeek).toBe(3);
   });
 
-  it('если сегодняшний выполнен / нет дня — самый ранний невыполненный', () => {
+  it('сегодняшний день выполнен → не предлагаем ничего (правка «Начало сентября»)', () => {
     const days = [day(1, 'COMPLETED'), day(2, 'PENDING'), day(3, 'COMPLETED')];
-    expect(pickCycleDayToOffer(days, 3)?.dayOfWeek).toBe(2); // сегодня(3) выполнен → ранний (2)
+    expect(pickCycleDayToOffer(days, 3)).toBeNull();
+    // PARTIAL (досрочный финиш) и SKIPPED тоже «закрыт»
+    expect(pickCycleDayToOffer([day(1, 'PENDING'), day(2, 'PARTIAL')], 2)).toBeNull();
+    expect(pickCycleDayToOffer([day(1, 'PENDING'), day(2, 'SKIPPED')], 2)).toBeNull();
+  });
+
+  it('выходной или день без сессии → самый ранний невыполненный', () => {
+    const days = [day(1, 'COMPLETED'), day(2, 'PENDING'), day(3, 'COMPLETED')];
     expect(pickCycleDayToOffer(days, null)?.dayOfWeek).toBe(2); // выходной → ранний
+    expect(pickCycleDayToOffer([day(1, 'PENDING'), day(2, null)], 2)?.dayOfWeek).toBe(1); // сегодня без сессии
+    expect(pickCycleDayToOffer(days, 4)?.dayOfWeek).toBe(2); // дня 4 нет в списке
   });
 
   it('IN_PROGRESS считается невыполненным', () => {

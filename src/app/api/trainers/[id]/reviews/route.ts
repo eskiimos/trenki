@@ -145,12 +145,16 @@ export async function POST(
       );
     }
 
-    // Один отзыв на пару (trainerId, userId). Переотправка обновляет отзыв и
-    // сбрасывает isApproved — правка снова уходит на модерацию.
+    // Один отзыв на пару (trainerId, userId). Переотправка обновляет отзыв.
+    // Текст уходит на модерацию; оценка БЕЗ текста одобряется сразу —
+    // модерировать нечего, а раньше такие отзывы висели в очереди пустыми и
+    // рейтинг тренера не менялся (правка владельца «оценка без отзыва
+    // скидывается»).
+    const isApproved = comment === null;
     const review = await prisma.trainerReview.upsert({
       where: { trainerId_userId: { trainerId, userId } },
-      create: { trainerId, userId, rating, comment },
-      update: { rating, comment, isApproved: false, createdAt: new Date() },
+      create: { trainerId, userId, rating, comment, isApproved },
+      update: { rating, comment, isApproved, createdAt: new Date() },
       include: { user: { select: USER_SELECT } },
     });
 

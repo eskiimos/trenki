@@ -1304,7 +1304,7 @@ export default function WorkoutPage() {
             type="button"
             onClick={saveWorkoutToFavorites}
             disabled={favSaving || favSaved}
-            className="w-full mt-2 rounded-full transition-transform active:scale-95"
+            className="w-full mt-3 rounded-full transition-transform active:scale-95"
             style={{
               backgroundColor: favSaved ? 'rgba(161, 255, 74, 0.16)' : 'transparent',
               border: `1px solid ${favSaved ? 'rgba(161,255,74,0.5)' : 'rgba(174,171,187,0.35)'}`,

@@ -75,7 +75,7 @@ interface ActiveMicrocycle {
 
 // «Крутые» названия нагрузок (таблица методиста).
 const MICROCYCLE_INTENT_LABEL: Record<MicrocycleIntent, string> = {
-  IN_TONE: 'База/стандарт',
+  IN_TONE: 'Стандарт',
   WARMUP: 'Зарядка',
   CHARGED: 'Овертайм',
   STRETCH: 'Раскисление',

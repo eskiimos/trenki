@@ -2078,7 +2078,7 @@ export default function VideoPage({ params }: VideoPageProps) {
       возможность нужна: лайк = избранное, а изнутри ИИ-тренировки его было не
       поставить вовсе (правка владельца «добавить занятия в избранное»). */}
   {fromWorkout && !isLandscape && (
-    <div className="bg-surface px-4 pb-3">
+    <div className="bg-surface px-4 pt-2 pb-3">
       <button
         onClick={toggleLike}
         aria-pressed={isLiked}

@@ -13,7 +13,7 @@ import PotentialRing from '@/components/PotentialRing';
 import SubscriptionExpiryCard from '@/components/SubscriptionExpiryCard';
 import EvolutionModal from '@/components/EvolutionModal';
 import StatusPathModal from '@/components/StatusPathModal';
-import TempoBadge from '@/components/TempoBadge';
+import TempoBadgeButton from '@/components/TempoBadgeButton';
 import { AchievementIcon, StatusIcon } from '@/components/gamification/icons';
 import LeagueTable from '@/components/LeagueTable';
 import { NavRow, SettingsGroup } from '@/components/profile/SettingsList';
@@ -386,16 +386,11 @@ const ProfilePage = () => {
               </span>
             </div>
             {/* Бейдж темпа — отдельной строкой, виден ВСЕГДА (активный ×2 или
-                отсчёт). Тап открывает ачивки — эндпоинт только для своего юзера,
-                поэтому кликабельно лишь в профиле (в родительском кабинете — статика). */}
+                отсчёт). Тап — объяснялка правила ×2 (правка владельца «Начало
+                сентября»: раньше уводило на ачивки, и что такое «ударный темп»
+                было непонятно). В родительском кабинете — статика. */}
             <div className="mb-3">
-              {/* Тап по бейджу — страница ачивок (решение босса: страница, не модалка) */}
-              <Link
-                href="/achievements"
-                className="inline-flex cursor-pointer transition-transform active:scale-95"
-              >
-                <TempoBadge streak={gamification.streak ?? 0} tempoActive={!!gamification.tempoActive} />
-              </Link>
+              <TempoBadgeButton streak={gamification.streak ?? 0} tempoActive={!!gamification.tempoActive} />
             </div>
             <div className="h-2 rounded-full bg-white/10 overflow-hidden">
               <div

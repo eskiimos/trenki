@@ -24,8 +24,11 @@ export function todayCycleDayIndex(weekStartDate: string | Date, now: Date): num
 
 /**
  * День цикла, который предложить вместо быстрой тренировки: сегодняшний
- * невыполненный день, иначе самый ранний невыполненный. null — предлагать
- * нечего (все дни закрыты или без сессии).
+ * невыполненный день. Если сегодняшний день уже закрыт (выполнен / заменён
+ * быстрой) — не предлагаем ничего: правка владельца «выполнил тренировку из
+ * цикла, жму быструю — всё равно предлагает треню из цикла (другую цель)».
+ * В выходной или в день без сессии — самый ранний невыполненный (догнать
+ * пропущенный). null — предлагать нечего.
  */
 export function pickCycleDayToOffer(
   days: CycleDayLite[],
@@ -40,6 +43,8 @@ export function pickCycleDayToOffer(
   if (todayCycleDay != null) {
     const today = incomplete.find((d) => d.dayOfWeek === todayCycleDay);
     if (today) return today;
+    const todayDay = days.find((d) => d.dayOfWeek === todayCycleDay);
+    if (todayDay?.workoutSession) return null; // сегодня уже отработал
   }
   return incomplete[0];
 }

@@ -31,7 +31,7 @@ function Chip({ children, active }: { children: React.ReactNode; active?: boolea
 }
 
 const DAY_MOCK = [
-  { d: 'Пн', emoji: '⚡️', label: 'База' },
+  { d: 'Пн', emoji: '⚡️', label: 'Стандарт' },
   { d: 'Вт', emoji: '🏃', label: 'Зарядка' },
   { d: 'Ср', emoji: '🔋', label: 'Овертайм' },
   { d: 'Чт', emoji: '🧘', label: 'Раскисление' },

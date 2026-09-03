@@ -11,7 +11,7 @@ interface ReviewModalProps {
   trainerName: string;
   /** Звезда, выбранная на странице тренера до открытия модалки */
   initialRating?: number;
-  onSubmitSuccess: () => void;
+  onSubmitSuccess: (rating: number, approved: boolean) => void;
 }
 
 export default function ReviewModal({
@@ -62,8 +62,9 @@ export default function ReviewModal({
       });
 
       if (response.ok) {
+        const data = await response.json().catch(() => ({}));
         setIsSubmitted(true);
-        onSubmitSuccess();
+        onSubmitSuccess(userRating, !!data?.review?.isApproved);
 
         // Закрыть модал через 3 секунды
         setTimeout(() => {

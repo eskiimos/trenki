@@ -46,6 +46,10 @@ export default function TrainerPage() {
   const [hoveredRating, setHoveredRating] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  // Своя оценка тренеру. Правка владельца «после выставления оценки без отзыва
+  // она скидывается»: страница никогда не читала viewer.myReview, а при
+  // закрытии модалки обнуляла звёзды — сохранённая оценка исчезала с экрана.
+  const [myReview, setMyReview] = useState<{ rating: number; isApproved: boolean } | null>(null);
 
   useEffect(() => {
     const fetchTrainerData = async () => {
@@ -82,6 +86,11 @@ export default function TrainerPage() {
         const reviewsData = await reviewsResponse.json();
         if (reviewsData.reviews) {
           setReviewsCount(reviewsData.reviews.length);
+        }
+        const my = reviewsData.viewer?.myReview;
+        if (my && typeof my.rating === 'number') {
+          setMyReview({ rating: my.rating, isApproved: !!my.isApproved });
+          setUserRating(my.rating);
         }
       } catch (error) {
         console.error('Error loading trainer:', error);
@@ -510,6 +519,11 @@ export default function TrainerPage() {
               );
             })}
           </div>
+          {myReview && (
+            <p className="text-white/50 text-xs mt-4">
+              Твоя оценка сохранена{myReview.isApproved ? '' : ' · отзыв на модерации'}
+            </p>
+          )}
         </div>
       </div>
 
@@ -520,11 +534,14 @@ export default function TrainerPage() {
           initialRating={userRating}
           onClose={() => {
             setIsReviewModalOpen(false);
-            setUserRating(0);
+            // Не обнуляем звёзды — возвращаем сохранённую оценку
+            setUserRating(myReview?.rating ?? 0);
           }}
           trainerId={trainerId}
           trainerName={`${trainer.name} ${trainer.lastName}`}
-          onSubmitSuccess={() => {
+          onSubmitSuccess={(rating, approved) => {
+            setMyReview({ rating, isApproved: approved });
+            setUserRating(rating);
             // Обновляем количество отзывов
             fetch(`/api/trainers/${trainerId}/reviews`)
               .then(res => res.json())

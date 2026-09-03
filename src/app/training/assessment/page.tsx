@@ -13,7 +13,7 @@ const trainingGoals = Object.values(TrainingGoal) as TrainingGoal[];
 
 // C-4: подписи дней цикла по intent (крутые названия нагрузок, как в календаре).
 const INTENT_LABELS: Record<string, string> = {
-  IN_TONE: 'База/стандарт',
+  IN_TONE: 'Стандарт',
   WARMUP: 'Зарядка',
   CHARGED: 'Овертайм',
   STRETCH: 'Раскисление',

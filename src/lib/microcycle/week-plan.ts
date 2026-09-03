@@ -83,13 +83,13 @@ export function intentFor(kind: DayKind, energyState: EnergyState): MicrocycleIn
 }
 
 // «Крутые» названия нагрузок (по таблице методиста):
-//   Заряжен→Овертайм, В тонусе→База/стандарт, Устал→Лёгкая нагрузка,
+//   Заряжен→Овертайм, В тонусе→Стандарт, Устал→Лёгкая нагрузка,
 //   Разминка→Зарядка, Растяжка→Раскисление.
 export function labelFor(kind: DayKind, energyState: EnergyState): string {
   if (kind === 'WARMUP') return 'Зарядка';
   if (kind === 'WARMUP_STRETCH') return 'Раскисление';
   if (energyState === EnergyState.FULLY_CHARGED) return 'Овертайм';
-  if (energyState === EnergyState.IN_TONE) return 'База/стандарт';
+  if (energyState === EnergyState.IN_TONE) return 'Стандарт';
   return 'Лёгкая нагрузка';
 }
 

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { plural } from '@/lib/plural';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import BottomNavigation from '@/components/BottomNavigation';
@@ -243,9 +244,9 @@ const TrainerVideosPage = () => {
                       className="text-white/60 mt-2"
                     >
                       <span>
-                        {video.likesCount >= 1000 
-                          ? `${(video.likesCount / 1000).toFixed(1)} тыс.` 
-                          : video.likesCount} лайков
+                        {video.likesCount >= 1000
+                          ? `${(video.likesCount / 1000).toFixed(1)} тыс. лайков`
+                          : `${video.likesCount} ${plural(video.likesCount, ['лайк', 'лайка', 'лайков'])}`}
                       </span>
                       <span className="text-white/40"> | </span>
                       <span>оборудование ({video.equipment.join(', ')})</span>
