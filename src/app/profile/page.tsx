@@ -310,18 +310,30 @@ const ProfilePage = () => {
                 );
               })}
               {/* Один «+», пока есть свободный слот (правка владельца: ряд из
-                  пустых кружков занимал место) */}
+                  пустых кружков занимал место). Пустая витрина — с подписью:
+                  что делать, а если наград ещё нет — откуда они берутся. */}
               {showcase.length < SHOWCASE_SLOTS && (
                 <Link
                   href="/achievements"
                   aria-label="Добавить награду в шапку"
-                  className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-muted transition-transform active:scale-95"
-                  style={{
-                    background: 'rgba(174,171,187,0.12)',
-                    border: '1px solid rgba(174,171,187,0.25)',
-                  }}
+                  className="flex items-center gap-2 min-w-0 transition-transform active:scale-95"
                 >
-                  <Plus size={16} aria-hidden />
+                  <span
+                    className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-muted"
+                    style={{
+                      background: 'rgba(174,171,187,0.12)',
+                      border: '1px solid rgba(174,171,187,0.25)',
+                    }}
+                  >
+                    <Plus size={16} aria-hidden />
+                  </span>
+                  {showcase.length === 0 && awards && (
+                    <span className="text-muted text-xs font-overpass truncate">
+                      {awards.streakUnlocked + awards.skillUnlocked > 0
+                        ? 'Добавь награду в шапку'
+                        : 'Награды — за тренировки'}
+                    </span>
+                  )}
                 </Link>
               )}
             </div>
