@@ -747,36 +747,70 @@ const TrenkiSection = () => {
   const [isLoading, setIsLoading] = useState(true);
   // «Потяни за край — попадёшь в каталог» (правка владельца): переход не по
   // докрутке, а когда лента уже упёрлась в конец и палец продолжает тянуть.
-  // Пока тянут — лента едет за пальцем, а карточка «Все видео» растягивается;
-  // за порогом подпись меняется на «Отпусти». Родной iOS-bounce выключен
-  // (overscroll-behavior: none), чтобы эффект не двоился. Стили ставим
-  // напрямую через ref — без ре-рендера на каждый touchmove.
+  // Пока тянут — лента едет за пальцем, а карточка «Все видео» СЖИМАЕТСЯ и
+  // скругляется (ширина/высота/радиус, а не scale: иконка и текст не
+  // искажаются — правка владельца после первой версии). За порогом подпись
+  // меняется на «Отпусти». Родной iOS-bounce выключен (overscroll-behavior:
+  // none), чтобы эффект не двоился. Стили ставим напрямую через ref — без
+  // ре-рендера на каждый touchmove.
+  const scrollRef = useRef<HTMLDivElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
   const ctaRef = useRef<HTMLAnchorElement>(null);
   const ctaLabelRef = useRef<HTMLSpanElement>(null);
-  const pullRef = useRef({ startX: 0, active: false, pull: 0 });
+  const pullRef = useRef({ startX: 0, active: false, pull: 0, baseW: 0, baseH: 0 });
   const navigatedRef = useRef(false);
   const PULL_THRESHOLD = 64;
   const PULL_MAX = 120;
+  const CTA_RADIUS = 4;
 
   const railAtEnd = (el: HTMLElement) => el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
 
   const applyPull = (pull: number, animate: boolean) => {
     const rail = railRef.current;
     const cta = ctaRef.current;
-    if (!rail || !cta) return;
-    const transition = animate ? 'transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none';
-    rail.style.transition = transition;
-    cta.style.transition = transition;
+    const st = pullRef.current;
+    if (!rail || !cta || !st.baseW) return;
+    const ease = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+    rail.style.transition = animate ? `transform 220ms ${ease}` : 'none';
+    cta.style.transition = animate
+      ? `width 220ms ${ease}, height 220ms ${ease}, border-radius 220ms ${ease}`
+      : 'none';
     rail.style.transform = pull > 0 ? `translateX(${-pull * 0.5}px)` : '';
-    cta.style.transform = pull > 0 ? `scaleX(${1 + pull / 140})` : '';
+    // Блок сжимается и округляется до «капли»; содержимое не масштабируется
+    cta.style.width = `${st.baseW - pull * 0.35}px`;
+    cta.style.height = `${st.baseH - pull * 0.6}px`;
+    cta.style.borderRadius = `${CTA_RADIUS + pull * 0.5}px`;
     if (ctaLabelRef.current) {
       ctaLabelRef.current.textContent = pull >= PULL_THRESHOLD ? 'Отпусти' : 'Все видео';
     }
   };
 
+  /** После пружины назад — снять инлайн-размеры (адаптив) и докрутить к краю:
+   *  во время сжатия контент ленты был уже, и браузер подрезал scrollLeft. */
+  const resetCtaAfterSpring = () => {
+    window.setTimeout(() => {
+      const cta = ctaRef.current;
+      const scroller = scrollRef.current;
+      if (cta) {
+        cta.style.transition = '';
+        cta.style.width = '';
+        cta.style.height = '';
+        cta.style.borderRadius = '';
+      }
+      if (scroller) scroller.scrollLeft = scroller.scrollWidth;
+    }, 240);
+  };
+
   const onRailTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    pullRef.current = { startX: e.touches[0].clientX, active: railAtEnd(e.currentTarget), pull: 0 };
+    const cta = ctaRef.current;
+    pullRef.current = {
+      startX: e.touches[0].clientX,
+      active: railAtEnd(e.currentTarget),
+      pull: 0,
+      // Базовый размер меряем на старте жеста — инлайн-стилей в этот момент нет
+      baseW: cta?.offsetWidth ?? 0,
+      baseH: cta?.offsetHeight ?? 0,
+    };
   };
 
   const onRailTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
@@ -810,7 +844,10 @@ const TrenkiSection = () => {
       router.push('/shorts-catalog');
       return;
     }
-    applyPull(0, true);
+    if (pulled > 0) {
+      applyPull(0, true);
+      resetCtaAfterSpring();
+    }
   };
 
   useEffect(() => {
@@ -849,6 +886,7 @@ const TrenkiSection = () => {
     <section style={{ paddingTop: '12px', paddingBottom: '12px' }}>
       <h2 className="px-4 text-white font-semibold mb-3" style={{ fontSize: '12px' }}>КОРОТКИЕ ВИДЕО</h2>
       <div
+        ref={scrollRef}
         className="overflow-x-auto pb-4"
         style={{ overscrollBehaviorX: 'none' }}
         onTouchStart={onRailTouchStart}
@@ -856,7 +894,8 @@ const TrenkiSection = () => {
         onTouchEnd={onRailTouchEnd}
         onTouchCancel={onRailTouchEnd}
       >
-      <div ref={railRef} className="flex space-x-4 px-4 w-max">
+      {/* items-center: сжатая карточка «Все видео» остаётся по центру строки */}
+      <div ref={railRef} className="flex items-center space-x-4 px-4 w-max">
         {shorts.map((short) => (
           <ShortVideoPlayer 
             key={short.id} 
@@ -877,10 +916,10 @@ const TrenkiSection = () => {
           href="/shorts-catalog"
           className="flex-shrink-0 w-36 aspect-[9/16] rounded flex flex-col items-center justify-center gap-2 text-brand"
           style={{
-            borderRadius: '4px',
+            borderRadius: `${CTA_RADIUS}px`,
             background: 'var(--lime-subtle)',
             border: '1px solid var(--border-lime)',
-            transformOrigin: 'left center',
+            boxSizing: 'border-box',
           }}
           aria-label="Все короткие видео"
         >
