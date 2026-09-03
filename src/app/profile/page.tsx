@@ -20,6 +20,7 @@ import { ActionRow, NavRow, SettingsGroup } from '@/components/profile/SettingsL
 import InstallGuideSheet from '@/components/InstallGuideSheet';
 import { isStandalone } from '@/lib/platform';
 import { calculateAge } from '@/lib/age-utils';
+import { plural } from '@/lib/plural';
 import { awardTier, SHOWCASE_SLOTS, TIER_STYLE } from '@/lib/award-tier';
 import { positionShort } from '@/lib/positions';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -175,6 +176,13 @@ const ProfilePage = () => {
     ? calculateAge(new Date(userProfile.profile.birthDate))
     : null;
 
+  // Возраст · рост · вес — только заполненные поля
+  const physical = [
+    displayAge != null ? `${displayAge} ${plural(displayAge, ['год', 'года', 'лет'])}` : null,
+    userProfile?.profile?.height ? `${userProfile.profile.height} см` : null,
+    userProfile?.profile?.weight ? `${userProfile.profile.weight} кг` : null,
+  ].filter((v): v is string => !!v);
+
   // Витрина наград: ТОЛЬКО то, что игрок сам выбрал (правка владельца «Начало
   // сентября»). Считается на рендере: профиль и награды приезжают параллельно.
   // Ключ, который больше не «получен» (история изменилась), молча пропускаем.
@@ -257,17 +265,17 @@ const ProfilePage = () => {
                   {/* Позиция сокращением — правка владельца «Начало сентября» */}
                   {positionAbbr && (
                     <span
-                      className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-black text-ink leading-none"
+                      className="inline-flex items-center rounded-md px-2.5 py-1 text-[11px] font-black text-ink leading-none tracking-[0.5px]"
                       style={{ background: 'rgba(249,248,254,0.12)' }}
                       title="Игровое амплуа"
                     >
                       {positionAbbr}
                     </span>
                   )}
-                  <span>
-                    {displayAge ?? '-'} лет · {userProfile?.profile?.height || '-'} см ·{' '}
-                    {userProfile?.profile?.weight || '-'} кг
-                  </span>
+                  {/* Одной строкой через join: разделители получают гарантированные
+                      пробелы (в JSX они схлопывались, выходило «28 лет ·177 см»),
+                      а незаполненные поля просто выпадают, без прочерков. */}
+                  <span>{physical.join(' · ')}</span>
                 </div>
                 {/* Общий потенциал числом — за подпиской он скрыт кольцом */}
                 {!paywalled && typeof userProfile?.profile?.potential === 'number' && (
