@@ -745,17 +745,72 @@ const TrenkiSection = () => {
   const router = useRouter();
   const [shorts, setShorts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  // Переход в каталог по докрутке до конца — один раз, чтобы не дёргать роутер
-  // на каждом scroll-событии у края.
+  // «Потяни за край — попадёшь в каталог» (правка владельца): переход не по
+  // докрутке, а когда лента уже упёрлась в конец и палец продолжает тянуть.
+  // Пока тянут — лента едет за пальцем, а карточка «Все видео» растягивается;
+  // за порогом подпись меняется на «Отпусти». Родной iOS-bounce выключен
+  // (overscroll-behavior: none), чтобы эффект не двоился. Стили ставим
+  // напрямую через ref — без ре-рендера на каждый touchmove.
+  const railRef = useRef<HTMLDivElement>(null);
+  const ctaRef = useRef<HTMLAnchorElement>(null);
+  const ctaLabelRef = useRef<HTMLSpanElement>(null);
+  const pullRef = useRef({ startX: 0, active: false, pull: 0 });
   const navigatedRef = useRef(false);
+  const PULL_THRESHOLD = 64;
+  const PULL_MAX = 120;
 
-  const onRailScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const el = e.currentTarget;
-    if (navigatedRef.current) return;
-    if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 4) {
+  const railAtEnd = (el: HTMLElement) => el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+
+  const applyPull = (pull: number, animate: boolean) => {
+    const rail = railRef.current;
+    const cta = ctaRef.current;
+    if (!rail || !cta) return;
+    const transition = animate ? 'transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none';
+    rail.style.transition = transition;
+    cta.style.transition = transition;
+    rail.style.transform = pull > 0 ? `translateX(${-pull * 0.5}px)` : '';
+    cta.style.transform = pull > 0 ? `scaleX(${1 + pull / 140})` : '';
+    if (ctaLabelRef.current) {
+      ctaLabelRef.current.textContent = pull >= PULL_THRESHOLD ? 'Отпусти' : 'Все видео';
+    }
+  };
+
+  const onRailTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    pullRef.current = { startX: e.touches[0].clientX, active: railAtEnd(e.currentTarget), pull: 0 };
+  };
+
+  const onRailTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    const st = pullRef.current;
+    const x = e.touches[0].clientX;
+    // До края докатились уже в этом жесте — начинаем отсчёт отсюда
+    if (!st.active) {
+      if (!railAtEnd(e.currentTarget)) return;
+      st.active = true;
+      st.startX = x;
+    }
+    const dx = st.startX - x; // палец влево = тянем дальше
+    if (dx <= 0) {
+      if (st.pull > 0) {
+        st.pull = 0;
+        applyPull(0, false);
+      }
+      return;
+    }
+    st.pull = Math.min(PULL_MAX, dx * 0.6); // с затуханием, как у резинки
+    applyPull(st.pull, false);
+  };
+
+  const onRailTouchEnd = () => {
+    const st = pullRef.current;
+    const pulled = st.pull;
+    st.pull = 0;
+    st.active = false;
+    if (pulled >= PULL_THRESHOLD && !navigatedRef.current) {
       navigatedRef.current = true;
       router.push('/shorts-catalog');
+      return;
     }
+    applyPull(0, true);
   };
 
   useEffect(() => {
@@ -792,18 +847,16 @@ const TrenkiSection = () => {
 
   return (
     <section style={{ paddingTop: '12px', paddingBottom: '12px' }}>
-      <div className="flex items-center justify-between px-4 mb-3">
-        <h2 className="text-white font-semibold" style={{ fontSize: '12px' }}>КОРОТКИЕ ВИДЕО</h2>
-        <Link
-          href="/shorts-catalog"
-          className="inline-flex items-center gap-0.5 text-brand font-overpass font-bold uppercase"
-          style={{ fontSize: '11px', letterSpacing: '0.5px' }}
-        >
-          Все
-          <ChevronRight size={14} aria-hidden />
-        </Link>
-      </div>
-      <div className="flex space-x-4 overflow-x-auto pb-4 px-4" onScroll={onRailScroll}>
+      <h2 className="px-4 text-white font-semibold mb-3" style={{ fontSize: '12px' }}>КОРОТКИЕ ВИДЕО</h2>
+      <div
+        className="overflow-x-auto pb-4"
+        style={{ overscrollBehaviorX: 'none' }}
+        onTouchStart={onRailTouchStart}
+        onTouchMove={onRailTouchMove}
+        onTouchEnd={onRailTouchEnd}
+        onTouchCancel={onRailTouchEnd}
+      >
+      <div ref={railRef} className="flex space-x-4 px-4 w-max">
         {shorts.map((short) => (
           <ShortVideoPlayer 
             key={short.id} 
@@ -817,22 +870,28 @@ const TrenkiSection = () => {
             } : undefined}
           />
         ))}
-        {/* Хвост ленты — вход в каталог: и по тапу, и по докрутке до конца */}
+        {/* Хвост ленты — вход в каталог: по тапу или потянув за край (тогда
+            карточка растягивается за пальцем) */}
         <Link
+          ref={ctaRef}
           href="/shorts-catalog"
           className="flex-shrink-0 w-36 aspect-[9/16] rounded flex flex-col items-center justify-center gap-2 text-brand"
           style={{
             borderRadius: '4px',
             background: 'var(--lime-subtle)',
             border: '1px solid var(--border-lime)',
+            transformOrigin: 'left center',
           }}
           aria-label="Все короткие видео"
         >
           <span className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--lime-medium)' }}>
             <ChevronRight size={22} aria-hidden />
           </span>
-          <span className="font-overpass font-extrabold uppercase text-[11px] tracking-[0.5px]">Все видео</span>
+          <span ref={ctaLabelRef} className="font-overpass font-extrabold uppercase text-[11px] tracking-[0.5px]">
+            Все видео
+          </span>
         </Link>
+      </div>
       </div>
     </section>
   );
