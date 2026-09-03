@@ -4,9 +4,15 @@
 // растущими наградами (по выходным XP больше всего — мотиватор просевшей
 // активности) и кнопка «Отметиться». Self-fetch /api/checkin, как StreakChip.
 // Чекин НЕ трогает серию/темп — только плоский XP.
+//
+// Сворачивание (правка владельца «Начало сентября»): карточка занимала много
+// места первого экрана. Пока сегодня не отмечался — всегда полный вид (это
+// призыв к действию). Отмечен — компактная строка, тап по ней раскрывает
+// неделю. Ручной выбор живёт до следующего ответа сервера с другим статусом
+// (новый день → снова полный вид).
 
-import { useEffect, useState } from 'react';
-import { CalendarCheck, Check, Star } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { CalendarCheck, Check, ChevronDown, Star } from 'lucide-react';
 
 interface WeekDay {
   date: string;
@@ -24,6 +30,10 @@ export default function DailyCheckinCard() {
   const [todayXp, setTodayXp] = useState(0);
   const [busy, setBusy] = useState(false);
   const [justEarned, setJustEarned] = useState<number | null>(null);
+  // Компактный вид. Дефолт — по статусу с сервера; меняем его только когда
+  // статус реально изменился, чтобы рефетч по фокусу не сбрасывал ручной выбор.
+  const [collapsed, setCollapsed] = useState(false);
+  const serverCheckedRef = useRef<boolean | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,8 +43,13 @@ export default function DailyCheckinCard() {
         .then((d) => {
           if (cancelled || !d?.week) return;
           setWeek(d.week);
-          setCheckedToday(!!d.checkedToday);
+          const nowChecked = !!d.checkedToday;
+          setCheckedToday(nowChecked);
           setTodayXp(d.todayXp ?? 0);
+          if (serverCheckedRef.current !== nowChecked) {
+            serverCheckedRef.current = nowChecked;
+            setCollapsed(nowChecked);
+          }
         })
         .catch(() => {});
     };
@@ -92,35 +107,77 @@ export default function DailyCheckinCard() {
   // Пока не загрузилось — не занимаем место на главной
   if (!week) return null;
 
+  const checkedCount = week.filter((d) => d.checked).length;
+  // Сворачивать можно только отмеченную карточку: без отметки она — призыв к действию
+  const canCollapse = checkedToday;
+  const isCompact = canCollapse && collapsed;
+
+  const header = (
+    <>
+      <div className="flex items-center gap-2 min-w-0">
+        <CalendarCheck size={20} className="text-brand shrink-0" aria-hidden />
+        <span className="text-white text-sm font-bold font-overpass uppercase tracking-wide truncate">
+          Ежедневный чекин
+        </span>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {justEarned !== null && (
+            /* Кит анимаций: награда всплывает и тает, потом остаётся пружинный бейдж */
+          <span className="relative shrink-0 inline-flex items-center">
+            <span className="anim-float-up absolute right-0 -top-4 inline-flex items-center gap-1 text-brand text-sm font-black font-overpass whitespace-nowrap">
+              +{justEarned} XP
+            </span>
+            <span className="anim-pop-success inline-flex items-center gap-1 text-brand text-sm font-black font-overpass">
+              <Star size={16} fill="currentColor" aria-hidden />
+              +{justEarned} XP
+            </span>
+          </span>
+        )}
+        {/* В компактном виде — статус дня и счётчик недели */}
+        {isCompact && justEarned === null && (
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold font-overpass">
+            <Check size={14} className="text-brand" aria-hidden />
+            <span className="text-brand">Сегодня</span>
+            <span className="text-muted tabular-nums">{checkedCount}/7</span>
+          </span>
+        )}
+        {canCollapse && (
+          <ChevronDown
+            size={18}
+            className="text-muted transition-transform"
+            style={{ transform: isCompact ? 'none' : 'rotate(180deg)' }}
+            aria-hidden
+          />
+        )}
+      </div>
+    </>
+  );
+
   return (
     // Отступ сверху — как у StreakChip (12): без него карточка прилипала к
     // блоку серии (правка владельца)
     <section className="px-4" style={{ paddingTop: 'var(--space-3)', paddingBottom: 'var(--space-3)' }}>
       <div
-        className="rounded-2xl p-4"
+        className={`rounded-2xl ${isCompact ? 'px-4 py-3' : 'p-4'}`}
         style={{ background: 'var(--color-surface)', border: '1px solid var(--border-hairline)' }}
       >
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <CalendarCheck size={20} className="text-brand shrink-0" aria-hidden />
-            <span className="text-white text-sm font-bold font-overpass uppercase tracking-wide truncate">
-              Ежедневный чекин
-            </span>
-          </div>
-          {justEarned !== null && (
-            /* Кит анимаций: награда всплывает и тает, потом остаётся пружинный бейдж */
-            <span className="relative shrink-0 inline-flex items-center">
-              <span className="anim-float-up absolute right-0 -top-4 inline-flex items-center gap-1 text-brand text-sm font-black font-overpass whitespace-nowrap">
-                +{justEarned} XP
-              </span>
-              <span className="anim-pop-success inline-flex items-center gap-1 text-brand text-sm font-black font-overpass">
-                <Star size={16} fill="currentColor" aria-hidden />
-                +{justEarned} XP
-              </span>
-            </span>
-          )}
-        </div>
+        {canCollapse ? (
+          <button
+            type="button"
+            onClick={() => setCollapsed((v) => !v)}
+            aria-expanded={!isCompact}
+            className={`w-full flex items-center justify-between gap-2 bg-transparent border-0 p-0 text-left cursor-pointer ${
+              isCompact ? '' : 'mb-3'
+            }`}
+          >
+            {header}
+          </button>
+        ) : (
+          <div className="flex items-center justify-between gap-2 mb-3">{header}</div>
+        )}
 
+        {isCompact ? null : (
+          <>
         {/* Неделя: Пн…Вс, награда растёт к выходным */}
         <div className="grid grid-cols-7 gap-1 mb-3">
           {week.map((day) => (
@@ -180,6 +237,8 @@ export default function DailyCheckinCard() {
         >
           {checkedToday ? 'Сегодня отмечено' : busy ? 'Секунду…' : `Отметиться · +${todayXp} XP`}
         </button>
+          </>
+        )}
       </div>
     </section>
   );
