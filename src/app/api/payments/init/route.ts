@@ -167,6 +167,23 @@ export async function POST(request: NextRequest) {
     data: { paymentId: res.PaymentId ?? null, status: res.Status ?? 'NEW' },
   });
 
-  logger.info('tbank Init ok', { orderId, paymentId: res.PaymentId });
+  // Состав чека в лог (без PII): чтобы при разборе тест-кейсов T-Bank было
+  // видно, ушёл ли Receipt и с какими реквизитами, а не гадать по коду.
+  logger.info('tbank Init ok', {
+    orderId,
+    paymentId: res.PaymentId,
+    mode: paymentsMode,
+    receipt: receipt
+      ? {
+          attached: true,
+          taxation: receiptSettings.taxation,
+          vat: receiptSettings.vat,
+          items: Array.isArray((receipt as { Items?: unknown[] }).Items)
+            ? (receipt as { Items: unknown[] }).Items.length
+            : 0,
+          hasEmail: Boolean((receipt as { Email?: string }).Email),
+        }
+      : { attached: false, reason: receiptSettings.enabled ? 'build-failed' : 'disabled' },
+  });
   return NextResponse.json({ paymentURL: res.PaymentURL, orderId });
 }
