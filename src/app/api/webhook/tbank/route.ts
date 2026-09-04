@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getTbankConfig, verifyNotificationToken } from '@/lib/payments/tbank';
+import { getTbankConfigByTerminalKey, verifyNotificationToken } from '@/lib/payments/tbank';
 import { grantPremiumForPayment } from '@/lib/payments/grant';
 import { logger } from '@/lib/logger';
 
@@ -13,14 +13,18 @@ export const dynamic = 'force-dynamic';
 const okText = () => new NextResponse('OK', { status: 200, headers: { 'Content-Type': 'text/plain' } });
 
 export async function POST(request: NextRequest) {
-  const config = getTbankConfig();
-  if (!config) {
-    logger.error('tbank webhook: config missing');
-    return NextResponse.json({ error: 'not configured' }, { status: 500 });
-  }
-
   const payload = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!payload) return NextResponse.json({ error: 'bad body' }, { status: 400 });
+
+  // Кассу выбираем по TerminalKey из самой нотификации: после переключения
+  // режима (боевая/тестовая) долетают нотификации от обеих, и проверка паролем
+  // «текущей» кассы отбросила бы чужую как подделку.
+  const terminalKey = payload.TerminalKey != null ? String(payload.TerminalKey) : null;
+  const config = getTbankConfigByTerminalKey(terminalKey);
+  if (!config) {
+    logger.error('tbank webhook: unknown terminal', { terminalKey });
+    return NextResponse.json({ error: 'not configured' }, { status: 500 });
+  }
 
   // Подпись обязательна — иначе это не от банка.
   if (!verifyNotificationToken(config, payload)) {

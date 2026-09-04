@@ -6,6 +6,7 @@ import {
   type SubscriptionPricing,
 } from '@/lib/subscription-plan';
 import { normalizeTaxation, normalizeVat, type Taxation, type Vat } from '@/lib/payments/receipt';
+import { normalizePaymentsMode, type PaymentsMode } from '@/lib/payments/tbank';
 
 /**
  * Настройки приложения (таблица app_settings, key-value). Сейчас — время
@@ -28,6 +29,7 @@ export const SETTING_KEYS = {
   introMonths: 'subscription.introMonths', // на сколько месяцев действует интро-скидка
   emailCampaignsEnabled: 'emailCampaigns.enabled', // общий рубильник триггерных email-кампаний (default FALSE)
   trialDays: 'trial.days', // пробный период ДЛЯ ВСЕХ новых, дней (0 = выключен)
+  paymentsMode: 'payments.mode', // 'live' | 'test' — какая касса T-Bank принимает оплаты
 } as const;
 
 export const REMINDER_DEFAULTS = {
@@ -263,4 +265,13 @@ export async function getSubscriptionPricing(): Promise<SubscriptionPricing> {
     introMonths,
     introPriceRub: computeIntroPrice(priceMonthlyRub, introDiscountPercent),
   };
+}
+
+/**
+ * Режим касс: боевая или тестовая (правка владельца). Дефолт — боевая:
+ * отсутствие записи не должно случайно переводить приём денег в тест.
+ */
+export async function getPaymentsMode(): Promise<PaymentsMode> {
+  const row = await prisma.appSetting.findUnique({ where: { key: SETTING_KEYS.paymentsMode } });
+  return normalizePaymentsMode(row?.value);
 }

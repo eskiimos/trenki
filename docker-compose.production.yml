@@ -82,6 +82,10 @@ services:
       - TBANK_TERMINAL_KEY=${TBANK_TERMINAL_KEY:-}
       - TBANK_PASSWORD=${TBANK_PASSWORD:-}
       - TBANK_API_BASE=${TBANK_API_BASE:-}
+      # Тестовая касса (переключатель в /admin/paywall). Пусто — режим test недоступен.
+      - TBANK_TEST_TERMINAL_KEY=${TBANK_TEST_TERMINAL_KEY:-}
+      - TBANK_TEST_PASSWORD=${TBANK_TEST_PASSWORD:-}
+      - TBANK_TEST_API_BASE=${TBANK_TEST_API_BASE:-}
       - TBANK_RETURN_ORIGIN=${TBANK_RETURN_ORIGIN:-https://trenki.app}
     volumes:
       # Shared dir с хостом для auto-deploy trigger'а. На хосте должна

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
-import { getTbankConfig, getState } from '@/lib/payments/tbank';
+import { getTbankConfigFor, getState } from '@/lib/payments/tbank';
 import { grantPremiumForPayment } from '@/lib/payments/grant';
 import { hasPremium } from '@/lib/access';
 import { logger } from '@/lib/logger';
@@ -34,7 +34,8 @@ export async function GET(request: NextRequest) {
   let status = payment.status;
 
   // Подстраховка: если ещё не CONFIRMED — спросим банк напрямую.
-  const config = getTbankConfig();
+  // Касса ТОГО платежа: режим мог переключиться после его создания.
+  const config = getTbankConfigFor(payment.isTest ? 'test' : 'live');
   if (config && payment.paymentId && status !== 'CONFIRMED' && status !== 'REJECTED' && status !== 'REFUNDED') {
     try {
       const st = await getState(config, payment.paymentId);

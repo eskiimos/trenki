@@ -13,16 +13,59 @@ export interface TbankConfig {
   apiBase: string;
 }
 
-/** Конфиг из env. null, если ключи не заданы (тогда оплата недоступна — деградируем мягко). */
-export function getTbankConfig(): TbankConfig | null {
-  const terminalKey = process.env.TBANK_TERMINAL_KEY;
-  const password = process.env.TBANK_PASSWORD;
+/**
+ * Какая касса используется (правка владельца «переключатель касс»):
+ *  live — боевой терминал, реальные деньги;
+ *  test — тестовый терминал T-Bank (ключ обычно с суффиксом DEMO).
+ * Сам режим хранится в app_settings (payments.mode) и переключается из
+ * админки; СЕКРЕТЫ остаются только в env — в БД их не кладём.
+ */
+export type PaymentsMode = 'live' | 'test';
+export const PAYMENTS_MODES: readonly PaymentsMode[] = ['live', 'test'] as const;
+
+export function normalizePaymentsMode(v: string | null | undefined): PaymentsMode {
+  return v === 'test' ? 'test' : 'live';
+}
+
+/** Конфиг нужной кассы из env. null, если её ключи не заданы. */
+export function getTbankConfigFor(mode: PaymentsMode): TbankConfig | null {
+  const terminalKey =
+    mode === 'test' ? process.env.TBANK_TEST_TERMINAL_KEY : process.env.TBANK_TERMINAL_KEY;
+  const password = mode === 'test' ? process.env.TBANK_TEST_PASSWORD : process.env.TBANK_PASSWORD;
   if (!terminalKey || !password) return null;
-  return {
-    terminalKey,
-    password,
-    apiBase: (process.env.TBANK_API_BASE || DEFAULT_API_BASE).replace(/\/+$/, ''),
-  };
+  const apiBase =
+    (mode === 'test' ? process.env.TBANK_TEST_API_BASE : process.env.TBANK_API_BASE) ||
+    DEFAULT_API_BASE;
+  return { terminalKey, password, apiBase: apiBase.replace(/\/+$/, '') };
+}
+
+/** Конфиг боевой кассы (обратная совместимость со старым именем). */
+export function getTbankConfig(): TbankConfig | null {
+  return getTbankConfigFor('live');
+}
+
+/**
+ * Конфиг по TerminalKey из входящей нотификации. Нужен вебхуку: после
+ * переключения режима могут долетать нотификации от ДРУГОЙ кассы, и проверять
+ * их паролем текущей — значит отбросить как «bad token».
+ */
+export function getTbankConfigByTerminalKey(terminalKey: string | null | undefined): TbankConfig | null {
+  if (!terminalKey) return null;
+  for (const mode of PAYMENTS_MODES) {
+    const cfg = getTbankConfigFor(mode);
+    if (cfg && cfg.terminalKey === terminalKey) return cfg;
+  }
+  return null;
+}
+
+/** Какие кассы настроены — для админки. Пароли наружу не отдаём, только ключи. */
+export function tbankModesStatus(): Record<PaymentsMode, { configured: boolean; terminalKey: string | null }> {
+  const out = {} as Record<PaymentsMode, { configured: boolean; terminalKey: string | null }>;
+  for (const mode of PAYMENTS_MODES) {
+    const cfg = getTbankConfigFor(mode);
+    out[mode] = { configured: !!cfg, terminalKey: cfg?.terminalKey ?? null };
+  }
+  return out;
 }
 
 /** Базовый origin для Notification/Success/Fail URL. Из env TBANK_RETURN_ORIGIN. */

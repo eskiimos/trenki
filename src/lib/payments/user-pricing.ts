@@ -98,7 +98,7 @@ export async function resolveUserPricing(
   // premiumGrantedAt (атомарный флаг «премиум по этому заказу выдан») — статусы
   // T-Bank разношёрстные, а этот флаг ставится ровно один раз на оплату.
   const paidCount = await prisma.payment.count({
-    where: { userId, premiumGrantedAt: { not: null } },
+    where: { userId, premiumGrantedAt: { not: null }, isTest: false },
   });
   const slotsLeft = effMonths - paidCount;
   if (slotsLeft <= 0) return effBase;
@@ -110,6 +110,7 @@ export async function resolveUserPricing(
       where: {
         userId,
         premiumGrantedAt: null,
+        isTest: false,
         amountKopecks: { lt: pricing.priceMonthlyRub * 100 },
         createdAt: { gt: new Date(Date.now() - PENDING_WINDOW_MS) },
       },

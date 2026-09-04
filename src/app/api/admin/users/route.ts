@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       // когда оформил (правка владельца «Начало сентября»).
       prisma.payment.groupBy({
         by: ['userId'],
-        where: { userId: { in: userIds }, premiumGrantedAt: { not: null } },
+        where: { userId: { in: userIds }, premiumGrantedAt: { not: null }, isTest: false },
         _count: { _all: true },
         _min: { premiumGrantedAt: true },
         _max: { premiumGrantedAt: true },

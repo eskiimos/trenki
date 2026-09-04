@@ -6,10 +6,12 @@ import {
   getFreeLessonVideoId,
   getReceiptSettings,
   getGlobalTrialDays,
+  getPaymentsMode,
   setAppSetting,
   SETTING_KEYS,
 } from '@/lib/settings';
 import { TAXATION_VALUES, VAT_VALUES } from '@/lib/payments/receipt';
+import { PAYMENTS_MODES, normalizePaymentsMode, tbankModesStatus } from '@/lib/payments/tbank';
 import { prisma } from '@/lib/prisma';
 import { PAYWALL_MODES, normalizePaywallMode } from '@/lib/paywall';
 import { logger } from '@/lib/logger';
@@ -24,12 +26,13 @@ export async function GET(request: NextRequest) {
   const denied = await requireAdminAsync(request);
   if (denied) return denied;
   try {
-    const [mode, pricing, freeLessonVideoId, receipt, trialDays] = await Promise.all([
+    const [mode, pricing, freeLessonVideoId, receipt, trialDays, paymentsMode] = await Promise.all([
       getPaywallMode(),
       getSubscriptionPricing(),
       getFreeLessonVideoId(),
       getReceiptSettings(),
       getGlobalTrialDays(),
+      getPaymentsMode(),
     ]);
     // Название текущего бесплатного занятия — чтобы админ видел, что выбрано.
     const freeLesson = freeLessonVideoId
@@ -46,6 +49,8 @@ export async function GET(request: NextRequest) {
       receipt,
       receiptOptions: { taxations: TAXATION_VALUES, vats: VAT_VALUES },
       trialDays,
+      // Касса: текущий режим + какие терминалы заданы в env (паролей тут нет)
+      payments: { mode: paymentsMode, modes: PAYMENTS_MODES, terminals: tbankModesStatus() },
     });
   } catch (error) {
     logger.error('admin/paywall GET failed', error);
@@ -150,7 +155,32 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ trialDays: days });
     }
 
-    return NextResponse.json({ error: 'Нужен mode, pricing, freeLessonVideoId, receipt или trialDays' }, { status: 400 });
+    // Ветка 6: касса — боевая или тестовая.
+    if (typeof body.paymentsMode === 'string') {
+      const next = normalizePaymentsMode(body.paymentsMode);
+      if (!PAYMENTS_MODES.includes(body.paymentsMode as never)) {
+        return NextResponse.json({ error: 'paymentsMode: live | test' }, { status: 400 });
+      }
+      // Переключаться некуда, если ключи этой кассы не заданы в env: иначе
+      // оплата молча начнёт отдавать 503.
+      const terminals = tbankModesStatus();
+      if (!terminals[next].configured) {
+        return NextResponse.json(
+          {
+            error:
+              next === 'test'
+                ? 'Тестовая касса не настроена: добавь TBANK_TEST_TERMINAL_KEY и TBANK_TEST_PASSWORD в .env.production и перезапусти приложение'
+                : 'Боевая касса не настроена: проверь TBANK_TERMINAL_KEY и TBANK_PASSWORD',
+          },
+          { status: 400 },
+        );
+      }
+      await setAppSetting(SETTING_KEYS.paymentsMode, next);
+      logger.warn('admin switched payments mode', { mode: next, terminalKey: terminals[next].terminalKey });
+      return NextResponse.json({ payments: { mode: next, modes: PAYMENTS_MODES, terminals } });
+    }
+
+    return NextResponse.json({ error: 'Нужен mode, pricing, freeLessonVideoId, receipt, trialDays или paymentsMode' }, { status: 400 });
   } catch (error) {
     logger.error('admin/paywall PATCH failed', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
-import { getTbankConfig, initPayment } from '@/lib/payments/tbank';
-import { getReceiptSettings } from '@/lib/settings';
+import { getTbankConfigFor, initPayment } from '@/lib/payments/tbank';
+import { getPaymentsMode, getReceiptSettings } from '@/lib/settings';
 import { resolveUserPricing } from '@/lib/payments/user-pricing';
 import { buildReceipt } from '@/lib/payments/receipt';
 import { SUBSCRIPTION_PERIOD_DAYS } from '@/lib/payments/grant';
@@ -47,9 +47,16 @@ export async function POST(request: NextRequest) {
     childName = [link.child.firstName, link.child.lastName].filter(Boolean).join(' ') || null;
   }
 
-  const config = getTbankConfig();
+  // Какая касса принимает оплату — переключается в админке (правка владельца).
+  const paymentsMode = await getPaymentsMode();
+  const config = getTbankConfigFor(paymentsMode);
   if (!config) {
+    logger.error('tbank config missing', { paymentsMode });
     return NextResponse.json({ error: 'Оплата пока не настроена' }, { status: 503 });
+  }
+  if (paymentsMode === 'test') {
+    // Видно в логах, что деньги не настоящие
+    logger.warn('payment init in TEST mode', { userId: user.id, terminalKey: config.terminalKey });
   }
 
   // Гигиена: массовое создание платёжных ссылок — единственный способ фармить
@@ -105,7 +112,15 @@ export async function POST(request: NextRequest) {
   // Запись заказа ДО обращения к банку (аудит + идемпотентность по orderId).
   // userId — ПОЛУЧАТЕЛЬ премиума: сам плательщик или его ребёнок (childId).
   await prisma.payment.create({
-    data: { orderId, userId: childId ?? user.id, amountKopecks, status: 'NEW', kind: 'init', isRecurrentInit: false },
+    data: {
+      orderId,
+      userId: childId ?? user.id,
+      amountKopecks,
+      status: 'NEW',
+      kind: 'init',
+      isRecurrentInit: false,
+      isTest: paymentsMode === 'test',
+    },
   });
 
   // Родителя после оплаты возвращаем в родительский кабинет (back=parent).

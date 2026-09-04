@@ -23,6 +23,8 @@ import {
   AlertCircle,
   Save,
   X,
+  FlaskConical,
+  Banknote,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -95,6 +97,47 @@ export default function PaywallAdminPage() {
   const [pickedVideoId, setPickedVideoId] = useState('');
   const [savingLesson, setSavingLesson] = useState(false);
   const [lessonMsg, setLessonMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  // Касса: боевая или тестовая (правка владельца). Секреты — в env, здесь
+  // только режим и видимые TerminalKey, чтобы не перепутать терминалы.
+  const [payMode, setPayMode] = useState<'live' | 'test'>('live');
+  const [terminals, setTerminals] = useState<Record<string, { configured: boolean; terminalKey: string | null }>>({});
+  const [savingPay, setSavingPay] = useState(false);
+  const [payMsg, setPayMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  const switchPayMode = async (next: 'live' | 'test') => {
+    if (next === payMode || savingPay) return;
+    if (
+      next === 'test' &&
+      !window.confirm('Переключить приём оплат на ТЕСТОВУЮ кассу? Реальные оплаты приниматься не будут.')
+    ) {
+      return;
+    }
+    setSavingPay(true);
+    setPayMsg(null);
+    try {
+      const res = await fetch('/api/admin/paywall', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentsMode: next }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPayMsg({ type: 'err', text: d?.error || 'Не удалось переключить кассу' });
+        return;
+      }
+      setPayMode(d?.payments?.mode ?? next);
+      if (d?.payments?.terminals) setTerminals(d.payments.terminals);
+      setPayMsg({
+        type: 'ok',
+        text: next === 'test' ? 'Оплаты идут через ТЕСТОВУЮ кассу' : 'Оплаты идут через боевую кассу',
+      });
+    } catch {
+      setPayMsg({ type: 'err', text: 'Сетевая ошибка' });
+    } finally {
+      setSavingPay(false);
+    }
+  };
 
   // Чек 54-ФЗ
   const [rcEnabled, setRcEnabled] = useState(false);
@@ -180,6 +223,10 @@ export default function PaywallAdminPage() {
             setRcEnabled(Boolean(d.receipt.enabled));
             setRcTaxation(d.receipt.taxation ?? 'usn_income');
             setRcVat(d.receipt.vat ?? 'none');
+          }
+          if (d?.payments) {
+            setPayMode(d.payments.mode === 'test' ? 'test' : 'live');
+            setTerminals(d.payments.terminals ?? {});
           }
         }
       } catch {
@@ -426,6 +473,126 @@ export default function PaywallAdminPage() {
                 {savingTrial ? 'Сохраняю…' : 'Сохранить пробный период'}
               </AdminButton>
             </div>
+          </AdminCard>
+
+          {/* Касса: боевая / тестовая */}
+          <AdminCard
+            style={{
+              border: `1px solid ${payMode === 'test' ? 'rgba(255,140,74,0.5)' : 'var(--border-hairline)'}`,
+            }}
+          >
+            <SectionTitle icon={payMode === 'test' ? FlaskConical : Banknote}>Касса</SectionTitle>
+            <div style={{ color: 'var(--color-muted)', fontSize: 12, lineHeight: 1.5, marginBottom: 16 }}>
+              Через какой терминал T-Bank идут оплаты. Ключи задаются в .env.production
+              (TBANK_* — боевая, TBANK_TEST_* — тестовая) и здесь не хранятся. Тестовые оплаты
+              помечаются и не считаются реальными: в карточке пользователя не появится «Премиум»
+              за оплату, а интро-периоды не расходуются.
+            </div>
+
+            <div className="flex flex-col gap-2" style={{ marginBottom: 16 }}>
+              {(
+                [
+                  ['live', 'Боевая касса', 'Реальные деньги'],
+                  ['test', 'Тестовая касса', 'Тестовые карты T-Bank, деньги не списываются'],
+                ] as const
+              ).map(([value, title, desc]) => {
+                const t = terminals[value];
+                const active = payMode === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => switchPayMode(value)}
+                    disabled={savingPay || (!t?.configured && !active)}
+                    aria-pressed={active}
+                    className="text-left transition-opacity disabled:opacity-50"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: 14,
+                      minHeight: 44,
+                      borderRadius: 'var(--radius-md)',
+                      cursor: savingPay || (!t?.configured && !active) ? 'default' : 'pointer',
+                      background: active
+                        ? value === 'test'
+                          ? 'rgba(255,140,74,0.12)'
+                          : 'var(--lime-subtle)'
+                        : 'transparent',
+                      border: `1px solid ${
+                        active
+                          ? value === 'test'
+                            ? 'rgba(255,140,74,0.5)'
+                            : 'var(--border-lime)'
+                          : 'var(--border-hairline)'
+                      }`,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 999,
+                        flexShrink: 0,
+                        border: `2px solid ${
+                          active
+                            ? value === 'test'
+                              ? 'var(--color-danger)'
+                              : 'var(--color-brand)'
+                            : 'var(--color-muted)'
+                        }`,
+                        background: active
+                          ? value === 'test'
+                            ? 'var(--color-danger)'
+                            : 'var(--color-brand)'
+                          : 'transparent',
+                      }}
+                    />
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 14, fontWeight: 700 }}>{title}</span>
+                      <span style={{ display: 'block', fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
+                        {t?.configured
+                          ? `${desc} · терминал ${t.terminalKey}`
+                          : 'Ключи не заданы в .env.production'}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {payMode === 'test' && (
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 8,
+                  padding: 12,
+                  borderRadius: 'var(--radius-md)',
+                  background: 'rgba(255,140,74,0.12)',
+                  color: 'var(--color-danger)',
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                  marginBottom: 12,
+                }}
+              >
+                <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} aria-hidden />
+                <span>
+                  Сейчас деньги НЕ принимаются: все оплаты уходят на тестовый терминал.
+                  Не забудь вернуть боевую кассу после проверки.
+                </span>
+              </div>
+            )}
+
+            {payMsg && (
+              <div
+                style={{
+                  fontSize: 13,
+                  color: payMsg.type === 'ok' ? 'var(--color-brand)' : 'var(--color-danger)',
+                }}
+              >
+                {payMsg.text}
+              </div>
+            )}
           </AdminCard>
 
           {/* Чек 54-ФЗ */}
