@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { ClipboardList, Flame, History, Plus, Settings, Smartphone, Sparkles, Star, Zap } from 'lucide-react';
+import { ClipboardList, CreditCard, Flame, History, Plus, Settings, Smartphone, Sparkles, Star, Zap } from 'lucide-react';
 import { useTelegram } from '../../hooks/useTelegram';
 import { ProfileSkeleton } from '../../components/Skeleton';
 import { Button } from '@/components/ui';
@@ -29,7 +29,7 @@ import { openSubscriptionModal } from '@/lib/subscription-modal';
 const ProfilePage = () => {
   const router = useRouter();
   const { user } = useTelegram();
-  const { paywalled } = useSubscription();
+  const { paywalled, hasPremium, premiumUntil, paywallActive } = useSubscription();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [recentGains, setRecentGains] = useState<any>(null);
@@ -575,6 +575,21 @@ const ProfilePage = () => {
             label="Настройки"
             hint="Уведомления, родителям, команда, помощь, выход"
           />
+          {/* Продлить подписку заранее: раньше премиум-юзер вообще не мог
+              открыть оплату — окно показывалось только тем, у кого доступа нет,
+              и карточка продления появлялась лишь за 3 дня до конца. */}
+          {paywallActive && hasPremium && (
+            <ActionRow
+              icon={CreditCard}
+              label="Подписка"
+              hint={
+                premiumUntil
+                  ? `Активна до ${new Date(premiumUntil).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })} · продлить`
+                  : 'Бессрочная'
+              }
+              onClick={() => openSubscriptionModal('expiring')}
+            />
+          )}
           {!installed && (
             <ActionRow
               icon={Smartphone}
