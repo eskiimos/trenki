@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
-import { getTbankConfigFor, getState } from '@/lib/payments/tbank';
+import { getTbankConfigFor, getState, FULL_CANCEL_STATUSES } from '@/lib/payments/tbank';
 import { grantPremiumForPayment } from '@/lib/payments/grant';
 import { hasPremium } from '@/lib/access';
 import { logger } from '@/lib/logger';
@@ -36,12 +36,17 @@ export async function GET(request: NextRequest) {
   // Подстраховка: если ещё не CONFIRMED — спросим банк напрямую.
   // Касса ТОГО платежа: режим мог переключиться после его создания.
   const config = getTbankConfigFor(payment.isTest ? 'test' : 'live');
-  if (config && payment.paymentId && status !== 'CONFIRMED' && status !== 'REJECTED' && status !== 'REFUNDED') {
+  const frozen = payment.refundedAt != null || FULL_CANCEL_STATUSES.has(status);
+  if (config && payment.paymentId && !frozen && status !== 'CONFIRMED' && status !== 'REJECTED') {
     try {
       const st = await getState(config, payment.paymentId);
       if (st.Success && st.Status) {
         status = st.Status;
-        await prisma.payment.update({ where: { orderId }, data: { status } });
+        // Условный UPDATE: возврат из админки мог пройти между чтением и записью
+        await prisma.payment.updateMany({
+          where: { orderId, refundedAt: null, status: { notIn: [...FULL_CANCEL_STATUSES] } },
+          data: { status },
+        });
         // Идемпотентно по orderId: даже если вебхук уже выдал — второй раз не выдаст.
         if (status === 'CONFIRMED') {
           await grantPremiumForPayment(orderId, { note: `T-Bank ${payment.kind} ${orderId}` });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getTbankConfigByTerminalKey, verifyNotificationToken } from '@/lib/payments/tbank';
+import { getTbankConfigByTerminalKey, getTbankConfigFor, verifyNotificationToken } from '@/lib/payments/tbank';
 import { grantPremiumForPayment, revokePremiumForPayment } from '@/lib/payments/grant';
 import { FULL_CANCEL_STATUSES } from '@/lib/payments/tbank';
 import { logger } from '@/lib/logger';
@@ -46,12 +46,29 @@ export async function POST(request: NextRequest) {
     return okText();
   }
 
-  // Статус не откатываем назад: нотификации могут прийти не по порядку (ретраи),
-  // а CONFIRMED — терминальный успех. Возврат (REFUNDED) обрабатываем отдельно.
-  const keepConfirmed = payment.status === 'CONFIRMED' && status !== 'REFUNDED';
+  // Касса нотификации обязана совпадать с кассой платежа: иначе нотификация,
+  // подписанная паролем ТЕСТОВОГО терминала (он виден в ЛК любому с доступом),
+  // могла бы «подтвердить» боевой заказ и выдать премиум бесплатно.
+  const expected = getTbankConfigFor(payment.isTest ? 'test' : 'live');
+  if (!expected || expected.terminalKey !== config.terminalKey) {
+    logger.warn('tbank webhook: terminal mismatch', {
+      orderId,
+      isTest: payment.isTest,
+      terminalKey: config.terminalKey,
+    });
+    return okText(); // OK — чтобы не ретраили, но ничего не меняем
+  }
 
-  await prisma.payment.update({
-    where: { orderId },
+  // Статус не откатываем назад: нотификации могут прийти не по порядку (ретраи).
+  // CONFIRMED — терминальный успех, из него уходим только в возврат (полный или
+  // частичный). Полный возврат/отмена — терминальны совсем: заказ «заморожен»,
+  // поздний CONFIRMED его не оживит и премиум не выдаст (ревью возвратов).
+  const isCancel = FULL_CANCEL_STATUSES.has(status) || status.startsWith('PARTIAL_');
+  const keepConfirmed = payment.status === 'CONFIRMED' && !isCancel;
+  const written = await prisma.payment.updateMany({
+    // Условие в самом UPDATE (а не по прочитанной строке): между findUnique и
+    // update мог пройти Cancel из админки.
+    where: { orderId, refundedAt: null, status: { notIn: [...FULL_CANCEL_STATUSES] } },
     data: {
       status: keepConfirmed ? payment.status : status || payment.status,
       paymentId: paymentId ?? payment.paymentId,
@@ -60,6 +77,10 @@ export async function POST(request: NextRequest) {
       raw: payload as object,
     },
   });
+  if (written.count === 0) {
+    logger.info('tbank webhook: order already refunded, ignored', { orderId, status });
+    return okText();
+  }
 
   // Сохранённую карту фиксируем на юзере СРАЗУ (не только внутри гранта) — иначе
   // при гонке «опрос статуса выдал премиум раньше вебхука» RebillId бы потерялся,

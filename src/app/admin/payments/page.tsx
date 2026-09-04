@@ -80,11 +80,16 @@ export default function AdminPaymentsPage() {
         setMsg({ type: 'err', text: d?.error || 'Не удалось вернуть' });
         return;
       }
+      const premiumNote = d.premiumRevoked
+        ? `, премиум откачен${d.premiumUntil ? ` до ${fmtDate(d.premiumUntil)}` : ' (снят)'}`
+        : d.premiumUnlimitedKept
+          ? ', бессрочный премиум не тронут'
+          : '';
       setMsg({
         type: 'ok',
-        text: `Возврат проведён: статус ${d.status}, ${rub(d.refundedKopecks ?? p.amountKopecks)}${
-          d.premiumRevoked ? `, премиум откачен${d.premiumUntil ? ` до ${fmtDate(d.premiumUntil)}` : ' (снят)'}` : ''
-        }`,
+        text: d.cancelled
+          ? `Неоплаченный заказ отменён (${d.status}), деньги не двигались${premiumNote}`
+          : `Возврат проведён: статус ${d.status}, ${rub(d.refundedKopecks ?? p.amountKopecks)}${premiumNote}`,
       });
       await load();
     } catch {

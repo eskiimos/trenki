@@ -97,8 +97,10 @@ export async function resolveUserPricing(
   // Сколько периодов уже УСПЕШНО оплачено этим получателем: считаем по
   // premiumGrantedAt (атомарный флаг «премиум по этому заказу выдан») — статусы
   // T-Bank разношёрстные, а этот флаг ставится ровно один раз на оплату.
+  // Полностью возвращённый заказ слот не занимает: период откачен, деньги
+  // вернулись. Частичный возврат refundedAt не ставит и считается оплатой.
   const paidCount = await prisma.payment.count({
-    where: { userId, premiumGrantedAt: { not: null }, isTest: false },
+    where: { userId, premiumGrantedAt: { not: null }, refundedAt: null, isTest: false },
   });
   const slotsLeft = effMonths - paidCount;
   if (slotsLeft <= 0) return effBase;

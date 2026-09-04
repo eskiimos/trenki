@@ -120,6 +120,7 @@ export async function POST(request: NextRequest) {
       kind: 'init',
       isRecurrentInit: false,
       isTest: paymentsMode === 'test',
+      payerId: user.id, // чек продажи ушёл плательщику — чек возврата уйдёт ему же
     },
   });
 
