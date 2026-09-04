@@ -141,6 +141,7 @@ export default function PaywallAdminPage() {
 
   // Чек 54-ФЗ
   const [rcEnabled, setRcEnabled] = useState(false);
+  const [rcEnabledTest, setRcEnabledTest] = useState(false);
   const [rcTaxation, setRcTaxation] = useState('usn_income');
   const [rcVat, setRcVat] = useState('none');
   const [savingRc, setSavingRc] = useState(false);
@@ -153,14 +154,19 @@ export default function PaywallAdminPage() {
       const res = await fetch('/api/admin/paywall', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ receipt: { enabled: rcEnabled, taxation: rcTaxation, vat: rcVat } }),
+        body: JSON.stringify({
+          receipt: { enabled: rcEnabled, enabledTest: rcEnabledTest, taxation: rcTaxation, vat: rcVat },
+        }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) {
         setRcMsg({ type: 'err', text: d?.error || 'Ошибка сохранения' });
         return;
       }
-      setRcMsg({ type: 'ok', text: rcEnabled ? 'Чеки включены' : 'Чеки выключены' });
+      setRcMsg({
+        type: 'ok',
+        text: `Чеки сохранены: боевая — ${rcEnabled ? 'вкл' : 'выкл'}, тестовая — ${rcEnabledTest ? 'вкл' : 'выкл'}`,
+      });
     } catch {
       setRcMsg({ type: 'err', text: 'Сетевая ошибка' });
     } finally {
@@ -220,7 +226,8 @@ export default function PaywallAdminPage() {
           }
           setFreeLesson(d?.freeLesson ?? null);
           if (d?.receipt) {
-            setRcEnabled(Boolean(d.receipt.enabled));
+            setRcEnabled(Boolean(d.receipt.enabledLive ?? d.receipt.enabled));
+            setRcEnabledTest(Boolean(d.receipt.enabledTest));
             setRcTaxation(d.receipt.taxation ?? 'usn_income');
             setRcVat(d.receipt.vat ?? 'none');
           }
@@ -598,28 +605,53 @@ export default function PaywallAdminPage() {
           {/* Чек 54-ФЗ */}
           <AdminCard
             style={{
-              border: `1px solid ${rcEnabled ? 'var(--border-lime)' : 'var(--border-hairline)'}`,
+              border: `1px solid ${rcEnabled || rcEnabledTest ? 'var(--border-lime)' : 'var(--border-hairline)'}`,
             }}
           >
             <SectionTitle icon={ReceiptText}>Чеки 54-ФЗ</SectionTitle>
             <div style={{ color: 'var(--color-muted)', fontSize: 12, lineHeight: 1.5, marginBottom: 16 }}>
-              Включай, только когда подключена облачная касса «Чеки от Т-Бизнеса» и бухгалтер
-              подтвердил систему налогообложения. Пока выключено — платежи идут без чека.
+              Чек (объект Receipt) уходит в банк вместе с платежом. Флаги раздельные: на боевой
+              кассе включай, только когда подключена облачная касса «Чеки от Т-Бизнеса» и бухгалтер
+              подтвердил систему налогообложения. На тестовой — включай смело, это нужно для
+              тест-кейса T-Bank «Формирование чека».
             </div>
 
-            <label
-              className="flex items-center gap-3 cursor-pointer"
-              style={{ marginBottom: 16, minHeight: 44 }}
-            >
-              <input
-                type="checkbox"
-                checked={rcEnabled}
-                onChange={(e) => setRcEnabled(e.target.checked)}
-                disabled={savingRc}
-                style={{ width: 20, height: 20, accentColor: 'var(--color-brand)', cursor: 'pointer' }}
-              />
-              <span style={{ fontSize: 14, fontWeight: 700 }}>Формировать чек при оплате</span>
-            </label>
+            <div className="flex flex-col gap-2" style={{ marginBottom: 16 }}>
+              {(
+                [
+                  ['live', 'Чек на боевой кассе', rcEnabled, setRcEnabled],
+                  ['test', 'Чек на тестовой кассе', rcEnabledTest, setRcEnabledTest],
+                ] as const
+              ).map(([kind, title, value, setValue]) => (
+                <label
+                  key={kind}
+                  className="flex items-center gap-3 cursor-pointer"
+                  style={{
+                    minHeight: 44,
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    background: payMode === kind ? 'rgba(255,255,255,0.04)' : 'transparent',
+                    border: `1px solid ${payMode === kind ? 'var(--border-hairline)' : 'transparent'}`,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={value}
+                    onChange={(e) => setValue(e.target.checked)}
+                    disabled={savingRc}
+                    style={{ width: 20, height: 20, accentColor: 'var(--color-brand)', cursor: 'pointer' }}
+                  />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 14, fontWeight: 700 }}>{title}</span>
+                    {payMode === kind && (
+                      <span style={{ display: 'block', fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
+                        Эта касса сейчас принимает оплаты
+                      </span>
+                    )}
+                  </span>
+                </label>
+              ))}
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>

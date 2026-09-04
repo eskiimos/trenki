@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
   // Чек 54-ФЗ. Включается в админке — только когда подключена облачная касса и
   // подтверждена система налогообложения. Пока выключен, платёж идёт без чека
   // (как и раньше), чтобы неверные реквизиты не ломали оплату.
-  const receiptSettings = await getReceiptSettings();
+  const receiptSettings = await getReceiptSettings(paymentsMode);
   let receipt: Record<string, unknown> | undefined;
   if (receiptSettings.enabled) {
     const built = buildReceipt({

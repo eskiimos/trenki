@@ -21,7 +21,8 @@ export const SETTING_KEYS = {
   preworkoutLateMin: 'reminder.preworkoutLateMin', // минут до тренировки — позднее
   paywallMode: 'paywall.mode', // 'off' | 'admins' | 'on' — роллаут-контроль paywall
   freeLessonVideoId: 'freeLesson.videoId', // «бесплатное занятие недели» — id видео, открытого всем
-  receiptEnabled: 'receipt.enabled', // формировать ли чек 54-ФЗ ('1'/'0')
+  receiptEnabled: 'receipt.enabled', // чек 54-ФЗ на БОЕВОЙ кассе ('1'/'0')
+  receiptEnabledTest: 'receipt.enabled.test', // чек на ТЕСТОВОЙ кассе — отдельный флаг: тест-кейс T-Bank «Формирование чека» требует Receipt в Init, но включать чеки на боевой кассе до подключения облачной нельзя
   receiptTaxation: 'receipt.taxation', // система налогообложения (osn/usn_income/...)
   receiptVat: 'receipt.vat', // ставка НДС в позиции чека (none/vat20/...)
   priceMonthly: 'subscription.priceMonthlyRub', // базовая цена подписки ₽/мес
@@ -163,7 +164,10 @@ export async function getEmailCampaignsEnabled(): Promise<boolean> {
 }
 
 export interface ReceiptSettings {
+  /** Действует ли чек для ЗАПРОШЕННОЙ кассы */
   enabled: boolean;
+  enabledLive: boolean;
+  enabledTest: boolean;
   taxation: Taxation;
   vat: Vat;
 }
@@ -173,12 +177,19 @@ export interface ReceiptSettings {
  * касса и не подтверждена система налогообложения, слать Receipt нельзя —
  * банк отклонит платёж, а неверные реквизиты в чеке нарушают 54-ФЗ.
  */
-export async function getReceiptSettings(): Promise<ReceiptSettings> {
+export async function getReceiptSettings(mode: PaymentsMode = 'live'): Promise<ReceiptSettings> {
   let rows: { key: string; value: string }[] = [];
   try {
     rows = await prisma.appSetting.findMany({
       where: {
-        key: { in: [SETTING_KEYS.receiptEnabled, SETTING_KEYS.receiptTaxation, SETTING_KEYS.receiptVat] },
+        key: {
+          in: [
+            SETTING_KEYS.receiptEnabled,
+            SETTING_KEYS.receiptEnabledTest,
+            SETTING_KEYS.receiptTaxation,
+            SETTING_KEYS.receiptVat,
+          ],
+        },
       },
       select: { key: true, value: true },
     });
@@ -186,8 +197,13 @@ export async function getReceiptSettings(): Promise<ReceiptSettings> {
     // таблицы может не быть — чеки выключены
   }
   const map = new Map(rows.map((r) => [r.key, r.value]));
+  // Флаг свой у каждой кассы (СНО и ставка НДС общие — организация одна).
+  const enabledKey =
+    mode === 'test' ? SETTING_KEYS.receiptEnabledTest : SETTING_KEYS.receiptEnabled;
   return {
-    enabled: map.get(SETTING_KEYS.receiptEnabled) === '1',
+    enabled: map.get(enabledKey) === '1',
+    enabledLive: map.get(SETTING_KEYS.receiptEnabled) === '1',
+    enabledTest: map.get(SETTING_KEYS.receiptEnabledTest) === '1',
     taxation: normalizeTaxation(map.get(SETTING_KEYS.receiptTaxation)),
     vat: normalizeVat(map.get(SETTING_KEYS.receiptVat)),
   };

@@ -127,6 +127,7 @@ export async function PATCH(request: NextRequest) {
     if (body.receipt && typeof body.receipt === 'object') {
       const r = body.receipt;
       const enabled = Boolean(r.enabled);
+      const enabledTest = Boolean(r.enabledTest);
       const taxation = String(r.taxation ?? '');
       const vat = String(r.vat ?? '');
       if (!TAXATION_VALUES.includes(taxation as never)) {
@@ -137,10 +138,11 @@ export async function PATCH(request: NextRequest) {
       }
       await Promise.all([
         setAppSetting(SETTING_KEYS.receiptEnabled, enabled ? '1' : '0'),
+        setAppSetting(SETTING_KEYS.receiptEnabledTest, enabledTest ? '1' : '0'),
         setAppSetting(SETTING_KEYS.receiptTaxation, taxation),
         setAppSetting(SETTING_KEYS.receiptVat, vat),
       ]);
-      logger.info('admin set receipt settings', { enabled, taxation, vat });
+      logger.info('admin set receipt settings', { enabled, enabledTest, taxation, vat });
       return NextResponse.json({ receipt: await getReceiptSettings() });
     }
 
