@@ -195,6 +195,38 @@ export async function getState(config: TbankConfig, paymentId: string): Promise<
   return callApi<GetStateResult>(config, 'GetState', { PaymentId: paymentId });
 }
 
+export interface CancelResult {
+  Success: boolean;
+  ErrorCode: string;
+  /** NEW→CANCELED, AUTHORIZED→REVERSED/PARTIAL_REVERSED, CONFIRMED→REFUNDED/PARTIAL_REFUNDED */
+  Status?: string;
+  PaymentId?: string | number;
+  OrderId?: string;
+  OriginalAmount?: number;
+  NewAmount?: number;
+  Message?: string;
+  Details?: string;
+}
+
+/** Статусы банка, означающие ПОЛНЫЙ возврат/отмену (премиум откатываем). */
+export const FULL_CANCEL_STATUSES: ReadonlySet<string> = new Set(['CANCELED', 'REVERSED', 'REFUNDED']);
+
+/**
+ * Отмена/возврат платежа (метод Cancel). Без Amount — на полную сумму
+ * (NEW→CANCELED, AUTHORIZED→REVERSED, CONFIRMED→REFUNDED). Receipt обязателен,
+ * если подключена онлайн-касса: чек возврата с теми же позициями. Как и в Init,
+ * Receipt не участвует в подписи Token.
+ */
+export async function cancelPayment(
+  config: TbankConfig,
+  p: { paymentId: string; amountKopecks?: number; receipt?: Record<string, unknown> },
+): Promise<CancelResult> {
+  const body: Record<string, unknown> = { PaymentId: p.paymentId };
+  if (p.amountKopecks != null) body.Amount = Math.round(p.amountKopecks);
+  if (p.receipt) body.Receipt = p.receipt;
+  return callApi<CancelResult>(config, 'Cancel', body);
+}
+
 export interface ChargeResult {
   Success: boolean;
   ErrorCode: string;

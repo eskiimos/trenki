@@ -98,3 +98,62 @@ export async function grantPremiumForPayment(
   });
   return { granted: true, until };
 }
+
+/**
+ * Срок премиума ПОСЛЕ полного возврата одного периода в `days` дней: отнимаем
+ * период от текущего срока; если после этого срок уже в прошлом (или премиума
+ * не было) — доступ снимается (null → вызывающий ставит FREE). Бессрочный
+ * премиум (premiumUntil=null при PREMIUM — ручная выдача) возврат не трогает:
+ * он не был куплен. Чистая функция — тесты без БД.
+ */
+export function computePremiumAfterRefund(
+  current: { accessTier: string | null; premiumUntil: Date | null } | null,
+  days: number,
+  now: Date,
+): Date | null {
+  if (!current || current.accessTier !== 'PREMIUM') return null;
+  if (current.premiumUntil == null) return current.premiumUntil; // бессрочный — не трогаем
+  const next = new Date(current.premiumUntil.getTime() - days * DAY_MS);
+  return next.getTime() > now.getTime() ? next : null;
+}
+
+/**
+ * Идемпотентный откат премиума ПО ЗАКАЗУ после полного возврата/отмены.
+ * Атомарно «клеймит» Payment (refundedAt: null → now) — сколько бы раз ни
+ * дёрнули (Cancel из админки + REFUNDED-нотификация + её ретраи), период
+ * отнимется ровно один раз. Если премиум по заказу не выдавался (отмена
+ * неоплаченного) — отнимать нечего, только помечаем.
+ */
+export async function revokePremiumForPayment(
+  orderId: string,
+  opts: { amountKopecks?: number | null; note?: string; now?: Date } = {},
+): Promise<{ revoked: boolean; until: Date | null }> {
+  const now = opts.now ?? new Date();
+  const claim = await prisma.payment.updateMany({
+    where: { orderId, refundedAt: null },
+    data: { refundedAt: now, ...(opts.amountKopecks != null ? { refundAmountKopecks: opts.amountKopecks } : {}) },
+  });
+  if (claim.count !== 1) return { revoked: false, until: null };
+
+  const payment = await prisma.payment.findUnique({
+    where: { orderId },
+    select: { userId: true, premiumGrantedAt: true },
+  });
+  if (!payment || !payment.premiumGrantedAt) return { revoked: false, until: null };
+
+  const user = await prisma.user.findUnique({
+    where: { id: payment.userId },
+    select: { accessTier: true, premiumUntil: true },
+  });
+  const until = computePremiumAfterRefund(user, SUBSCRIPTION_PERIOD_DAYS, now);
+  const bessrochny = user?.accessTier === 'PREMIUM' && user.premiumUntil == null;
+  await prisma.user.update({
+    where: { id: payment.userId },
+    data: bessrochny
+      ? { premiumNote: opts.note ?? `Возврат ${orderId} (бессрочный премиум не тронут)` }
+      : until
+        ? { premiumUntil: until, premiumNote: opts.note ?? `Возврат ${orderId}` }
+        : { accessTier: AccessTier.FREE, premiumUntil: null, premiumNote: opts.note ?? `Возврат ${orderId}` },
+  });
+  return { revoked: true, until };
+}

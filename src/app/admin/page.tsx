@@ -17,6 +17,7 @@ import {
   Film, BarChart3, Settings, Zap, GraduationCap, Blocks, Gamepad2,
   Link2, Ticket, ShieldCheck, Send, AlarmClock, Lock, ScanSearch, Palette,
   ArrowRight, LayoutDashboard, AlertTriangle,
+  CreditCard,
 } from 'lucide-react';
 
 // Подмножество ответа /api/admin/stats, которое использует дашборд.
@@ -363,6 +364,12 @@ export default function AdminDashboardPage() {
               icon={Lock}
               title="Paywall (подписка)"
               desc="Вкл/выкл, режим обкатки на админах"
+            />
+            <NavCard
+              href="/admin/payments"
+              icon={CreditCard}
+              title="Платежи"
+              desc="Обе кассы, возвраты"
             />
             <NavCard
               href="/admin/content-check"

@@ -1085,6 +1085,8 @@ model Payment {
   errorCode       String?
   premiumGrantedAt DateTime? // когда по ЭТОМУ заказу выдан премиум — атомарный флаг идемпотентности (клейм через updateMany)
   isTest          Boolean  @default(false) // платёж через ТЕСТОВУЮ кассу (payments.mode=test) — не считается реальной оплатой
+  refundedAt      DateTime? // полный возврат/отмена проведены и премиум по заказу откачен (атомарный флаг, как premiumGrantedAt)
+  refundAmountKopecks Int? // сумма возврата в копейках (для аудита; частичный возврат премиум не трогает)
   raw             Json? // последняя нотификация/ответ (аудит)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

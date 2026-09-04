@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getTbankConfigByTerminalKey, verifyNotificationToken } from '@/lib/payments/tbank';
-import { grantPremiumForPayment } from '@/lib/payments/grant';
+import { grantPremiumForPayment, revokePremiumForPayment } from '@/lib/payments/grant';
+import { FULL_CANCEL_STATUSES } from '@/lib/payments/tbank';
 import { logger } from '@/lib/logger';
 
 // POST /api/webhook/tbank — Notification от T-Bank о статусе платежа.
@@ -86,6 +87,31 @@ export async function POST(request: NextRequest) {
       logger.error('tbank webhook: grant failed', e);
       // Не отвечаем OK — пусть T-Bank повторит, чтобы не потерять выдачу.
       return NextResponse.json({ error: 'grant failed' }, { status: 500 });
+    }
+  }
+
+  // Полный возврат/отмена — в т.ч. сделанные из кабинета банка, минуя нашу
+  // админку: откатываем выданный период (идемпотентно по orderId). Частичный
+  // возврат (PARTIAL_*) премиум не трогает — решение владельца не принималось,
+  // просто фиксируем статус.
+  if (FULL_CANCEL_STATUSES.has(status)) {
+    try {
+      const amount = payload.Amount != null ? Number(payload.Amount) : null;
+      const r = await revokePremiumForPayment(orderId, {
+        amountKopecks: Number.isFinite(amount) ? amount : null,
+        note: `Возврат ${orderId} (${status}, нотификация T-Bank)`,
+      });
+      if (r.revoked) {
+        logger.info('tbank webhook: premium revoked', {
+          userId: payment.userId,
+          orderId,
+          status,
+          until: r.until?.toISOString() ?? null,
+        });
+      }
+    } catch (e) {
+      logger.error('tbank webhook: revoke failed', e);
+      return NextResponse.json({ error: 'revoke failed' }, { status: 500 });
     }
   }
 
