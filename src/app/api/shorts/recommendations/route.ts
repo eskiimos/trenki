@@ -1,3 +1,4 @@
+import { getSessionUserId } from '@/lib/auth-server';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
@@ -5,7 +6,8 @@ import { prisma } from '@/lib/prisma';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    // Лайки — только по своей сессии; userId из query больше не читаем (IDOR)
+    const sessionUserId = await getSessionUserId(request);
     const excludeIds = searchParams.getAll('exclude'); // IDs для исключения
     const limit = parseInt(searchParams.get('limit') || '10');
     const offset = parseInt(searchParams.get('offset') || '0');
@@ -42,16 +44,12 @@ export async function GET(request: NextRequest) {
 
         // Проверяем статус лайка
         let isLiked = false;
-        if (userId) {
-          const user = await prisma.user.findUnique({
-            where: { telegramId: userId }
-          });
-
-          if (user) {
+        if (sessionUserId) {
+          {
             const like = await prisma.shortLike.findUnique({
               where: {
                 userId_shortId: {
-                  userId: user.id,
+                  userId: sessionUserId,
                   shortId: short.id
                 }
               }

@@ -116,8 +116,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET - Получение истории отправленных уведомлений
-export async function GET() {
+// GET - Получение истории отправленных уведомлений (только админ: раньше
+// история рассылок и число подписчиков отдавались без авторизации)
+export async function GET(request: NextRequest) {
+  const denied = await requireAdminAsync(request);
+  if (denied) return denied;
   try {
     const notifications = await prisma.pushNotification.findMany({
       orderBy: { createdAt: 'desc' },

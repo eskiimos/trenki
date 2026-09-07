@@ -1,50 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAuthUser } from '@/lib/coach/guards';
+import { logger } from '@/lib/logger';
 
-// DELETE - Удалить комментарий
+// DELETE — удалить свой комментарий к шортсу. Автор — из httpOnly-сессии
+// (раньше роут брал userId=telegramId из query: любой, кто знает чужой
+// telegramId, мог удалять чужие комментарии — IDOR, см. CLAUDE.md). Админ
+// может удалить любой.
 export async function DELETE(
   request: NextRequest,
-  context: { params: Promise<{ id: string; commentId: string }> }
+  context: { params: Promise<{ id: string; commentId: string }> },
 ) {
+  const auth = await requireAuthUser(request);
+  if ('response' in auth) return auth.response;
   try {
-    const { commentId } = await context.params;
-    const { searchParams } = new URL(request.url);
-    const telegramId = searchParams.get('userId');
-
-    if (!telegramId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
-
-    // Находим пользователя по telegramId
-    const user = await prisma.user.findUnique({
-      where: { telegramId }
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    // Проверяем, что комментарий принадлежит пользователю
+    const { id: shortId, commentId } = await context.params;
     const comment = await prisma.shortComment.findUnique({
-      where: { id: commentId }
+      where: { id: commentId },
+      select: { id: true, userId: true, shortId: true },
     });
-
-    if (!comment) {
-      return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
+    if (!comment || comment.shortId !== shortId) {
+      return NextResponse.json({ error: 'Комментарий не найден' }, { status: 404 });
     }
-
-    if (comment.userId !== user.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    if (comment.userId !== auth.user.id && !auth.user.isAdmin) {
+      return NextResponse.json({ error: 'Можно удалять только свои комментарии' }, { status: 403 });
     }
-
-    // Удаляем комментарий
-    await prisma.shortComment.delete({
-      where: { id: commentId }
-    });
-
+    await prisma.shortComment.delete({ where: { id: commentId } });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting comment:', error);
+    logger.error('short comment delete failed', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
