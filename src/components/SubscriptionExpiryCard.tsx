@@ -9,12 +9,12 @@ import { plural } from '@/lib/plural';
 // Показывается только премиум-юзеру с конечным premiumUntil за 3 дня до конца.
 // Бессрочный премиум (premiumUntil=null) и FREE — не показываем.
 //
-// Оформление (правка владельца 14.09): вместо сплошной оранжевой заливки —
-// градиент, как у бейджа «Ударный темп»: по краям цвет плотнее, в центре
-// просвечивает тёмный фон приложения. Только краснее: рамка, свечение
-// вовнутрь и сам текст — красные (--color-alert). Текст ужат до «Подписка
-// закончится через N дней» (без «скоро»), отступы уменьшены — карточка
-// занимает меньше первого экрана.
+// Оформление (правка владельца 14.09): вместо сплошной заливки — градиент,
+// как у бейджа «Ударный темп»: по краям цвет плотнее, в центре просвечивает
+// тёмный фон приложения, плюс рамка и свечение вовнутрь. Цвет — тот же
+// --color-danger, что у бейджа темпа (красный вариант владелец отклонил).
+// Текст ужат до «Подписка закончится через N дней» (без «скоро»), отступы
+// уменьшены — карточка занимает меньше первого экрана.
 
 const EXPIRY_WINDOW_DAYS = 3;
 
@@ -37,9 +37,9 @@ export default function SubscriptionExpiryCard() {
     <div
       role="status"
       style={{
-        background: 'var(--grad-alert)',
-        border: '1px solid var(--border-alert)',
-        boxShadow: 'var(--glow-alert-inset)',
+        background: 'var(--grad-danger)',
+        border: '1px solid var(--border-danger)',
+        boxShadow: 'var(--glow-danger-inset)',
         borderRadius: 'var(--radius-lg)',
         padding: 14,
         marginBottom: 16,
@@ -48,7 +48,7 @@ export default function SubscriptionExpiryCard() {
       <div
         className="font-overpass uppercase flex items-center justify-center gap-2"
         style={{
-          color: 'var(--alert-text)',
+          color: 'var(--color-danger)',
           fontWeight: 900,
           fontSize: 14,
           lineHeight: 1.2,
@@ -67,8 +67,8 @@ export default function SubscriptionExpiryCard() {
           width: '100%',
           marginTop: 10,
           height: 44,
-          background: 'var(--color-alert)',
-          color: 'var(--color-ink)',
+          background: 'var(--color-danger)',
+          color: 'var(--color-night)',
           border: 'none',
           borderRadius: 'var(--radius-pill)',
           fontWeight: 900,
