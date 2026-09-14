@@ -101,7 +101,6 @@ function buildCsp(nonce: string, isDev: boolean): string {
     'connect-src': [
       "'self'",
       'https://api.kinescope.io',
-      'https://uploader.kinescope.io',
       'https://*.kinescope.io',
       'https://kinescopecdn.net',
       'https://cdn.jsdelivr.net',

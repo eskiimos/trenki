@@ -76,7 +76,7 @@ npm test && npm run lint && npx tsc --noEmit
 | Push | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | web-push; ключи обязательны, subject по умолчанию указывает на старый домен, задавайте `mailto:admin@trenki.app` |
 | Cloudinary | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | аватары, обложки, pose-кадры |
 | S3 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | видео и шортсы; нужны все пять |
-| Kinescope | `KINESCOPE_API_KEY`, `KINESCOPE_PROJECT_ID` | старый контент и загрузка из админки; без project id берётся первый проект аккаунта |
+| Kinescope | `KINESCOPE_API_KEY` | чтение старого контента (ссылки, превью, длительность); заливка видео туда убрана |
 | Оплата | `TBANK_TERMINAL_KEY`, `TBANK_PASSWORD`, `TBANK_API_BASE` | боевая касса; `API_BASE` необязателен, по умолчанию `https://securepay.tinkoff.ru/v2` |
 | Оплата, тест | `TBANK_TEST_TERMINAL_KEY`, `TBANK_TEST_PASSWORD`, `TBANK_TEST_API_BASE` | тестовый терминал, переключается в админке |
 | Оплата | `TBANK_RETURN_ORIGIN` | origin для return- и notification-URL, по умолчанию `https://trenki.app` |
@@ -85,7 +85,7 @@ npm test && npm run lint && npx tsc --noEmit
 | Логи | `LOG_LEVEL` | `debug` / `info` / `warn` / `error`, в проде по умолчанию `info` |
 | Telegram | `BOT_TOKEN` | остаток старой интеграции, используется только для уведомлений через `src/lib/telegram.ts` |
 
-Нюансы прода: `APP_ORIGIN`, `NEXT_PUBLIC_APP_URL` и `KINESCOPE_PROJECT_ID` compose в контейнер не пробрасывает, там действуют значения по умолчанию. `KINESCOPE_API_KEY` в проде берётся из переменной `NEXT_PUBLIC_KINESCOPE_API_KEY` в `.env.production`.
+Нюансы прода: `APP_ORIGIN` и `NEXT_PUBLIC_APP_URL` compose в контейнер не пробрасывает, там действуют значения по умолчанию. `KINESCOPE_API_KEY` в проде берётся из переменной `NEXT_PUBLIC_KINESCOPE_API_KEY` в `.env.production`.
 
 ## Архитектура
 
@@ -157,7 +157,7 @@ instrumentation.ts проверка обязательных env при стар
 | Обложки | Cloudinary (`/api/upload`, `kind=short` → 9:16) или S3 | прямая ссылка |
 | Аватары, логотипы клубов | Cloudinary | прямая ссылка |
 | Pose-кадры | Cloudinary raw, authenticated | signed URL на час |
-| Старый контент | Kinescope | через `/api/kinescope/metadata` |
+| Старый контент | Kinescope | через `/api/kinescope/metadata`; новое туда не заливается |
 
 S3 не транскодирует: только mp4 и webm до 800 МБ.
 

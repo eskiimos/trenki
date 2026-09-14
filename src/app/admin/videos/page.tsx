@@ -351,7 +351,6 @@ const AdminVideosPage = () => {
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]); // ID тегов из базы
   const [activeTab, setActiveTab] = useState<'basic' | 'algorithm'>('basic');
   const [algorithmSubTab, setAlgorithmSubTab] = useState<'classification' | 'targeting'>('classification');
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [s3UploadProgress, setS3UploadProgress] = useState<number | null>(null);
 
   const getMissingAlgorithmFields = (video: Video) => {
@@ -676,87 +675,6 @@ const AdminVideosPage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleVideoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const videoName = file.name.replace(/\.[^/.]+$/, ''); // имя без расширения
-
-    try {
-      setUploadProgress(0);
-
-      // Шаг 1: получаем URL для загрузки от нашего сервера
-      const initRes = await fetch('/api/kinescope/upload-init', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: videoName, filesize: file.size, filename: file.name }),
-      });
-
-      if (!initRes.ok) {
-        const err = await initRes.json();
-        alert(`Ошибка инициализации загрузки: ${err.error}`);
-        setUploadProgress(null);
-        return;
-      }
-
-      const { videoId, uploadUrl } = await initRes.json();
-
-      // Шаг 2: загружаем файл напрямую на Kinescope через XHR (чтобы отслеживать прогресс)
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', uploadUrl);
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            setUploadProgress(Math.round((event.loaded / event.total) * 100));
-          }
-        };
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve();
-          } else {
-            reject(new Error(`Upload failed: ${xhr.status} ${xhr.responseText}`));
-          }
-        };
-        xhr.onerror = () => reject(new Error('Network error during upload'));
-        xhr.send(file);
-      });
-
-      // Шаг 3: сохраняем URL и автоматически получаем метаданные
-      const kinescopeUrl = `https://kinescope.io/${videoId}`;
-      setFormData(prev => ({ ...prev, videoUrl: kinescopeUrl }));
-      setUploadProgress(null);
-
-      // Авто-загрузка метаданных (превью, длительность)
-      try {
-        const metaRes = await fetch('/api/kinescope/metadata', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ videoUrl: kinescopeUrl }),
-        });
-        if (metaRes.ok) {
-          const meta = await metaRes.json();
-          setFormData(prev => ({
-            ...prev,
-            title: prev.title || meta.title || videoName,
-            thumbnail: prev.thumbnail || meta.thumbnail || '',
-            duration: meta.duration || prev.duration,
-          }));
-        }
-      } catch {
-        // метаданные ещё могут не быть готовы сразу после загрузки
-      }
-
-      alert('Видео успешно загружено');
-    } catch (error: any) {
-      console.error('Video upload error:', error);
-      alert(`Ошибка загрузки: ${error.message}`);
-      setUploadProgress(null);
-    }
-
-    // Сбрасываем input
-    e.target.value = '';
   };
 
   // Загрузка видеофайла в собственное S3-хранилище (reg.ru): получаем presigned
@@ -1618,35 +1536,20 @@ const AdminVideosPage = () => {
                       После вставки URL нажмите «Получить данные» для автозаполнения превью
                     </p>
 
-                    {/* Загрузка файла напрямую на Kinescope */}
+                    {/* Загрузка файла в собственное S3-хранилище (reg.ru).
+                        Заливка на Kinescope убрана (правка владельца 14.09):
+                        оставался второй способ, который только путал. Старые
+                        Kinescope-ссылки по-прежнему вставляются в поле URL и
+                        играются. */}
                     <div className="flex items-center gap-3" style={{ marginTop: 16 }}>
                       <div style={{ flex: 1, height: 1, background: 'var(--border-hairline)' }} />
                       <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>или загрузить файл</span>
                       <div style={{ flex: 1, height: 1, background: 'var(--border-hairline)' }} />
                     </div>
                     <div style={{ marginTop: 12 }}>
-                      <label htmlFor="videoFileUpload" style={uploadLabelStyle(uploadProgress !== null)}>
-                        <Upload size={20} aria-hidden />
-                        Загрузить видеофайл
-                      </label>
-                      <input
-                        id="videoFileUpload"
-                        type="file"
-                        accept="video/*"
-                        onChange={handleVideoFileUpload}
-                        disabled={uploadProgress !== null}
-                        className="hidden"
-                      />
-                      {uploadProgress !== null && (
-                        <ProgressBar value={uploadProgress} label="Загрузка" />
-                      )}
-                    </div>
-
-                    {/* Загрузка файла в собственное S3-хранилище (reg.ru) */}
-                    <div style={{ marginTop: 12 }}>
                       <label htmlFor="s3FileUpload" style={uploadLabelStyle(s3UploadProgress !== null)}>
                         <CloudUpload size={20} aria-hidden />
-                        Загрузить файл в хранилище
+                        Загрузить видеофайл
                       </label>
                       <input
                         id="s3FileUpload"
