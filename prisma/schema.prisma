@@ -347,6 +347,55 @@ model Short {
   @@map("shorts")
 }
 
+// Очередь серверной обработки видео (перекодирование вместо Kinescope).
+// Админ заливает сырой исходник в S3 (s3://uploads/...), при сохранении карточки
+// видео/шортса создаётся задача; воркер (src/lib/media/worker.ts) пережимает
+// файл, подменяет videoUrl цели и применяет отложенную публикацию.
+// Цель полиморфная (Video или Short), поэтому без FK: при удалении цели задачи
+// отменяются в роутах DELETE, а воркер перед подменой проверяет, что цель жива.
+enum MediaJobStatus {
+  QUEUED
+  PROCESSING
+  DONE
+  FAILED
+  CANCELED
+}
+
+enum MediaJobTarget {
+  VIDEO
+  SHORT
+}
+
+model MediaJob {
+  id             String         @id @default(cuid())
+  targetType     MediaJobTarget
+  targetId       String
+  sourceUrl      String // s3://uploads/<uuid>.<ext> — сырой исходник
+  status         MediaJobStatus @default(QUEUED)
+  publishOnReady Boolean        @default(false) // опубликовать цель после обработки
+  stage          String? // download | probe | transcode | remux | thumbnail | upload
+  progress       Int            @default(0) // 0–100, для админки
+  resultUrl      String?
+  error          String?
+  attempts       Int            @default(0) // запуски после постановки/ошибки (с паузой между ними)
+  retryAt        DateTime? // после временной ошибки не брать раньше этого времени
+  interruptions  Int            @default(0) // перехваты после смерти процесса (деплой) — не ошибка файла
+  heartbeatAt    DateTime? // пульс воркера: устаревший = процесс умер (деплой)
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  // Прежний файл цели (при замене). Удаляется не сразу: у зрителя, который
+  // смотрит видео в момент подмены, presigned-ссылка живёт до 6 часов.
+  previousUrl       String?
+  previousDeletedAt DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([sourceUrl]) // один исходник — одна задача (двойной сабмит, дубли карточек)
+  @@index([targetType, targetId])
+  @@index([status, createdAt])
+  @@map("media_jobs")
+}
+
 model ShortLike {
   id        String   @id @default(cuid())
   userId    String

@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma';
 import { updateUserActivity } from '@/lib/updateUserActivity';
 import { requireAdminAsync } from '@/lib/admin-session';
 import { getSessionUserId } from '@/lib/auth-server';
+import { isRawUploadUrl } from '@/lib/media/url-plan';
+import { hasJobForSource } from '@/lib/media/jobs';
+import { kickMediaWorker } from '@/lib/media/worker';
 
 // GET - получить все опубликованные shorts (публичное, isLiked заполняется только при наличии сессии)
 export async function GET(request: NextRequest) {
@@ -89,22 +92,54 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const short = await prisma.short.create({
-      data: {
-        title: body.title,
-        description: body.description || '',
-        videoUrl: body.videoUrl,
-        thumbnail: body.thumbnail || '',
-        trainerId: body.trainerId || null,
-        tags: body.tags || [],
-        isPublished: body.isPublished ?? true,
-        order: body.order || 0,
-        audience: body.audience || 'HOCKEY',
-      },
-    });
+    // Сырой исходник пережимается воркером; до конца обработки шортс не
+    // публикуется (см. src/lib/media/url-plan.ts).
+    const needsProcessing = isRawUploadUrl(body.videoUrl);
+    if (needsProcessing && (await hasJobForSource(body.videoUrl))) {
+      return NextResponse.json(
+        { error: 'Этот файл уже использован — загрузите файл заново' },
+        { status: 400 },
+      );
+    }
+    const requestedPublish = body.isPublished ?? true;
 
-    return NextResponse.json({ short });
+    // Шортс и задача обработки — одной транзакцией (без «сырого» шортса без задачи).
+    const short = await prisma.$transaction(async (tx) => {
+      const created = await tx.short.create({
+        data: {
+          title: body.title,
+          description: body.description || '',
+          videoUrl: body.videoUrl,
+          thumbnail: body.thumbnail || '',
+          trainerId: body.trainerId || null,
+          tags: body.tags || [],
+          isPublished: needsProcessing ? false : requestedPublish,
+          order: body.order || 0,
+          audience: body.audience || 'HOCKEY',
+        },
+      });
+      if (needsProcessing) {
+        await tx.mediaJob.create({
+          data: {
+            targetType: 'SHORT',
+            targetId: created.id,
+            sourceUrl: body.videoUrl,
+            publishOnReady: Boolean(requestedPublish),
+          },
+        });
+      }
+      return created;
+    });
+    if (needsProcessing) kickMediaWorker({ immediate: true });
+
+    return NextResponse.json({ short, processing: needsProcessing });
   } catch (error: any) {
+    if (error?.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'Тренька с этим файлом уже сохранена — обновите список' },
+        { status: 409 },
+      );
+    }
     console.error('Error creating short:', error);
     return NextResponse.json({ 
       error: 'Failed to create short',

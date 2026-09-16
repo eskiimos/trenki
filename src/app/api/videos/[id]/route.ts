@@ -3,7 +3,15 @@ import { prisma } from '@/lib/prisma';
 import { requireAdminAsync } from '@/lib/admin-session';
 import { gatePaidContent } from '@/lib/coach/guards';
 import { getFreeLessonVideoId } from '@/lib/settings';
-import { resolveVideoUrl, deleteS3ObjectsByUrls } from '@/lib/s3';
+import { resolveVideoUrl, deleteS3ObjectsByUrls, isOwnStorageUrl, isS3Url } from '@/lib/s3';
+import { isRawUploadUrl, planUrlUpdate } from '@/lib/media/url-plan';
+import {
+  cancelMediaJobsForTarget,
+  enqueueMediaJob,
+  hasJobForSource,
+  setPublishIntent,
+} from '@/lib/media/jobs';
+import { kickMediaWorker } from '@/lib/media/worker';
 
 export async function GET(
   request: NextRequest,
@@ -199,22 +207,54 @@ export async function PUT(
     console.log('Updating video - ageGroups:', ageGroupsArray);
     console.log('Updating video - trainingGoals:', trainingGoalsArray);
 
-    // Обновляем видео
-    const video = await prisma.video.update({
-      where: { id },
+    const existing = await prisma.video.findUnique({ where: { id }, select: { videoUrl: true } });
+    if (!existing) {
+      return NextResponse.json({ error: 'Видео не найдено' }, { status: 404 });
+    }
+    // isPublished не прислали → true (историческое поведение формы).
+    const requestedPublish = isPublished !== undefined ? Boolean(isPublished) : true;
+    // Замена файла и незавершённая обработка: см. правила в src/lib/media/url-plan.ts.
+    const urlPlan = planUrlUpdate({
+      current: existing.videoUrl,
+      incoming: videoUrl,
+      requestedPublish,
+      incomingHasJob:
+        isRawUploadUrl(videoUrl) && videoUrl !== existing.videoUrl ? await hasJobForSource(videoUrl) : false,
+      currentInOwnStorage: isOwnStorageUrl(existing.videoUrl),
+    });
+    const finalVideoUrl = urlPlan.videoUrl ?? existing.videoUrl;
+    // Длительность файлов нашего хранилища ставит воркер из самого файла; поля
+    // в форме нет, и устаревшая форма присылала бы 0 поверх настоящей.
+    const workerOwnsDuration = isS3Url(existing.videoUrl) || isS3Url(finalVideoUrl);
+
+    // Отмена задач и новое намерение публикации — ДО записи карточки: воркер
+    // применяет результат под блокировкой строки задачи и либо увидит их, либо
+    // успеет раньше — тогда CAS ниже вернёт 409.
+    if (!urlPlan.enqueueSource) {
+      if (urlPlan.cancelJobs) await cancelMediaJobsForTarget('VIDEO', id);
+      if (urlPlan.updatePublishIntent) await setPublishIntent('VIDEO', id, requestedPublish);
+    }
+
+    // Обновляем видео. CAS по videoUrl: если воркер подменил файл между чтением
+    // existing и записью, план построен на устаревших данных — 409, а не запись
+    // старого URL поверх результата.
+    const { count: updated } = await prisma.video.updateMany({
+      where: { id, videoUrl: existing.videoUrl },
       data: {
         title,
         description: description || '',
-        duration: typeof duration === 'string' ? parseInt(duration) : duration,
-        videoUrl,
-        thumbnail: thumbnail || '',
+        duration: workerOwnsDuration ? undefined : typeof duration === 'string' ? parseInt(duration) : duration,
+        videoUrl: finalVideoUrl,
+        // Превью присылается, только если админ его менял (undefined — не
+        // трогать: его мог поставить воркер, пока форма была открыта).
+        thumbnail: thumbnail === undefined ? undefined : thumbnail || '',
         category,
         difficulty,
         trainerId: primaryTrainerId, // ведущий автор
         tags: tags || [],
         equipment: equipment || [],
         level: level || '',
-        isPublished: isPublished !== undefined ? isPublished : true,
+        isPublished: urlPlan.isPublished ?? requestedPublish,
         rpeMin: rpeMinNum,
         rpeMax: rpeMaxNum,
         moduleType: moduleTypeEnum as any,
@@ -227,6 +267,15 @@ export async function PUT(
         isSfp: isSfpFlag,
         sports: sportsArray as any,
       },
+    });
+    if (updated !== 1) {
+      return NextResponse.json(
+        { error: 'Видео только что обновилось (закончилась обработка файла) — нажмите «Сохранить изменения» ещё раз' },
+        { status: 409 },
+      );
+    }
+    const video = await prisma.video.findUniqueOrThrow({
+      where: { id },
       include: {
         trainer: {
           select: {
@@ -330,12 +379,29 @@ export async function PUT(
       }
     }
 
+    if (urlPlan.enqueueSource) {
+      await enqueueMediaJob({
+        targetType: 'VIDEO',
+        targetId: id,
+        sourceUrl: urlPlan.enqueueSource,
+        publishOnReady: requestedPublish,
+      });
+      kickMediaWorker({ immediate: true });
+    }
     return NextResponse.json({ 
       success: true,
       video,
+      processing: !!urlPlan.enqueueSource || isRawUploadUrl(video.videoUrl),
+      videoUrlIgnored: urlPlan.ignoredIncoming,
       message: 'Video updated successfully' 
     });
   } catch (error: any) {
+    if (error?.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'Этот файл уже сохранён — обновите страницу' },
+        { status: 409 },
+      );
+    }
     console.error('Error updating video:', error);
     return NextResponse.json({ 
       error: 'Internal server error',
@@ -380,6 +446,10 @@ export async function DELETE(
 
     // И только после этого удаляем саму запись видео
     await prisma.video.delete({ where: { id } });
+
+    // Незавершённая обработка больше не нужна: задачи отменяем, исходники
+    // удаляем (воркер, если уже пережимает, увидит отмену и уберёт результат).
+    await cancelMediaJobsForTarget('VIDEO', id);
 
     // Файлы — best-effort после успешного удаления записи
     if (fileUrls) {

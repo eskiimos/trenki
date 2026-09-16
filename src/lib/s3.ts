@@ -1,4 +1,15 @@
-import { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { createReadStream, createWriteStream } from 'fs';
+import { stat } from 'fs/promises';
+import { pipeline } from 'stream/promises';
+import { Transform, type Readable } from 'stream';
+import {
+  S3Client,
+  GetObjectCommand,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { logger } from '@/lib/logger';
 
@@ -58,9 +69,170 @@ function getClient(config: S3Config): S3Client {
         secretAccessKey: config.secretAccessKey,
       },
       forcePathStyle: true, // обязательно для reg.ru
+      // Сеть к S3 не должна вешать запрос/воркер навсегда (удаление объектов).
+      // requestTimeout без throwOnRequestTimeout только пишет WARN — нужен флаг;
+      // socketTimeout — простой сокета.
+      requestHandler: {
+        connectionTimeout: 10_000,
+        socketTimeout: 30_000,
+        requestTimeout: 30_000,
+        throwOnRequestTimeout: true,
+      },
     });
   }
   return cachedClient;
+}
+
+// Отдельный клиент для серверной перекачки больших файлов (воркер обработки
+// видео). С дефолтным requestChecksumCalculation=WHEN_SUPPORTED SDK шлёт
+// потоковое тело как aws-chunked с CRC32-трейлером — старые Ceph RGW (reg.ru)
+// такое либо не принимают, либо сохраняют Content-Encoding: aws-chunked на
+// объекте. WHEN_REQUIRED даёт обычный PUT с Content-Length. Presigned-ссылки
+// для браузера остаются на основном клиенте — там всё проверено на проде.
+let cachedTransferClient: S3Client | null = null;
+
+function getTransferClient(config: S3Config): S3Client {
+  if (!cachedTransferClient) {
+    cachedTransferClient = new S3Client({
+      endpoint: config.endpoint,
+      region: config.region,
+      credentials: {
+        accessKeyId: config.accessKeyId,
+        secretAccessKey: config.secretAccessKey,
+      },
+      forcePathStyle: true,
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
+      // socketTimeout — простой сокета (большой PUT идёт долго, но не молча).
+      // Общий requestTimeout не ставим: он оборвал бы заливку дольше лимита.
+      // Для тела GetObject таймер снимается после заголовков — у скачивания свой
+      // сторож простоя (downloadObjectToFile).
+      requestHandler: { connectionTimeout: 10_000, socketTimeout: 120_000 },
+    });
+  }
+  return cachedTransferClient;
+}
+
+function requireConfig(): S3Config {
+  const config = getS3Config();
+  if (!config) throw new Error('S3 не сконфигурирован (нет S3_* переменных окружения)');
+  return config;
+}
+
+/** Размер объекта в байтах; null — объекта нет. */
+export async function headObjectSize(key: string, signal?: AbortSignal): Promise<number | null> {
+  const config = requireConfig();
+  try {
+    const res = await getTransferClient(config).send(
+      new HeadObjectCommand({ Bucket: config.bucket, Key: key }),
+      { abortSignal: signal },
+    );
+    return typeof res.ContentLength === 'number' ? res.ContentLength : 0;
+  } catch (error) {
+    const status = (error as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
+    if (status === 404) return null;
+    throw error;
+  }
+}
+
+const DOWNLOAD_STALL_MS = 60_000;
+
+/** Потоковое скачивание объекта в локальный файл (память не растёт с размером). */
+export async function downloadObjectToFile(key: string, filePath: string, signal?: AbortSignal): Promise<void> {
+  const config = requireConfig();
+  const res = await getTransferClient(config).send(
+    new GetObjectCommand({ Bucket: config.bucket, Key: key }),
+    { abortSignal: signal },
+  );
+  if (!res.Body) throw new Error(`S3: пустое тело объекта ${key}`);
+  // Сторож простоя: соединение, которое перестало отдавать байты, иначе
+  // висело бы бесконечно и держало очередь обработки.
+  let timer: NodeJS.Timeout | null = null;
+  const watchdog = new Transform({
+    transform(chunk, _enc, cb) {
+      arm();
+      cb(null, chunk);
+    },
+    flush(cb) {
+      if (timer) clearTimeout(timer);
+      cb();
+    },
+  });
+  const arm = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => watchdog.destroy(new Error(`скачивание из хранилища зависло (${key})`)), DOWNLOAD_STALL_MS);
+  };
+  arm();
+  try {
+    await pipeline(res.Body as Readable, watchdog, createWriteStream(filePath), { signal });
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
+ * Загрузка локального файла одним PUT (до 5 ГиБ — лимит S3; результаты
+ * обработки — сотни МБ). Файл читается потоком, Content-Length берётся из fs.
+ */
+export async function uploadFileToObject(
+  filePath: string,
+  key: string,
+  contentType: string,
+  opts?: { acl?: 'public-read'; signal?: AbortSignal },
+): Promise<void> {
+  const config = requireConfig();
+  const { size } = await stat(filePath);
+  const body = createReadStream(filePath);
+  try {
+    await getTransferClient(config).send(
+      new PutObjectCommand({
+        Bucket: config.bucket,
+        Key: key,
+        Body: body,
+        ContentLength: size,
+        ContentType: contentType,
+        ...(opts?.acl ? { ACL: opts.acl } : {}),
+      }),
+      { abortSignal: opts?.signal },
+    );
+  } finally {
+    // При ошибке/отмене SDK не закрывает поток: открытый fd держал бы место
+    // удалённого временного файла до конца процесса.
+    body.destroy();
+  }
+}
+
+/** Ключи объектов по префиксу (с пагинацией) — для уборки брошенных исходников. */
+export async function listObjects(
+  prefix: string,
+  opts: { maxKeys?: number; signal?: AbortSignal } = {},
+): Promise<Array<{ key: string; lastModified: Date | null }>> {
+  const config = requireConfig();
+  const maxKeys = opts.maxKeys ?? 5000;
+  const result: Array<{ key: string; lastModified: Date | null }> = [];
+  let token: string | undefined;
+  do {
+    const res = await getTransferClient(config).send(
+      new ListObjectsV2Command({ Bucket: config.bucket, Prefix: prefix, ContinuationToken: token }),
+      { abortSignal: opts.signal },
+    );
+    for (const obj of res.Contents ?? []) {
+      if (obj.Key) result.push({ key: obj.Key, lastModified: obj.LastModified ?? null });
+    }
+    token = res.IsTruncated ? res.NextContinuationToken : undefined;
+  } while (token && result.length < maxKeys);
+  return result;
+}
+
+/** URL указывает на объект нашего бакета (s3://key или публичный https бакета). */
+export function isOwnStorageUrl(url: string | null | undefined): boolean {
+  return !!url && (s3KeyFromUrl(url) !== null || s3KeyFromPublicUrl(url) !== null);
+}
+
+/** Публичный https-URL объекта (path-style reg.ru) — для public-read превью и шортсов. */
+export function publicObjectUrl(key: string): string {
+  const config = requireConfig();
+  return `${config.endpoint}/${config.bucket}/${key}`;
 }
 
 /** TTL по умолчанию для просмотра — 6 часов (хватает на любую тренировку с запасом). */
@@ -82,8 +254,9 @@ export async function presignGetUrl(key: string, expiresSec: number = DEFAULT_GE
 
 /**
  * Presigned PUT для прямой загрузки файла из браузера админа в бакет (мимо
- * нашего сервера). Content-Type участвует в подписи — клиент обязан отправить
- * PUT с ТЕМ ЖЕ заголовком Content-Type, иначе S3 ответит 403.
+ * нашего сервера). Подписан только host (X-Amz-SignedHeaders=host); ACL и
+ * checksum уходят в query подписи, Content-Type в подпись не входит — S3
+ * сохраняет тот, что браузер пришлёт заголовком.
  */
 export async function presignPutUrl(
   key: string,
@@ -94,7 +267,7 @@ export async function presignPutUrl(
   const config = getS3Config();
   if (!config) throw new Error('S3 не сконфигурирован (нет S3_* переменных окружения)');
   // ACL public-read — для превью (публичные объекты, прямые ссылки без TTL).
-  // ACL участвует в подписи: загружающий обязан слать x-amz-acl: public-read.
+  // Загружающий шлёт заголовок x-amz-acl: public-read (как в подписи).
   const command = new PutObjectCommand({
     Bucket: config.bucket,
     Key: key,
@@ -127,17 +300,25 @@ export function s3KeyFromPublicUrl(url: string | null | undefined): string | nul
 }
 
 /**
- * Первые байты объекта (для серверных проверок формата, напр. faststart).
- * Бросает при отсутствии конфига/объекта — вызывающий решает, что делать.
+ * Удаление одного объекта с результатом: true — удалён или его и не было,
+ * false — S3 не настроено или запрос упал (вызывающий повторит позже).
  */
-export async function readObjectRange(key: string, start: number, end: number): Promise<Buffer> {
+export async function deleteS3ObjectStrict(url: string, signal?: AbortSignal): Promise<boolean> {
   const config = getS3Config();
-  if (!config) throw new Error('S3 не сконфигурирован');
-  const res = await getClient(config).send(
-    new GetObjectCommand({ Bucket: config.bucket, Key: key, Range: `bytes=${start}-${end}` }),
-  );
-  const body = await res.Body?.transformToByteArray();
-  return Buffer.from(body ?? []);
+  if (!config) return false;
+  const key = s3KeyFromUrl(url) ?? s3KeyFromPublicUrl(url);
+  if (!key) return true; // не наш объект — удалять нечего
+  try {
+    await getTransferClient(config).send(new DeleteObjectCommand({ Bucket: config.bucket, Key: key }), {
+      abortSignal: signal,
+    });
+    return true;
+  } catch (error) {
+    const status = (error as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
+    if (status === 404) return true;
+    logger.error('deleteS3ObjectStrict: не удалось удалить объект', error, { key });
+    return false;
+  }
 }
 
 /**
@@ -160,7 +341,7 @@ export async function deleteS3ObjectsByUrls(urls: Array<string | null | undefine
           new DeleteObjectCommand({ Bucket: config.bucket, Key: key }),
         );
       } catch (error) {
-        logger.error('deleteS3ObjectsByUrls: не удалось удалить объект', { key, error: String(error) });
+        logger.error('deleteS3ObjectsByUrls: не удалось удалить объект', error, { key });
       }
     }),
   );

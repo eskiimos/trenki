@@ -27,6 +27,11 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: '**.kinescope.io', port: '', pathname: '/**' },
       { protocol: 'https', hostname: 'kinescopecdn.net', port: '', pathname: '/**' },
       { protocol: 'https', hostname: 'res.cloudinary.com', port: '', pathname: '/**' },
+      // Наше S3 (reg.ru): публичные превью и обложки шортсов, в т.ч. кадры,
+      // которые делает воркер обработки видео. Без этого /_next/image отвечает
+      // 400 «url parameter is not allowed» и превью в каталоге битые.
+      // Хост статический: S3_ENDPOINT на этапе сборки образа недоступен.
+      { protocol: 'https', hostname: 's3.regru.cloud', port: '', pathname: '/**' },
     ],
   },
   outputFileTracingRoot: process.cwd(),

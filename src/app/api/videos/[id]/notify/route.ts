@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAsync } from '@/lib/admin-session';
 import { prisma } from '@/lib/prisma';
 import { broadcastPush } from '@/lib/coach/push';
+import { hasActiveJob } from '@/lib/media/jobs';
 
 // POST /api/videos/[id]/notify — рассылка push «доступно новое видео» всем
 // атлетам. Только из админки (кнопка «Опубликовать для атлетов»). Защита от
@@ -29,6 +30,11 @@ export async function POST(
   }
   if (!video.isPublished) {
     return NextResponse.json({ error: 'Видео не опубликовано' }, { status: 400 });
+  }
+  // Идёт замена файла у опубликованного видео: push сейчас привёл бы атлетов
+  // к старой версии — ждём окончания обработки.
+  if (await hasActiveJob('VIDEO', video.id)) {
+    return NextResponse.json({ error: 'Видео ещё обрабатывается — отправьте уведомление после обработки' }, { status: 409 });
   }
   if (video.athletesNotifiedAt && !force) {
     return NextResponse.json(

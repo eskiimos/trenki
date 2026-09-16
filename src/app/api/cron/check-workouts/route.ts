@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { formatWorkoutTime } from '@/lib/telegram';
 import { notifyUser } from '@/lib/notify';
 import { getReminderSettings } from '@/lib/settings';
+import { kickMediaWorker } from '@/lib/media/worker';
 
 /**
  * Cron: проверка ScheduledWorkout и отправка напоминаний.
@@ -30,6 +31,11 @@ export async function GET(request: NextRequest) {
     if (authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Единственный ежеминутный тик на хосте — заодно будим воркер обработки
+    // видео: после деплоя (контейнер пересоздан) он подхватит прерванную задачу
+    // без отдельной строки в crontab. Не ждёт окончания обработки.
+    kickMediaWorker();
 
     const appUrl =
       process.env.NEXT_PUBLIC_APP_URL?.trim() ||

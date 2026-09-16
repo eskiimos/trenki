@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import {
   AdminPage,
@@ -26,7 +26,20 @@ import {
   Film,
   List,
   Loader2,
+  Check,
 } from 'lucide-react';
+import {
+  MediaJobBadge,
+  MediaJobError,
+  acquireUploadWakeLock,
+  isAbortError,
+  isJobActive,
+  uploadFileToS3,
+  useLeaveWarning,
+  useMediaJobs,
+  useUploadAbortRef,
+} from '@/components/admin/media-upload';
+import { isRawUploadUrl } from '@/lib/media/url-plan';
 
 interface Short {
   id: string;
@@ -41,6 +54,8 @@ interface Short {
   viewsCount: number;
   order: number;
   createdAt: string;
+  /** Намерение публикации шортса на обработке (из /api/admin/shorts), иначе null. */
+  publishIntent?: boolean | null;
 }
 
 interface Trainer {
@@ -57,6 +72,20 @@ export default function AdminShortsPage() {
   const [editingShortId, setEditingShortId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  // Имя только что залитого (ещё не сохранённого) файла — статус в форме и
+  // предупреждение при уходе со страницы.
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  // Текущая заливка отменяется при переключении карточки/сбросе формы и при
+  // уходе со страницы — иначе файл записался бы в другую тренью.
+  const uploadAbortRef = useUploadAbortRef();
+  // videoUrl и обложка на момент открытия: пока админ их не менял, форму можно
+  // обновить результатом обработки, а обложку не слать в PUT.
+  const openedVideoUrlRef = useRef<string | null>(null);
+  const openedThumbnailRef = useRef<string>('');
+  // Зеркало текущего значения поля обложки (для onSettled вне рендера).
+  const thumbnailFieldRef = useRef<string>('');
+  const editingShortIdRef = useRef<string | null>(null);
   
   // Form state
   const [title, setTitle] = useState('');
@@ -87,16 +116,26 @@ export default function AdminShortsPage() {
     return `${trainer.name} ${trainer.lastName}`.trim();
   };
 
-  const fetchShorts = async () => {
+  const fetchShorts = async (): Promise<Short[]> => {
     try {
-      const response = await fetch('/api/shorts');
+      // Админский список: с черновиками и шортсами на обработке (публичный
+      // /api/shorts отдаёт только опубликованные).
+      const response = await fetch('/api/admin/shorts', { cache: 'no-store' });
       const data = await response.json();
       setShorts(data.shorts || []);
+      return data.shorts || [];
     } catch (error) {
       console.error('Error loading shorts:', error);
+      return [];
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const abortUpload = () => {
+    uploadAbortRef.current?.abort();
+    uploadAbortRef.current = null;
+    setUploadProgress(null);
   };
 
   const fetchTrainers = async () => {
@@ -109,8 +148,51 @@ export default function AdminShortsPage() {
     }
   };
 
+  // Статусы серверной обработки; завершилась — перечитываем список.
+  const {
+    jobs: mediaJobs,
+    refresh: refreshMediaJobs,
+    retry: retryMediaJob,
+    dismiss: dismissMediaJob,
+  } = useMediaJobs('SHORT', async (settledIds) => {
+    const list = await fetchShorts();
+    // Открытая тренька, чей файл только что обработан: подтягиваем новый
+    // videoUrl и обложку, если админ сам эти поля в форме не менял.
+    const id = editingShortIdRef.current;
+    const fresh = id && settledIds.includes(id) ? list.find((sh) => sh.id === id) : undefined;
+    if (!fresh) return;
+    // Значения ref — до setState: updater React выполнит позже, при рендере.
+    const openedUrl = openedVideoUrlRef.current;
+    const openedThumb = openedThumbnailRef.current;
+    openedVideoUrlRef.current = fresh.videoUrl;
+    // Базу обложки сдвигаем, только если поле реально получит кадр воркера.
+    if (thumbnailFieldRef.current === openedThumb) openedThumbnailRef.current = fresh.thumbnail || '';
+    setVideoUrl((prev) => (prev === openedUrl ? fresh.videoUrl : prev));
+    setThumbnail((prev) => (prev === openedThumb ? fresh.thumbnail || '' : prev));
+  });
+
+  // Идёт заливка или файл залит, но не сохранён — спросить перед сбросом формы.
+  const confirmDiscardUpload = () => {
+    const busy = uploadAbortRef.current !== null;
+    if (!busy && !uploadedFileName) return true;
+    return window.confirm(
+      busy ? 'Загрузка файла будет прервана — продолжить?' : 'Загруженный файл ещё не сохранён — отменить?',
+    );
+  };
+  useLeaveWarning(uploadProgress !== null || (showForm && !!uploadedFileName));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (uploadProgress !== null) {
+      alert('Дождитесь окончания загрузки файла');
+      return;
+    }
+    if (!videoUrl) {
+      alert('Загрузите видеофайл');
+      return;
+    }
+    if (saving) return;
+    setSaving(true);
 
     const finalTags = parseTags(tagsInput);
     setTags(finalTags);
@@ -118,7 +200,9 @@ export default function AdminShortsPage() {
       title,
       description,
       videoUrl,
-      thumbnail,
+      // При редактировании обложку шлём, только если её меняли: иначе устаревшая
+      // форма затёрла бы кадр, поставленный воркером.
+      thumbnail: editingShortId && thumbnail === openedThumbnailRef.current ? undefined : thumbnail,
       trainerId: trainerId || null,
       tags: finalTags,
       order,
@@ -137,21 +221,52 @@ export default function AdminShortsPage() {
       });
 
       if (response.ok) {
-        alert(editingShortId ? 'Тренька обновлена!' : 'Тренька добавлена!');
+        const data = await response.json().catch(() => ({}));
+        const linkIgnored =
+          !!data.videoUrlIgnored && videoUrl !== openedVideoUrlRef.current && !isRawUploadUrl(videoUrl);
+        alert(
+          (data.processing
+            ? `${editingShortId ? 'Тренька сохранена' : 'Тренька добавлена'}. Видео обрабатывается на сервере ` +
+              `(обычно несколько минут) — ${isPublished ? 'появится в ленте автоматически' : 'останется черновиком'}.`
+            : editingShortId
+              ? 'Тренька обновлена!'
+              : 'Тренька добавлена!') +
+            (linkIgnored ? '\n\nСсылка не изменена: видео уже перенесено в наше хранилище.' : ''),
+        );
         resetForm();
         fetchShorts();
+        void refreshMediaJobs();
       } else {
         const errorData = await response.json();
+        if (response.status === 409) {
+          // Воркер только что обновил тренью: подтягиваем свежие данные (залитый
+          // файл не трогаем) — повторное сохранение безопасно.
+          void fetchShorts();
+          void refreshMediaJobs();
+        }
         alert(`Ошибка: ${errorData.error || 'Неизвестная ошибка'}`);
       }
     } catch (error) {
       console.error('Error saving short:', error);
       alert('Ошибка при сохранении');
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleEditShort = (short: Short) => {
+    // Та же тренька уже открыта — просто вернуться к форме.
+    if (showForm && editingShortId === short.id) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (!confirmDiscardUpload()) return;
+    abortUpload();
+    editingShortIdRef.current = short.id;
     setEditingShortId(short.id);
+    setUploadedFileName(null);
+    openedVideoUrlRef.current = short.videoUrl;
+    openedThumbnailRef.current = short.thumbnail || '';
     setTitle(short.title);
     setDescription(short.description || '');
     setVideoUrl(short.videoUrl);
@@ -160,7 +275,14 @@ export default function AdminShortsPage() {
     setTags(short.tags);
     setTagsInput(short.tags.join(', '));
     setOrder(short.order);
-    setIsPublished(short.isPublished);
+    // Пока видео обрабатывается (или обработка упала), isPublished в БД временно
+    // false — в форме показываем то, что админ выбирал (намерение задачи). Оно
+    // приходит со списком; статусы задач — запасной источник.
+    const job = mediaJobs[short.id];
+    setIsPublished(
+      short.publishIntent ??
+        (job && (isJobActive(job) || job.status === 'FAILED') ? job.publishOnReady : short.isPublished),
+    );
     setAudience((short as any).audience || 'HOCKEY');
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -205,7 +327,12 @@ export default function AdminShortsPage() {
   };
 
   const resetForm = () => {
+    abortUpload();
+    editingShortIdRef.current = null;
     setEditingShortId(null);
+    setUploadedFileName(null);
+    openedVideoUrlRef.current = null;
+    openedThumbnailRef.current = '';
     setTitle('');
     setDescription('');
     setVideoUrl('');
@@ -273,80 +400,53 @@ export default function AdminShortsPage() {
     }
   };
 
-  // Загрузка файла тренька в НАШЕ S3-хранилище (раньше лился в Kinescope, но
-  // ключ Kinescope не даёт прав на загрузку — 401). Шортсы — бесплатный контент,
-  // объект публичный, в videoUrl пишется прямой https-URL (плеер играет как есть).
-  // Вставка Kinescope-ссылки в поле URL по-прежнему работает.
+  // Видеофайл тренька → наше S3 как сырой исходник (s3://uploads/...). После
+  // сохранения сервер пережимает его (src/lib/media/worker.ts), кладёт публичный
+  // mp4 и сам подменяет videoUrl (и обложку, если пусто).
   const handleVideoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-
-    const videoName = file.name.replace(/\.[^/.]+$/, '');
-    const contentType = file.type || 'video/mp4';
-
+    abortUpload();
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
+    const isCurrent = () => uploadAbortRef.current === controller;
+    setUploadProgress(0);
     try {
-      setUploadProgress(0);
-
-      const initRes = await fetch('/api/admin/s3/upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName: file.name, contentType, kind: 'short' }),
-      });
-      const init = await initRes.json().catch(() => ({}));
-      if (!initRes.ok) {
-        alert(`Ошибка инициализации загрузки: ${init.error || `HTTP ${initRes.status}`}`);
-        setUploadProgress(null);
-        return;
-      }
-      const { uploadUrl, videoUrl: publicUrl, acl } = init;
-
-      // PUT напрямую в S3: Content-Type и x-amz-acl обязаны совпадать с подписью
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('PUT', uploadUrl);
-        xhr.setRequestHeader('Content-Type', contentType);
-        if (acl) xhr.setRequestHeader('x-amz-acl', acl);
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            setUploadProgress(Math.round((event.loaded / event.total) * 100));
-          }
-        };
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else reject(new Error(`Upload failed: ${xhr.status}`));
-        };
-        xhr.onerror = () => reject(new Error('Network error'));
-        xhr.send(file);
-      });
-
-      setVideoUrl(publicUrl);
-      if (!title) setTitle(videoName);
-      setUploadProgress(null);
-
-      // Проверка faststart: шортс без него в ленте «вечно грузится»
-      // (реальный случай — moov в конце файла, см. /api/admin/s3/verify-video)
-      let warned = false;
-      try {
-        const v = await fetch('/api/admin/s3/verify-video', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ videoUrl: publicUrl }),
-        });
-        const check = await v.json().catch(() => ({}));
-        if (v.ok && check.ok === false && check.warning) {
-          warned = true;
-          alert(`Тренька загружена, НО: ${check.warning}`);
-        }
-      } catch { /* проверка — не повод ломать загрузку */ }
-      if (!warned) alert('Тренька успешно загружена');
+      const url = await uploadFileToS3(
+        file,
+        'short',
+        (p) => {
+          if (isCurrent()) setUploadProgress(p);
+        },
+        controller.signal,
+      );
+      if (!isCurrent()) return;
+      setVideoUrl(url);
+      // Функциональный апдейт: название, введённое во время заливки, не затираем.
+      const name = file.name.replace(/\.[^/.]+$/, '');
+      setTitle((t) => (t.trim() ? t : name));
+      setUploadedFileName(file.name);
     } catch (error: any) {
+      if (isAbortError(error) || !isCurrent()) return;
       console.error('Video upload error:', error);
       alert(`Ошибка загрузки: ${error.message}`);
-      setUploadProgress(null);
+    } finally {
+      if (isCurrent()) {
+        uploadAbortRef.current = null;
+        setUploadProgress(null);
+      }
     }
-
-    e.target.value = '';
   };
+
+  thumbnailFieldRef.current = thumbnail;
+  const editingJob = editingShortId ? mediaJobs[editingShortId] : undefined;
+  // Kinescope временно исключён для новых треньк (решение владельца 16.09): поле
+  // ссылки — только у старых записей со сторонним URL.
+  // Решаем по URL из списка: иначе очищенное поле исчезало бы вместе с кнопкой.
+  const originalVideoUrl = editingShortId ? shorts.find((sh) => sh.id === editingShortId)?.videoUrl ?? '' : '';
+  const isOwnStorage = (url: string) => url.startsWith('s3://') || url.includes('s3.regru.cloud');
+  const showLegacyUrlField = !!originalVideoUrl && !isOwnStorage(originalVideoUrl) && !videoUrl.startsWith('s3://');
 
   return (
     <AdminPage>
@@ -425,38 +525,62 @@ export default function AdminShortsPage() {
               </select>
             </div>
 
-            {/* URL видео */}
+            {/* Видео */}
             <div>
-              <label style={labelStyle}>URL видео *</label>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  type="text"
-                  value={videoUrl}
-                  onChange={(e) => setVideoUrl(e.target.value)}
-                  style={{ ...inputStyle, flex: 1 }}
-                  placeholder="ID или ссылка на видео"
-                  required
-                />
-                <AdminButton
-                  type="button"
-                  tone="secondary"
-                  icon={RefreshCw}
-                  onClick={handleFetchKinescopeMetadata}
-                  style={{ flexShrink: 0 }}
-                >
-                  Получить данные
-                </AdminButton>
-              </div>
+              <label style={labelStyle}>Видео *</label>
+              {showLegacyUrlField && (
+                <>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={videoUrl}
+                      onChange={(e) => setVideoUrl(e.target.value)}
+                      style={{ ...inputStyle, flex: 1 }}
+                      placeholder="https://kinescope.io/..."
+                    />
+                    {videoUrl.includes('kinescope.io') && (
+                      <AdminButton
+                        type="button"
+                        tone="secondary"
+                        icon={RefreshCw}
+                        onClick={handleFetchKinescopeMetadata}
+                        style={{ flexShrink: 0 }}
+                      >
+                        Получить данные
+                      </AdminButton>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 6 }}>
+                    Старое видео по ссылке. Чтобы перенести его в наше хранилище — загрузите файл ниже.
+                  </div>
+                </>
+              )}
 
-              {/* Загрузка файла напрямую в S3 */}
-              <div className="flex items-center gap-3" style={{ marginTop: 16 }}>
-                <div style={{ flex: 1, height: 1, background: 'var(--border-hairline)' }} />
-                <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>или загрузить файл</span>
-                <div style={{ flex: 1, height: 1, background: 'var(--border-hairline)' }} />
-              </div>
+              {editingJob && (isJobActive(editingJob) || editingJob.status === 'FAILED') && (
+                <div style={{ marginTop: 8 }}>
+                  <MediaJobBadge job={editingJob} />
+                  <MediaJobError
+                    job={editingJob}
+                    onRetry={retryMediaJob}
+                    onDismiss={originalVideoUrl && !isRawUploadUrl(originalVideoUrl) ? dismissMediaJob : undefined}
+                  />
+                </div>
+              )}
+
+              {uploadProgress === null && uploadedFileName && (
+                <div className="flex items-start gap-2" style={{ fontSize: 13, marginTop: 8 }}>
+                  <Check size={16} style={{ flexShrink: 0, marginTop: 2, color: 'var(--color-brand)' }} aria-hidden />
+                  <span>
+                    Файл «{uploadedFileName}» загружен. После сохранения сервер обработает его — тренька
+                    появится в ленте автоматически.
+                  </span>
+                </div>
+              )}
+
               <div style={{ marginTop: 12 }}>
                 <label
                   htmlFor="shortsVideoFileUpload"
+                  onClick={acquireUploadWakeLock}
                   className="inline-flex items-center justify-center gap-2 transition-opacity hover:opacity-85"
                   style={{
                     minHeight: 44,
@@ -471,7 +595,7 @@ export default function AdminShortsPage() {
                   }}
                 >
                   <Upload size={20} aria-hidden />
-                  Загрузить видеофайл
+                  {videoUrl ? 'Заменить видеофайл' : 'Загрузить видеофайл'}
                 </label>
                 <input
                   id="shortsVideoFileUpload"
@@ -484,7 +608,7 @@ export default function AdminShortsPage() {
                 {uploadProgress !== null && (
                   <div style={{ marginTop: 12 }}>
                     <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 8 }}>
-                      Загрузка: {uploadProgress}%
+                      Загрузка: {uploadProgress}% — не блокируйте экран и не уходите со страницы до конца
                     </div>
                     <div
                       role="progressbar"
@@ -512,6 +636,10 @@ export default function AdminShortsPage() {
                     </div>
                   </div>
                 )}
+                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 8 }}>
+                  Подойдёт файл прямо с телефона (MOV или MP4): сервер сам сожмёт его. Если не
+                  загрузить обложку — возьмём кадр из видео.
+                </div>
               </div>
             </div>
 
@@ -599,11 +727,18 @@ export default function AdminShortsPage() {
 
             {/* Кнопки */}
             <div className="flex flex-wrap gap-3">
-              <AdminButton type="submit" icon={Save}>
+              <AdminButton type="submit" icon={Save} disabled={uploadProgress !== null || saving}>
                 {editingShortId ? 'Обновить' : 'Добавить'}
               </AdminButton>
               {editingShortId && (
-                <AdminButton type="button" tone="secondary" icon={X} onClick={resetForm}>
+                <AdminButton
+                  type="button"
+                  tone="secondary"
+                  icon={X}
+                  onClick={() => {
+                    if (confirmDiscardUpload()) resetForm();
+                  }}
+                >
                   Отменить
                 </AdminButton>
               )}
@@ -655,7 +790,7 @@ export default function AdminShortsPage() {
                         fill
                         className="object-cover"
                       />
-                    ) : short.videoUrl ? (
+                    ) : short.videoUrl && !short.videoUrl.startsWith('s3://') ? (
                       <video
                         src={short.videoUrl}
                         className="w-full h-full object-cover"
@@ -711,6 +846,16 @@ export default function AdminShortsPage() {
                         {short.isPublished ? 'Опубликован' : 'Черновик'}
                       </span>
                     </div>
+                    {(isJobActive(mediaJobs[short.id]) || mediaJobs[short.id]?.status === 'FAILED') && (
+                      <div style={{ marginTop: 6 }}>
+                        <MediaJobBadge job={mediaJobs[short.id]} />
+                      </div>
+                    )}
+                    <MediaJobError
+                      job={mediaJobs[short.id]}
+                      onRetry={retryMediaJob}
+                      onDismiss={short.videoUrl && !isRawUploadUrl(short.videoUrl) ? dismissMediaJob : undefined}
+                    />
 
                     {/* Описание */}
                     {short.description && (

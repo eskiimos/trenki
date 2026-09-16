@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
+import { requireAdminAsync } from '@/lib/admin-session';
+import { RAW_UPLOAD_PREFIX } from '@/lib/media/url-plan';
 
 // Функция для форматирования продолжительности в YouTube формате (MM:SS или H:MM:SS)
 function formatDuration(seconds: number): string {
@@ -22,12 +24,20 @@ export async function GET(request: NextRequest) {
     // админка (videos, training-modules) и тренерский конструктор заданий
     // (coach/assignments/new) — всем достаточно requireAuthUser; сырой
     // videoUrl нужен только админ-формам редактирования.
-    const auth = await requireAuthUser(request);
-    if ('response' in auth) return auth.response;
-    const includeVideoUrl = auth.user.isAdmin === true;
+    // Админ (admin_token или сессия с isAdmin) — первым: у админа, вошедшего по
+    // логину/паролю или переключившегося на обычный аккаунт, trenki_session без
+    // isAdmin, и форма редактирования получала бы videoUrl: undefined.
+    const isAdmin = (await requireAdminAsync(request)) === null;
+    if (!isAdmin) {
+      const auth = await requireAuthUser(request);
+      if ('response' in auth) return auth.response;
+    }
+    const includeVideoUrl = isAdmin;
 
-    // Получаем ВСЕ видео, включая неопубликованные
+    // Получаем ВСЕ видео, включая неопубликованные. Тренеру не показываем
+    // видео, которые ещё обрабатываются (сырой исходник у атлета не играет).
     const videos = await prisma.video.findMany({
+      where: includeVideoUrl ? undefined : { NOT: { videoUrl: { startsWith: RAW_UPLOAD_PREFIX } } },
       include: {
         trainer: {
           select: {

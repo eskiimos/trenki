@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { updateUserActivity } from '@/lib/updateUserActivity';
 import { requireAdminAsync } from '@/lib/admin-session';
+import { isRawUploadUrl } from '@/lib/media/url-plan';
+import { hasJobForSource } from '@/lib/media/jobs';
+import { kickMediaWorker } from '@/lib/media/worker';
 import { getSessionUserId } from '@/lib/auth-server';
 import { getFreeLessonVideoId } from '@/lib/settings';
 
@@ -187,6 +190,17 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Сырой исходник (s3://uploads/...) заливается приватно и пережимается
+    // воркером после сохранения. До конца обработки видео не публикуется —
+    // публикацию, о которой просил админ, воркер применит сам.
+    const needsProcessing = isRawUploadUrl(videoUrl);
+    if (needsProcessing && (await hasJobForSource(videoUrl))) {
+      return NextResponse.json(
+        { error: 'Этот файл уже использован в другом видео — загрузите файл заново' },
+        { status: 400 },
+      );
+    }
+
     // Преобразуем duration в число
     const durationNum = parseInt(duration) || 0;
     
@@ -257,7 +271,7 @@ export async function POST(request: NextRequest) {
           tags: tags || [],
           equipment: equipment || [],
           level: level || null,
-          isPublished: isPublished ?? false,
+          isPublished: needsProcessing ? false : (isPublished ?? false),
           rpeMin: rpeMinNum,
           rpeMax: rpeMaxNum,
           moduleType: moduleTypeEnum as any,
@@ -274,6 +288,19 @@ export async function POST(request: NextRequest) {
           trainer: true
         }
       });
+
+      // Задача обработки — в той же транзакции: черновик без задачи (сбой между
+      // шагами) навсегда остался бы «сырым» без бейджа и способа починить.
+      if (needsProcessing) {
+        await tx.mediaJob.create({
+          data: {
+            targetType: 'VIDEO',
+            targetId: created.id,
+            sourceUrl: videoUrl,
+            publishOnReady: isPublished ?? false,
+          },
+        });
+      }
 
       // Полный набор авторов (включая ведущего), order = позиция в списке.
       await tx.videoTrainer.createMany({
@@ -339,8 +366,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ video, id: video.id });
+    if (needsProcessing) kickMediaWorker({ immediate: true });
+
+    return NextResponse.json({ video, id: video.id, processing: needsProcessing });
   } catch (error: any) {
+    if (error?.code === 'P2002') {
+      // Уникальный sourceUrl: двойной сабмит — карточка уже создана первым запросом.
+      return NextResponse.json(
+        { error: 'Видео с этим файлом уже сохранено — обновите список' },
+        { status: 409 },
+      );
+    }
     console.error('Error creating video:', error);
     console.error('Error details:', error.message);
     return NextResponse.json({ 

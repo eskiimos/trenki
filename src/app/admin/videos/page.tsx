@@ -1,10 +1,22 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import MultiLevelTagFilter from '@/components/MultiLevelTagFilter';
 import { AgeGroup, TrainingGoal } from '@/generated/prisma';
 import { GOAL_LABELS } from '@/lib/training-algorithm-v3';
+import {
+  MediaJobBadge,
+  MediaJobError,
+  acquireUploadWakeLock,
+  isAbortError,
+  isJobActive,
+  uploadFileToS3,
+  useLeaveWarning,
+  useMediaJobs,
+  useUploadAbortRef,
+} from '@/components/admin/media-upload';
+import { isRawUploadUrl } from '@/lib/media/url-plan';
 import {
   AdminPage,
   PageHeader,
@@ -352,6 +364,22 @@ const AdminVideosPage = () => {
   const [activeTab, setActiveTab] = useState<'basic' | 'algorithm'>('basic');
   const [algorithmSubTab, setAlgorithmSubTab] = useState<'classification' | 'targeting'>('classification');
   const [s3UploadProgress, setS3UploadProgress] = useState<number | null>(null);
+  // Имя только что залитого (ещё не сохранённого) видеофайла — для статуса в форме
+  // и предупреждения при уходе со страницы.
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  // Текущая заливка: отменяется при переключении карточки/отмене формы, чтобы
+  // файл не записался в другую карточку (и не заменил там рабочее видео).
+  // При уходе со страницы заливка тоже отменяется.
+  const uploadAbortRef = useUploadAbortRef();
+  // videoUrl и превью карточки на момент открытия: пока админ их не менял,
+  // форму можно обновить результатом обработки, а превью не слать в PUT.
+  const openedVideoUrlRef = useRef<string | null>(null);
+  const openedThumbnailRef = useRef<string>('');
+  // Зеркало текущего значения поля превью (для onSettled вне рендера).
+  const thumbnailFieldRef = useRef<string>('');
+  const editingVideoIdRef = useRef<string | null>(null);
+  // Токен открытия карточки: ответ /tags от прежней карточки не должен открыть форму.
+  const editSeqRef = useRef(0);
 
   const getMissingAlgorithmFields = (video: Video) => {
     const missing: string[] = [];
@@ -384,7 +412,7 @@ const AdminVideosPage = () => {
     coauthorIds: [] as string[], // мульти-тренер: доп. соавторы (без ведущего)
     tags: '', // Оставляем для обратной совместимости (старые текстовые теги)
     equipment: '',
-    duration: 0, // Длительность в секундах (из Kinescope)
+    duration: 0, // Длительность в секундах (заполняет сервер при обработке файла)
     // Поля для алгоритма тренировок (LoadType-based)
     типМодуля: '',
     типНагрузки: '', // Основное поле - создаёт LoadType тег автоматически
@@ -422,7 +450,7 @@ const AdminVideosPage = () => {
     }
   };
 
-  const fetchVideos = async () => {
+  const fetchVideos = async (): Promise<Video[]> => {
     try {
       // Добавляем timestamp чтобы избежать кэширования
       const response = await fetch(`/api/videos/all?t=${Date.now()}`);
@@ -430,16 +458,73 @@ const AdminVideosPage = () => {
       console.log('Fetched videos:', data.videos);
       setVideos(data.videos || []);
       setListError(false);
+      return data.videos || [];
     } catch (error) {
       console.error('Error fetching videos:', error);
       setListError(true);
+      return [];
     } finally {
       setIsListLoading(false);
     }
   };
 
+  const abortUpload = () => {
+    uploadAbortRef.current?.abort();
+    uploadAbortRef.current = null;
+    setS3UploadProgress(null);
+  };
+
+  // Статусы серверной обработки видео; завершилась — перечитываем список
+  // (videoUrl, длительность, публикация поменялись на сервере).
+  const {
+    jobs: mediaJobs,
+    refresh: refreshMediaJobs,
+    retry: retryMediaJob,
+    dismiss: dismissMediaJob,
+  } = useMediaJobs('VIDEO', async (settledIds) => {
+    const list = await fetchVideos();
+    // Открытая карточка, чей файл только что обработан: подтягиваем новый
+    // videoUrl/длительность/превью, если админ сам эти поля в форме не менял.
+    const id = editingVideoIdRef.current;
+    const fresh = id && settledIds.includes(id) ? list.find((v) => v.id === id) : undefined;
+    if (!fresh) return;
+    // Значения ref — до setState: updater React выполнит позже, при рендере.
+    const openedUrl = openedVideoUrlRef.current;
+    const openedThumb = openedThumbnailRef.current;
+    openedVideoUrlRef.current = fresh.videoUrl ?? null;
+    // Базу превью сдвигаем, только если поле реально получит кадр воркера:
+    // иначе очистка поля ушла бы как «стереть» кадр, которого админ не видел.
+    if (thumbnailFieldRef.current === openedThumb) openedThumbnailRef.current = fresh.thumbnail || '';
+    setFormData((prev) => ({
+      ...prev,
+      ...(prev.videoUrl === openedUrl
+        ? { videoUrl: fresh.videoUrl ?? prev.videoUrl, duration: fresh.duration || prev.duration }
+        : {}),
+      ...(prev.thumbnail === openedThumb ? { thumbnail: fresh.thumbnail || '' } : {}),
+    }));
+  });
+
+  // Идёт заливка или файл залит, но не сохранён — спросить перед сбросом формы.
+  const confirmDiscardUpload = () => {
+    const busy = uploadAbortRef.current !== null;
+    if (!busy && !uploadedFileName) return true;
+    return window.confirm(
+      busy ? 'Загрузка файла будет прервана — продолжить?' : 'Загруженный файл ещё не сохранён — отменить?'
+    );
+  };
+  useLeaveWarning(s3UploadProgress !== null || (showForm && !!uploadedFileName));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (s3UploadProgress !== null) {
+      alert('Дождитесь окончания загрузки файла');
+      return;
+    }
+    if (!formData.videoUrl) {
+      // Поле ссылки у новых видео скрыто — required на нём больше не сработает.
+      alert('Загрузите видеофайл');
+      return;
+    }
     setIsLoading(true);
 
     try {
@@ -452,7 +537,10 @@ const AdminVideosPage = () => {
         title: formData.title,
         description: formData.description,
         videoUrl: formData.videoUrl,
-        thumbnail: formData.thumbnail,
+        // При редактировании превью шлём, только если его меняли: иначе
+        // устаревшая форма затёрла бы кадр, поставленный воркером.
+        thumbnail:
+          editingVideoId && formData.thumbnail === openedThumbnailRef.current ? undefined : formData.thumbnail,
         category: formData.category,
         difficulty: formData.difficulty,
         trainerId: formData.trainerId,
@@ -517,16 +605,40 @@ const AdminVideosPage = () => {
           });
         }
         
-        alert(editingVideoId ? 'Видео успешно обновлено!' : 'Видео успешно добавлено!');
+        const linkIgnored =
+          !!data.videoUrlIgnored &&
+          formData.videoUrl !== openedVideoUrlRef.current &&
+          !isRawUploadUrl(formData.videoUrl);
+        alert(
+          (data.processing
+            ? `${editingVideoId ? 'Изменения сохранены' : 'Видео добавлено'}. Файл обрабатывается на сервере ` +
+              '(обычно 10–30 минут) — видео появится у пользователей автоматически. Страницу можно закрыть.'
+            : editingVideoId
+              ? 'Видео успешно обновлено!'
+              : 'Видео успешно добавлено!') +
+            (linkIgnored ? '\n\nСсылка не изменена: видео уже перенесено в наше хранилище.' : '')
+        );
         setShowForm(false);
+        editSeqRef.current++;
+        editingVideoIdRef.current = null;
         setEditingVideoId(null);
+        setUploadedFileName(null);
+        openedVideoUrlRef.current = null;
+        openedThumbnailRef.current = '';
         setSelectedTagIds([]); // Очищаем выбранные теги
         setFormData({
           ...initialFormState,
           trainerId: trainers[0]?.id || '',
         });
         fetchVideos();
+        void refreshMediaJobs();
       } else {
+        if (response.status === 409) {
+          // Воркер только что обновил карточку: подтягиваем свежие данные в форму
+          // (залитый файл не трогаем) — повторное сохранение безопасно.
+          void fetchVideos();
+          void refreshMediaJobs();
+        }
         alert(`Ошибка: ${data.error}${data.details ? '\nДетали: ' + data.details : ''}`);
       }
     } catch (error) {
@@ -677,137 +789,82 @@ const AdminVideosPage = () => {
     }
   };
 
-  // Загрузка видеофайла в собственное S3-хранилище (reg.ru): получаем presigned
-  // PUT у нашего сервера и грузим файл напрямую в бакет через XHR (с прогрессом).
-  // В поле videoUrl пишется внутренний URL вида s3://videos/<id>.mp4 — плеер
-  // получит подписанную ссылку от API при просмотре.
-  // Длительность файла ДО заливки — через скрытый <video> с objectURL.
-  // Для Kinescope длительность приходила из их API; у S3-загрузок её никто не
-  // проставлял, и каталог показывал «0:00» (правка владельца).
-  const probeVideoDuration = (file: File): Promise<number | null> =>
-    new Promise((resolve) => {
-      try {
-        const url = URL.createObjectURL(file);
-        const v = document.createElement('video');
-        v.preload = 'metadata';
-        const done = (val: number | null) => {
-          URL.revokeObjectURL(url);
-          resolve(val);
-        };
-        v.onloadedmetadata = () =>
-          done(Number.isFinite(v.duration) && v.duration > 0 ? Math.round(v.duration) : null);
-        v.onerror = () => done(null);
-        setTimeout(() => done(null), 10000); // страховка от зависшего decode
-        v.src = url;
-      } catch {
-        resolve(null);
-      }
-    });
-
-  // Общая загрузка в S3: kind=video → приватный файл, s3:// в поле videoUrl;
-  // kind=thumbnail → публичное превью (x-amz-acl из подписи), https в thumbnail.
-  const uploadToS3 = async (file: File, kind: 'video' | 'thumbnail') => {
-    const contentType = file.type || (kind === 'thumbnail' ? 'image/jpeg' : 'video/mp4');
-
+  // Видеофайл → наше S3 как сырой исходник (s3://uploads/...). Сам по себе он
+  // не играбелен: после сохранения карточки сервер пережимает файл
+  // (src/lib/media/worker.ts) и сам подменяет videoUrl, длительность и — если
+  // пусто — превью. Поэтому здесь ни проверки faststart, ни длительности.
+  const runUpload = async (
+    file: File,
+    kind: 'video' | 'thumbnail',
+    apply: (url: string) => void,
+    errorLabel: string
+  ) => {
+    abortUpload();
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
+    const isCurrent = () => uploadAbortRef.current === controller;
+    setS3UploadProgress(0);
     try {
-      setS3UploadProgress(0);
-
-      // Шаг 1: presigned PUT от нашего сервера (fileSize — для проверки на
-      // сырой исходник: транскодинга нет, что залито — то и раздаётся)
-      const initRes = await fetch('/api/admin/s3/upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName: file.name, contentType, kind, fileSize: file.size }),
-      });
-      const init = await initRes.json().catch(() => ({}));
-      if (!initRes.ok) {
-        alert(`Ошибка подготовки загрузки: ${init.error || `HTTP ${initRes.status}`}`);
-        setS3UploadProgress(null);
-        return;
-      }
-      const { uploadUrl, videoUrl, acl } = init;
-
-      // Шаг 2: PUT напрямую в S3. Content-Type (и x-amz-acl для превью) обязаны
-      // совпадать с подписанными, иначе S3 ответит 403.
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('PUT', uploadUrl);
-        xhr.setRequestHeader('Content-Type', contentType);
-        if (acl) xhr.setRequestHeader('x-amz-acl', acl);
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            setS3UploadProgress(Math.round((event.loaded / event.total) * 100));
-          }
-        };
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve();
-          } else {
-            reject(new Error(`Upload failed: ${xhr.status} ${xhr.responseText}`));
-          }
-        };
-        xhr.onerror = () => reject(new Error('Network error during upload'));
-        xhr.send(file);
-      });
-
-      // Шаг 3: записываем URL в нужное поле формы; для видео — заодно
-      // длительность из самого файла (иначе в каталоге «0:00»)
-      if (kind === 'thumbnail') {
-        setFormData(prev => ({ ...prev, thumbnail: videoUrl }));
-      } else {
-        const durationSec = await probeVideoDuration(file);
-        setFormData(prev => ({
-          ...prev,
-          videoUrl,
-          ...(durationSec && (!prev.duration || prev.duration <= 0)
-            ? { duration: durationSec }
-            : {}),
-        }));
-      }
-      setS3UploadProgress(null);
-
-      // Шаг 4 (видео): серверная проверка faststart — файл без него на
-      // телефонах «вечно грузится», и лучше узнать об этом сейчас, а не из
-      // жалоб пользователей.
-      let warned = false;
-      if (kind === 'video') {
-        try {
-          const v = await fetch('/api/admin/s3/verify-video', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ videoUrl }),
-          });
-          const check = await v.json().catch(() => ({}));
-          if (v.ok && check.ok === false && check.warning) {
-            warned = true;
-            alert(`Файл загружен, НО: ${check.warning}`);
-          }
-        } catch { /* проверка — не повод ломать загрузку */ }
-      }
-      if (!warned) {
-        alert(kind === 'thumbnail' ? 'Превью загружено в хранилище' : 'Файл загружен в хранилище');
-      }
+      const url = await uploadFileToS3(
+        file,
+        kind,
+        (p) => {
+          if (isCurrent()) setS3UploadProgress(p);
+        },
+        controller.signal
+      );
+      if (isCurrent()) apply(url);
     } catch (error: any) {
+      if (isAbortError(error) || !isCurrent()) return;
       console.error('S3 upload error:', error);
-      alert(`Ошибка загрузки в хранилище: ${error.message}`);
-      setS3UploadProgress(null);
+      alert(`${errorLabel}: ${error.message}`);
+    } finally {
+      if (isCurrent()) {
+        uploadAbortRef.current = null;
+        setS3UploadProgress(null);
+      }
     }
   };
 
   const handleS3FileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) await uploadToS3(file, 'video');
     e.target.value = '';
+    if (!file) return;
+    await runUpload(
+      file,
+      'video',
+      (url) => {
+        setFormData(prev => ({ ...prev, videoUrl: url }));
+        setUploadedFileName(file.name);
+      },
+      'Ошибка загрузки видео'
+    );
   };
 
+  // Превью в S3: публичный объект, прямая ссылка без TTL.
   const handleS3ThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) await uploadToS3(file, 'thumbnail');
     e.target.value = '';
+    if (!file) return;
+    await runUpload(file, 'thumbnail', (url) => setFormData(prev => ({ ...prev, thumbnail: url })), 'Ошибка загрузки превью');
   };
 
     const handleEditVideo = async (video: Video) => {
+    // Та же карточка уже открыта (частый путь на телефоне — вернуться к форме):
+    // ничего не сбрасываем, просто прокручиваем.
+    if (showForm && editingVideoId === video.id) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (!confirmDiscardUpload()) return;
+    abortUpload();
+    const seq = ++editSeqRef.current;
+    editingVideoIdRef.current = video.id;
     setEditingVideoId(video.id);
+    setUploadedFileName(null);
+    setSelectedTagIds([]);
+    openedVideoUrlRef.current = video.videoUrl ?? null;
+    openedThumbnailRef.current = video.thumbnail || '';
     
     // Обратный маппинг enum → русские названия для формы
     const moduleTypeToRussian: Record<string, string> = {
@@ -843,7 +900,8 @@ const AdminVideosPage = () => {
     setFormData({
       title: video.title,
       description: video.description || '',
-      videoUrl: video.videoUrl,
+      // undefined, если сессия не признана админской (videoUrl не отдан) — не падаем.
+      videoUrl: video.videoUrl ?? '',
       thumbnail: video.thumbnail || '',
       category: video.category,
       difficulty: video.difficulty,
@@ -873,15 +931,17 @@ const AdminVideosPage = () => {
     // Загружаем теги из базы данных для этого видео
     try {
       const response = await fetch(`/api/videos/${video.id}/tags`);
+      if (seq !== editSeqRef.current) return; // пока грузились теги, открыли другую карточку
       if (response.ok) {
         const data = await response.json();
+        if (seq !== editSeqRef.current) return;
         // data.tags - массив объектов Tag с полем id
         setSelectedTagIds(data.tags.map((tag: { id: string }) => tag.id));
       }
     } catch (error) {
       console.error('Error loading video tags:', error);
-      setSelectedTagIds([]);
     }
+    if (seq !== editSeqRef.current) return;
     
     setActiveTab('basic'); // Всегда начинаем с первой вкладки
     setAlgorithmSubTab('classification'); // И с первой подвкладки
@@ -890,7 +950,14 @@ const AdminVideosPage = () => {
   };
 
   const handleCancelEdit = () => {
+    if (!confirmDiscardUpload()) return;
+    abortUpload();
+    editSeqRef.current++;
+    editingVideoIdRef.current = null;
     setEditingVideoId(null);
+    setUploadedFileName(null);
+    openedVideoUrlRef.current = null;
+    openedThumbnailRef.current = '';
     setShowForm(false);
     setSelectedTagIds([]); // Очищаем выбранные теги
     setActiveTab('basic'); // Сбрасываем на первую вкладку
@@ -1338,6 +1405,14 @@ const AdminVideosPage = () => {
     }
   };
 
+  thumbnailFieldRef.current = formData.thumbnail;
+  const editingJob = editingVideoId ? mediaJobs[editingVideoId] : undefined;
+  // Поле ссылки — только у старых записей со сторонним URL (Kinescope). Решаем по
+  // URL из списка: иначе очищенное поле исчезало бы вместе с кнопкой.
+  const originalVideoUrl = editingVideoId ? videos.find((v) => v.id === editingVideoId)?.videoUrl ?? '' : '';
+  const showLegacyUrlField =
+    !!originalVideoUrl && !originalVideoUrl.startsWith('s3://') && !formData.videoUrl.startsWith('s3://');
+
   return (
     <AdminPage>
       <PageHeader
@@ -1354,7 +1429,17 @@ const AdminVideosPage = () => {
               if (showForm && editingVideoId) {
                 handleCancelEdit();
               } else if (!showForm) {
-                // Открываем форму для нового видео
+                // Открываем форму для нового видео. Сбрасываем режим
+                // редактирования: иначе «Добавить видео» ушло бы PUT-ом в
+                // прошлую открытую карточку.
+                abortUpload();
+                editSeqRef.current++;
+                editingVideoIdRef.current = null;
+                setEditingVideoId(null);
+                setSelectedTagIds([]);
+                setUploadedFileName(null);
+                openedVideoUrlRef.current = null;
+                openedThumbnailRef.current = '';
                 setFormData({
                   ...initialFormState,
                   trainerId: trainers[0]?.id || '',
@@ -1363,8 +1448,7 @@ const AdminVideosPage = () => {
                 setAlgorithmSubTab('classification');
                 setShowForm(true);
               } else {
-                // Закрываем форму
-                setShowForm(false);
+                // Закрываем форму (handleCancelEdit спросит, если файл не сохранён)
                 handleCancelEdit();
               }
             }}
@@ -1503,70 +1587,102 @@ const AdminVideosPage = () => {
                     </p>
                   </div>
 
-                  {/* URL видео */}
+                  {/* Видео: файл в наше хранилище. Kinescope временно исключён для
+                      новых видео (решение владельца 16.09): поле ссылки остаётся
+                      только у старых записей со сторонней ссылкой — чтобы их можно
+                      было редактировать, не перезаливая. */}
                   <div className="md:col-span-2">
-                    <label style={labelStyle}>URL видео<Req /></label>
-                    <div className="flex flex-wrap gap-2">
-                      <input
-                        type="url"
-                        name="videoUrl"
-                        value={formData.videoUrl}
-                        onChange={handleChange}
-                        required
-                        placeholder="ID или ссылка на видео"
-                        style={{ ...inputStyle, width: 'auto', flex: '1 1 240px', minWidth: 0 }}
-                      />
-                      {formData.videoUrl && formData.videoUrl.includes('kinescope.io') && (
-                        <AdminButton
-                          type="button"
-                          tone="secondary"
-                          onClick={handleFetchKinescopeMetadata}
-                          disabled={isLoading}
-                        >
-                          {isLoading ? (
-                            <Loader2 size={20} className="animate-spin" aria-hidden />
-                          ) : (
-                            <RefreshCw size={20} aria-hidden />
+                    <label style={labelStyle}>Видео<Req /></label>
+                    {showLegacyUrlField && (
+                      <>
+                        <div className="flex flex-wrap gap-2">
+                          <input
+                            type="url"
+                            name="videoUrl"
+                            value={formData.videoUrl}
+                            onChange={handleChange}
+                            placeholder="https://kinescope.io/..."
+                            style={{ ...inputStyle, width: 'auto', flex: '1 1 240px', minWidth: 0 }}
+                          />
+                          {formData.videoUrl.includes('kinescope.io') && (
+                            <AdminButton
+                              type="button"
+                              tone="secondary"
+                              onClick={handleFetchKinescopeMetadata}
+                              disabled={isLoading}
+                            >
+                              {isLoading ? (
+                                <Loader2 size={20} className="animate-spin" aria-hidden />
+                              ) : (
+                                <RefreshCw size={20} aria-hidden />
+                              )}
+                              {isLoading ? 'Загрузка...' : 'Получить данные'}
+                            </AdminButton>
                           )}
-                          {isLoading ? 'Загрузка...' : 'Получить данные'}
-                        </AdminButton>
-                      )}
-                    </div>
-                    <p style={hintStyle}>
-                      После вставки URL нажмите «Получить данные» для автозаполнения превью
-                    </p>
+                        </div>
+                        <p style={hintStyle}>
+                          Старое видео по ссылке. Чтобы перенести его в наше хранилище — загрузите файл ниже.
+                        </p>
+                      </>
+                    )}
 
-                    {/* Загрузка файла в собственное S3-хранилище (reg.ru).
-                        Заливка на Kinescope убрана (правка владельца 14.09):
-                        оставался второй способ, который только путал. Старые
-                        Kinescope-ссылки по-прежнему вставляются в поле URL и
-                        играются. */}
-                    <div className="flex items-center gap-3" style={{ marginTop: 16 }}>
-                      <div style={{ flex: 1, height: 1, background: 'var(--border-hairline)' }} />
-                      <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>или загрузить файл</span>
-                      <div style={{ flex: 1, height: 1, background: 'var(--border-hairline)' }} />
-                    </div>
+                    {editingJob && (isJobActive(editingJob) || editingJob.status === 'FAILED') && (
+                      <div style={{ marginTop: 8 }}>
+                        <MediaJobBadge job={editingJob} />
+                        <MediaJobError
+                          job={editingJob}
+                          onRetry={retryMediaJob}
+                          onDismiss={originalVideoUrl && !isRawUploadUrl(originalVideoUrl) ? dismissMediaJob : undefined}
+                        />
+                      </div>
+                    )}
+
+                    {s3UploadProgress === null && uploadedFileName && (
+                      <p className="flex items-start gap-2" style={{ ...hintStyle, color: 'var(--color-ink)' }}>
+                        <Check size={16} style={{ flexShrink: 0, marginTop: 2, color: 'var(--color-brand)' }} aria-hidden />
+                        <span>
+                          Файл «{uploadedFileName}» загружен. После сохранения сервер обработает его
+                          (обычно 10–30 минут) — видео появится у пользователей автоматически.
+                        </span>
+                      </p>
+                    )}
+                    {s3UploadProgress === null && !uploadedFileName && formData.videoUrl.startsWith('s3://videos/') && (
+                      <p className="flex items-center gap-2" style={{ ...hintStyle, color: 'var(--color-ink)' }}>
+                        <Check size={16} style={{ color: 'var(--color-brand)' }} aria-hidden />
+                        Видео в хранилище{formData.duration > 0 ? ` · ${formatDuration(formData.duration)}` : ''}
+                      </p>
+                    )}
+
                     <div style={{ marginTop: 12 }}>
-                      <label htmlFor="s3FileUpload" style={uploadLabelStyle(s3UploadProgress !== null)}>
+                      <label
+                        htmlFor="s3FileUpload"
+                        onClick={acquireUploadWakeLock}
+                        style={uploadLabelStyle(s3UploadProgress !== null, formData.videoUrl ? 'secondary' : 'primary')}
+                      >
                         <CloudUpload size={20} aria-hidden />
-                        Загрузить видеофайл
+                        {formData.videoUrl ? 'Заменить видеофайл' : 'Загрузить видеофайл'}
                       </label>
                       <input
                         id="s3FileUpload"
                         type="file"
-                        accept="video/mp4,video/webm"
+                        accept="video/*"
                         onChange={handleS3FileUpload}
                         disabled={s3UploadProgress !== null}
                         className="hidden"
                       />
                       {s3UploadProgress !== null && (
-                        <ProgressBar value={s3UploadProgress} label="Загрузка в хранилище" />
+                        <>
+                          <ProgressBar value={s3UploadProgress} label="Загрузка в хранилище" />
+                          <p style={hintStyle}>
+                            Не блокируйте экран, не сворачивайте браузер и не уходите со страницы
+                            до конца загрузки — на iPhone уход не предупреждается, и загрузка прервётся.
+                          </p>
+                        </>
                       )}
                       <p style={hintStyle}>
-                        Только готовый к вебу MP4 (H.264, до 1080p, ~4-5 Мбит/с): транскодинга
-                        нет — что залито, то и получат телефоны. Исходник .mov с камеры
-                        (гигабайтный, 2.7K) у пользователей НЕ играется — сначала экспортируй
-                        в MP4. Модуль на 10 минут ≈ 300-400 МБ.
+                        Подойдёт файл прямо с телефона или камеры (MOV или MP4, до 4 ГБ): сервер
+                        сам сожмёт его до 1080p. Длительность и превью (если не загрузить своё)
+                        заполнятся автоматически.
                       </p>
                     </div>
                   </div>
@@ -2414,11 +2530,11 @@ const AdminVideosPage = () => {
                   type="button"
                   tone="secondary"
                   icon={X}
-                  onClick={() => setShowForm(false)}
+                  onClick={handleCancelEdit}
                 >
                   Отмена
                 </AdminButton>
-                <AdminButton type="submit" tone="primary" disabled={isLoading}>
+                <AdminButton type="submit" tone="primary" disabled={isLoading || s3UploadProgress !== null}>
                   {isLoading ? (
                     <Loader2 size={20} className="animate-spin" aria-hidden />
                   ) : (
@@ -2496,6 +2612,16 @@ const AdminVideosPage = () => {
                       {video.isPublished ? 'Опубликовано' : 'Черновик'}
                     </span>
                   </div>
+                  {(isJobActive(mediaJobs[video.id]) || mediaJobs[video.id]?.status === 'FAILED') && (
+                    <div style={{ marginTop: 8 }}>
+                      <MediaJobBadge job={mediaJobs[video.id]} />
+                    </div>
+                  )}
+                  <MediaJobError
+                    job={mediaJobs[video.id]}
+                    onRetry={retryMediaJob}
+                    onDismiss={video.videoUrl && !isRawUploadUrl(video.videoUrl) ? dismissMediaJob : undefined}
+                  />
 
                   {missingFields.length > 0 && (
                     <div
@@ -2579,8 +2705,14 @@ const AdminVideosPage = () => {
                       type="button"
                       tone={video.athletesNotifiedAt ? 'secondary' : 'primary'}
                       onClick={() => handleNotifyAthletes(video)}
-                      disabled={!video.isPublished}
-                      title={!video.isPublished ? 'Сначала опубликуйте видео' : undefined}
+                      disabled={!video.isPublished || isJobActive(mediaJobs[video.id])}
+                      title={
+                        isJobActive(mediaJobs[video.id])
+                          ? 'Дождитесь окончания обработки видео'
+                          : !video.isPublished
+                            ? 'Сначала опубликуйте видео'
+                            : undefined
+                      }
                     >
                       {video.athletesNotifiedAt ? (
                         <>

@@ -63,6 +63,11 @@ COPY certs/russian_trusted_root_ca.crt certs/russian_trusted_sub_ca.crt /usr/loc
 RUN apk add --no-cache ca-certificates && update-ca-certificates
 ENV NODE_OPTIONS=--use-openssl-ca
 
+# ffmpeg для серверной обработки видео (src/lib/media/worker.ts): админ
+# заливает сырой исходник, сервер пережимает в H.264 1080p. Пакет Alpine
+# содержит libx264 и zscale (тонмаппинг HDR с iPhone). ~130 МБ к образу.
+RUN apk add --no-cache ffmpeg
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
