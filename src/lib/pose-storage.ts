@@ -9,8 +9,10 @@
  *
  * Безопасность:
  *  - Тип ассета `authenticated`: публичный URL без подписи возвращает 401.
- *  - На GET /api/pose-sessions/[id] бэкенд проверяет роль (coach или владелец)
- *    и подписывает временный URL (TTL 1 час) через `cloudinary.utils.private_download_url`.
+ *  - На GET /api/pose-sessions/[id] бэкенд проверяет доступ (владелец сессии или
+ *    тренер его ACTIVE-команды, см. src/lib/pose-access.ts — одной роли COACH
+ *    недостаточно, это был IDOR) и подписывает временный URL (TTL 1 час) через
+ *    `cloudinary.utils.private_download_url`.
  */
 
 import { v2 as cloudinary } from 'cloudinary';

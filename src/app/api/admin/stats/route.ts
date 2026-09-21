@@ -1,32 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminAsync } from '@/lib/admin-session';
+import { logger } from '@/lib/logger';
+import {
+  STATS_TZ,
+  buildDailySeries,
+  dayWindow,
+  hourInTz,
+  sumLastDays,
+  zonedDayStart,
+} from '@/lib/stats/daily-series';
+import { ADMIN_STATS_WORKOUTS, NON_STAFF_USER_WHERE } from '@/lib/stats/workout-definition';
+import {
+  countCountedWorkouts,
+  findCountedWorkoutDates,
+  getStaffUserIds,
+} from '@/lib/stats/workout-definition-server';
+
+/** Графики и суммы «за 30 дней» — одно окно: сегодня + 29 дней до него. */
+const CHART_DAYS = 30;
 
 export async function GET(request: NextRequest) {
   const denied = await requireAdminAsync(request);
   if (denied) return denied;
   try {
+    // Все границы — по Москве явно, а не по таймзоне процесса: раньше
+    // `new Date(y, m, d)` давал МСК-полночь в проде (TZ контейнера), но
+    // группировка по дням шла через toISOString (UTC) — ночные записи
+    // уезжали во вчера, и последний столбик не совпадал с KPI «сегодня».
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const window30 = dayWindow(CHART_DAYS, now, STATS_TZ);
+    const today = zonedDayStart(window30.lastDay, STATS_TZ);
+    // «За неделю» — 7 календарных дней включая сегодня (раньше было 8: today − 7 суток)
+    const weekAgo = zonedDayStart(window30.lastDay - 6, STATS_TZ);
+    const monthAgo = window30.since;
     const twoMinutesAgo = new Date(now.getTime() - 2 * 60 * 1000);
+
+    // ===== РЯДЫ ЗА 30 ДНЕЙ (регистрации и тренировки) =====
+    // Ровно 30 точек с нулями у обоих рядов — соседние графики на дашборде
+    // всегда одной ширины и с одинаковыми датами.
+    //
+    // Регистрации — без аккаунтов команды (isAdmin/isTester): тестовые
+    // аккаунты — шум в метрике роста, а тренировки команды исключены по
+    // решению владельца; KPI и график считаем одинаково. Флаг ставится уже
+    // после регистрации, поэтому помеченный тестер исчезает и из прошлых дней —
+    // это и нужно. «Всего пользователей» (знаменатель DAU/WAU) не трогаем.
+    //
+    // Тренировка — по общему определению (см. src/lib/stats/workout-definition).
+    // Список команды берём один раз на оба подсчёта (график и итог за всё время).
+    const staffUserIds = await getStaffUserIds();
+    const [registrationRows, workoutDates, countedWorkoutsTotal] = await Promise.all([
+      prisma.user.findMany({
+        where: { createdAt: { gte: window30.since }, ...NON_STAFF_USER_WHERE },
+        select: { createdAt: true },
+      }),
+      findCountedWorkoutDates(ADMIN_STATS_WORKOUTS, { since: window30.since, staffUserIds }),
+      countCountedWorkouts(ADMIN_STATS_WORKOUTS, { staffUserIds }),
+    ]);
+    const registrationsSeries = buildDailySeries(
+      registrationRows.map((u) => u.createdAt),
+      window30,
+      STATS_TZ,
+    );
+    const sessionsSeries = buildDailySeries(workoutDates, window30, STATS_TZ);
 
     // ===== ПОЛЬЗОВАТЕЛИ =====
     const totalUsers = await prisma.user.count();
-    const usersToday = await prisma.user.count({
-      where: { createdAt: { gte: today } }
-    });
-    const usersYesterday = await prisma.user.count({
-      where: { createdAt: { gte: yesterday, lt: today } }
-    });
-    const usersThisWeek = await prisma.user.count({
-      where: { createdAt: { gte: weekAgo } }
-    });
-    const usersThisMonth = await prisma.user.count({
-      where: { createdAt: { gte: monthAgo } }
-    });
+    // Суммы — из того же ряда, что и график: цифры в карточке и столбики сходятся
+    const usersToday = sumLastDays(registrationsSeries, 1);
+    const usersYesterday = registrationsSeries.at(-2)?.count ?? 0;
+    const usersThisWeek = sumLastDays(registrationsSeries, 7);
+    const usersThisMonth = sumLastDays(registrationsSeries, CHART_DAYS);
 
     // Активные пользователи (были онлайн)
     const activeToday = await prisma.user.count({
@@ -81,17 +125,19 @@ export async function GET(request: NextRequest) {
     // ===== ТРЕНИРОВКИ =====
     // Считаем по WorkoutSession (реальные тренировки), а НЕ по legacy-пустой
     // TrainingSession — иначе дашборд показывал 0. «Сегодня/неделя/график» —
-    // по фактически завершённым (completedAt).
+    // по общему определению тренировки, из одного ряда по МСК-дням; counted —
+    // то же определение за всё время (KPI «Тренировок»).
+    // total/completed/completionRate — статусы ВСЕХ сессий за всё время
+    // (с синтетикой, командой, закрытыми днями цикла; PARTIAL не в completed).
+    // Это воронка статусов, а не «тренировки»: в UI подписана отдельно, и
+    // доля не считается как counted/total — числитель и знаменатель жили бы
+    // по разным правилам.
     const totalSessions = await prisma.workoutSession.count();
     const completedSessions = await prisma.workoutSession.count({
       where: { status: 'COMPLETED' }
     });
-    const sessionsToday = await prisma.workoutSession.count({
-      where: { status: 'COMPLETED', completedAt: { gte: today } }
-    });
-    const sessionsThisWeek = await prisma.workoutSession.count({
-      where: { status: 'COMPLETED', completedAt: { gte: weekAgo } }
-    });
+    const sessionsToday = sumLastDays(sessionsSeries, 1);
+    const sessionsThisWeek = sumLastDays(sessionsSeries, 7);
 
     // ===== ИЗБРАННОЕ =====
     const totalFavorites = await prisma.favoriteVideo.count();
@@ -118,46 +164,19 @@ export async function GET(request: NextRequest) {
       where: { gender: { not: null } }
     });
 
-    // ===== РЕГИСТРАЦИИ ПО ДНЯМ (последние 30 дней) =====
-    // Получаем все пользователи за последний месяц и группируем на клиенте
-    const usersLastMonth = await prisma.user.findMany({
-      where: { createdAt: { gte: monthAgo } },
-      select: { createdAt: true },
-      orderBy: { createdAt: 'asc' }
-    });
-
-    const registrationsByDay = usersLastMonth.reduce((acc, user) => {
-      const dateStr = user.createdAt.toISOString().split('T')[0];
-      acc[dateStr] = (acc[dateStr] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    // ===== АКТИВНОСТЬ ПО ЧАСАМ (сегодня) =====
+    // ===== АКТИВНОСТЬ ПО ЧАСАМ (сегодня, МСК) =====
+    // Оговорка: это час ПОСЛЕДНЕЙ активности каждого пользователя
+    // (User.lastActivity), а не все его заходы за день.
     const activeUsersToday = await prisma.user.findMany({
       where: { lastActivity: { gte: today } },
       select: { lastActivity: true }
     });
 
     const activityByHour = activeUsersToday.reduce((acc, user) => {
-      const hour = user.lastActivity.getHours();
+      const hour = hourInTz(user.lastActivity, STATS_TZ);
       acc[hour] = (acc[hour] || 0) + 1;
       return acc;
     }, {} as Record<number, number>);
-
-    // ===== ТРЕНИРОВКИ ПО ДНЯМ (последние 30 дней) =====
-    // Завершённые тренировки по дню завершения (completedAt).
-    const sessionsLastMonth = await prisma.workoutSession.findMany({
-      where: { status: 'COMPLETED', completedAt: { gte: monthAgo } },
-      select: { completedAt: true },
-      orderBy: { completedAt: 'asc' }
-    });
-
-    const sessionsByDay = sessionsLastMonth.reduce((acc, session) => {
-      if (!session.completedAt) return acc;
-      const dateStr = session.completedAt.toISOString().split('T')[0];
-      acc[dateStr] = (acc[dateStr] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
 
     // ===== ТОП КОНТЕНТ =====
     const topVideos = await prisma.video.findMany({
@@ -269,6 +288,7 @@ export async function GET(request: NextRequest) {
         favorites: totalFavorites
       },
       training: {
+        counted: countedWorkoutsTotal,
         total: totalSessions,
         completed: completedSessions,
         completionRate: totalSessions > 0 ? ((completedSessions / totalSessions) * 100).toFixed(1) : 0,
@@ -299,18 +319,13 @@ export async function GET(request: NextRequest) {
         }))
       },
       charts: {
-        registrations: Object.entries(registrationsByDay).map(([date, count]) => ({
-          date,
-          count
-        })),
+        // Ровно CHART_DAYS точек { date: 'YYYY-MM-DD' (МСК), count } с нулями
+        registrations: registrationsSeries,
         activity: Object.entries(activityByHour).map(([hour, count]) => ({
           hour: parseInt(hour),
           count
         })),
-        sessions: Object.entries(sessionsByDay).map(([date, count]) => ({
-          date,
-          count
-        }))
+        sessions: sessionsSeries
       },
       top: {
         videos: topVideos,
@@ -322,7 +337,7 @@ export async function GET(request: NextRequest) {
       generatedAt: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Error fetching stats:', error);
+    logger.error('admin stats: failed', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

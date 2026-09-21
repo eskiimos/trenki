@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
+import { coachAthletesWhere, isCoachOfAthlete } from '@/lib/coach/athlete-access';
+import { resolvePoseListScope } from '@/lib/pose-access';
+import type { Prisma } from '@/generated/prisma';
 import {
   POSE_FRAMES_ENCODING,
   encodePoseFrames,
@@ -107,7 +110,7 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/pose-sessions?athleteId=...&videoId=...
- * Тренер видит сессии своих атлетов, атлет — только свои.
+ * Тренер видит сессии атлетов своих команд (ACTIVE), атлет — только свои.
  * Сами кадры не возвращаем (тяжело) — только превью-метаданные.
  */
 export async function GET(request: NextRequest) {
@@ -118,11 +121,20 @@ export async function GET(request: NextRequest) {
   const athleteIdParam = url.searchParams.get('athleteId');
   const videoIdParam = url.searchParams.get('videoId');
 
-  const where: { athleteId?: string; videoId?: string } = {};
-  if (auth.user.role === 'COACH') {
-    if (athleteIdParam) where.athleteId = athleteIdParam;
-  } else {
+  const where: Prisma.PoseSessionWhereInput = {};
+  const scope = resolvePoseListScope(auth.user, athleteIdParam);
+  if (scope.kind === 'own') {
     where.athleteId = auth.user.id;
+  } else if (scope.kind === 'coach-athlete') {
+    // Чужой атлет — 403, как у карточки атлета (coach-view): страница атлета
+    // тренеру в этом случае и так недоступна, молча отдавать пустой список незачем.
+    if (!(await isCoachOfAthlete(auth.user.id, scope.athleteId))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    where.athleteId = scope.athleteId;
+  } else {
+    // Без ?athleteId раньше уходил пустой where — последние 50 сессий всей базы.
+    where.athlete = coachAthletesWhere(auth.user.id);
   }
   if (videoIdParam) where.videoId = videoIdParam;
 

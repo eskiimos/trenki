@@ -32,6 +32,7 @@ import { parsePrevDay, labelFor } from '@/lib/microcycle/week-plan';
 import { MicrocycleStatus } from '@/generated/prisma';
 import { getReminderSettings } from '@/lib/settings';
 import { buildDailyReminder } from '@/lib/notifications/reminder-texts';
+import { pushTag } from '@/lib/notifications/push-tag';
 
 export const dynamic = 'force-dynamic';
 
@@ -146,6 +147,9 @@ export async function GET(request: NextRequest) {
       title: text.title,
       body: text.body,
       url: '/calendar',
+      // Явная метка: варианты заголовка чередуются по дням, и по заголовку
+      // сегодняшнее не заменило бы вчерашнее «сегодня у тебя …».
+      tag: pushTag('daily-reminder'),
     }).catch((err) => console.error('microcycle reminder push failed', userId, err));
     sent++;
   }

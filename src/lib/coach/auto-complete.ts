@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import { sendUserPush } from './push';
+import { assignmentDonePush } from './assignment-push';
 
 /**
  * Закрывает все активные (PENDING/IN_PROGRESS) задания игрока на указанные videoIds.
@@ -39,11 +40,7 @@ export async function markAssignmentsCompletedForVideos(
   const coachIds = Array.from(new Set(active.map((a) => a.coachId)));
   await Promise.allSettled(
     coachIds.map((coachId) =>
-      sendUserPush(coachId, {
-        title: 'Задание выполнено',
-        body: `${athleteName} закрыл назначенную тренировку`,
-        url: '/coach/assignments',
-      })
+      sendUserPush(coachId, assignmentDonePush({ id: athleteId, name: athleteName }))
     )
   );
 }

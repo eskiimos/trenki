@@ -148,6 +148,7 @@ const COMPLEXITY_LABELS: Record<string, string> = {
   AMATEUR: 'Любитель',
   ADVANCED: 'Продвинутый',
   PRO: 'Профи',
+  ANY: 'Любой', // подходит всем уровням; в дырах не бывает, только в статистике
 };
 
 const ENERGY_LABELS: Record<string, string> = {

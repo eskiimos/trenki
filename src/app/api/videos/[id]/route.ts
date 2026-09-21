@@ -176,6 +176,9 @@ export async function PUT(
       'Любитель': 'AMATEUR',
       'Продвинутый': 'ADVANCED',
       'Профи': 'PRO',
+      // «Любой» — видео подходит атлету любого уровня (разминка, заминка):
+      // подбор берёт его наравне с видео точного уровня.
+      'Любой': 'ANY',
     };
     const complexityEnum = complexity ? complexityMap[complexity] || complexity : null;
 

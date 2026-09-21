@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuthUser, requireCoach } from '@/lib/coach/guards';
+import { isCoachOfAthlete } from '@/lib/coach/athlete-access';
+import { canReviewPoseSession, canViewPoseSession } from '@/lib/pose-access';
 import { POSE_FRAMES_ENCODING, signPoseFramesUrl } from '@/lib/pose-storage';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/pose-sessions/[id]
- * Тренер видит любую сессию, атлет — только свою.
+ * Атлет видит только свою сессию, тренер — сессии атлетов своих команд (ACTIVE).
  *
  * Кадры скелета НЕ возвращаются в ответе:
  *  - новые сессии: возвращаем `framesUrl` (signed, TTL 1 час) — клиент сам качает с Cloudinary;
@@ -30,7 +32,13 @@ export async function GET(
   });
   if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  if (auth.user.role !== 'COACH' && session.athleteId !== auth.user.id) {
+  // Раньше любой COACH открывал любую сессию. Проверку команды делаем только
+  // тренеру и только для чужой сессии — свою атлет открывает без запроса в БД.
+  const coachOfAthlete =
+    auth.user.role === 'COACH' &&
+    session.athleteId !== auth.user.id &&
+    (await isCoachOfAthlete(auth.user.id, session.athleteId));
+  if (!canViewPoseSession(auth.user, session.athleteId, coachOfAthlete)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -74,7 +82,8 @@ export async function GET(
 
 /**
  * PATCH /api/pose-sessions/[id]
- * Тренер ставит оценку и комментарий к сессии трекинга движений атлета.
+ * Тренер ставит оценку и комментарий к сессии трекинга движений атлета
+ * своей команды (ACTIVE). Раньше оценить можно было любую сессию в базе.
  */
 export async function PATCH(
   request: NextRequest,
@@ -93,9 +102,21 @@ export async function PATCH(
   }
   const comment = typeof body.comment === 'string' ? body.comment.slice(0, 1000) : null;
 
-  const existing = await prisma.poseSession.findUnique({ where: { id } });
+  const existing = await prisma.poseSession.findUnique({
+    where: { id },
+    select: { athleteId: true },
+  });
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
+  const coachOfAthlete =
+    existing.athleteId !== auth.user.id &&
+    (await isCoachOfAthlete(auth.user.id, existing.athleteId));
+  if (!canReviewPoseSession(auth.user, existing.athleteId, coachOfAthlete)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  // Отдаём только поля оценки: полная строка тащила бы legacy-кадры (JSONB до
+  // 9000 кадров) и сырой Cloudinary public_id, а клиенту нужен лишь факт успеха.
   const updated = await prisma.poseSession.update({
     where: { id },
     data: {
@@ -103,6 +124,15 @@ export async function PATCH(
       coachRating: rating,
       coachComment: comment ?? undefined,
       reviewedAt: new Date(),
+    },
+    select: {
+      id: true,
+      athleteId: true,
+      videoId: true,
+      coachId: true,
+      coachRating: true,
+      coachComment: true,
+      reviewedAt: true,
     },
   });
 

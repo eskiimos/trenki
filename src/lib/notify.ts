@@ -7,6 +7,7 @@
  */
 import { isValidTelegramId, sendTelegramMessage } from '@/lib/telegram';
 import { sendUserPush } from '@/lib/coach/push';
+import { logger } from '@/lib/logger';
 
 interface NotifyPayload {
   /** Заголовок (для push) */
@@ -15,6 +16,12 @@ interface NotifyPayload {
   body: string;
   /** Куда вести по клику (для push) */
   url?: string;
+  /**
+   * Метка push (pushTag из '@/lib/notifications/push-tag'). Нужна, когда у пушей
+   * одного смысла разные заголовки (напоминания «через 30» и «через 10 минут»):
+   * без неё метка берётся из заголовка, и устаревшее напоминание не заменяется.
+   */
+  tag?: string;
   /** Полный текст для Telegram (с эмодзи и форматированием) */
   telegramMessage: string;
   /** Опции для Telegram API: parse_mode, inline_keyboard и т.п. */
@@ -47,10 +54,11 @@ export async function notifyUser(
       title: payload.title,
       body: payload.body,
       url: payload.url,
+      tag: payload.tag,
     });
     return 'push';
   } catch (err) {
-    console.error('[notifyUser] push fallback failed:', err);
+    logger.error('notifyUser: push fallback failed', err, { userId: user.id });
     return 'none';
   }
 }

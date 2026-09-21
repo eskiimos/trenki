@@ -24,6 +24,7 @@ import { prisma } from '@/lib/prisma';
 import { sendUserPush } from '@/lib/coach/push';
 import { hasPremium } from '@/lib/access';
 import { decideNudge, DUSTY_AFTER_DAYS } from '@/lib/notifications/nudges';
+import { pushTag } from '@/lib/notifications/push-tag';
 import { computeStreak } from '@/lib/gamification';
 import { WorkoutStatus, UserRole } from '@/generated/prisma';
 
@@ -143,6 +144,9 @@ export async function GET(request: NextRequest) {
       title: decision.text.title,
       body: decision.text.body,
       url: decision.text.url,
+      // Метка по треку, а не по заголовку: у «серии» в заголовке число дней, у
+      // онбординга свой текст на каждый шаг — неоткрытый прошлый нудж заменяется.
+      tag: pushTag(`nudge-${decision.kind}`),
     }).catch((err) => console.error('engagement nudge failed', u.id, err));
     sent++;
   }

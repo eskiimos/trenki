@@ -18,6 +18,7 @@ import {
 
 import { requireAdminAsync } from '@/lib/admin-session';
 import { priorityTier } from '@/lib/content-check-priority';
+import { type AthleteComplexity, videoFitsComplexity } from '@/lib/complexity';
 
 /**
  * GET /api/admin/content-check
@@ -32,7 +33,9 @@ const AGE_GROUPS: AgeGroup[] = [
   AgeGroup.ADULT,
 ];
 
-const COMPLEXITIES: Complexity[] = [
+// Уровни атлета, по которым ищем дыры. «Любой» (ANY) — не уровень атлета, а
+// свойство видео: такое видео закрывает все четыре уровня (см. countByCriteria).
+const COMPLEXITIES: AthleteComplexity[] = [
   Complexity.BEGINNER,
   Complexity.AMATEUR,
   Complexity.ADVANCED,
@@ -65,7 +68,7 @@ const MODULE_RECOMMENDED_COUNT: Record<ModuleType, number> = {
   [ModuleType.TECHNIQUE]: 2,
 };
 
-const POTENTIAL_BY_COMPLEXITY: Record<Complexity, number> = {
+const POTENTIAL_BY_COMPLEXITY: Record<AthleteComplexity, number> = {
   [Complexity.BEGINNER]: 20,
   [Complexity.AMATEUR]: 40,
   [Complexity.ADVANCED]: 60,
@@ -78,7 +81,7 @@ interface GapAnalysis {
   loadType: LoadType;
   muscleGroup?: MuscleGroup;
   ageGroup?: AgeGroup;
-  complexity?: Complexity;
+  complexity?: AthleteComplexity;
   energyState?: EnergyState;
   priority: number; // 1-10, где 10 - критично
   reason: string;
@@ -117,7 +120,7 @@ export async function GET(request: NextRequest) {
       muscleGroup: MuscleGroup;
       goal: TrainingGoal;
       ageGroup?: AgeGroup;
-      complexity?: Complexity;
+      complexity?: AthleteComplexity;
       rpeRange?: { min: number; max: number };
     }) =>
       allVideos.filter((video) => {
@@ -126,7 +129,11 @@ export async function GET(request: NextRequest) {
         if (video.muscleGroup !== criteria.muscleGroup) return false;
         if (!video.trainingGoals?.includes(criteria.goal)) return false;
         if (criteria.ageGroup && !video.ageGroups?.includes(criteria.ageGroup)) return false;
-        if (criteria.complexity && video.complexity !== criteria.complexity) return false;
+        // «Любой» подходит всем уровням — как в подборе (module-selection-v3),
+        // иначе универсальная разминка/заминка давала бы ложные дыры.
+        if (criteria.complexity && !videoFitsComplexity(video.complexity, criteria.complexity)) {
+          return false;
+        }
         if (criteria.rpeRange) {
           if (video.rpeMin == null || video.rpeMax == null) return false;
           if (video.rpeMin > criteria.rpeRange.max) return false;
@@ -322,7 +329,8 @@ export async function GET(request: NextRequest) {
         acc[group] = allVideos.filter((v) => v.ageGroups?.includes(group)).length;
         return acc;
       }, {} as Record<AgeGroup, number>),
-      byComplexity: COMPLEXITIES.reduce((acc, complexity) => {
+      // Сколько видео с каждым значением уровня, включая «Любой».
+      byComplexity: [...COMPLEXITIES, Complexity.ANY].reduce((acc, complexity) => {
         acc[complexity] = allVideos.filter((v) => v.complexity === complexity).length;
         return acc;
       }, {} as Record<Complexity, number>),

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { formatWorkoutTime } from '@/lib/telegram';
 import { notifyUser } from '@/lib/notify';
+import { pushTag } from '@/lib/notifications/push-tag';
 import { getReminderSettings } from '@/lib/settings';
 import { kickMediaWorker } from '@/lib/media/worker';
 
@@ -94,6 +95,9 @@ export async function GET(request: NextRequest) {
         title: `⏰ Через ${preworkoutEarlyMin} минут тренировка`,
         body: workout.video.title,
         url: `/video/${workout.video.id}`,
+        // Общая метка раннего и позднего напоминания об ЭТОЙ тренировке: «через 10»
+        // заменяет в шторке уже неверное «через 30».
+        tag: pushTag('workout-soon', workout.id),
         telegramMessage,
         telegramOptions: {
           parseMode: 'HTML',
@@ -144,6 +148,9 @@ export async function GET(request: NextRequest) {
         title: `🔥 Через ${preworkoutLateMin} минут тренировка`,
         body: workout.video.title,
         url: `/video/${workout.video.id}`,
+        // Общая метка раннего и позднего напоминания об ЭТОЙ тренировке: «через 10»
+        // заменяет в шторке уже неверное «через 30».
+        tag: pushTag('workout-soon', workout.id),
         telegramMessage,
         telegramOptions: {
           parseMode: 'HTML',

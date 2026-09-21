@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
 import { sendUserPush } from '@/lib/coach/push';
+import { assignmentDonePush } from '@/lib/coach/assignment-push';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,11 +41,10 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
   // При завершении задания — пушим тренеру
   if (status === 'COMPLETED') {
     const athleteName = `${auth.user.firstName ?? ''} ${auth.user.lastName ?? ''}`.trim() || 'Игрок';
-    sendUserPush(updated.coachId, {
-      title: 'Задание выполнено',
-      body: `${athleteName} закрыл назначенную тренировку`,
-      url: '/coach/assignments',
-    }).catch(() => { });
+    sendUserPush(
+      updated.coachId,
+      assignmentDonePush({ id: auth.user.id, name: athleteName }),
+    ).catch(() => { });
   }
 
   return NextResponse.json({ assignment: updated });

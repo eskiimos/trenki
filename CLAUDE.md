@@ -35,7 +35,7 @@ SESSION_SECRET=... npm test  # если ещё не в env
 ## Pose-сессии (MediaPipe)
 - Запись кадров скелета — `PoseTracker.tsx` → `POST /api/pose-sessions`.
 - Кадры пакуются в gzip-JSON и заливаются в Cloudinary как `resource_type: 'raw'`, `type: 'authenticated'`. В БД пишется только `framesUrl` (Cloudinary public_id) и `framesEncoding`.
-- На чтение (`GET /api/pose-sessions/[id]`) бэкенд проверяет роль (coach или сам атлет) и возвращает signed URL с TTL 1 час. Клиент сам качает и распаковывает (`DecompressionStream('gzip')`).
+- Доступ: атлет видит только свои сессии, тренер — только сессии атлетов своих команд со статусом ACTIVE (`src/lib/pose-access.ts` + `src/lib/coach/athlete-access.ts`); одной роли COACH недостаточно — это был IDOR. Оценку (PATCH) ставит только тренер команды атлета. На чтение (`GET /api/pose-sessions/[id]`) возвращается signed URL с TTL 1 час. Клиент сам качает и распаковывает (`DecompressionStream('gzip')`).
 - Старые сессии до миграции лежат в `PoseSession.frames` (JSONB). Они продолжают работать через legacy-ветку, пока не пройдёт бэкфилл — `tsx prisma/migrate-pose-frames-to-cloudinary.ts [--delete-source]`.
 - Без `CLOUDINARY_*` env-переменных запись pose-сессий деградирует до старого JSONB-режима с warning'ом — нормально для dev, в проде Cloudinary должен быть настроен.
 

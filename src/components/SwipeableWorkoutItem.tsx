@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ThumbsUp, Trash2 } from 'lucide-react';
 import { getTelegramId } from '@/lib/auth';
+import TrainerLink from '@/components/TrainerLink';
 
 interface SwipeableWorkoutItemProps {
   workout: any;
@@ -55,6 +56,13 @@ export default function SwipeableWorkoutItem({
       setIsSwiped(false);
     }
     setStartX(null);
+  };
+
+  // Свайп открывает кнопки действий — тап в этот момент не должен переходить
+  const preventIfSwiping = (e: React.MouseEvent) => {
+    if (Math.abs(currentX) > 5) {
+      e.preventDefault();
+    }
   };
 
   const handleDelete = async () => {
@@ -130,93 +138,97 @@ export default function SwipeableWorkoutItem({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        <Link 
-          href={`/video/${workout.video.id}?fromWorkout=true`} 
-          className="block"
-          onClick={(e) => {
-            // Prevent navigation if swiping
-            if (Math.abs(currentX) > 5) {
-              e.preventDefault();
-            }
-          }}
-        >
-          <div className="flex p-3 gap-4">
-            {/* Thumbnail */}
-            <div className="relative w-32 h-20 rounded-xl overflow-hidden flex-shrink-0">
-              {workout.video.thumbnail ? (
-                <Image
-                  src={workout.video.thumbnail}
-                  alt={workout.video.title}
-                  fill
-                  className="object-cover"
-                />
-              ) : (
-                <div className="w-full h-full bg-gray-800" />
-              )}
-              <div className="absolute bottom-1 right-1 bg-black/60 rounded px-1.5 py-0.5">
-                <span className="text-white text-[10px] font-medium">
-                  {Math.floor(workout.video.duration / 60)}:{String(workout.video.duration % 60).padStart(2, '0')}
-                </span>
-              </div>
-            </div>
-
-            {/* Info */}
-            <div className="flex-1 flex flex-col justify-between py-1">
-              {/* Trainer and Start Time */}
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full overflow-hidden bg-gray-700 relative">
-                    {workout.video.trainer.avatar ? (
-                      <Image
-                        src={workout.video.trainer.avatar}
-                        alt={workout.video.trainer.name}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-[8px] text-white">
-                        {workout.video.trainer.name[0]}
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-white text-xs font-bold uppercase">
-                    {workout.video.trainer.name} {workout.video.trainer.lastName}
-                  </span>
-                </div>
-                {workout.date && (
-                  <span className="text-[#A1FF4A] text-xs font-bold">
-                    {new Date(workout.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                )}
-              </div>
-
-              {/* Tags */}
-              <div className="flex flex-wrap gap-2">
-                {workout.video.category && (
-                  <div className="bg-[#2A3045] rounded px-2 py-1">
-                    <span className="text-[#AEABBB] text-[10px] font-medium">
-                      {categoryMap[workout.video.category] || workout.video.category}
-                    </span>
-                  </div>
-                )}
-                {workout.video.equipment && workout.video.equipment.length > 0 && (
-                  <div className="bg-[#2A3045] rounded px-2 py-1">
-                    <span className="text-[#AEABBB] text-[10px] font-medium">
-                      {workout.video.equipment[0]}
-                    </span>
-                  </div>
-                )}
-                {workout.video.level && (
-                  <div className="bg-[#2A3045] rounded px-2 py-1">
-                    <span className="text-[#AEABBB] text-[10px] font-medium">
-                      {levelMap[workout.video.level] || workout.video.level}
-                    </span>
-                  </div>
-                )}
-              </div>
+        {/* Карточка — не ссылка целиком: аватар и имя ведут к тренеру (п.2
+            «Середина сентября»), а <a> в <a> вкладывать нельзя. Ссылка на
+            видео — прозрачный слой поверх карточки (в конце разметки),
+            тренер — поверх неё (TrainerLink, z-1). */}
+        <div className="flex p-3 gap-4">
+          {/* Thumbnail */}
+          <div className="relative w-32 h-20 rounded-xl overflow-hidden flex-shrink-0">
+            {workout.video.thumbnail ? (
+              <Image
+                src={workout.video.thumbnail}
+                alt={workout.video.title}
+                fill
+                className="object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-gray-800" />
+            )}
+            <div className="absolute bottom-1 right-1 bg-black/60 rounded px-1.5 py-0.5">
+              <span className="text-white text-[10px] font-medium">
+                {Math.floor(workout.video.duration / 60)}:{String(workout.video.duration % 60).padStart(2, '0')}
+              </span>
             </div>
           </div>
-        </Link>
+
+          {/* Info */}
+          <div className="flex-1 flex flex-col justify-between py-1">
+            {/* Trainer and Start Time */}
+            <div className="flex items-center justify-between gap-2 mb-1">
+              {/* py-2/-my-2 — тап-зона выше строки без сдвига вёрстки */}
+              <TrainerLink
+                trainer={workout.video.trainer}
+                onClick={preventIfSwiping}
+                className="flex items-center gap-2 py-2 -my-2"
+              >
+                <div className="w-5 h-5 rounded-full overflow-hidden bg-gray-700 relative">
+                  {workout.video.trainer.avatar ? (
+                    <Image
+                      src={workout.video.trainer.avatar}
+                      alt={workout.video.trainer.name}
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[8px] text-white">
+                      {workout.video.trainer.name[0]}
+                    </div>
+                  )}
+                </div>
+                <span className="text-white text-xs font-bold uppercase">
+                  {workout.video.trainer.name} {workout.video.trainer.lastName}
+                </span>
+              </TrainerLink>
+              {workout.date && (
+                <span className="text-[#A1FF4A] text-xs font-bold">
+                  {new Date(workout.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
+
+            {/* Tags */}
+            <div className="flex flex-wrap gap-2">
+              {workout.video.category && (
+                <div className="bg-[#2A3045] rounded px-2 py-1">
+                  <span className="text-[#AEABBB] text-[10px] font-medium">
+                    {categoryMap[workout.video.category] || workout.video.category}
+                  </span>
+                </div>
+              )}
+              {workout.video.equipment && workout.video.equipment.length > 0 && (
+                <div className="bg-[#2A3045] rounded px-2 py-1">
+                  <span className="text-[#AEABBB] text-[10px] font-medium">
+                    {workout.video.equipment[0]}
+                  </span>
+                </div>
+              )}
+              {workout.video.level && (
+                <div className="bg-[#2A3045] rounded px-2 py-1">
+                  <span className="text-[#AEABBB] text-[10px] font-medium">
+                    {levelMap[workout.video.level] || workout.video.level}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        <Link
+          href={`/video/${workout.video.id}?fromWorkout=true`}
+          aria-label={workout.video.title}
+          className="absolute inset-0"
+          onClick={preventIfSwiping}
+        />
       </div>
     </div>
   );

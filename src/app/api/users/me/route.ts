@@ -4,6 +4,8 @@ import { getSessionUserId } from '@/lib/auth-server';
 import { hasPremium } from '@/lib/access';
 import { isPaywalled } from '@/lib/paywall';
 import { getPaywallMode, getFreeLessonVideoId } from '@/lib/settings';
+import { isFreshAccount, isNewcomer } from '@/lib/home-first-visit';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +50,39 @@ export async function GET(request: NextRequest) {
   // активен. Клиент подставляет его в карточку на главной.
   const freeLessonVideoId = await getFreeLessonVideoId();
 
+  // Правило «не при первом заходе» на главной (правки «Середина сентября»,
+  // п.3): новичок — аккаунту меньше суток, ни чек-ина, ни завершённой
+  // тренировки. Считаем здесь, а не отдельным роутом: главная и так ждёт этот
+  // ответ до первой отрисовки. Аккаунтам старше суток (почти все запросы) —
+  // ни одного лишнего запроса к БД.
+  let newcomer = false;
+  if (isFreshAccount(user.createdAt)) {
+    try {
+      const [checkin, workout] = await Promise.all([
+        prisma.dailyCheckin.findFirst({ where: { userId: user.id }, select: { id: true } }),
+        prisma.workoutSession.findFirst({
+          where: {
+            userId: user.id,
+            synthetic: false,
+            status: { in: ['COMPLETED', 'PARTIAL'] },
+          },
+          select: { id: true },
+        }),
+      ]);
+      newcomer = isNewcomer({
+        createdAt: user.createdAt,
+        hasAnyCheckin: !!checkin,
+        hasAnyWorkout: !!workout,
+      });
+    } catch (error) {
+      // Роут общий для всего приложения — сбой второстепенного флага не должен
+      // ронять ответ. «Не новичок» безопаснее: чек-ин лучше показать, чем спрятать.
+      logger.warn('users/me newcomer check failed', {
+        errMessage: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   return NextResponse.json({
     id: user.id,
     telegramId: user.telegramId,
@@ -66,5 +101,6 @@ export async function GET(request: NextRequest) {
     paywallActive: mode !== 'off', // включён ли paywall вообще (для premium-UI: баннер продления)
     referralCode: user.referralCode, // канал (для окна «Оформить» — поле промокода тренера)
     freeLessonVideoId, // «урок недели» для FREE (id видео или null, если не назначен)
+    newcomer, // главная прячет чек-ин, пуши и «На экран Домой» — src/lib/home-first-visit.ts
   });
 }

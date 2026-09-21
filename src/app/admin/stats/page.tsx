@@ -17,6 +17,21 @@ import {
   Heart, LineChart, MessageSquare, Pause, PieChart, RefreshCw, Star, Trophy,
   UserPlus, Users, Video,
 } from 'lucide-react';
+import { BarChart, DailyBarChart, type UnitForms } from '@/components/admin/bar-chart';
+import { plural } from '@/lib/plural';
+
+const REGISTRATION_FORMS: UnitForms = ['регистрация', 'регистрации', 'регистраций'];
+const WORKOUT_FORMS: UnitForms = ['тренировка', 'тренировки', 'тренировок'];
+const USER_FORMS: UnitForms = ['пользователь', 'пользователя', 'пользователей'];
+
+/** «Всего 5 регистраций» — сумма ряда со склонением. */
+const totalWithUnit = (series: Array<{ count: number }>, unit: UnitForms) => {
+  const n = series.reduce((s, p) => s + p.count, 0);
+  return `${n.toLocaleString('ru-RU')} ${plural(n, unit)}`;
+};
+
+const TAB_IDS = ['overview', 'users', 'content', 'training', 'distributions', 'charts', 'top', 'recent'] as const;
+type TabId = (typeof TAB_IDS)[number];
 
 interface Stats {
   users: {
@@ -66,6 +81,9 @@ interface Stats {
     favorites: number;
   };
   training: {
+    /** Тренировки по общему определению (как на графике) за всё время. */
+    counted: number;
+    /** Статусы ВСЕХ сессий за всё время — воронка, а не «тренировки». */
     total: number;
     completed: number;
     completionRate: string;
@@ -143,84 +161,6 @@ function StatRow({
   );
 }
 
-/**
- * Столбчатая диаграмма. Высота бара — в процентах от контейнера (раньше были
- * магические множители height*2 / height*1.5 в боксах 256/192px), hover-зона —
- * вся колонка (раньше при count = 0 бар имел нулевую высоту и тултип был
- * недостижим), подписи — каждая N-я без поворота.
- */
-function BarChart({
-  data,
-  color,
-  unit,
-  height = 224,
-  labelEvery = 1,
-}: {
-  data: Array<{ label: string; value: number }>;
-  color: string;
-  unit: string;
-  height?: number;
-  labelEvery?: number;
-}) {
-  if (data.length === 0) {
-    return <EmptyState icon={LineChart} title="Пока нет данных" />;
-  }
-  const max = Math.max(...data.map((d) => d.value), 1);
-
-  return (
-    <div className="overflow-x-auto">
-      <div style={{ minWidth: data.length * 20 }}>
-        <div className="flex items-end gap-1" style={{ height }}>
-          {data.map((d, i) => (
-            <div
-              key={i}
-              className="group flex h-full flex-1 items-end"
-              style={{ minWidth: 12 }}
-            >
-              <div
-                className="relative w-full transition-opacity group-hover:opacity-80"
-                style={{
-                  height: `${(d.value / max) * 100}%`,
-                  minHeight: 2,
-                  background: color,
-                  borderRadius: '4px 4px 0 0',
-                }}
-              >
-                <span
-                  className="pointer-events-none absolute left-1/2 -translate-x-1/2 whitespace-nowrap opacity-0 transition-opacity group-hover:opacity-100"
-                  style={{
-                    bottom: '100%',
-                    marginBottom: 4,
-                    padding: '4px 8px',
-                    fontSize: 12,
-                    borderRadius: 'var(--radius-sm)',
-                    background: 'var(--color-night)',
-                    border: '1px solid var(--border-hairline)',
-                    color: 'var(--color-ink)',
-                  }}
-                >
-                  {d.label}: {d.value} {unit}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="flex gap-1" style={{ marginTop: 8 }}>
-          {data.map((d, i) => (
-            <div
-              key={i}
-              className="flex-1 truncate text-center"
-              style={{ minWidth: 12, fontSize: 11, color: 'var(--color-muted)' }}
-            >
-              {i % labelEvery === 0 ? d.label : ''}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /** Строка ТОП-контента: ранг-тайл + название + просмотры/лайки с подписями. */
 function TopRow({
   rank,
@@ -288,7 +228,15 @@ export default function AdminStatsPage() {
   // (`if (!stats) return null`) без единого слова.
   const [loadError, setLoadError] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'content' | 'training' | 'distributions' | 'charts' | 'top' | 'recent'>('overview');
+  const [activeTab, setActiveTab] = useState<TabId>('overview');
+
+  // «Подробнее» на карточках графиков дашборда ведёт на /admin/stats?tab=charts —
+  // раньше открывалась вкладка «Ключевые», и графика тренировок там не было.
+  // Читаем location, а не useSearchParams: тому нужна Suspense-обёртка страницы.
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    if (tab && (TAB_IDS as readonly string[]).includes(tab)) setActiveTab(tab as TabId);
+  }, []);
 
   useEffect(() => {
     fetchStats();
@@ -503,11 +451,14 @@ export default function AdminStatsPage() {
               hint={`DAU: ${stats.activity.dauRate}%`}
               accent={stats.activity.onlineNow > 0}
             />
+            {/* Тренировки — по тому же определению, что график и «Сегодня»;
+                всего сессий (с PENDING/SKIPPED, синтетикой, командой) сюда
+                не подмешиваем — см. вкладку «Тренировки» */}
             <Kpi
               icon={Dumbbell}
               label="Тренировок"
-              value={stats.training.total}
-              hint={`Завершено: ${stats.training.completionRate}%`}
+              value={stats.training.counted}
+              hint={`Сегодня: ${stats.training.today}`}
             />
             <Kpi
               icon={Video}
@@ -667,20 +618,31 @@ export default function AdminStatsPage() {
         <div className="mb-8">
           <SectionTitle icon={Dumbbell}>Тренировки</SectionTitle>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* Две карточки — два разных счёта, и это подписано: «Тренировки»
+                по решению владельца (как на графике), «Сессии по статусам» —
+                сырая воронка всех сессий. Сравнивать их между собой нельзя. */}
             <AdminCard>
-              <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>Статистика сессий</h3>
+              <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>Тренировки</h3>
+              <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
+                Как на графике: завершённые и досрочно завершённые; без синтетики, админов, тестеров
+                и дублей закрытого дня цикла · дни по Москве
+              </p>
               <div className="space-y-2">
-                <StatRow label="Всего сессий" value={stats.training.total} />
-                <StatRow label="Завершено" value={stats.training.completed} tone="brand" />
-                <StatRow label="Процент завершения" value={`${stats.training.completionRate}%`} />
+                <StatRow label="Сегодня" value={stats.training.today} tone="brand" />
+                <StatRow label="За неделю" value={stats.training.thisWeek} />
+                <StatRow label="За всё время" value={stats.training.counted} />
               </div>
             </AdminCard>
 
             <AdminCard>
-              <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 12px' }}>Активность</h3>
+              <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>Сессии по статусам</h3>
+              <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
+                Все сессии за всё время, включая синтетику, админов и тестеров
+              </p>
               <div className="space-y-2">
-                <StatRow label="Сегодня" value={stats.training.today} tone="brand" />
-                <StatRow label="За неделю" value={stats.training.thisWeek} />
+                <StatRow label="Всего сессий" value={stats.training.total} />
+                <StatRow label="Со статусом COMPLETED" value={stats.training.completed} />
+                <StatRow label="Доля COMPLETED" value={`${stats.training.completionRate}%`} />
               </div>
             </AdminCard>
 
@@ -776,34 +738,60 @@ export default function AdminStatsPage() {
           <SectionTitle icon={LineChart}>Графики</SectionTitle>
           <div className="space-y-4">
             <AdminCard>
-              <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px' }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>
                 Регистрации за 30 дней
               </h3>
-              <BarChart
-                data={stats.charts.registrations.map((day) => ({
-                  label: formatDate(day.date),
-                  value: day.count,
-                }))}
+              <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
+                Всего {totalWithUnit(stats.charts.registrations, REGISTRATION_FORMS)} · без аккаунтов
+                админов и тестеров · дни по Москве
+              </p>
+              <DailyBarChart
+                series={stats.charts.registrations}
                 color="var(--color-brand-blue)"
-                unit="регистраций"
-                height={224}
-                labelEvery={5}
+                unit={REGISTRATION_FORMS}
+                height={180}
+                label="Регистрации по дням за 30 дней"
               />
             </AdminCard>
 
             <AdminCard>
-              <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 16px' }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>
+                Тренировки за 30 дней
+              </h3>
+              <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
+                Всего {totalWithUnit(stats.charts.sessions, WORKOUT_FORMS)} · завершённые и досрочно
+                завершённые; без синтетики, админов, тестеров и дублей закрытого дня цикла · дни по
+                Москве
+              </p>
+              <DailyBarChart
+                series={stats.charts.sessions}
+                color="var(--color-brand)"
+                unit={WORKOUT_FORMS}
+                height={180}
+                label="Тренировки по дням за 30 дней"
+              />
+            </AdminCard>
+
+            <AdminCard>
+              <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>
                 Активность по часам (сегодня)
               </h3>
+              <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
+                Час последнего захода каждого пользователя · по Москве
+              </p>
               <BarChart
                 data={Array.from({ length: 24 }, (_, hour) => ({
-                  label: `${hour}:00`,
+                  key: `h${hour}`,
                   value: stats.charts.activity.find((a) => a.hour === hour)?.count || 0,
+                  title: `${hour}:00–${hour + 1}:00`,
+                  // Каждые 3 часа, а на узком экране остаются кратные 6
+                  axisLabel: hour % 3 === 0 ? `${hour}:00` : undefined,
+                  axisPriority: hour % 6 === 0 ? 2 : 1,
                 }))}
                 color="var(--color-brand)"
-                unit="активных"
-                height={192}
-                labelEvery={3}
+                unit={USER_FORMS}
+                height={160}
+                label="Активность по часам за сегодня"
               />
             </AdminCard>
           </div>

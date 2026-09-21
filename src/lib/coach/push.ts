@@ -1,11 +1,30 @@
 import webpush from 'web-push';
 import prisma from '@/lib/prisma';
+import { resolvePushTag } from '@/lib/notifications/push-tag';
 
-interface PushNotificationPayload {
+export interface PushNotificationPayload {
   title: string;
   body: string;
   url?: string;
   icon?: string;
+  /**
+   * Метка типа уведомления (см. pushTag в '@/lib/notifications/push-tag'):
+   * пуш с той же меткой заменяет предыдущий в шторке, с другой — ложится рядом.
+   * Не передана — метка берётся из заголовка.
+   */
+  tag?: string;
+}
+
+/** JSON, который разбирает обработчик 'push' в public/sw.js. */
+function buildPushBody(payload: PushNotificationPayload): string {
+  return JSON.stringify({
+    title: payload.title,
+    body: payload.body,
+    icon: payload.icon ?? '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    url: payload.url ?? '/',
+    tag: resolvePushTag(payload),
+  });
 }
 
 let vapidConfigured = false;
@@ -34,13 +53,7 @@ export async function sendUserPush(
   const subs = await prisma.pushSubscription.findMany({ where: { userId } });
   if (subs.length === 0) return;
 
-  const body = JSON.stringify({
-    title: payload.title,
-    body: payload.body,
-    icon: payload.icon ?? '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
-    url: payload.url ?? '/',
-  });
+  const body = buildPushBody(payload);
 
   await Promise.allSettled(
     subs.map(async (sub) => {
@@ -73,13 +86,7 @@ export async function broadcastPush(
   const subs = await prisma.pushSubscription.findMany({ where: { userId: { in: userIds } } });
   if (subs.length === 0) return { recipients: 0, subscriptions: 0 };
 
-  const body = JSON.stringify({
-    title: payload.title,
-    body: payload.body,
-    icon: payload.icon ?? '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
-    url: payload.url ?? '/',
-  });
+  const body = buildPushBody(payload);
 
   await Promise.allSettled(
     subs.map(async (sub) => {

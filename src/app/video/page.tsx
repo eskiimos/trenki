@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { plural } from '@/lib/plural';
 import Image from 'next/image';
 import BottomNavigation from '@/components/BottomNavigation';
+import TrainerLink from '@/components/TrainerLink';
 import { Skeleton } from '@/components/Skeleton';
 import { Button } from '@/components/ui';
 import VideoFiltersModal, {
@@ -452,7 +453,10 @@ const VideoPage = () => {
         ) : (
           <div className="flex flex-col sm:grid sm:grid-cols-2 gap-4">
             {filteredVideos.map((video) => (
-              <Link key={video.id} href={`/video/${video.id}`}>
+              // Карточка — не ссылка целиком: аватар и имя ведут к тренеру (п.2
+              // «Середина сентября»). Ссылка на видео — на заголовке, растянута
+              // на всю карточку (after:inset-0); тренер и лента чипов — поверх.
+              <div key={video.id} className="relative">
                 <div>
                   <div className="relative w-full aspect-video">
                     <Image
@@ -472,28 +476,44 @@ const VideoPage = () => {
 
                   <div className="px-4 py-3">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-700">
-                        {video.trainer.avatar ? (
-                          <Image
-                            src={video.trainer.avatar}
-                            alt={`${video.trainer.name} ${video.trainer.lastName}`}
-                            width={40}
-                            height={40}
-                            className="object-cover w-full h-full"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-white font-bold">
-                            {video.trainer.name.charAt(0)}
-                          </div>
-                        )}
-                      </div>
-                      <h3 className="text-white text-base font-semibold line-clamp-2 leading-tight flex-1">
-                        {video.title.toUpperCase()}
-                      </h3>
+                      {/* p-0.5/-m-0.5: тап-зона 44px при том же круге 40px */}
+                      <TrainerLink
+                        trainer={video.trainer}
+                        ariaLabel={`Тренер ${video.trainer.name} ${video.trainer.lastName}`}
+                        className="block shrink-0 p-0.5 -m-0.5 rounded-full"
+                      >
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-700">
+                          {video.trainer.avatar ? (
+                            <Image
+                              src={video.trainer.avatar}
+                              alt={`${video.trainer.name} ${video.trainer.lastName}`}
+                              width={40}
+                              height={40}
+                              className="object-cover w-full h-full"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-white font-bold">
+                              {video.trainer.name.charAt(0)}
+                            </div>
+                          )}
+                        </div>
+                      </TrainerLink>
+                      <Link href={`/video/${video.id}`} className="flex-1 min-w-0 after:absolute after:inset-0">
+                        <h3 className="text-white text-base font-semibold line-clamp-2 leading-tight">
+                          {video.title.toUpperCase()}
+                        </h3>
+                      </Link>
                     </div>
 
-                    <div
-                      className="overflow-x-auto -mx-4 px-4 mb-2 hide-scrollbar"
+                    {/* Лента чипов лежит поверх растянутой ссылки, иначе её
+                        нельзя пролистать пальцем; тап по чипам — тоже на видео,
+                        как было. Дубль ссылки скрыт от клавиатуры (tabIndex=-1),
+                        но не от скринридера — иначе пропадут метки модуля,
+                        нагрузки, сложности, RPE и теги. */}
+                    <Link
+                      href={`/video/${video.id}`}
+                      tabIndex={-1}
+                      className="relative z-1 block overflow-x-auto -mx-4 px-4 mb-2 hide-scrollbar"
                       style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                     >
                       <div className="flex gap-2 w-max">
@@ -557,12 +577,13 @@ const VideoPage = () => {
                           </span>
                         ))}
                       </div>
-                    </div>
+                    </Link>
 
+                    {/* py-2 у строчной ссылки расширяет тап-зону, не сдвигая вёрстку */}
                     <div style={{ fontSize: '12px' }} className="text-white/60 mt-2">
-                      <span>
+                      <TrainerLink trainer={video.trainer} className="py-2">
                         {video.trainer.name} {video.trainer.lastName}
-                      </span>
+                      </TrainerLink>
                       <span className="text-white/40"> | </span>
                       <span>
                         {video.likesCount >= 1000
@@ -578,7 +599,7 @@ const VideoPage = () => {
                     </div>
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}

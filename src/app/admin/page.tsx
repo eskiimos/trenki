@@ -19,6 +19,10 @@ import {
   ArrowRight, LayoutDashboard, AlertTriangle,
   CreditCard,
 } from 'lucide-react';
+import { DailyBarChart, type UnitForms } from '@/components/admin/bar-chart';
+
+const REGISTRATION_FORMS: UnitForms = ['регистрация', 'регистрации', 'регистраций'];
+const WORKOUT_FORMS: UnitForms = ['тренировка', 'тренировки', 'тренировок'];
 
 // Подмножество ответа /api/admin/stats, которое использует дашборд.
 interface AdminStats {
@@ -69,30 +73,6 @@ const timeAgo = (iso: string): string => {
   if (d === 1) return 'вчера';
   return `${d} дн назад`;
 };
-
-// ───────── Мини-спарклайн (CSS-бары, без либы) ─────────
-function Sparkline({ data, color }: { data: Array<{ date: string; count: number }>; color: string }) {
-  if (!data.length) {
-    return (
-      <div className="h-16 flex items-center justify-center" style={{ fontSize: 12, color: 'var(--color-muted)' }}>
-        нет данных
-      </div>
-    );
-  }
-  const max = Math.max(...data.map((d) => d.count), 1);
-  return (
-    <div className="flex items-end gap-[2px] h-16">
-      {data.map((d, i) => (
-        <div
-          key={i}
-          className="flex-1 rounded-t-sm min-h-[2px]"
-          style={{ height: `${Math.max(3, (d.count / max) * 100)}%`, backgroundColor: color }}
-          title={`${d.date}: ${d.count}`}
-        />
-      ))}
-    </div>
-  );
-}
 
 /** Ссылка «Подробнее →» в шапке блока (иконка вместо текстовой стрелки). */
 function MoreLink({ href, children }: { href: string; children: React.ReactNode }) {
@@ -229,9 +209,15 @@ export default function AdminDashboardPage() {
                 </div>
                 <div style={{ fontSize: 18, fontWeight: 800 }}>{num(regSum)} за 30 дней</div>
               </div>
-              <MoreLink href="/admin/stats">Подробнее</MoreLink>
+              <MoreLink href="/admin/stats?tab=charts">Подробнее</MoreLink>
             </div>
-            <Sparkline data={stats.charts.registrations} color="var(--color-brand-blue)" />
+            <DailyBarChart
+              series={stats.charts.registrations}
+              color="var(--color-brand-blue)"
+              unit={REGISTRATION_FORMS}
+              height={120}
+              label="Регистрации по дням за 30 дней"
+            />
           </AdminCard>
           <AdminCard>
             <div className="flex items-start justify-between gap-3 mb-3">
@@ -248,9 +234,15 @@ export default function AdminDashboardPage() {
                 </div>
                 <div style={{ fontSize: 18, fontWeight: 800 }}>{num(sessSum)} за 30 дней</div>
               </div>
-              <MoreLink href="/admin/stats">Подробнее</MoreLink>
+              <MoreLink href="/admin/stats?tab=charts">Подробнее</MoreLink>
             </div>
-            <Sparkline data={stats.charts.sessions} color="var(--color-brand)" />
+            <DailyBarChart
+              series={stats.charts.sessions}
+              color="var(--color-brand)"
+              unit={WORKOUT_FORMS}
+              height={120}
+              label="Тренировки по дням за 30 дней"
+            />
           </AdminCard>
         </div>
       )}

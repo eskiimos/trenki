@@ -20,6 +20,8 @@ import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay'
 import PotentialIslandBanner from '@/components/PotentialIslandBanner';
 // import HowAiWorksModal from '@/components/HowAiWorksModal'; // временно скрыто на главной
 import PushOptInBanner from '@/components/PushOptInBanner';
+import TrainerLink from '@/components/TrainerLink';
+import { canShowHomeExtras, readGuideFlags, GUIDE_DISMISSED_KEY, TOUR_STARTED_KEY, type GuideFlags } from '@/lib/home-first-visit';
 import { Play, Zap, Lock, Compass, ChevronRight } from 'lucide-react';
 import { openSubscriptionModal, handlePaywallResponse } from '@/lib/subscription-modal';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -27,19 +29,28 @@ import { useTour } from '@/components/tour/TourProvider';
 import { Banner, Button } from '@/components/ui';
 import { Skeleton } from '@/components/Skeleton';
 
+/** localStorage, который может бросить уже на доступе (заблокированные данные сайта). */
+const safeLocalStorage = (): Storage | null => {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+};
+
 // Плашка-гайд на главной: предлагает пройти тур новичкам. Видна, пока тур не
 // пройден и плашка не закрыта (✕). Запуск тура — useTour().startTour().
-const GuideBanner = () => {
-  const { startTour } = useTour();
+// onGuideChange — сообщить главной, что флаги гида поменялись: от них зависит
+// показ чек-ина (п.3 «Середина сентября»), он должен появиться сразу, без перезагрузки.
+const GuideBanner = ({ onGuideChange }: { onGuideChange: () => void }) => {
+  const { startTour, isActive } = useTour();
   const [show, setShow] = useState(false);
   useEffect(() => {
-    try {
-      const done = localStorage.getItem('trenki_tour_completed');
-      const dismissed = localStorage.getItem('trenki_guide_banner_dismissed');
-      if (!done && !dismissed) setShow(true);
-    } catch {}
+    const flags = readGuideFlags(safeLocalStorage());
+    if (!flags.tourCompleted && !flags.guideDismissed) setShow(true);
   }, []);
-  if (!show) return null;
+  // Во время тура (в т.ч. восстановленного после рефреша) плашка не нужна
+  if (!show || isActive) return null;
   return (
     <section className="px-4" style={{ paddingTop: 12 }}>
       <Banner
@@ -47,11 +58,26 @@ const GuideBanner = () => {
         title="Первый раз тут?"
         subtitle="Пройди быстрый тур по приложению"
         action={
-          <Button size="sm" style={{ flexShrink: 0 }} onClick={() => { setShow(false); startTour(); }}>
+          <Button
+            size="sm"
+            style={{ flexShrink: 0 }}
+            onClick={() => {
+              // Отметка «тур запускали»: брошенный посреди тур (закрыли
+              // приложение) иначе прятал бы чек-ин до истечения первых суток
+              try { safeLocalStorage()?.setItem(TOUR_STARTED_KEY, '1'); } catch {}
+              setShow(false);
+              startTour();
+              onGuideChange();
+            }}
+          >
             Начать
           </Button>
         }
-        onDismiss={() => { try { localStorage.setItem('trenki_guide_banner_dismissed', '1'); } catch {} setShow(false); }}
+        onDismiss={() => {
+          try { safeLocalStorage()?.setItem(GUIDE_DISMISSED_KEY, '1'); } catch {}
+          setShow(false);
+          onGuideChange();
+        }}
       />
     </section>
   );
@@ -95,6 +121,22 @@ const HomePage = () => {
     { id: string; cycleNumber: number; completedCount: number } | null
   >(null);
   const [feedbackModalDismissed, setFeedbackModalDismissed] = useState(false);
+
+  // Не при первом заходе (п.3 «Середина сентября»): чек-ин, баннер пушей и
+  // «На экран Домой» ждут, пока новичок разберётся с гидом. Правило целиком —
+  // src/lib/home-first-visit.ts. null — ещё не известно (не показываем).
+  const { isActive: tourActive } = useTour();
+  const [guideFlags, setGuideFlags] = useState<GuideFlags | null>(null);
+  const [newcomer, setNewcomer] = useState<boolean | null>(null);
+  const refreshGuideFlags = () => setGuideFlags(readGuideFlags(safeLocalStorage()));
+  // Перечитываем и на смену статуса тура: завершение/«Пропустить» пишет флаг
+  // в TourProvider, после этого блоки должны появиться сразу.
+  useEffect(() => {
+    setGuideFlags(readGuideFlags(safeLocalStorage()));
+  }, [tourActive]);
+  // newcomer приходит в ответе /api/users/me — его и так ждёт проверка
+  // авторизации ниже, отдельного запроса на каждый заход нет.
+  const showHomeExtras = canShowHomeExtras({ tourActive, flags: guideFlags, newcomer });
 
   // Инициализируем Telegram WebApp
   useTelegram();
@@ -148,10 +190,15 @@ const HomePage = () => {
         (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
       if (isLocalhost) {
+        // Без сессии правило «новичка» не проверить — блоки главной видны сразу
+        setNewcomer(false);
         setIsCheckingAuth(false);
         return;
       }
 
+      // Ошибка/непонятный ответ → «не новичок»: лучше показать чек-ин
+      // новичку, чем спрятать его у действующих пользователей
+      let isNewcomerUser = false;
       // Источник истины — серверная сессия. localStorage может быть устаревшим:
       // полагаясь на него мы попадали в loop /login ↔ /.
       try {
@@ -172,10 +219,12 @@ const HomePage = () => {
             router.replace('/parent');
             return;
           }
+          isNewcomerUser = data?.newcomer === true;
         }
       } catch {
         // сетевая ошибка — пробуем показать страницу, чтобы не блокировать UI
       }
+      setNewcomer(isNewcomerUser);
       setIsCheckingAuth(false);
     };
 
@@ -198,7 +247,7 @@ const HomePage = () => {
       {/* Контейнер с максимальной шириной для планшетов и десктопов */}
       <div className="max-w-4xl mx-auto">
         {/* Плашка-гайд для новичков (закрывается ✕) */}
-        <GuideBanner />
+        <GuideBanner onGuideChange={refreshGuideFlags} />
 
         {/* Напоминание о незавершенной тренировке */}
         <WorkoutReminder />
@@ -206,8 +255,9 @@ const HomePage = () => {
         {/* Проактивный промпт на push-уведомления (Sprint 3): единственная
             причина «пуши приходят почти никому» — почти никто не подписан.
             Закрываемый; сам скрывается, если уже подписан/отклонил/закрыл.
-            Свой px-4 и paddingTop — внутри компонента (без двойной обёртки). */}
-        <PushOptInBanner />
+            Свой px-4 и paddingTop — внутри компонента (без двойной обёртки).
+            Новичку — не при первом заходе (п.3). */}
+        {showHomeExtras && <PushOptInBanner />}
 
         {/* Островок «раскрой потенциал с подпиской» — поднят наверх (правки
             август-середина): поп-ап про подписку должен быть на виду сразу. */}
@@ -217,8 +267,9 @@ const HomePage = () => {
         <StreakChip />
 
         {/* Ежедневный чекин: +XP за тап, по выходным больше всего (правки
-            «Конец августа»). Серию/темп не трогает. */}
-        <DailyCheckinCard />
+            «Конец августа»). Серию/темп не трогает. Новичку — только после
+            гида, не при первом заходе (п.3 «Середина сентября»). */}
+        {showHomeExtras && <DailyCheckinCard />}
 
         {/* Секция с короткими видео (треньки) */}
         <TrenkiSection />
@@ -242,8 +293,9 @@ const HomePage = () => {
       {/* Нижнее меню */}
       <BottomNavigation activeTab="home" />
 
-      {/* Пилюля «добавь на экран Домой» (адаптивно; один раз на устройство) */}
-      <AddToHomeScreen />
+      {/* Пилюля «добавь на экран Домой» (адаптивно; один раз на устройство).
+          Новичку — не при первом заходе (п.3): задержка 5с считается от монтирования. */}
+      {showHomeExtras && <AddToHomeScreen />}
 
       {/* Опрос после микроцикла */}
       {pendingFeedbackCycle && !feedbackModalDismissed && (
@@ -1443,57 +1495,64 @@ const VideoCard = ({ video, isNew }: VideoCardProps & { isNew?: boolean }) => {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  const trainerName = `${video.trainer?.name ?? ''} ${video.trainer?.lastName ?? ''}`.trim();
+
   return (
-    <Link
-      href={`/video/${video.id}`}
-      onClick={(e) => { if (locked) { e.preventDefault(); openSubscriptionModal('video'); } }}
-    >
-      {/* На мобиле карточка ~80% viewport, чтобы справа выглядывала
-          следующая — визуальный hint что список горизонтально скроллится. */}
-      <div className="flex-shrink-0 w-[80vw] sm:w-[calc(50vw-1rem)] cursor-pointer">
-        {/* Video Thumbnail */}
-        <div className="relative rounded overflow-hidden" style={{ width: '100%', height: 'auto', aspectRatio: '16/9', maxHeight: '280px' }}>
-          {video.thumbnail && (
-            <Image
-              src={video.thumbnail}
-              alt={video.title}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 50vw"
-            />
-          )}
-          {/* Duration badge */}
-          <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm text-white text-sm font-medium px-2.5 py-1 rounded-lg">
-            {formatDuration(video.duration)}
-          </div>
-          {/* Урок недели — открыт для FREE (бейдж), остальное под замком */}
-          {isFreeLesson && paywalled && (
-            <div className="absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: '#A1FF4A', color: '#060919' }}>
-              Урок недели
-            </div>
-          )}
-          {locked && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/45 backdrop-blur-[1px]">
-              <Lock size={28} color="#F9F8FE" aria-hidden />
-            </div>
-          )}
-          {/* "Новинка" badge */}
-          {isNew && !locked && (
-            <div className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: '#A1FF4A', color: '#060919' }}>
-              Новинка
-            </div>
-          )}
+    // Карточка — не ссылка целиком: тап по аватару/имени ведёт к тренеру
+    // (п.2 «Середина сентября»). Ссылка на видео — на заголовке и растянута
+    // на всю карточку (after:inset-0), тренер лежит поверх — см. TrainerLink.
+    // На мобиле карточка ~80% viewport, чтобы справа выглядывала
+    // следующая — визуальный hint что список горизонтально скроллится.
+    <div className="relative shrink-0 w-[80vw] sm:w-[calc(50vw-1rem)] cursor-pointer">
+      {/* Video Thumbnail */}
+      <div className="relative rounded overflow-hidden" style={{ width: '100%', height: 'auto', aspectRatio: '16/9', maxHeight: '280px' }}>
+        {video.thumbnail && (
+          <Image
+            src={video.thumbnail}
+            alt={video.title}
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 50vw"
+          />
+        )}
+        {/* Duration badge */}
+        <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-sm text-white text-sm font-medium px-2.5 py-1 rounded-lg">
+          {formatDuration(video.duration)}
         </div>
-        
-        {/* Video Info */}
-        <div className="px-0 py-3">
-          {/* Trainer Avatar + Title на одной строке */}
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gray-700">
+        {/* Урок недели — открыт для FREE (бейдж), остальное под замком */}
+        {isFreeLesson && paywalled && (
+          <div className="absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: '#A1FF4A', color: '#060919' }}>
+            Урок недели
+          </div>
+        )}
+        {locked && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/45 backdrop-blur-[1px]">
+            <Lock size={28} color="#F9F8FE" aria-hidden />
+          </div>
+        )}
+        {/* "Новинка" badge */}
+        {isNew && !locked && (
+          <div className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: '#A1FF4A', color: '#060919' }}>
+            Новинка
+          </div>
+        )}
+      </div>
+      
+      {/* Video Info */}
+      <div className="px-0 py-3">
+        {/* Trainer Avatar + Title на одной строке */}
+        <div className="flex items-center gap-3 mb-2">
+          {/* p-0.5/-m-0.5: тап-зона 44px при том же круге 40px */}
+          <TrainerLink
+            trainer={video.trainer}
+            ariaLabel={trainerName ? `Тренер ${trainerName}` : 'Тренер'}
+            className="block shrink-0 p-0.5 -m-0.5 rounded-full"
+          >
+            <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-700">
               {video.trainer?.avatar ? (
                 <Image
                   src={video.trainer.avatar}
-                  alt={`${video.trainer.name} ${video.trainer.lastName}`}
+                  alt={trainerName}
                   width={40}
                   height={40}
                   className="object-cover w-full h-full"
@@ -1504,20 +1563,27 @@ const VideoCard = ({ video, isNew }: VideoCardProps & { isNew?: boolean }) => {
                 </div>
               )}
             </div>
-            <h3 className="text-white text-base font-semibold line-clamp-2 leading-tight flex-1">
+          </TrainerLink>
+          <Link
+            href={`/video/${video.id}`}
+            onClick={(e) => { if (locked) { e.preventDefault(); openSubscriptionModal('video'); } }}
+            className="flex-1 min-w-0 after:absolute after:inset-0"
+          >
+            <h3 className="text-white text-base font-semibold line-clamp-2 leading-tight">
               {video.title.toUpperCase()}
             </h3>
-          </div>
-          
-          {/* Trainer info */}
-          <div style={{ fontSize: '12px' }} className="text-white/60">
-            <span>
-              {video.trainer?.name} {video.trainer?.lastName}
-            </span>
-          </div>
+          </Link>
+        </div>
+
+        {/* Trainer info. py-2 у строчной ссылки расширяет тап-зону, не
+            сдвигая вёрстку (вертикальный padding инлайна не влияет на строку) */}
+        <div style={{ fontSize: '12px' }} className="text-white/60">
+          <TrainerLink trainer={video.trainer} className="py-2">
+            {trainerName}
+          </TrainerLink>
         </div>
       </div>
-    </Link>
+    </div>
   );
 };
 

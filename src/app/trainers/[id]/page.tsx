@@ -54,15 +54,10 @@ export default function TrainerPage() {
   useEffect(() => {
     const fetchTrainerData = async () => {
       try {
-        console.log('Fetching trainer with ID:', trainerId);
-        
         // Загружаем данные тренера
         const trainerResponse = await fetch(`/api/trainers/${trainerId}`);
-        console.log('Trainer response status:', trainerResponse.status);
-        
         const trainerData = await trainerResponse.json();
-        console.log('Trainer data:', trainerData);
-        
+
         if (!trainerResponse.ok || !trainerData.trainer) {
           setError(trainerData.error || 'Тренер не найден');
           setLoading(false);

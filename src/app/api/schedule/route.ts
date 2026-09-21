@@ -52,6 +52,7 @@ export async function GET(req: NextRequest) {
             category: true,
             trainer: {
               select: {
+                id: true, // карточка в календаре ведёт на страницу тренера
                 name: true,
                 lastName: true,
                 avatar: true,

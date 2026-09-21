@@ -17,6 +17,7 @@ import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Sparkles, Star } from 'lucide-react';
 import BottomNavigation from '@/components/BottomNavigation';
+import TrainerLink from '@/components/TrainerLink';
 import { Skeleton } from '@/components/Skeleton';
 
 // Длительность видео в формате YouTube (MM:SS или H:MM:SS)
@@ -270,8 +271,11 @@ const WorkoutCard = ({
   </div>
 );
 
+// Карточка — не ссылка целиком: аватар и имя ведут к тренеру (п.2 «Середина
+// сентября»). Ссылка на видео — на заголовке, растянута на всю карточку
+// (after:inset-0), тренер лежит поверх — см. TrainerLink.
 const VideoCard = ({ v }: { v: VideoItem }) => (
-  <Link href={`/video/${v.id}`} className="rounded-2xl overflow-hidden bg-night block">
+  <div className="relative rounded-2xl overflow-hidden bg-night">
     <div className="relative w-full aspect-video">
       <Image
         src={v.thumbnail && v.thumbnail.trim() !== '' ? v.thumbnail : '/images/video_prew_2.png'}
@@ -285,31 +289,44 @@ const VideoCard = ({ v }: { v: VideoItem }) => (
     </div>
     <div className="p-4">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-gray-700">
-          {v.trainer.avatar ? (
-            <Image
-              src={v.trainer.avatar}
-              alt={`${v.trainer.name} ${v.trainer.lastName}`}
-              width={40}
-              height={40}
-              className="object-cover w-full h-full"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-white font-bold">
-              {v.trainer.name.charAt(0)}
-            </div>
-          )}
-        </div>
-        <h3 className="text-white text-base font-semibold line-clamp-2 leading-tight flex-1">
-          {v.title.toUpperCase()}
-        </h3>
+        {/* p-0.5/-m-0.5: тап-зона 44px при том же круге 40px */}
+        <TrainerLink
+          trainer={v.trainer}
+          ariaLabel={`Тренер ${v.trainer.name} ${v.trainer.lastName}`}
+          className="block shrink-0 p-0.5 -m-0.5 rounded-full"
+        >
+          <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-700">
+            {v.trainer.avatar ? (
+              <Image
+                src={v.trainer.avatar}
+                alt={`${v.trainer.name} ${v.trainer.lastName}`}
+                width={40}
+                height={40}
+                className="object-cover w-full h-full"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-white font-bold">
+                {v.trainer.name.charAt(0)}
+              </div>
+            )}
+          </div>
+        </TrainerLink>
+        <Link href={`/video/${v.id}`} className="flex-1 min-w-0 after:absolute after:inset-0">
+          <h3 className="text-white text-base font-semibold line-clamp-2 leading-tight">
+            {v.title.toUpperCase()}
+          </h3>
+        </Link>
       </div>
+      {/* py-2 у строчной ссылки расширяет тап-зону, не сдвигая вёрстку */}
       <div className="text-white/60 text-xs mt-2">
-        {formatDate(v.date)} · {v.trainer.name} {v.trainer.lastName}
+        {formatDate(v.date)} ·{' '}
+        <TrainerLink trainer={v.trainer} className="py-2">
+          {v.trainer.name} {v.trainer.lastName}
+        </TrainerLink>
         {v.equipment.length > 0 && ` · ${v.equipment.join(' / ')}`}
       </div>
     </div>
-  </Link>
+  </div>
 );
 
 // useSearchParams в клиентской странице требует Suspense-границу (App Router:

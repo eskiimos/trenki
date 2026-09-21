@@ -879,6 +879,7 @@ const AdminVideosPage = () => {
       'AMATEUR': 'Любитель',
       'ADVANCED': 'Продвинутый',
       'PRO': 'Профи',
+      'ANY': 'Любой',
     };
     
     const muscleGroupToRussian: Record<string, string> = {
@@ -1027,7 +1028,12 @@ const AdminVideosPage = () => {
       'тазобедренный': 'ЛФК колено',
     };
 
+    // Первым — «любой»: цикл ниже берёт первый найденный ключ, а короткое
+    // «про» ловится внутри многих слов (прогиб, профилактика) и перебило бы
+    // явно указанный «Любой».
     const complexityMap: Record<string, string> = {
+      'любой': 'Любой',
+      'все уровни': 'Любой',
       'новичок': 'Новичок',
       'начинающий': 'Новичок',
       'beginner': 'Новичок',
@@ -1238,7 +1244,10 @@ const AdminVideosPage = () => {
         'Продвинутый': 'ADVANCED',
         'Профи': 'EXPERT',
       };
-      parsed.difficulty = complexityToDifficulty[parsed.сложность] || parsed.difficulty;
+      // У «Любой» пары в каталожной сложности нет — не пишем ключ вовсе,
+      // иначе difficulty: undefined затёр бы в форме уже выбранное значение.
+      const mappedDifficulty = complexityToDifficulty[parsed.сложность];
+      if (mappedDifficulty) parsed.difficulty = mappedDifficulty;
     }
 
     if (!parsed.trainingGoals && parsed.типНагрузки) {
@@ -2280,8 +2289,11 @@ const AdminVideosPage = () => {
                         <option value="Любитель">Любитель</option>
                         <option value="Продвинутый">Продвинутый</option>
                         <option value="Профи">Профи</option>
+                        <option value="Любой">Любой</option>
                       </select>
-                      <p style={hintStyle}>Для кого подходит упражнение</p>
+                      <p style={hintStyle}>
+                        Для кого подходит упражнение. «Любой» — всем уровням (разминка, заминка)
+                      </p>
                     </div>
 
                   </div>

@@ -1,31 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminAsync } from '@/lib/admin-session';
-import { careerStartYearFromExperience } from '@/lib/trainer';
+import { careerStartYearFromExperience, trainerExperienceYears } from '@/lib/trainer';
+import { logger } from '@/lib/logger';
 
+// Публичный роут: middleware пропускает /api/* без сессии, а страница тренера —
+// переход с каждой карточки видео. Раньше тут был include.videos без select —
+// наружу уходили все колонки всех видео тренера, включая videoUrl платных,
+// неопубликованных и сырых s3://uploads/… в обработке (мимо пейвола /api/videos).
+// Поэтому только явный select публичных полей: колонка, добавленная в Trainer
+// позже, сама не утечёт. Список видео страница берёт из /api/videos?trainerId.
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await context.params;
-    
+
     const trainer = await prisma.trainer.findUnique({
       where: { id },
-      include: {
-        videos: {
-          orderBy: { createdAt: 'desc' }
-        }
-      }
+      select: {
+        id: true,
+        name: true,
+        lastName: true,
+        speciality: true,
+        experience: true,
+        careerStartYear: true,
+        rating: true,
+        avatar: true,
+        description: true,
+      },
     });
 
     if (!trainer) {
       return NextResponse.json({ error: 'Trainer not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ trainer });
+    return NextResponse.json({
+      trainer: {
+        id: trainer.id,
+        name: trainer.name,
+        lastName: trainer.lastName,
+        speciality: trainer.speciality,
+        // Как в списке /api/trainers: опыт деривируется из careerStartYear
+        // (растёт +1 каждый 1 января), а не берётся из legacy-снимка
+        experience: trainerExperienceYears(trainer),
+        rating: trainer.rating,
+        avatar: trainer.avatar,
+        description: trainer.description,
+      },
+    });
   } catch (error) {
-    console.error('Error fetching trainer:', error);
+    logger.error('trainers/[id] GET failed', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

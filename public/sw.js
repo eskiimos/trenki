@@ -187,12 +187,18 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('push', (event) => {
   console.log('[SW] Push notification received');
   
+  // Метка (tag): уведомление с той же меткой заменяет предыдущее в шторке.
+  // Сервер шлёт метку по типу пуша (src/lib/notifications/push-tag.ts), чтобы,
+  // например, задание от тренера не затиралось нуджем про серию. Payload без
+  // метки (ручная рассылка из админки, пуши, отправленные до деплоя) получает
+  // прежнюю общую метку — для них поведение не меняется.
   let notificationData = {
     title: 'Треньки',
     body: 'Новое уведомление',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
     url: '/',
+    tag: 'trenki-notification',
   };
   
   // Парсим данные из push-уведомления
@@ -205,6 +211,10 @@ self.addEventListener('push', (event) => {
         icon: data.icon || notificationData.icon,
         badge: data.badge || notificationData.badge,
         url: data.url || notificationData.url,
+        tag:
+          typeof data.tag === 'string' && data.tag.trim()
+            ? data.tag.trim().slice(0, 256)
+            : notificationData.tag,
       };
     } catch (e) {
       console.error('[SW] Error parsing push data:', e);
@@ -216,7 +226,11 @@ self.addEventListener('push', (event) => {
     icon: notificationData.icon,
     badge: notificationData.badge,
     vibrate: [200, 100, 200],
-    tag: 'trenki-notification',
+    tag: notificationData.tag,
+    // Без renotify замена уведомления с той же меткой приходит беззвучно — повторное
+    // «Серия под угрозой» просто молча подменяло вчерашнее. Метка тут всегда
+    // непустая, иначе renotify: true бросает TypeError.
+    renotify: true,
     requireInteraction: false,
     data: {
       url: notificationData.url,

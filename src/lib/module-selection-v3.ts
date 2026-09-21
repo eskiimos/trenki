@@ -24,6 +24,9 @@ import {
   FALLBACK_PRIORITIES,
   RPERange,
 } from './training-algorithm-v3';
+// Фильтр по уровню всегда включает «Любой» (ANY): такие видео подбираются
+// наравне с видео точного уровня на всех ступенях, а не только на ANY_MODULE.
+import { complexityFilterForLevels } from './complexity';
 
 interface VideoWithTrainer extends Video {
   trainer: {
@@ -92,7 +95,7 @@ async function searchWithPriority(
   switch (priority) {
     case 'PERFECT_MATCH':
       // Все теги совпадают
-      where.complexity = { in: complexityToComplexityEnum(criteria.complexityLevels) };
+      where.complexity = { in: complexityFilterForLevels(criteria.complexityLevels) };
       if (criteria.ageGroup) {
         where.ageGroups = { has: criteria.ageGroup };
       }
@@ -108,7 +111,7 @@ async function searchWithPriority(
 
     case 'NO_LOAD_TYPE':
       // Без учета типа нагрузки
-      where.complexity = { in: complexityToComplexityEnum(criteria.complexityLevels) };
+      where.complexity = { in: complexityFilterForLevels(criteria.complexityLevels) };
       if (criteria.ageGroup) {
         where.ageGroups = { has: criteria.ageGroup };
       }
@@ -121,7 +124,7 @@ async function searchWithPriority(
 
     case 'NO_AGE':
       // Без учета возраста
-      where.complexity = { in: complexityToComplexityEnum(criteria.complexityLevels) };
+      where.complexity = { in: complexityFilterForLevels(criteria.complexityLevels) };
       if (criteria.muscleGroups.length > 0) {
         where.muscleGroup = { in: criteria.muscleGroups };
       }
@@ -134,7 +137,7 @@ async function searchWithPriority(
 
     case 'NO_RPE':
       // Без учета RPE
-      where.complexity = { in: complexityToComplexityEnum(criteria.complexityLevels) };
+      where.complexity = { in: complexityFilterForLevels(criteria.complexityLevels) };
       if (criteria.ageGroup) {
         where.ageGroups = { has: criteria.ageGroup };
       }
@@ -148,7 +151,7 @@ async function searchWithPriority(
 
     case 'BASIC_MATCH':
       // Минимальные требования: только тип модуля, направление, возраст и уровень
-      where.complexity = { in: complexityToComplexityEnum(criteria.complexityLevels) };
+      where.complexity = { in: complexityFilterForLevels(criteria.complexityLevels) };
       if (criteria.ageGroup) {
         where.ageGroups = { has: criteria.ageGroup };
       }
@@ -159,7 +162,8 @@ async function searchWithPriority(
 
     case 'ANY_MODULE':
       // Вообще любое видео нужного типа модуля (для разминки/заминки)
-      // Только moduleType и isPublished
+      // Только moduleType и isPublished. Сюда же доходят видео без уровня
+      // («Не указано»); «Любой» (ANY) берётся раньше — на всех уровнях выше.
       break;
   }
 
@@ -195,20 +199,6 @@ async function searchWithPriority(
   // Выбираем случайное видео из найденных
   const randomIndex = Math.floor(Math.random() * videos.length);
   return videos[randomIndex];
-}
-
-/**
- * Преобразование ComplexityLevel в Complexity enum из Prisma
- */
-function complexityToComplexityEnum(levels: ComplexityLevel[]): any[] {
-  const mapping: Record<ComplexityLevel, any> = {
-    [ComplexityLevel.BEGINNER]: 'BEGINNER',
-    [ComplexityLevel.AMATEUR]: 'AMATEUR',
-    [ComplexityLevel.ADVANCED]: 'ADVANCED',
-    [ComplexityLevel.PRO]: 'PRO',
-  };
-
-  return levels.map(level => mapping[level]);
 }
 
 /**
