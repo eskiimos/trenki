@@ -357,7 +357,7 @@ export default function TrainingAssessmentPage() {
             }}>
               цель тренировки
             </h2>
-            <div className="flex flex-wrap" data-tour="goal-section" style={{ gap: '12px' }}>
+            <div className="flex flex-wrap" style={{ gap: '12px' }}>
               {trainingGoals.map((goal) => {
                 const info = GOAL_LABELS[goal];
                 if (!info) return null;
@@ -417,7 +417,7 @@ export default function TrainingAssessmentPage() {
             }}>
               твое состояние
             </h2>
-            <div data-tour="energy-state" style={{ display: 'flex', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '12px' }}>
               {energyStates.map((state) => {
                 const info = ENERGY_STATE_LABELS[state];
                 if (!info) return null;
@@ -465,7 +465,6 @@ export default function TrainingAssessmentPage() {
       >
         <button
           type="button"
-          data-tour="submit-button"
           onClick={handleSubmit}
           disabled={!formData.goal || isSubmitting || userLoading}
           className="w-full rounded-full font-medium transition-all uppercase flex items-center justify-center"

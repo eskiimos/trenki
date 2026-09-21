@@ -548,14 +548,13 @@ export default function CalendarPage() {
         )}
 
         {/* Большая кнопка сборки недели — ТОЛЬКО когда микроцикла ещё нет
-            (пустое состояние + точка входа + якорь онбординг-тура). Когда неделя
+            (пустое состояние + точка входа). Когда неделя
             собрана, пересборка живёт компактной ссылкой внутри календаря ниже —
             большую кнопку сверху не показываем, чтобы не провоцировать случайную
             замену всего плана. */}
         {cycleLoaded && !microcycle && (
           <button
             type="button"
-            data-tour="microcycle-button"
             onClick={handleGenerateMicrocycle}
             disabled={generatingCycle}
             className="w-full mb-4 rounded-2xl flex items-center gap-3 p-4 transition-transform active:scale-[0.98]"

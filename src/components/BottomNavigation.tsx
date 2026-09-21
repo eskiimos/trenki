@@ -11,6 +11,7 @@ interface BottomNavigationProps {
 const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' }) => {
   return (
     <nav
+      data-tour="bottom-nav"
       className="fixed bottom-0 left-0 right-0 bg-[#060919] border-t border-[#101530] px-4 z-40"
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)', paddingTop: 12 }}
     >

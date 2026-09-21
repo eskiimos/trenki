@@ -1,22 +1,20 @@
 import { TourStep } from './types';
 
-// Сценарий продуктового тура атлета.
+// Сценарий продуктового тура атлета (переписан 2026-09 под текущий интерфейс:
+// главная точка входа — карточка «ИИ-тренер · собрать неделю» на главной, а не
+// кнопка в календаре; экран быстрой тренировки больше не проходим целиком).
 //
-// Маршрут: главная → (тап карточки ИИ-тренер) → ассессмент (тап цели,
-// тап состояния, «Вперёд» только поясняем) → (тап «Собрать неделю» в
-// календаре, РЕАЛЬНАЯ генерация микроцикла) → 5 дней → профиль.
+// Маршрут: главная (шапка → нижнее меню → быстрая тренировка → тап «собрать
+// неделю») → календарь (готовая неделя) → профиль (потенциал → уровень и XP).
 //
-// ВАЖНО: в туре одиночная тренировка ИИ-тренера НЕ генерируется и НЕ
-// сохраняется — шаг «Вперёд» только подсвечивается и поясняется (advanceOn
-// 'next'), реального сабмита нет. Сохраняется только микроцикл (5 дней) —
-// он и есть носитель вовлечения. Вне тура одиночная работает как прежде.
+// Реально сохраняется только микроцикл (тап по карточке на главной выполняет
+// обычную сборку). Без подписки шаги про неделю пропускаются (requiresAccess).
 //
-// 3 шага продвигаются реальным тапом пользователя (2, 3, 4) + ключевой
-// тап «Собрать неделю» (6). data-tour якоря:
-//   src/app/page.tsx                      (header, ai-trainer-card)
-//   src/app/training/assessment/page.tsx  (goal-section, energy-state, submit-button)
-//   src/app/calendar/page.tsx             (microcycle-button, microcycle-banner)
-//   src/app/profile/page.tsx              (potential-ring)
+// data-tour якоря:
+//   src/app/page.tsx                    (header, ai-trainer-card, microcycle-card)
+//   src/components/BottomNavigation.tsx (bottom-nav)
+//   src/app/calendar/page.tsx           (microcycle-banner)
+//   src/app/profile/page.tsx            (potential-ring, level-card)
 
 export const PRODUCT_TOUR: TourStep[] = [
   {
@@ -28,60 +26,61 @@ export const PRODUCT_TOUR: TourStep[] = [
     body: 'Здесь твоё имя, игровой номер и позиция. А приложение помогает тебе расти как игроку.',
   },
   {
-    id: 'home-ai',
+    id: 'home-nav',
+    route: '/',
+    anchor: 'bottom-nav',
+    advanceOn: 'next',
+    title: 'Навигация',
+    body: 'Внизу — главная, треньки (короткие упражнения), все тренировки, календарь и твой профиль.',
+  },
+  {
+    id: 'home-quick',
     route: '/',
     anchor: 'ai-trainer-card',
-    advanceOn: 'tap',
-    title: 'Быстрая тренировка',
-    body: 'Нажми на карточку — моментально соберём тренировку под тебя.',
-  },
-  {
-    id: 'assess-goal',
-    route: '/training/assessment',
-    anchor: 'goal-section',
-    advanceOn: 'tap',
-    title: 'Выбери цель',
-    body: 'Над чем работаем? Выбери одну из целей.',
-  },
-  {
-    id: 'assess-energy',
-    route: '/training/assessment',
-    anchor: 'energy-state',
-    advanceOn: 'tap',
-    title: 'Твоё состояние',
-    body: 'Отметь, как себя чувствуешь — ИИ подстроит нагрузку. Нажми на один из вариантов.',
-  },
-  {
-    id: 'assess-submit',
-    route: '/training/assessment',
-    anchor: 'submit-button',
     advanceOn: 'next',
-    title: 'Разовая тренировка',
-    body: 'Кнопка «Вперёд» соберёт одну тренировку под этот запрос. А сейчас покажу кое-что мощнее — целую неделю.',
+    title: 'Быстрая тренировка',
+    body: 'Нужна одна тренировка прямо сейчас? Выбери цель и самочувствие — ИИ соберёт её за секунды.',
   },
   {
-    id: 'cal-generate',
-    route: '/calendar',
-    anchor: 'microcycle-button',
+    id: 'home-week',
+    route: '/',
+    anchor: 'microcycle-card',
     advanceOn: 'tap',
-    title: 'Собери неделю',
-    body: 'ИИ-тренер составит сразу 5 тренировок на неделю — под твой уровень. Нажми!',
+    requiresAccess: true,
+    title: 'ИИ-тренер на неделю',
+    body: 'Главное — план на неделю: 5 тренировок под твой уровень. Нажми на кнопку — ИИ-тренер соберёт его.',
   },
   {
     id: 'cal-week',
     route: '/calendar',
     anchor: 'microcycle-banner',
     advanceOn: 'next',
+    navigate: 'wait',
+    optional: true,
+    requiresAccess: true,
     title: 'Твоя неделя готова',
-    body: 'Вот твой план на 5 дней. Каждый день — своя тренировка. Открывай по очереди и расти.',
+    body: 'Вот твой план на 5 дней. Каждый день — своя тренировка: открывай по очереди и расти.',
   },
   {
     id: 'profile-potential',
     route: '/profile',
     anchor: 'potential-ring',
     advanceOn: 'next',
-    isLast: true,
     title: 'Твой потенциал',
-    body: 'Кольцо потенциала и пять характеристик растут с каждой тренировкой. Это всё — дальше ты сам!',
+    body: 'Кольцо потенциала и пять характеристик растут с каждой тренировкой.',
+  },
+  {
+    id: 'profile-level',
+    route: '/profile',
+    anchor: 'level-card',
+    advanceOn: 'next',
+    isLast: true,
+    title: 'Уровень и опыт',
+    body: 'За тренировки и ежедневный чек-ин копишь опыт — растут уровень и звание. Тренируйся 3 дня подряд, и включится ударный темп: весь опыт дня удваивается. Дальше — ты сам!',
   },
 ];
+
+/** Шаги, доступные пользователю (без платных — при paywall). */
+export function availableTourSteps(paywalled: boolean): TourStep[] {
+  return PRODUCT_TOUR.filter((s) => !(s.requiresAccess && paywalled));
+}

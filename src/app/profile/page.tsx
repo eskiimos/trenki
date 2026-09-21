@@ -427,7 +427,7 @@ const ProfilePage = () => {
         {/* Карточка уровня (геймификация): статус-«эволюция», уровень, XP-прогресс.
             Пока сводка не загрузилась — ничего не показываем (без скелетона). */}
         {gamification && (
-          <div className="bg-surface rounded-2xl p-4 mb-6 border border-white/5">
+          <div className="bg-surface rounded-2xl p-4 mb-6 border border-white/5" data-tour="level-card">
             {/* Ряд 1: звание слева, уровень справа — как до бейджа темпа,
                 чтобы на узких экранах (iPhone ~390) ничего не переносилось */}
             <div className="flex items-center justify-between gap-2 mb-2">
