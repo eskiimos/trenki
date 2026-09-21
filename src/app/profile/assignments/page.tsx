@@ -72,7 +72,7 @@ export default function MyAssignmentsPage() {
           Назад
         </button>
         <h1 className="font-overpass uppercase" style={{ fontWeight: 900, fontSize: 22 }}>
-          Задания от тренера
+          Мои задания
         </h1>
 
         <div className="mt-4 flex gap-2">
@@ -124,7 +124,7 @@ export default function MyAssignmentsPage() {
             <div key={a.id} style={{ background: '#060919', border: '1px solid #26252F', borderRadius: 14, padding: '14px 16px' }}>
               <div className="flex items-center justify-between">
                 <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 12 }}>
-                  От {a.coach.firstName} {a.coach.lastName}
+                  От тренера · {a.coach.firstName} {a.coach.lastName}
                 </div>
                 <StatusBadge status={a.status} />
               </div>

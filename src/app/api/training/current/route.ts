@@ -4,10 +4,93 @@ import { WorkoutStatus, MicrocycleStatus } from '@/generated/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
 import { goalsFromStoredDays } from '@/lib/microcycle/week-plan';
 import { resolveVideoUrl } from '@/lib/s3';
+import { pickTodayReminder } from '@/lib/training/today-reminder';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const WORKOUT_INCLUDE = {
+  videos: {
+    include: {
+      video: { include: { trainer: true } },
+    },
+    orderBy: { order: 'asc' as const },
+  },
+  microcycleDay: { include: { microcycle: { include: { days: true } } } },
+};
 
 /**
- * GET /api/training/current[?workoutId=xxx]
+ * PENDING-сессия сегодняшнего дня активного микроцикла.
+ * «Сегодня» считаем в UTC-днях — в ТОЙ ЖЕ системе координат, что хранимый
+ * якорь weekStartDate (UTC-полночь, см. week-start.ts и todayCycleDayIndex в
+ * offer.ts). Смешение с МСК давало бы другой «сегодняшний» день, чем остальные
+ * точки входа.
+ */
+async function findTodayCycleSessionId(userId: string): Promise<string | null> {
+  const todayIdx = Math.floor(Date.now() / DAY_MS);
+  const activeDays = await prisma.microcycleDay.findMany({
+    where: {
+      workoutSessionId: { not: null },
+      microcycle: { userId, status: { not: MicrocycleStatus.ARCHIVED } },
+      workoutSession: { status: WorkoutStatus.PENDING },
+    },
+    select: {
+      dayOfWeek: true,
+      workoutSessionId: true,
+      microcycle: { select: { weekStartDate: true } },
+    },
+  });
+  const todays = activeDays.find(
+    (d) =>
+      Math.floor((d.microcycle.weekStartDate.getTime() + (d.dayOfWeek - 1) * DAY_MS) / DAY_MS) ===
+      todayIdx,
+  );
+  return todays?.workoutSessionId ?? null;
+}
+
+/**
+ * Режим напоминания на главной (?scope=today): только сегодняшняя тренировка
+ * (см. src/lib/training/today-reminder.ts) и НИКАКИХ записей в БД — раньше
+ * каждый заход на главную гасил в SKIPPED все старые сессии, включая сессии
+ * заданий тренера.
+ */
+async function findTodayReminderSessionId(userId: string, tz: string | null): Promise<string | null> {
+  const now = new Date();
+  // С запасом на таймзоны: «сегодня» пользователя целиком внутри последних 48 ч.
+  const since = new Date(now.getTime() - 2 * DAY_MS);
+  const [inProgress, pending, todayCycleSessionId] = await Promise.all([
+    prisma.workoutSession.findMany({
+      where: {
+        userId,
+        status: WorkoutStatus.IN_PROGRESS,
+        OR: [{ startedAt: { gte: since } }, { startedAt: null, createdAt: { gte: since } }],
+      },
+      select: { id: true, startedAt: true, createdAt: true },
+      orderBy: { startedAt: 'desc' },
+      take: 10,
+    }),
+    prisma.workoutSession.findMany({
+      where: { userId, status: WorkoutStatus.PENDING, createdAt: { gte: since } },
+      select: { id: true, createdAt: true, microcycleDay: { select: { id: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    }),
+    findTodayCycleSessionId(userId),
+  ]);
+  return pickTodayReminder(
+    {
+      inProgress,
+      todayCycleSessionId,
+      pending: pending.map((s) => ({ id: s.id, createdAt: s.createdAt, isCycleDay: !!s.microcycleDay })),
+    },
+    now,
+    tz,
+  );
+}
+
+/**
+ * GET /api/training/current[?workoutId=xxx][?scope=today]
  * Получает активную тренировку текущего пользователя (или конкретную по workoutId).
+ * scope=today — для напоминания на главной: только сегодняшняя, без записей в БД.
  * Auth: httpOnly session cookie.
  */
 export async function GET(request: NextRequest) {
@@ -17,20 +100,10 @@ export async function GET(request: NextRequest) {
     const userId = auth.user.id;
 
     const workoutId = request.nextUrl.searchParams.get('workoutId');
+    const scope = request.nextUrl.searchParams.get('scope');
 
     let workout = workoutId
-      ? await prisma.workoutSession.findUnique({
-          where: { id: workoutId },
-          include: {
-            videos: {
-              include: {
-                video: { include: { trainer: true } },
-              },
-              orderBy: { order: 'asc' },
-            },
-            microcycleDay: { include: { microcycle: { include: { days: true } } } },
-          },
-        })
+      ? await prisma.workoutSession.findUnique({ where: { id: workoutId }, include: WORKOUT_INCLUDE })
       : null;
 
     // Запросили чужую тренировку по workoutId — закрываем
@@ -38,7 +111,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ workout: null }, { status: 404 });
     }
 
-    if (!workout) {
+    if (!workout && !workoutId && scope === 'today') {
+      const id = await findTodayReminderSessionId(userId, auth.user.timezone || 'Europe/Moscow');
+      workout = id ? await prisma.workoutSession.findUnique({ where: { id }, include: WORKOUT_INCLUDE }) : null;
+    } else if (!workout) {
       // Фолбэк без workoutId. Раньше брали просто «самую свежую висящую»
       // (createdAt desc) — но у активного микроцикла 5 PENDING-сессий, созданных
       // одной транзакцией, и выпадала фактически произвольная (баг «назад →
@@ -48,15 +124,7 @@ export async function GET(request: NextRequest) {
       //      в т.ч. только что созданная замена дня — как раньше);
       //   3) если свежайшая — цикловая (их 5 с одинаковым createdAt):
       //      СЕГОДНЯШНИЙ день цикла, а не произвольный.
-      const include = {
-        videos: {
-          include: {
-            video: { include: { trainer: true } },
-          },
-          orderBy: { order: 'asc' as const },
-        },
-        microcycleDay: { include: { microcycle: { include: { days: true } } } },
-      };
+      const include = WORKOUT_INCLUDE;
 
       workout = await prisma.workoutSession.findFirst({
         where: { userId, status: WorkoutStatus.IN_PROGRESS },
@@ -73,36 +141,10 @@ export async function GET(request: NextRequest) {
         workout = freshest;
 
         if (freshest?.microcycleDay) {
-          // «Сегодня» считаем в UTC-днях — в ТОЙ ЖЕ системе координат, что
-          // хранимый якорь weekStartDate (UTC-полночь, см. week-start.ts и
-          // todayCycleDayIndex в offer.ts). Смешение с МСК давало бы другой
-          // «сегодняшний» день, чем остальные точки входа.
-          const DAY_MS = 24 * 60 * 60 * 1000;
-          const todayIdx = Math.floor(Date.now() / DAY_MS);
-          const activeDays = await prisma.microcycleDay.findMany({
-            where: {
-              workoutSessionId: { not: null },
-              microcycle: { userId, status: { not: MicrocycleStatus.ARCHIVED } },
-              workoutSession: { status: WorkoutStatus.PENDING },
-            },
-            select: {
-              dayOfWeek: true,
-              workoutSessionId: true,
-              microcycle: { select: { weekStartDate: true } },
-            },
-          });
-          const todays = activeDays.find(
-            (d) =>
-              Math.floor(
-                (d.microcycle.weekStartDate.getTime() + (d.dayOfWeek - 1) * DAY_MS) / DAY_MS,
-              ) === todayIdx,
-          );
-          if (todays?.workoutSessionId && todays.workoutSessionId !== freshest.id) {
+          const todaysId = await findTodayCycleSessionId(userId);
+          if (todaysId && todaysId !== freshest.id) {
             workout =
-              (await prisma.workoutSession.findUnique({
-                where: { id: todays.workoutSessionId },
-                include,
-              })) ?? freshest;
+              (await prisma.workoutSession.findUnique({ where: { id: todaysId }, include })) ?? freshest;
           }
         }
       }
@@ -119,7 +161,13 @@ export async function GET(request: NextRequest) {
           },
           select: { workoutSessionId: true },
         });
-        const protectedIds = microcycleDays
+        // И сессии невыполненных заданий тренера: задание живо, пока его не
+        // выполнили, — гасить его тренировку нельзя.
+        const assignmentSessions = await prisma.trainingAssignment.findMany({
+          where: { athleteId: userId, workoutSessionId: { not: null }, status: { not: 'COMPLETED' } },
+          select: { workoutSessionId: true },
+        });
+        const protectedIds = [...microcycleDays, ...assignmentSessions]
           .map((d) => d.workoutSessionId)
           .filter((id): id is string => id !== null);
 

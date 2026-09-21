@@ -564,7 +564,7 @@ const ProfilePage = () => {
             label="Избранное"
             hint="Треньки, занятия и тренировки от ИИ"
           />
-          <NavRow href="/profile/assignments" icon={ClipboardList} label="Задания от тренера" />
+          <NavRow href="/profile/assignments" icon={ClipboardList} label="Мои задания" />
         </SettingsGroup>
 
         {/* Вход в настройки — последним блоком страницы, отдельной карточкой:

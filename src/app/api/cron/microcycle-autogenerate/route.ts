@@ -21,6 +21,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendUserPush } from '@/lib/coach/push';
 import { generateMicrocycleForUser } from '@/lib/microcycle/generate';
+import { getPaywallMode } from '@/lib/settings';
+import { isPaywalled } from '@/lib/paywall';
 import { getMicrocycleWeekStart } from '@/lib/microcycle/week-start';
 import { UserRole } from '@/generated/prisma';
 
@@ -36,14 +38,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Только атлеты, у которых есть профиль и опция включена.
-  const eligible = await prisma.user.findMany({
+  // Только атлеты, у которых есть профиль и опция включена, — и с доступом:
+  // микроцикл целиком платный (ручной generate отвечает 402), а крон раньше
+  // собирал его и бесплатным атлетам, если опция когда-то была включена.
+  const mode = await getPaywallMode();
+  const candidates = await prisma.user.findMany({
     where: {
       role: UserRole.ATHLETE,
       profile: { is: { autoGenerateMicrocycle: true } },
     },
-    select: { id: true },
+    select: { id: true, accessTier: true, premiumUntil: true, isAdmin: true },
   });
+  const eligible = candidates.filter((u) => !isPaywalled(u, mode));
+  const paywalledSkipped = candidates.length - eligible.length;
 
   const startedAt = Date.now();
   // Cron всегда стартует цикл с ближайшего понедельника — логика
@@ -79,6 +86,7 @@ export async function GET(request: NextRequest) {
   const durationMs = Date.now() - startedAt;
   return NextResponse.json({
     total: eligible.length,
+    paywalledSkipped,
     created,
     existing,
     noProfile,

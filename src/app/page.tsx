@@ -14,7 +14,6 @@ import AddToHomeScreen from '@/components/AddToHomeScreen';
 import WorkoutReminder from '@/components/WorkoutReminder';
 import StreakChip from '@/components/StreakChip';
 import DailyCheckinCard from '@/components/DailyCheckinCard';
-import AssignmentsBanner from '@/components/AssignmentsBanner';
 import MicrocycleFeedbackModal from '@/components/MicrocycleFeedbackModal';
 import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay';
 import PotentialIslandBanner from '@/components/PotentialIslandBanner';
@@ -22,7 +21,8 @@ import PotentialIslandBanner from '@/components/PotentialIslandBanner';
 import PushOptInBanner from '@/components/PushOptInBanner';
 import TrainerLink from '@/components/TrainerLink';
 import { canShowHomeExtras, readGuideFlags, GUIDE_DISMISSED_KEY, TOUR_STARTED_KEY, type GuideFlags } from '@/lib/home-first-visit';
-import { Play, Zap, Lock, Compass, ChevronRight } from 'lucide-react';
+import { Play, Zap, Lock, Compass, ChevronRight, ClipboardList } from 'lucide-react';
+import { plural } from '@/lib/plural';
 import { openSubscriptionModal, handlePaywallResponse } from '@/lib/subscription-modal';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTour } from '@/components/tour/TourProvider';
@@ -276,9 +276,6 @@ const HomePage = () => {
 
         {/* Запланированная тренировка (за 1 час до старта) */}
         <ScheduledWorkoutSection />
-
-        {/* Баннер с тренировками от тренера */}
-        <AssignmentsBanner />
 
         {/* Каталог тренировок */}
         <TrainingsSection />
@@ -1000,6 +997,27 @@ const TrainingsSection = () => {
     const [cycleChecked, setCycleChecked] = useState(false);
     const { paywalled, freeLessonVideoId } = useSubscription();
 
+    // Одна ситуативная кнопка (п.10 «Середина сентября»): есть активные задания
+    // (от тренера; позже и от родителя) — «Мои задания», иначе ИИ-тренер. Он
+    // по-прежнему доступен из календаря. null — сводка ещё грузится: держим
+    // место, чтобы кнопка не перескакивала; ошибка → ИИ-тренер. Во время тура —
+    // всегда ИИ-тренер: шаг тура просит нажать именно его.
+    const { isActive: tourActive } = useTour();
+    const [activeTasks, setActiveTasks] = useState<number | null>(null);
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch('/api/assignments/summary', { cache: 'no-store' });
+                const data = res.ok ? await res.json() : null;
+                if (!cancelled) setActiveTasks(Number(data?.active) || 0);
+            } catch {
+                if (!cancelled) setActiveTasks(0);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
     // Узнаём, есть ли уже собранный активный цикл. Если есть — кнопка НЕ
     // пересобирает неделю при каждом тапе (правка владельца), а ведёт в
     // календарь к готовому плану.
@@ -1106,28 +1124,52 @@ const TrainingsSection = () => {
           )
         )}
 
-        {/* Кнопка «Собрать микроцикл» — главная точка входа */}
-        <button
-            type="button"
-            data-tour="microcycle-card"
-            onClick={handleMicrocycleClick}
-            disabled={generatingCycle}
-            className="w-full mb-2 transition-transform active:scale-[0.99]"
-            style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
-                background: 'var(--grad-accent)',
-                border: '1px solid var(--border-lime)', borderRadius: 8,
-                cursor: generatingCycle ? 'wait' : 'pointer', opacity: generatingCycle ? 0.7 : 1,
-            }}
-        >
-            <div style={{ width: 40, height: 40, borderRadius: 999, background: 'rgba(161,255,74,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Zap size={20} color="#A1FF4A" fill="#A1FF4A" aria-hidden /></div>
-            <div className="text-left flex-1 min-w-0">
-                <div style={{ color: '#A1FF4A', fontSize: 11, fontFamily: 'Overpass', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>ИИ-тренер</div>
-                <div style={{ color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                    {generatingCycle ? 'Собираю неделю…' : hasActiveCycle ? 'Открыть мою неделю' : 'Собрать микроцикл на неделю'}
+        {/* Главная точка входа: «Мои задания», если они есть, иначе ИИ-тренер */}
+        {activeTasks === null && !tourActive ? (
+            <div className="w-full mb-2" aria-hidden style={{ height: 70, borderRadius: 8, background: 'rgba(255,255,255,0.04)' }} />
+        ) : activeTasks && activeTasks > 0 && !tourActive ? (
+            <Link href="/profile/assignments" style={{ textDecoration: 'none' }}>
+                <div
+                    className="w-full mb-2 transition-transform active:scale-[0.99]"
+                    style={{
+                        display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
+                        background: 'var(--grad-accent)',
+                        border: '1px solid var(--border-lime)', borderRadius: 8,
+                    }}
+                >
+                    <div style={{ width: 40, height: 40, borderRadius: 999, background: 'rgba(161,255,74,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><ClipboardList size={20} color="#A1FF4A" aria-hidden /></div>
+                    <div className="text-left flex-1 min-w-0">
+                        <div style={{ color: '#A1FF4A', fontSize: 11, fontFamily: 'Overpass', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Мои задания</div>
+                        <div style={{ color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                            {activeTasks} {plural(activeTasks, ['задание', 'задания', 'заданий'])} {plural(activeTasks, ['ждёт', 'ждут', 'ждут'])}
+                        </div>
+                    </div>
+                    <ChevronRight size={20} color="#A1FF4A" aria-hidden />
                 </div>
-            </div>
-        </button>
+            </Link>
+        ) : (
+            <button
+                type="button"
+                data-tour="microcycle-card"
+                onClick={handleMicrocycleClick}
+                disabled={generatingCycle}
+                className="w-full mb-2 transition-transform active:scale-[0.99]"
+                style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
+                    background: 'var(--grad-accent)',
+                    border: '1px solid var(--border-lime)', borderRadius: 8,
+                    cursor: generatingCycle ? 'wait' : 'pointer', opacity: generatingCycle ? 0.7 : 1,
+                }}
+            >
+                <div style={{ width: 40, height: 40, borderRadius: 999, background: 'rgba(161,255,74,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Zap size={20} color="#A1FF4A" fill="#A1FF4A" aria-hidden /></div>
+                <div className="text-left flex-1 min-w-0">
+                    <div style={{ color: '#A1FF4A', fontSize: 11, fontFamily: 'Overpass', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>ИИ-тренер</div>
+                    <div style={{ color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        {generatingCycle ? 'Собираю неделю…' : hasActiveCycle ? 'Открыть мою неделю' : 'Собрать микроцикл на неделю'}
+                    </div>
+                </div>
+            </button>
+        )}
         {cycleError && <div style={{ color: '#FF8C4A', fontSize: 12, marginBottom: 8, textAlign: 'center' }}>{cycleError}</div>}
 
         {/* Короткое объяснение логики подбора (Sprint 3). Временно скрыто по

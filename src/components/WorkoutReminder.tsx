@@ -49,7 +49,9 @@ export default function WorkoutReminder() {
 
     const fetchCurrentWorkout = async () => {
       try {
-        const response = await fetch('/api/training/current');
+        // scope=today: только сегодняшняя тренировка (брошенная вчера больше не
+        // всплывает — правка «Середина сентября», п.5) и без записей в БД.
+        const response = await fetch('/api/training/current?scope=today');
         if (response.status === 401) {
           setIsLoading(false);
           return;
