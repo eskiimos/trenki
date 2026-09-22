@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
         status: true,
         kind: true,
         amountKopecks: true,
+        periodDays: true,
         isTest: true,
         errorCode: true,
         premiumGrantedAt: true,

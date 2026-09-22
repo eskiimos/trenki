@@ -3,6 +3,7 @@ import { normalizePaywallMode, type PaywallMode } from '@/lib/paywall';
 import {
   PRICING_DEFAULTS,
   computeIntroPrice,
+  validateQuarterPrice,
   type SubscriptionPricing,
 } from '@/lib/subscription-plan';
 import { normalizeTaxation, normalizeVat, type Taxation, type Vat } from '@/lib/payments/receipt';
@@ -29,6 +30,7 @@ export const SETTING_KEYS = {
   priceMonthly: 'subscription.priceMonthlyRub', // базовая цена подписки ₽/мес
   introDiscountPercent: 'subscription.introDiscountPercent', // макс. скидка по промо, %
   introMonths: 'subscription.introMonths', // на сколько месяцев действует интро-скидка
+  priceQuarter: 'subscription.priceQuarterRub', // цена «3 месяца» (90 дней), ₽; 0 — не продаём
   emailCampaignsEnabled: 'emailCampaigns.enabled', // общий рубильник триггерных email-кампаний (default FALSE)
   trialDays: 'trial.days', // пробный период ДЛЯ ВСЕХ новых, дней (0 = выключен)
   paymentsMode: 'payments.mode', // 'live' | 'test' — какая касса T-Bank принимает оплаты
@@ -263,7 +265,12 @@ export async function getSubscriptionPricing(): Promise<SubscriptionPricing> {
     rows = await prisma.appSetting.findMany({
       where: {
         key: {
-          in: [SETTING_KEYS.priceMonthly, SETTING_KEYS.introDiscountPercent, SETTING_KEYS.introMonths],
+          in: [
+            SETTING_KEYS.priceMonthly,
+            SETTING_KEYS.introDiscountPercent,
+            SETTING_KEYS.introMonths,
+            SETTING_KEYS.priceQuarter,
+          ],
         },
       },
       select: { key: true, value: true },
@@ -292,11 +299,16 @@ export async function getSubscriptionPricing(): Promise<SubscriptionPricing> {
     36,
   );
 
+  // Квартал, противоречащий месячной цене (правили напрямую в БД) — выключен
+  const quarterRaw = parseIntInRange(map.get(SETTING_KEYS.priceQuarter), PRICING_DEFAULTS.priceQuarterRub, 0, 3_000_000);
+  const priceQuarterRub = validateQuarterPrice(quarterRaw, priceMonthlyRub) ? 0 : quarterRaw;
+
   return {
     priceMonthlyRub,
     introDiscountPercent,
     introMonths,
     introPriceRub: computeIntroPrice(priceMonthlyRub, introDiscountPercent),
+    priceQuarterRub,
   };
 }
 

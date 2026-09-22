@@ -83,6 +83,8 @@ export default function PaywallAdminPage() {
   const [priceMonthly, setPriceMonthly] = useState('1200');
   const [discount, setDiscount] = useState('75');
   const [months, setMonths] = useState('3');
+  // Тариф «3 месяца»: разовая оплата за 90 дней по своей цене; 0 — не продаём
+  const [priceQuarter, setPriceQuarter] = useState('0');
   const [savingPrice, setSavingPrice] = useState(false);
   const [priceMsg, setPriceMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
@@ -220,6 +222,7 @@ export default function PaywallAdminPage() {
             setPriceMonthly(String(d.pricing.priceMonthlyRub ?? 1200));
             setDiscount(String(d.pricing.introDiscountPercent ?? 75));
             setMonths(String(d.pricing.introMonths ?? 3));
+            setPriceQuarter(String(d.pricing.priceQuarterRub ?? 0));
           }
           if (typeof d.trialDays === 'number') {
             setTrialDays(String(d.trialDays));
@@ -281,6 +284,7 @@ export default function PaywallAdminPage() {
             priceMonthlyRub: Number(priceMonthly),
             introDiscountPercent: Number(discount),
             introMonths: Number(months),
+            priceQuarterRub: Number(priceQuarter),
           },
         }),
       });
@@ -293,6 +297,7 @@ export default function PaywallAdminPage() {
         setPriceMonthly(String(d.pricing.priceMonthlyRub));
         setDiscount(String(d.pricing.introDiscountPercent));
         setMonths(String(d.pricing.introMonths));
+        setPriceQuarter(String(d.pricing.priceQuarterRub ?? 0));
       }
       setPriceMsg({ type: 'ok', text: 'Цены сохранены' });
     } catch {
@@ -417,7 +422,8 @@ export default function PaywallAdminPage() {
           <AdminCard style={{ marginTop: 12 }}>
             <SectionTitle icon={CreditCard}>Цены подписки</SectionTitle>
             <div style={{ color: 'var(--color-muted)', fontSize: 12, lineHeight: 1.5, marginBottom: 16 }}>
-              Отображаются в окне оформления. Годовой тариф пока не используется.
+              Отображаются в окне оформления. Оплата разовая, без автопродления: месяц — 30 дней,
+              «3 месяца» — 90 дней по своей цене (скидка по промокоду на него не действует).
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
@@ -437,6 +443,29 @@ export default function PaywallAdminPage() {
                   />
                 </div>
               ))}
+            </div>
+            <div style={{ marginTop: 16, maxWidth: 260 }}>
+              <label style={labelStyle}>Цена за 3 месяца, ₽ (0 — не продавать)</label>
+              <input
+                type="number"
+                min={0}
+                value={priceQuarter}
+                onChange={(e) => setPriceQuarter(e.target.value)}
+                style={{ ...inputStyle, colorScheme: 'dark' }}
+              />
+            </div>
+            <div style={{ color: 'var(--color-muted)', fontSize: 13, marginTop: 8 }}>
+              {Number(priceQuarter) > 0 ? (
+                <>
+                  ≈ {Math.round(Number(priceQuarter) / 3)} ₽/мес · выгода{' '}
+                  <b style={{ color: 'var(--color-brand)' }}>
+                    {Math.max(0, Number(priceMonthly) * 3 - Number(priceQuarter))} ₽
+                  </b>{' '}
+                  против трёх месяцев по {priceMonthly} ₽
+                </>
+              ) : (
+                'Тариф «3 месяца» выключен — в окне оплаты только месяц'
+              )}
             </div>
             <div style={{ color: 'var(--color-muted)', fontSize: 13, marginTop: 16 }}>
               Со скидкой:{' '}

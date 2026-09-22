@@ -15,6 +15,8 @@ interface PaymentRow {
   status: string;
   kind: string;
   amountKopecks: number;
+  /** Срок заказа: 30 — месяц, 90 — «3 месяца» */
+  periodDays: number;
   isTest: boolean;
   errorCode: string | null;
   premiumGrantedAt: string | null;
@@ -65,7 +67,9 @@ export default function AdminPaymentsPage() {
     if (
       !window.confirm(
         `Вернуть ${rub(p.amountKopecks)} по заказу ${p.orderId} (${who})?${
-          p.isTest ? '\nЭто ТЕСТОВАЯ касса, деньги не настоящие.' : '\nДеньги уйдут покупателю, премиум за этот период снимется.'
+          p.isTest
+            ? '\nЭто ТЕСТОВАЯ касса, деньги не настоящие.'
+            : `\nДеньги уйдут покупателю, премиум за этот период (${p.periodDays} дней) снимется.`
         }`,
       )
     ) {
@@ -158,7 +162,12 @@ export default function AdminPaymentsPage() {
                       <div>{[p.user.firstName, p.user.lastName].filter(Boolean).join(' ') || '—'}</div>
                       <div style={{ color: 'var(--color-muted)', fontSize: 11 }}>{p.user.email || p.user.id}</div>
                     </td>
-                    <td style={{ padding: '10px 14px', whiteSpace: 'nowrap', fontWeight: 700 }}>{rub(p.amountKopecks)}</td>
+                    <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontWeight: 700 }}>{rub(p.amountKopecks)}</div>
+                      <div style={{ color: 'var(--color-muted)', fontSize: 11 }}>
+                        {p.periodDays === 90 ? '3 месяца · 90 дней' : `${p.periodDays} дней`}
+                      </div>
+                    </td>
                     <td style={{ padding: '10px 14px' }}>
                       <span style={{ ...statusTone(p.status), padding: '3px 8px', borderRadius: 'var(--radius-pill)', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>
                         {p.status}

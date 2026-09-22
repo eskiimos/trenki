@@ -39,3 +39,25 @@ describe('FULL_CANCEL_STATUSES', () => {
     for (const s of ['PARTIAL_REFUNDED', 'PARTIAL_REVERSED', 'CONFIRMED', 'NEW']) expect(FULL_CANCEL_STATUSES.has(s)).toBe(false);
   });
 });
+
+describe('квартал: выдача и возврат по сроку заказа', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  it('возврат квартала снимает все 90 дней, а не 30', () => {
+    const now = new Date('2026-09-22T12:00:00Z');
+    // Купил квартал сегодня поверх пустого премиума: доступ до now+90
+    const until = new Date(now.getTime() + 90 * DAY);
+    expect(computePremiumAfterRefund({ accessTier: 'PREMIUM', premiumUntil: until }, 90, now)).toBeNull();
+    // При снятии 30 (старое поведение) остались бы 60 бесплатных дней
+    expect(computePremiumAfterRefund({ accessTier: 'PREMIUM', premiumUntil: until }, 30, now)?.getTime()).toBe(
+      now.getTime() + 60 * DAY,
+    );
+  });
+
+  it('квартал поверх оставшегося месяца: возврат квартала оставляет месяц', () => {
+    const now = new Date('2026-09-22T12:00:00Z');
+    const until = new Date(now.getTime() + (20 + 90) * DAY);
+    expect(computePremiumAfterRefund({ accessTier: 'PREMIUM', premiumUntil: until }, 90, now)?.getTime()).toBe(
+      now.getTime() + 20 * DAY,
+    );
+  });
+});

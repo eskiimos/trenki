@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminAsync } from '@/lib/admin-session';
 import { cancelPayment, getTbankConfigFor, FULL_CANCEL_STATUSES } from '@/lib/payments/tbank';
-import { revokePremiumForPayment, SUBSCRIPTION_PERIOD_DAYS } from '@/lib/payments/grant';
+import { revokePremiumForPayment } from '@/lib/payments/grant';
+import { normalizePeriodDays } from '@/lib/subscription-plan';
 import { buildReceipt } from '@/lib/payments/receipt';
 import { getReceiptSettings } from '@/lib/settings';
 import { logger } from '@/lib/logger';
@@ -76,7 +77,8 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ orderI
     const built = buildReceipt({
       amountKopecks: payment.amountKopecks,
       email: payer?.email ?? payment.user.email,
-      name: `Доступ к сервису «Треньки», ${SUBSCRIPTION_PERIOD_DAYS} дней`,
+      // Позиция чека возврата — как в чеке продажи (срок заказа: 30 или 90 дней)
+      name: `Доступ к сервису «Треньки», ${normalizePeriodDays(payment.periodDays)} дней`,
       taxation: receiptSettings.taxation,
       vat: receiptSettings.vat,
     });

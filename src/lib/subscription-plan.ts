@@ -7,6 +7,7 @@ export const PRICING_DEFAULTS = {
   priceMonthlyRub: 1200, // базовая цена ₽/мес
   introDiscountPercent: 75, // «до 75%» — макс. скидка по промокоду тренера
   introMonths: 3, // на сколько первых месяцев действует интро-скидка
+  priceQuarterRub: 0, // цена за 3 месяца; 0 — тариф не продаётся (ставит админ)
 };
 
 export interface SubscriptionPricing {
@@ -14,6 +15,63 @@ export interface SubscriptionPricing {
   introDiscountPercent: number;
   introMonths: number;
   introPriceRub: number; // вычисляемая: цена со скидкой (round)
+  /** Цена «3 месяца» (разовая оплата за 90 дней), ₽. 0 — не продаётся. */
+  priceQuarterRub: number;
+}
+
+// ── Тарифы (п.12 «Середина сентября», решения владельца 21.09): месяц и
+// квартал. Оба — разовая оплата без автопродления; квартал = 90 дней по своей
+// цене, которую ставит админ. Льгота по промокоду (300 ₽) — только помесячно.
+
+export type SubscriptionPlan = 'month' | 'quarter';
+
+/** Срок доступа по тарифу, дней. */
+export const PLAN_PERIOD_DAYS: Record<SubscriptionPlan, number> = { month: 30, quarter: 90 };
+
+/** Тариф из тела запроса; всё неизвестное — null (400), пусто — месяц. */
+export function parsePlan(v: unknown): SubscriptionPlan | null {
+  if (v === undefined || v === null || v === '') return 'month';
+  return v === 'month' || v === 'quarter' ? v : null;
+}
+
+/** Срок заказа из БД: ожидаем 30 или 90; всё странное — 30 (как до тарифов). */
+export function normalizePeriodDays(v: number | null | undefined): number {
+  return Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 366 ? (v as number) : PLAN_PERIOD_DAYS.month;
+}
+
+/** Сколько «месяцев» (30-дневных периодов) покрывает заказ: 30 → 1, 90 → 3. */
+export function periodMonths(periodDays: number): number {
+  return Math.max(1, Math.round(normalizePeriodDays(periodDays) / PLAN_PERIOD_DAYS.month));
+}
+
+/**
+ * Проверка цены квартала из админки. 0 — выключить тариф. Иначе — дороже
+ * месяца (иначе заказ квартала выглядел бы как льготный месяц) и не дороже
+ * трёх месяцев (иначе тариф бессмысленен — скорее опечатка).
+ */
+export function validateQuarterPrice(quarterRub: number, monthlyRub: number): string | null {
+  if (!Number.isInteger(quarterRub) || quarterRub < 0) return 'Цена за 3 месяца — целое число ₽ (0 — не продавать)';
+  if (quarterRub === 0) return null;
+  if (quarterRub <= monthlyRub) return 'Цена за 3 месяца должна быть больше цены за месяц';
+  if (quarterRub > monthlyRub * 3) return 'Цена за 3 месяца не может быть больше трёх месячных';
+  return null;
+}
+
+/** Что показать про квартал: цена, «≈ N ₽/мес», выгода против 3 × месяц. */
+export function quarterOffer(pricing: Pick<SubscriptionPricing, 'priceMonthlyRub' | 'priceQuarterRub'>): {
+  enabled: boolean;
+  priceRub: number;
+  perMonthRub: number;
+  savingsRub: number;
+} {
+  const priceRub = pricing.priceQuarterRub;
+  if (!(priceRub > 0)) return { enabled: false, priceRub: 0, perMonthRub: 0, savingsRub: 0 };
+  return {
+    enabled: true,
+    priceRub,
+    perMonthRub: Math.round(priceRub / 3),
+    savingsRub: Math.max(0, pricing.priceMonthlyRub * 3 - priceRub),
+  };
 }
 
 /** Интро-цена ₽/мес после скидки. Напр. 1200 при −75% → 300. */

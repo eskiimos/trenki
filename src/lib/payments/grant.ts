@@ -1,11 +1,13 @@
 import { prisma } from '@/lib/prisma';
 import { AccessTier, type Prisma } from '@/generated/prisma';
 import { FULL_CANCEL_STATUSES } from '@/lib/payments/tbank';
+import { normalizePeriodDays } from '@/lib/subscription-plan';
 
 // Выдача/продление премиума после успешной оплаты и откат после возврата.
 // Один источник для вебхука T-Bank, опроса статуса, крона и админки — те же
 // поля, что ставит ручной админ-грант.
 
+/** Срок месячного тарифа. Срок КОНКРЕТНОГО заказа — Payment.periodDays (30/90). */
 export const SUBSCRIPTION_PERIOD_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -36,7 +38,7 @@ export function computePremiumUntil(
 
 /**
  * Продлевает премиум на произвольное число дней (оплата, триал, ручная выдача).
- * Ядро для grantPremiumPeriod и выдачи триала по промокоду. null — премиум
+ * Ядро для выдачи по заказу и триала по промокоду. null — премиум
  * бессрочный, срок не менялся.
  */
 export async function grantPremiumDays(
@@ -65,14 +67,16 @@ export async function grantPremiumDays(
 }
 
 /**
- * Продлевает премиум на один платёжный период (30 дней). rebillId (если пришёл)
- * сохраняется для последующих автосписаний.
+ * Блокировка строки юзера до конца транзакции. Выдача и возврат читают
+ * premiumUntil, считают новый срок и пишут его обратно: два параллельных
+ * заказа одного юзера (родитель платит квартал, ребёнок — месяц; возврат A
+ * во время выдачи B) без блокировки перетёрли бы друг друга — один период
+ * терялся бы (заказ уже помечен выданным и повторно не выдаётся) или
+ * оставались бы лишние дни. В READ COMMITTED следующий SELECT после
+ * блокировки видит уже закоммиченный срок.
  */
-export async function grantPremiumPeriod(
-  userId: string,
-  opts: { rebillId?: string | null; note?: string; now?: Date; db?: Db } = {},
-): Promise<Date | null> {
-  return grantPremiumDays(userId, SUBSCRIPTION_PERIOD_DAYS, opts);
+async function lockUserRow(tx: Prisma.TransactionClient, userId: string): Promise<void> {
+  await tx.$queryRaw`SELECT 1 FROM "users" WHERE "id" = ${userId} FOR UPDATE`;
 }
 
 /** Условие «по заказу ещё можно выдать»: не выдавали, не возвращали, не отменён. */
@@ -83,7 +87,8 @@ const grantableWhere = () => ({
 });
 
 /**
- * Идемпотентная выдача премиума ПО ЗАКАЗУ. Атомарно «клеймит» Payment
+ * Идемпотентная выдача премиума ПО ЗАКАЗУ на его срок (Payment.periodDays:
+ * 30 — месяц, 90 — квартал). Атомарно «клеймит» Payment
  * (premiumGrantedAt: null → now через updateMany) и продлевает премиум ровно один
  * раз на orderId — сколько бы раз ни дёрнули (вебхук + ретраи + опрос статуса +
  * гонки). Клейм и запись юзера — в одной транзакции: сбой после клейма не
@@ -105,11 +110,12 @@ export async function grantPremiumForPayment(
 
     const payment = await tx.payment.findUnique({
       where: { orderId },
-      select: { userId: true, rebillId: true, kind: true },
+      select: { userId: true, rebillId: true, kind: true, periodDays: true },
     });
     if (!payment) return { granted: false };
+    await lockUserRow(tx, payment.userId);
 
-    const until = await grantPremiumPeriod(payment.userId, {
+    const until = await grantPremiumDays(payment.userId, normalizePeriodDays(payment.periodDays), {
       rebillId: opts.rebillId ?? payment.rebillId,
       note: opts.note ?? `T-Bank ${payment.kind} ${orderId}`,
       now,
@@ -146,7 +152,9 @@ export interface RevokeResult {
 }
 
 /**
- * Идемпотентный откат премиума ПО ЗАКАЗУ после полного возврата/отмены.
+ * Идемпотентный откат премиума ПО ЗАКАЗУ после полного возврата/отмены —
+ * отнимается срок ЭТОГО заказа (квартал — 90 дней, иначе после возврата
+ * квартала у юзера остались бы 60 бесплатных дней).
  * Атомарно «клеймит» Payment (refundedAt: null → now) — сколько бы раз ни
  * дёрнули (Cancel из админки + REFUNDED-нотификация + её ретраи), период
  * отнимется ровно один раз. Клейм и запись юзера — в одной транзакции. Если
@@ -170,9 +178,10 @@ export async function revokePremiumForPayment(
 
     const payment = await tx.payment.findUnique({
       where: { orderId },
-      select: { userId: true, premiumGrantedAt: true },
+      select: { userId: true, premiumGrantedAt: true, periodDays: true },
     });
     if (!payment || !payment.premiumGrantedAt) return { revoked: false, until: null };
+    await lockUserRow(tx, payment.userId);
 
     const user = await tx.user.findUnique({
       where: { id: payment.userId },
@@ -187,7 +196,7 @@ export async function revokePremiumForPayment(
       return { revoked: false, until: null, unlimitedKept: true };
     }
 
-    const until = computePremiumAfterRefund(user, SUBSCRIPTION_PERIOD_DAYS, now);
+    const until = computePremiumAfterRefund(user, normalizePeriodDays(payment.periodDays), now);
     await tx.user.update({
       where: { id: payment.userId },
       data: until

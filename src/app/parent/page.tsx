@@ -16,6 +16,7 @@ import PotentialRing from '@/components/PotentialRing';
 import StatusPathModal from '@/components/StatusPathModal';
 import { StatusIcon } from '@/components/gamification/icons';
 import ParentTasksBlock, { type ParentTaskView } from '@/components/parent/ParentTasksBlock';
+import { quarterOffer, type SubscriptionPlan } from '@/lib/subscription-plan';
 
 interface ChildCard {
   id: string;
@@ -93,16 +94,28 @@ const ChildCardView = ({
     isIntro: boolean;
     introPaymentsLeft: number;
     basePriceRub: number;
+    quarter?: { enabled: boolean; priceRub: number; perMonthRub: number; savingsRub: number };
   } | null>(null);
+  // Цена не загрузилась — платить можно (сумму покажет банк), но не «вслепую»
+  // по публичной цене, пока персональная ещё грузится
+  const [childPricingFailed, setChildPricingFailed] = useState(false);
+  // Тариф «3 месяца» — если админ его включил (п.12 «Середина сентября»)
+  const [plan, setPlan] = useState<SubscriptionPlan>('month');
+  const quarter = childPricing?.quarter ?? quarterOffer(pricing);
+  const isQuarter = quarter.enabled && plan === 'quarter';
   useEffect(() => {
     if (child.premium.active) return; // кнопки оплаты нет — цена не нужна
     let cancelled = false;
     fetch(`/api/subscription/pricing/me?childId=${encodeURIComponent(child.id)}`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (!cancelled && d && typeof d.amountRub === 'number') setChildPricing(d);
+        if (cancelled) return;
+        if (d && typeof d.amountRub === 'number') setChildPricing(d);
+        else setChildPricingFailed(true);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setChildPricingFailed(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -155,7 +168,7 @@ const ChildCardView = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ childId: child.id }),
+        body: JSON.stringify({ childId: child.id, plan: isQuarter ? 'quarter' : 'month' }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.paymentURL) {
@@ -320,21 +333,57 @@ const ChildCardView = ({
         ) : (
           <>
             <div className="text-white text-sm font-bold mb-2">Подписки нет</div>
+            {quarter.enabled && (
+              <div role="radiogroup" aria-label="Срок подписки" className="grid grid-cols-2 gap-2 mb-2">
+                {(['month', 'quarter'] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    role="radio"
+                    aria-checked={plan === p}
+                    onClick={() => setPlan(p)}
+                    className="rounded-full py-2 text-xs font-bold font-overpass uppercase"
+                    style={{
+                      background: plan === p ? '#A1FF4A' : 'rgba(255,255,255,0.06)',
+                      color: plan === p ? '#060919' : '#F9F8FE',
+                    }}
+                  >
+                    {p === 'month' ? '1 месяц' : '3 месяца'}
+                  </button>
+                ))}
+              </div>
+            )}
             <button
               type="button"
               onClick={handleSubscribe}
-              disabled={paying}
+              disabled={paying || (!childPricing && !childPricingFailed)}
               className="w-full bg-brand text-night rounded-full py-2.5 px-4 text-sm font-bold font-overpass uppercase transition-transform active:scale-95 disabled:opacity-70"
             >
               {paying
                 ? 'Переходим к оплате…'
-                : `Оформить подписку — ${childPricing?.amountRub ?? pricing.priceMonthlyRub} ₽/мес`}
+                : isQuarter
+                  ? `Оформить на 3 месяца — ${quarter.priceRub} ₽`
+                  : `Оформить подписку — ${
+                      childPricing ? childPricing.amountRub : childPricingFailed ? pricing.priceMonthlyRub : '…'
+                    } ₽ / 30 дней`}
             </button>
-            {childPricing?.isIntro && (
+            {isQuarter && (
+              <p className="text-muted text-xs text-center mt-2">
+                90 дней доступа, ≈ {quarter.perMonthRub} ₽/мес
+                {quarter.savingsRub > 0 && !childPricing?.isIntro ? ` — выгода ${quarter.savingsRub} ₽` : ''}
+                {childPricing?.isIntro ? '. Скидка по промокоду — только при оплате помесячно' : ''}
+              </p>
+            )}
+            {!isQuarter && childPricing?.isIntro && (
               <p className="text-muted text-xs text-center mt-2">
                 Цена по промокоду тренера (вместо {childPricing.basePriceRub} ₽) — осталось{' '}
                 {childPricing.introPaymentsLeft}{' '}
                 {childPricing.introPaymentsLeft === 1 ? 'оплата' : childPricing.introPaymentsLeft < 5 ? 'оплаты' : 'оплат'}
+              </p>
+            )}
+            {childPricingFailed && (
+              <p className="text-muted text-xs text-center mt-2">
+                Итоговая цена (с учётом промокода) — на странице оплаты
               </p>
             )}
             {payError && (

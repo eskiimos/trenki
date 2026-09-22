@@ -14,6 +14,7 @@ import { TAXATION_VALUES, VAT_VALUES } from '@/lib/payments/receipt';
 import { PAYMENTS_MODES, normalizePaymentsMode, tbankModesStatus } from '@/lib/payments/tbank';
 import { prisma } from '@/lib/prisma';
 import { PAYWALL_MODES, normalizePaywallMode } from '@/lib/paywall';
+import { validateQuarterPrice } from '@/lib/subscription-plan';
 import { logger } from '@/lib/logger';
 
 // Настройки подписки: режим paywall (paywall.mode) + цены (subscription.*).
@@ -81,6 +82,11 @@ export async function PATCH(request: NextRequest) {
       const priceMonthlyRub = Number(p.priceMonthlyRub);
       const introDiscountPercent = Number(p.introDiscountPercent);
       const introMonths = Number(p.introMonths);
+      // Старая вкладка админки поля не шлёт — оставляем сохранённое значение
+      const priceQuarterRub =
+        p.priceQuarterRub === undefined
+          ? (await getSubscriptionPricing()).priceQuarterRub
+          : Number(p.priceQuarterRub);
 
       const okInt = (n: number, min: number, max: number) =>
         Number.isInteger(n) && n >= min && n <= max;
@@ -95,11 +101,14 @@ export async function PATCH(request: NextRequest) {
       if (!okInt(introMonths, 0, 36)) {
         return NextResponse.json({ error: 'Месяцев интро — целое от 0 до 36' }, { status: 400 });
       }
+      const quarterError = validateQuarterPrice(priceQuarterRub, priceMonthlyRub);
+      if (quarterError) return NextResponse.json({ error: quarterError }, { status: 400 });
 
       await Promise.all([
         setAppSetting(SETTING_KEYS.priceMonthly, String(priceMonthlyRub)),
         setAppSetting(SETTING_KEYS.introDiscountPercent, String(introDiscountPercent)),
         setAppSetting(SETTING_KEYS.introMonths, String(introMonths)),
+        setAppSetting(SETTING_KEYS.priceQuarter, String(priceQuarterRub)),
       ]);
       const pricing = await getSubscriptionPricing();
       logger.info('admin set subscription pricing', { pricing });

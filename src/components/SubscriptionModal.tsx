@@ -9,7 +9,7 @@ import {
   closeSubscriptionModal,
   type PaywallReason,
 } from '@/lib/subscription-modal';
-import { FREE_FEATURES, PAID_FEATURES } from '@/lib/subscription-plan';
+import { FREE_FEATURES, PAID_FEATURES, quarterOffer, type SubscriptionPlan } from '@/lib/subscription-plan';
 
 // Глобальная модалка подписки (п.3 «оформи подписку» + п.4 «что входит + цена»).
 // Хост монтируется один раз в layout; открывается из любого места через
@@ -45,7 +45,10 @@ export default function SubscriptionModal() {
     isIntro: boolean;
     introPaymentsLeft: number;
     basePriceRub: number;
+    quarter?: { enabled: boolean; priceRub: number; perMonthRub: number; savingsRub: number };
   } | null>(null);
+  // Тариф: месяц или «3 месяца» (п.12 «Середина сентября»; квартал включает админ)
+  const [plan, setPlan] = useState<SubscriptionPlan>('month');
 
   // meError: персональная цена НЕ загрузилась — показываем базовую с оговоркой
   // (итог — на странице банка), но оплату не блокируем: упавший pricing/me не
@@ -72,6 +75,7 @@ export default function SubscriptionModal() {
     if (open) {
       setMe(null);
       setMeError(false);
+      setPlan('month');
       loadMyPricing();
     }
   }, [open]);
@@ -112,7 +116,11 @@ export default function SubscriptionModal() {
     setPaying(true);
     setPayError(null);
     try {
-      const res = await fetch('/api/payments/init', { method: 'POST' });
+      const res = await fetch('/api/payments/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: quarter.enabled ? plan : 'month' }),
+      });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.paymentURL) {
         window.location.href = data.paymentURL; // редирект на оплату T-Bank
@@ -145,6 +153,10 @@ export default function SubscriptionModal() {
 
   if (!open) return null;
   const t = TITLES[reason] ?? TITLES.generic;
+  // Квартал: из персональной цены (то же, что спишет init), до её загрузки — из публичной
+  const quarter = me?.quarter ?? quarterOffer(pricing);
+  const isQuarter = quarter.enabled && plan === 'quarter';
+  const monthPriceLabel = me === null && !meError ? '…' : `${me?.amountRub ?? pricing.priceMonthlyRub}`;
 
   return (
     <div
@@ -230,17 +242,98 @@ export default function SubscriptionModal() {
           ))}
         </div>
 
+        {/* Выбор тарифа — только если админ включил «3 месяца» */}
+        {quarter.enabled && (
+          <div role="radiogroup" aria-label="Срок подписки" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 20 }}>
+            {(
+              [
+                { id: 'month', label: '1 месяц', price: `${monthPriceLabel} ₽`, sub: '30 дней' },
+                {
+                  id: 'quarter',
+                  label: '3 месяца',
+                  price: `${quarter.priceRub} ₽`,
+                  sub: `≈ ${quarter.perMonthRub} ₽/мес`,
+                },
+              ] as const
+            ).map((o) => {
+              const active = plan === o.id;
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setPlan(o.id)}
+                  style={{
+                    position: 'relative',
+                    textAlign: 'left',
+                    padding: '12px 14px',
+                    borderRadius: 14,
+                    background: active ? 'rgba(161,255,74,0.10)' : '#060919',
+                    border: `1.5px solid ${active ? '#A1FF4A' : '#26252F'}`,
+                    color: '#F9F8FE',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {o.id === 'quarter' && quarter.savingsRub > 0 && !me?.isIntro && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: -9,
+                        right: 10,
+                        background: '#A1FF4A',
+                        color: '#060919',
+                        borderRadius: 999,
+                        padding: '2px 8px',
+                        fontSize: 10,
+                        fontWeight: 900,
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.3,
+                      }}
+                    >
+                      Выгодно
+                    </span>
+                  )}
+                  <div style={{ fontSize: 13, color: '#AEABBB', fontWeight: 700 }}>{o.label}</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, marginTop: 2 }}>{o.price}</div>
+                  <div style={{ fontSize: 12, color: '#AEABBB', marginTop: 2 }}>{o.sub}</div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Цена */}
         <div
           style={{
-            marginTop: 20,
+            marginTop: quarter.enabled ? 12 : 20,
             padding: 16,
             borderRadius: 16,
             background: 'linear-gradient(135deg, rgba(161,255,74,0.12), rgba(68,92,255,0.14))',
             border: '1px solid #2d3448',
           }}
         >
-          {me?.isIntro ? (
+          {isQuarter ? (
+            <>
+              {/* Квартал — по своей цене для всех, льгота промокода только помесячно */}
+              <div style={{ color: '#F9F8FE', fontSize: 22, fontWeight: 900 }}>
+                {quarter.priceRub} ₽
+                <span style={{ fontSize: 14, color: '#AEABBB', fontWeight: 700 }}> / 90 дней</span>
+              </div>
+              <div style={{ color: '#AEABBB', fontSize: 13, marginTop: 2 }}>
+                {me?.isIntro
+                  ? 'Скидка по промокоду тренера действует только при оплате помесячно'
+                  : quarter.savingsRub > 0
+                    ? `≈ ${quarter.perMonthRub} ₽/мес — выгода ${quarter.savingsRub} ₽ против оплаты помесячно`
+                    : `≈ ${quarter.perMonthRub} ₽/мес`}
+              </div>
+              {meError && (
+                <div style={{ color: '#AEABBB', fontSize: 12, marginTop: 2 }}>
+                  Итоговая цена — на странице оплаты
+                </div>
+              )}
+            </>
+          ) : me?.isIntro ? (
             <>
               {/* Интро-цена по промокоду: показываем ровно то, что спишется */}
               <div style={{ color: '#F9F8FE', fontSize: 22, fontWeight: 900 }}>
@@ -363,7 +456,7 @@ export default function SubscriptionModal() {
           <p style={{ color: '#FF6B6B', fontSize: 12, textAlign: 'center', marginTop: 8 }}>{payError}</p>
         )}
         <p style={{ color: '#6E6B7B', fontSize: 11, textAlign: 'center', marginTop: 10, lineHeight: 1.4 }}>
-          Оплата картой — разовая, за 30 дней доступа. Автосписаний нет: когда срок
+          Оплата картой — разовая, за {isQuarter ? 90 : 30} дней доступа. Автосписаний нет: когда срок
           закончится, продлить можно вручную.
         </p>
       </div>

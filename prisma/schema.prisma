@@ -1140,6 +1140,7 @@ model Payment {
   refundedAt      DateTime? // полный возврат/отмена проведены и премиум по заказу откачен (атомарный флаг, как premiumGrantedAt)
   refundAmountKopecks Int? // сумма возврата в копейках (для аудита; частичный возврат премиум не трогает)
   payerId         String? // КТО платил (родитель при оплате за ребёнка); userId — получатель премиума. Чек возврата уходит плательщику
+  periodDays      Int      @default(30) // срок доступа по заказу: 30 — месяц, 90 — квартал (п.12 «Середина сентября»); по нему выдача и возврат
   raw             Json? // последняя нотификация/ответ (аудит)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

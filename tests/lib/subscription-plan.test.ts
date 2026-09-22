@@ -1,5 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { computeIntroPrice, effectiveIntro, PRICING_DEFAULTS } from '../../src/lib/subscription-plan';
+import {
+  computeIntroPrice,
+  effectiveIntro,
+  normalizePeriodDays,
+  parsePlan,
+  periodMonths,
+  PLAN_PERIOD_DAYS,
+  PRICING_DEFAULTS,
+  quarterOffer,
+  validateQuarterPrice,
+} from '../../src/lib/subscription-plan';
 
 // Глобальные настройки прода на момент правки: 1200 ₽, −75%, 3 месяца → 300 ₽
 const GLOBAL = { priceMonthlyRub: 1200, introDiscountPercent: 75, introMonths: 3 };
@@ -70,5 +80,50 @@ describe('effectiveIntro — условия скидки канала vs гло�
   it('глобальная выключена и у кода ничего своего → скидки нет', () => {
     const globalOff = { priceMonthlyRub: 1200, introDiscountPercent: 0, introMonths: 3 };
     expect(effectiveIntro(NO_CODE_SETTINGS, globalOff).active).toBe(false);
+  });
+});
+
+describe('тариф «3 месяца» (п.12 «Середина сентября»)', () => {
+  it('parsePlan: пусто — месяц, мусор — null', () => {
+    expect(parsePlan(undefined)).toBe('month');
+    expect(parsePlan('')).toBe('month');
+    expect(parsePlan('quarter')).toBe('quarter');
+    expect(parsePlan('year')).toBeNull();
+    expect(parsePlan(3)).toBeNull();
+  });
+
+  it('срок тарифа и «месяцы» заказа', () => {
+    expect(PLAN_PERIOD_DAYS).toEqual({ month: 30, quarter: 90 });
+    expect(periodMonths(30)).toBe(1);
+    expect(periodMonths(90)).toBe(3);
+    // Старые/битые значения — как месяц
+    expect(normalizePeriodDays(0)).toBe(30);
+    expect(normalizePeriodDays(null)).toBe(30);
+    expect(normalizePeriodDays(90)).toBe(90);
+  });
+
+  it('validateQuarterPrice: 0 — выключить, иначе дороже месяца и не дороже трёх', () => {
+    expect(validateQuarterPrice(0, 1200)).toBeNull();
+    expect(validateQuarterPrice(2990, 1200)).toBeNull();
+    expect(validateQuarterPrice(3600, 1200)).toBeNull();
+    expect(validateQuarterPrice(1200, 1200)).toMatch(/больше цены за месяц/);
+    expect(validateQuarterPrice(900, 1200)).toMatch(/больше цены за месяц/);
+    expect(validateQuarterPrice(3601, 1200)).toMatch(/трёх месячных/);
+    expect(validateQuarterPrice(-1, 1200)).toMatch(/целое/);
+    expect(validateQuarterPrice(2990.5, 1200)).toMatch(/целое/);
+  });
+
+  it('quarterOffer: цена за месяц и выгода против 3 × месяц', () => {
+    expect(quarterOffer({ priceMonthlyRub: 1200, priceQuarterRub: 2990 })).toEqual({
+      enabled: true,
+      priceRub: 2990,
+      perMonthRub: 997,
+      savingsRub: 610,
+    });
+    expect(quarterOffer({ priceMonthlyRub: 1200, priceQuarterRub: 0 }).enabled).toBe(false);
+  });
+
+  it('по умолчанию квартал выключен — пока админ не поставит цену', () => {
+    expect(PRICING_DEFAULTS.priceQuarterRub).toBe(0);
   });
 });

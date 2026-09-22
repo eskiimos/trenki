@@ -6,12 +6,13 @@ import { getTbankConfigFor, initPayment } from '@/lib/payments/tbank';
 import { getPaymentsMode, getReceiptSettings } from '@/lib/settings';
 import { resolveUserPricing } from '@/lib/payments/user-pricing';
 import { buildReceipt } from '@/lib/payments/receipt';
-import { SUBSCRIPTION_PERIOD_DAYS } from '@/lib/payments/grant';
+import { PLAN_PERIOD_DAYS, parsePlan } from '@/lib/subscription-plan';
 import { rateLimit } from '@/lib/coach/rate-limit';
 import { logger } from '@/lib/logger';
 
 // POST /api/payments/init — старт оплаты доступа. Оплата РАЗОВАЯ: списание один
-// раз, премиум на 30 дней, продление — вручную новой оплатой (автосписания нет).
+// раз, премиум на 30 дней (plan=month) или 90 дней (plan=quarter, п.12
+// «Середина сентября»), продление — вручную новой оплатой (автосписания нет).
 // Создаёт Payment(NEW), зовёт T-Bank Init, возвращает PaymentURL для редиректа.
 // Реальный статус — из вебхука + GetState, а не из редиректа.
 export const dynamic = 'force-dynamic';
@@ -29,9 +30,13 @@ export async function POST(request: NextRequest) {
   // премиум через существующий вебхук уйдёт ребёнку (grant.ts выдаёт по
   // payment.userId). Платит и получает чек (54-ФЗ) текущий юзер — родитель.
   // Без childId (body может отсутствовать вовсе) — самооплата, как раньше.
-  const body = (await request.json().catch(() => null)) as { childId?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { childId?: unknown; plan?: unknown } | null;
   const childId =
     body && typeof body.childId === 'string' && body.childId ? body.childId : null;
+  // Тариф: месяц (по умолчанию — старые клиенты шлют пустое тело) или квартал
+  const plan = parsePlan(body?.plan);
+  if (!plan) return NextResponse.json({ error: 'Неизвестный тариф' }, { status: 400 });
+  const periodDays = PLAN_PERIOD_DAYS[plan];
   let childName: string | null = null;
   if (childId) {
     const link = await prisma.parentLink.findUnique({
@@ -70,16 +75,27 @@ export async function POST(request: NextRequest) {
   // всегда списывалась базовая цена — скидка по промокоду существовала только
   // в тексте модалки. forCharge резервирует интро-слоты под незавершённые
   // ссылки (антифарм).
-  const userPricing = await resolveUserPricing(childId ?? user.id, { forCharge: true });
-  if (userPricing.pendingIntroHold) {
-    // НЕ списываем молча базовую вместо показанной интро — показанная цена
-    // обязана совпадать со списанной.
-    return NextResponse.json(
-      { error: 'Предыдущая ссылка на оплату ещё активна. Открой её или попробуй через полчаса.' },
-      { status: 409 },
-    );
+  const userPricing = await resolveUserPricing(childId ?? user.id, { forCharge: plan === 'month' });
+  let amountRub: number;
+  if (plan === 'quarter') {
+    // Квартал — по своей цене для всех: льгота промокода только помесячно
+    // (решение владельца 21.09). Цена 0 — тариф выключен в админке.
+    if (!userPricing.quarter.enabled) {
+      return NextResponse.json({ error: 'Тариф на 3 месяца сейчас недоступен' }, { status: 400 });
+    }
+    amountRub = userPricing.quarter.priceRub;
+  } else {
+    if (userPricing.pendingIntroHold) {
+      // НЕ списываем молча базовую вместо показанной интро — показанная цена
+      // обязана совпадать со списанной.
+      return NextResponse.json(
+        { error: 'Предыдущая ссылка на оплату ещё активна. Открой её или попробуй через полчаса.' },
+        { status: 409 },
+      );
+    }
+    amountRub = userPricing.amountRub;
   }
-  const amountKopecks = userPricing.amountRub * 100;
+  const amountKopecks = amountRub * 100;
 
   // Чек 54-ФЗ. Включается в админке — только когда подключена облачная касса и
   // подтверждена система налогообложения. Пока выключен, платёж идёт без чека
@@ -91,7 +107,7 @@ export async function POST(request: NextRequest) {
       amountKopecks,
       email: user.email, // чек всегда ПЛАТЕЛЬЩИКУ — при оплате за ребёнка тоже
 
-      name: `Доступ к сервису «Треньки», ${SUBSCRIPTION_PERIOD_DAYS} дней`,
+      name: `Доступ к сервису «Треньки», ${periodDays} дней`,
       taxation: receiptSettings.taxation,
       vat: receiptSettings.vat,
     });
@@ -121,6 +137,7 @@ export async function POST(request: NextRequest) {
       isRecurrentInit: false,
       isTest: paymentsMode === 'test',
       payerId: user.id, // чек продажи ушёл плательщику — чек возврата уйдёт ему же
+      periodDays, // по нему вебхук выдаст срок, а возврат — отнимет
     },
   });
 
@@ -133,8 +150,8 @@ export async function POST(request: NextRequest) {
       amountKopecks,
       orderId,
       description: childName
-        ? `Доступ «Треньки» на 30 дней — для ${childName}`
-        : 'Доступ «Треньки» на 30 дней',
+        ? `Доступ «Треньки» на ${periodDays} дней — для ${childName}`
+        : `Доступ «Треньки» на ${periodDays} дней`,
       customerKey: user.id, // стабильный ключ клиента на стороне банка (плательщик, не ребёнок)
       // Recurrent НЕ передаём: оплата разовая, автосписания нет. Это ещё и
       // требование тест-кейса №1 T-Bank («не передавайте Recurrent=Y»).
@@ -172,6 +189,7 @@ export async function POST(request: NextRequest) {
   // видно, ушёл ли Receipt и с какими реквизитами, а не гадать по коду.
   logger.info('tbank Init ok', {
     orderId,
+    plan,
     paymentId: res.PaymentId,
     mode: paymentsMode,
     receipt: receipt

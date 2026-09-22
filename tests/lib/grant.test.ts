@@ -45,3 +45,14 @@ describe('computePremiumUntil — стекинг премиума', () => {
     expect(computePremiumUntil({ accessTier: 'PREMIUM', premiumUntil: null }, 30, NOW)).toBeNull();
   });
 });
+
+describe('computePremiumUntil — квартал (90 дней)', () => {
+  it('квартал складывается с активным премиумом', () => {
+    const until = new Date(NOW.getTime() + 10 * DAY);
+    const r = computePremiumUntil({ accessTier: 'PREMIUM', premiumUntil: until }, 90, NOW);
+    expect(r?.getTime()).toBe(until.getTime() + 90 * DAY);
+  });
+  it('бессрочный премиум квартал не укорачивает', () => {
+    expect(computePremiumUntil({ accessTier: 'PREMIUM', premiumUntil: null }, 90, NOW)).toBeNull();
+  });
+});

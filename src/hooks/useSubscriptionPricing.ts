@@ -11,6 +11,7 @@ const DEFAULT: SubscriptionPricing = {
   introDiscountPercent: PRICING_DEFAULTS.introDiscountPercent,
   introMonths: PRICING_DEFAULTS.introMonths,
   introPriceRub: computeIntroPrice(PRICING_DEFAULTS.priceMonthlyRub, PRICING_DEFAULTS.introDiscountPercent),
+  priceQuarterRub: PRICING_DEFAULTS.priceQuarterRub,
 };
 
 let cache: SubscriptionPricing | null = null;
@@ -27,6 +28,7 @@ async function load(): Promise<void> {
         introDiscountPercent: Number(d.introDiscountPercent) ?? DEFAULT.introDiscountPercent,
         introMonths: Number(d.introMonths) ?? DEFAULT.introMonths,
         introPriceRub: Number(d.introPriceRub) || DEFAULT.introPriceRub,
+        priceQuarterRub: Number(d.priceQuarterRub) || 0,
       };
     } else {
       cache = { ...DEFAULT };

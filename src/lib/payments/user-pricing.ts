@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getSubscriptionPricing } from '@/lib/settings';
-import { effectiveIntro } from '@/lib/subscription-plan';
+import { effectiveIntro, PLAN_PERIOD_DAYS, quarterOffer } from '@/lib/subscription-plan';
 
 // Персональная цена подписки С УЧЁТОМ ПРОМОКОДА — единый источник и для показа
 // (/api/subscription/pricing/me), и для списания (/api/payments/init).
@@ -25,6 +25,11 @@ export interface UserPricing {
   introPriceRub: number;
   introMonths: number;
   introDiscountPercent: number;
+  /**
+   * Тариф «3 месяца» — по своей цене для всех (льгота промокода на него не
+   * действует, решение владельца 21.09). enabled=false — не продаётся.
+   */
+  quarter: { enabled: boolean; priceRub: number; perMonthRub: number; savingsRub: number };
   /**
    * Только forCharge: интро-слоты заняты НЕЗАВЕРШЁННЫМИ платёжными ссылками —
    * новую по интро-цене создавать нельзя (init отвечает 409, а не молча
@@ -59,6 +64,7 @@ export async function resolveUserPricing(
     introPriceRub: pricing.introPriceRub,
     introMonths: pricing.introMonths,
     introDiscountPercent: pricing.introDiscountPercent,
+    quarter: quarterOffer(pricing),
   };
 
   const user = await prisma.user.findUnique({
@@ -94,13 +100,23 @@ export async function resolveUserPricing(
     introDiscountPercent: effPercent,
   };
 
-  // Сколько периодов уже УСПЕШНО оплачено этим получателем: считаем по
+  // Сколько МЕСЯЧНЫХ оплат уже УСПЕШНО прошло у этого получателя: считаем по
   // premiumGrantedAt (атомарный флаг «премиум по этому заказу выдан») — статусы
   // T-Bank разношёрстные, а этот флаг ставится ровно один раз на оплату.
   // Полностью возвращённый заказ слот не занимает: период откачен, деньги
   // вернулись. Частичный возврат refundedAt не ставит и считается оплатой.
+  // Квартал льготные слоты НЕ тратит: льгота промокода — только помесячно
+  // (решение владельца 21.09), и купивший квартал по полной цене не должен
+  // терять свои три месяца по 300 ₽ — иначе результат зависел бы от порядка
+  // покупок (3×300 → квартал можно, квартал → 3×300 уже нет).
   const paidCount = await prisma.payment.count({
-    where: { userId, premiumGrantedAt: { not: null }, refundedAt: null, isTest: false },
+    where: {
+      userId,
+      premiumGrantedAt: { not: null },
+      refundedAt: null,
+      isTest: false,
+      periodDays: PLAN_PERIOD_DAYS.month,
+    },
   });
   const slotsLeft = effMonths - paidCount;
   if (slotsLeft <= 0) return effBase;
@@ -113,6 +129,8 @@ export async function resolveUserPricing(
         userId,
         premiumGrantedAt: null,
         isTest: false,
+        // Только месячные: квартал льготным не бывает
+        periodDays: PLAN_PERIOD_DAYS.month,
         amountKopecks: { lt: pricing.priceMonthlyRub * 100 },
         createdAt: { gt: new Date(Date.now() - PENDING_WINDOW_MS) },
       },
