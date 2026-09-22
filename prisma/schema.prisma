@@ -228,6 +228,7 @@ model Video {
   videoTags           VideoTag[]
   trainer             Trainer               @relation(fields: [trainerId], references: [id]) // ведущий автор (primary)
   coauthors           VideoTrainer[]        // соавторы-тренеры (мульти-тренер, включая ведущего)
+  poseReference       PoseReference?        // эталон движений тренера (скелет по кадрам), см. PoseReference
   workoutSessions     WorkoutSessionVideo[]
   scheduledWorkouts   ScheduledWorkout[]
   trainingAssignments TrainingAssignment[]
@@ -1006,6 +1007,31 @@ model TrainingAssignment {
   @@index([athleteId, status])
   @@index([coachId, dueDate])
   @@map("training_assignments")
+}
+
+// Эталон движений тренера по видео (п.1 «Середина сентября», пилот трекинга):
+// видео прогоняется через MediaPipe Pose (heavy) в браузере админа, точки
+// скелета по кадрам лежат в Cloudinary (как и pose-сессии — не в БД), здесь
+// только ссылка и сводка. Одно видео — один эталон; повторная обработка
+// перезаписывает. Смотрят пока только админы (/admin/pose).
+model PoseReference {
+  id               String   @id @default(cuid())
+  videoId          String   @unique
+  video            Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  framesUrl        String // Cloudinary public_id (или dev-путь без Cloudinary)
+  framesEncoding   String   @default("json-gzip")
+  formatVersion    Int      @default(1)
+  model            String // pose_landmarker_heavy / _full / _lite
+  fps              Int // частота выборки кадров
+  frameCount       Int
+  durationSec      Float
+  detectedRatio    Float // доля кадров, где тренер найден
+  legsVisibleRatio Float // доля кадров, где таз, колени и голеностопы видны
+  createdById      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("pose_references")
 }
 
 model PoseSession {

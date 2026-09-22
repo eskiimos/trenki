@@ -78,9 +78,11 @@ export function decodePoseFrames(buf: Buffer): PoseFramesDocument {
 export async function uploadPoseFrames(
   sessionId: string,
   payload: Buffer,
+  opts: { folder?: string } = {},
 ): Promise<string> {
   ensureConfigured();
-  const publicId = `${CLOUDINARY_FOLDER}/${sessionId}`;
+  // folder — для эталонов тренеров (trenki/pose-references), по умолчанию — сессии атлетов
+  const publicId = `${opts.folder ?? CLOUDINARY_FOLDER}/${sessionId}`;
   await new Promise<void>((resolve, reject) => {
     cloudinary.uploader
       .upload_stream(

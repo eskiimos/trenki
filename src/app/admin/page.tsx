@@ -15,7 +15,7 @@ import {
 import {
   Users, Activity, Video, Dumbbell, Bell, Star, MessageSquare,
   Film, BarChart3, Settings, Zap, GraduationCap, Blocks, Gamepad2,
-  Link2, Ticket, ShieldCheck, Send, AlarmClock, Lock, ScanSearch, Palette, MessageSquareText,
+  Link2, Ticket, ShieldCheck, Send, AlarmClock, Lock, ScanSearch, Palette, MessageSquareText, PersonStanding,
   ArrowRight, LayoutDashboard, AlertTriangle,
   CreditCard,
 } from 'lucide-react';
@@ -374,6 +374,12 @@ export default function AdminDashboardPage() {
               icon={ScanSearch}
               title="Проверка контента"
               desc="Целостность данных"
+            />
+            <NavCard
+              href="/admin/pose"
+              icon={PersonStanding}
+              title="Эталоны движений"
+              desc="Скелет тренера по видео (пилот трекинга)"
             />
             <NavCard href="/admin/ui-kit" icon={Palette} title="UI-кит" desc="Токены и компоненты" />
             <NavCard href="/admin/animation-kit" icon={Film} title="Кит анимаций" desc="Движение и живость" />

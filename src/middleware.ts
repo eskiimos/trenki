@@ -72,6 +72,10 @@ function buildCsp(nonce: string, isDev: boolean): string {
       'https://mc.yandex.ru',
       'https://mc.webvisor.com',
       'https://cdn.jsdelivr.net',
+      // MediaPipe (распознавание позы) — это WebAssembly: без этого браузер
+      // запрещает компилировать WASM, и трекинг/эталоны не запускаются.
+      // Разрешает только WASM, не eval() для JS.
+      "'wasm-unsafe-eval'",
       ...(isDev ? ["'unsafe-eval'"] : []),
     ],
     'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],

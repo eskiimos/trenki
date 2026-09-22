@@ -171,6 +171,28 @@ export async function downloadObjectToFile(key: string, filePath: string, signal
 }
 
 /**
+ * Поток объекта для отдачи через наш домен (админская обработка видео в
+ * браузере: MediaPipe читает пиксели кадров, а с чужого домена без CORS
+ * браузер это запрещает). Тело не буферизуется — идёт потоком.
+ */
+export async function openObjectStream(
+  key: string,
+  signal?: AbortSignal,
+): Promise<{ body: ReadableStream<Uint8Array>; contentLength: number | null; contentType: string | null }> {
+  const config = requireConfig();
+  const res = await getTransferClient(config).send(
+    new GetObjectCommand({ Bucket: config.bucket, Key: key }),
+    { abortSignal: signal },
+  );
+  if (!res.Body) throw new Error(`S3: пустое тело объекта ${key}`);
+  return {
+    body: res.Body.transformToWebStream() as ReadableStream<Uint8Array>,
+    contentLength: res.ContentLength ?? null,
+    contentType: res.ContentType ?? null,
+  };
+}
+
+/**
  * Загрузка локального файла одним PUT (до 5 ГиБ — лимит S3; результаты
  * обработки — сотни МБ). Файл читается потоком, Content-Length берётся из fs.
  */
