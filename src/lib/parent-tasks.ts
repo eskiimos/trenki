@@ -6,6 +6,7 @@
 
 import { GOAL_LABELS } from '@/lib/training-algorithm-v3';
 import { plural } from '@/lib/plural';
+import { DEFAULT_PUSH_TEMPLATES, renderPush, type PushTemplates } from '@/lib/notifications/templates';
 
 export const PARENT_RELATIONS = ['MOTHER', 'FATHER', 'OTHER'] as const;
 export type ParentRelationValue = (typeof PARENT_RELATIONS)[number];
@@ -89,11 +90,16 @@ export function validateNewTask(input: NewTaskInput, activeGoals: readonly strin
   return null;
 }
 
-/** Пуш ребёнку о новом задании (эмодзи в системном пуше допустимы). */
-export function parentTaskPush(relation: string | null | undefined): { title: string; body: string } {
-  const w = relationWords(relation);
-  const title = relation === 'MOTHER' ? 'Задание от мамы!' : relation === 'FATHER' ? 'Задание от папы!' : 'Задание от родителя!';
-  return { title, body: `Привет, чемпион! Тебе прилетела тренировка ${w.from}. Вперёд к выполнению 💪` };
+/**
+ * Пуш ребёнку о новом задании — шаблон parentTaskNew из админки ({from} —
+ * «от мамы»/«от папы»/«от родителя»). Эмодзи в системном пуше допустимы.
+ */
+export function parentTaskPush(
+  relation: string | null | undefined,
+  templates: PushTemplates = DEFAULT_PUSH_TEMPLATES,
+  name?: string | null,
+): { title: string; body: string } {
+  return renderPush(templates, 'parentTaskNew', { from: relationWords(relation).from, name });
 }
 
 function escapeHtml(s: string): string {

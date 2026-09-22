@@ -30,9 +30,10 @@ export type PushKind =
    * вчерашнее с устаревшим «сегодня у тебя …».
    */
   | 'daily-reminder'
-  /** Вовлекающие нуджи (engagement-nudges) — по треку: онбординг, серия, «запылились». */
+  /** Вовлекающие нуджи (engagement-nudges) — по треку: онбординг, серия, пропуск, «запылились». */
   | 'nudge-onboarding'
   | 'nudge-streak'
+  | 'nudge-missed'
   | 'nudge-dusty';
 
 const TAG_PREFIX = 'trenki:';

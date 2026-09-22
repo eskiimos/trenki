@@ -17,6 +17,7 @@ import { normalizePaymentsMode, type PaymentsMode } from '@/lib/payments/tbank';
 
 export const SETTING_KEYS = {
   dailyTime: 'reminder.dailyTime', // "HH:MM" — ежедневное напоминание (локально по TZ юзера)
+  nudgeTime: 'reminder.nudgeTime', // "HH:MM" — вечерние нуджи: серия, пропуск, новичкам (локально)
   preworkoutEarlyMin: 'reminder.preworkoutEarlyMin', // минут до тренировки — раннее
   preworkoutLateMin: 'reminder.preworkoutLateMin', // минут до тренировки — позднее
   paywallMode: 'paywall.mode', // 'off' | 'admins' | 'on' — роллаут-контроль paywall
@@ -35,6 +36,8 @@ export const SETTING_KEYS = {
 
 export const REMINDER_DEFAULTS = {
   dailyTime: '10:00',
+  // Вечер: дети тренируются после школы, а «серию» можно спасти только сегодня
+  nudgeTime: '18:00',
   preworkoutEarlyMin: 30,
   preworkoutLateMin: 10,
 };
@@ -43,6 +46,9 @@ export interface ReminderSettings {
   dailyHour: number; // 0..23
   dailyMinute: number; // 0..59
   dailyTime: string; // нормализованное "HH:MM"
+  nudgeHour: number;
+  nudgeMinute: number;
+  nudgeTime: string; // нормализованное "HH:MM"
   preworkoutEarlyMin: number; // > preworkoutLateMin
   preworkoutLateMin: number;
 }
@@ -77,7 +83,12 @@ export async function getReminderSettings(): Promise<ReminderSettings> {
     rows = await prisma.appSetting.findMany({
       where: {
         key: {
-          in: [SETTING_KEYS.dailyTime, SETTING_KEYS.preworkoutEarlyMin, SETTING_KEYS.preworkoutLateMin],
+          in: [
+            SETTING_KEYS.dailyTime,
+            SETTING_KEYS.nudgeTime,
+            SETTING_KEYS.preworkoutEarlyMin,
+            SETTING_KEYS.preworkoutLateMin,
+          ],
         },
       },
       select: { key: true, value: true },
@@ -90,6 +101,9 @@ export async function getReminderSettings(): Promise<ReminderSettings> {
   const hm =
     parseHHMM(map.get(SETTING_KEYS.dailyTime) ?? REMINDER_DEFAULTS.dailyTime) ??
     parseHHMM(REMINDER_DEFAULTS.dailyTime)!;
+  const nudge =
+    parseHHMM(map.get(SETTING_KEYS.nudgeTime) ?? REMINDER_DEFAULTS.nudgeTime) ??
+    parseHHMM(REMINDER_DEFAULTS.nudgeTime)!;
   const early = parseMinutes(map.get(SETTING_KEYS.preworkoutEarlyMin), REMINDER_DEFAULTS.preworkoutEarlyMin);
   const late = parseMinutes(map.get(SETTING_KEYS.preworkoutLateMin), REMINDER_DEFAULTS.preworkoutLateMin);
 
@@ -97,6 +111,9 @@ export async function getReminderSettings(): Promise<ReminderSettings> {
     dailyHour: hm.hour,
     dailyMinute: hm.minute,
     dailyTime: `${pad(hm.hour)}:${pad(hm.minute)}`,
+    nudgeHour: nudge.hour,
+    nudgeMinute: nudge.minute,
+    nudgeTime: `${pad(nudge.hour)}:${pad(nudge.minute)}`,
     preworkoutEarlyMin: early,
     preworkoutLateMin: late,
   };

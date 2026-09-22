@@ -1,37 +1,22 @@
 /**
- * Cron: вовлекающие пуши — онбординг-дрип и нудж «гантели запылились».
+ * Cron: вовлекающие пуши — онбординг-дрип, «серия под угрозой», «пропуск
+ * 2 дня», «гантели запылились». Логика — src/lib/notifications/engagement-runner.ts.
  *
  *   0 15 * * * curl -s -H "Authorization: Bearer $CRON_SECRET" \
  *     http://localhost:3000/api/cron/engagement-nudges
  *
- * Раз в сутки (днём). Три трека, приоритет сверху вниз:
- *  1) ОНБОРДИНГ-ДРИП — зарегистрировался, но НИ РАЗУ не тренировался: серия из
- *     3 сообщений на 1-й, 3-й и 7-й день. Шаг фиксируется в User.nudgeStep.
- *  2) «СЕРИЯ ПОД УГРОЗОЙ» — стрик ≥ 2 дней, последняя тренировка вчера:
- *     сегодня последний шанс не обнулить серию. Без отдельного поля-интервала —
- *     условие «вчера» само по себе одноразовое, плюс общий дедуп lastNudgeOn.
- *  3) «ГАНТЕЛИ ЗАПЫЛИЛИСЬ» — без активной подписки и не тренировался
- *     DUSTY_AFTER_DAYS дней. Повторяется не чаще, чем раз в этот же интервал.
- *
- * Дедуп: User.lastNudgeOn (локальная дата) — не больше одного нуджа в день, плюс
- * НЕ шлём в день, когда человеку уже ушло дневное напоминание по микроциклу
- * (User.lastReminderOn) — два пуша об одном и том же раздражают.
- * Атомарный claim через updateMany — повторный тик крона не задвоит.
+ * С 22.09 основной запуск — из поминутного крона microcycle-reminders: пуши
+ * уходят вечером по местному времени игрока (настройка в /admin/reminders).
+ * Этот роут оставлен для совместимости со старой строкой crontab и ручного
+ * запуска: он делает то же самое и берёт только тех, чьё время уже наступило,
+ * поэтому лишнего не отправит.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { sendUserPush } from '@/lib/coach/push';
-import { hasPremium } from '@/lib/access';
-import { decideNudge, DUSTY_AFTER_DAYS } from '@/lib/notifications/nudges';
-import { pushTag } from '@/lib/notifications/push-tag';
-import { computeStreak } from '@/lib/gamification';
-import { WorkoutStatus, UserRole } from '@/generated/prisma';
+import { runEngagementNudges } from '@/lib/notifications/engagement-runner';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-const MAX_BATCH = 500; // предохранитель: не рассылаем лавину за один тик
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -39,117 +24,10 @@ export async function GET(request: NextRequest) {
   if (request.headers.get('authorization') !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-
-  const now = new Date();
-  const localDate = (tz: string | null): string => {
-    try {
-      return new Intl.DateTimeFormat('en-CA', { timeZone: tz || 'Europe/Moscow' }).format(now);
-    } catch {
-      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(now);
-    }
-  };
-
-  // Кандидаты: только те, у кого есть push-подписка (иначе пуш никуда не уйдёт).
-  // У User нет обратной связи на PushSubscription — берём id отдельным запросом.
-  const subs = await prisma.pushSubscription.findMany({
-    where: { userId: { not: null } },
-    select: { userId: true },
-    distinct: ['userId'],
-  });
-  const subscribedIds = subs.map((s) => s.userId!).filter(Boolean);
-  if (subscribedIds.length === 0) {
-    return NextResponse.json({ candidates: 0, sent: 0, skipped: 0 });
+  try {
+    return NextResponse.json(await runEngagementNudges());
+  } catch (error) {
+    logger.error('engagement nudges failed', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
-
-  const users = await prisma.user.findMany({
-    where: {
-      id: { in: subscribedIds },
-      role: UserRole.ATHLETE, // тренерам атлетский дрип не нужен (у них нет своих тренировок)
-    },
-    // Кому дольше всех не слали — первыми. Без этого batch каждый день упирался
-    // бы в одну и ту же «голову» выборки, а хвост не получал нуджей никогда.
-    orderBy: { lastNudgeOn: { sort: 'asc', nulls: 'first' } },
-    select: {
-      id: true,
-      createdAt: true,
-      timezone: true,
-      accessTier: true,
-      premiumUntil: true,
-      nudgeStep: true,
-      lastNudgeOn: true,
-      lastDustyNudgeAt: true,
-      lastReminderOn: true,
-      role: true,
-    },
-    take: MAX_BATCH,
-  });
-
-  let sent = 0;
-  let skipped = 0;
-
-  for (const u of users) {
-    const today = localDate(u.timezone);
-
-    // Уже слали сегодня нудж — или сегодня ушло дневное напоминание.
-    if (u.lastNudgeOn === today || u.lastReminderOn === today) { skipped++; continue; }
-
-    // Завершённые тренировки — по ним считаем и простой, и стрик.
-    // ВАЖНО: по completedAt, а не createdAt — сессии микроцикла создаются пачкой
-    // на всю неделю заранее, и по createdAt активный юзер выглядел бы «пропавшим».
-    // N+1 приемлем: кандидатов ≤ MAX_BATCH и один запрос даёт сразу оба значения
-    // (последних 120 завершений хватает на любой реалистичный стрик).
-    const recentDone = await prisma.workoutSession.findMany({
-      where: { userId: u.id, status: WorkoutStatus.COMPLETED, completedAt: { not: null } },
-      orderBy: { completedAt: 'desc' },
-      select: { completedAt: true },
-      take: 120,
-    });
-    const lastDone = recentDone[0];
-    const daysSince = lastDone?.completedAt
-      ? Math.floor((now.getTime() - lastDone.completedAt.getTime()) / DAY_MS)
-      : null;
-    const currentStreak = computeStreak(
-      recentDone.map((s) => s.completedAt!),
-      now,
-    );
-
-    const decision = decideNudge(
-      {
-        createdAt: u.createdAt,
-        everTrained: !!lastDone,
-        daysSinceLastTraining: daysSince,
-        hasPremium: hasPremium(u),
-        nudgeStep: u.nudgeStep,
-        daysSinceLastDusty: u.lastDustyNudgeAt
-          ? Math.floor((now.getTime() - u.lastDustyNudgeAt.getTime()) / DAY_MS)
-          : null,
-        currentStreak,
-      },
-      now,
-    );
-    if (!decision) { skipped++; continue; }
-
-    // Атомарно занимаем отправку на сегодня (гонку выиграет один тик).
-    const claim = await prisma.user.updateMany({
-      where: { id: u.id, OR: [{ lastNudgeOn: null }, { lastNudgeOn: { not: today } }] },
-      data: {
-        lastNudgeOn: today,
-        nudgeStep: decision.nextStep,
-        ...(decision.kind === 'dusty' ? { lastDustyNudgeAt: now } : {}),
-      },
-    });
-    if (claim.count !== 1) { skipped++; continue; }
-
-    sendUserPush(u.id, {
-      title: decision.text.title,
-      body: decision.text.body,
-      url: decision.text.url,
-      // Метка по треку, а не по заголовку: у «серии» в заголовке число дней, у
-      // онбординга свой текст на каждый шаг — неоткрытый прошлый нудж заменяется.
-      tag: pushTag(`nudge-${decision.kind}`),
-    }).catch((err) => console.error('engagement nudge failed', u.id, err));
-    sent++;
-  }
-
-  return NextResponse.json({ candidates: users.length, sent, skipped, dustyAfterDays: DUSTY_AFTER_DAYS });
 }

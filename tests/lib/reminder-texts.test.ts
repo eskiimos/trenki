@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
-  DAILY_REMINDER_VARIANTS,
+  DAILY_REMINDER_TEMPLATES,
   pickReminderVariantIndex,
   buildDailyReminder,
 } from '../../src/lib/notifications/reminder-texts';
+import { DEFAULT_PUSH_TEMPLATES } from '../../src/lib/notifications/templates';
 
 describe('pickReminderVariantIndex', () => {
   it('детерминирован: тот же день + юзер → тот же вариант', () => {
@@ -15,9 +16,9 @@ describe('pickReminderVariantIndex', () => {
   it('всегда в границах массива', () => {
     for (let d = 1; d <= 28; d += 1) {
       const date = `2026-07-${String(d).padStart(2, '0')}`;
-      const idx = pickReminderVariantIndex(date, 'user-x', DAILY_REMINDER_VARIANTS.length);
+      const idx = pickReminderVariantIndex(date, 'user-x', DAILY_REMINDER_TEMPLATES.length);
       expect(idx).toBeGreaterThanOrEqual(0);
-      expect(idx).toBeLessThan(DAILY_REMINDER_VARIANTS.length);
+      expect(idx).toBeLessThan(DAILY_REMINDER_TEMPLATES.length);
     }
   });
 
@@ -52,6 +53,17 @@ describe('buildDailyReminder', () => {
   it('без имени заголовок остаётся валидным', () => {
     const t = buildDailyReminder('2026-07-20', 'u1', null, 'В тонусе');
     expect(t.title).not.toContain('null');
+    expect(t.title.toLowerCase()).toContain('чемпион');
     expect(t.body).toContain('В тонусе');
+  });
+
+  it('берёт текст из переданных шаблонов (правка админа)', () => {
+    const custom = {
+      ...DEFAULT_PUSH_TEMPLATES,
+      dailyReminder1: { title: 'Эй, {name}!', body: 'Сегодня «{day}»' },
+      dailyReminder2: { title: 'Эй, {name}!', body: 'Сегодня «{day}»' },
+    };
+    const t = buildDailyReminder('2026-07-20', 'u1', 'Иван', 'Разминка', custom);
+    expect(t).toEqual({ title: 'Эй, Иван!', body: 'Сегодня «Разминка»' });
   });
 });

@@ -66,11 +66,23 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * Номер дня вместо «миллисекунд полуночи»: арифметика серий идёт шагом 1, а не
  * −24ч — в таймзонах с DST сутки бывают 23/25 часов, и шаг −24ч там ломается.
  */
+// Форматтер на таймзону: new Intl.DateTimeFormat дорогой, а серия/нуджи
+// зовут calendarDayIndex на каждую тренировку каждого юзера.
+const dayFormatters = new Map<string, Intl.DateTimeFormat>();
+function dayFormatter(tz: string): Intl.DateTimeFormat {
+  let f = dayFormatters.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-CA', { timeZone: tz }); // бросает на битой tz — не кэшируется
+    dayFormatters.set(tz, f);
+  }
+  return f;
+}
+
 export function calendarDayIndex(d: Date, tz?: string | null): number {
   if (tz) {
     try {
       // en-CA → 'YYYY-MM-DD'
-      const s = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(d);
+      const s = dayFormatter(tz).format(d);
       const [y, m, dd] = s.split('-').map(Number);
       return Date.UTC(y, m - 1, dd) / DAY_MS;
     } catch {

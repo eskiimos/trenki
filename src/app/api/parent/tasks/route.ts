@@ -8,6 +8,7 @@ import { sendUserPush } from '@/lib/coach/push';
 import { pushTag } from '@/lib/notifications/push-tag';
 import { logger } from '@/lib/logger';
 import { parentTaskPush, taskDueDate, validateNewTask } from '@/lib/parent-tasks';
+import { getPushTemplates } from '@/lib/notifications/templates-server';
 import type { ParentRelation, TrainingGoal } from '@/generated/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
       where: { parentId_childId: { parentId, childId } },
       select: {
         id: true,
-        child: { select: { id: true, accessTier: true, premiumUntil: true, isAdmin: true } },
+        child: { select: { id: true, firstName: true, accessTier: true, premiumUntil: true, isAdmin: true } },
       },
     });
     if (!link) return NextResponse.json({ error: 'Ребёнок не найден' }, { status: 404 });
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
       prisma.parentLink.update({ where: { id: link.id }, data: { relation } }),
     ]);
 
-    const push = parentTaskPush(relation);
+    const push = parentTaskPush(relation, await getPushTemplates(), link.child.firstName);
     sendUserPush(childId, { ...push, url: '/profile/assignments', tag: pushTag('parent-task-new', task.id) }).catch(
       (err) => logger.error('parent task push failed', err, { childId }),
     );

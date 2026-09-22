@@ -4,6 +4,7 @@ import { LoadDirection, WorkoutStatus } from '@/generated/prisma';
 import { requireCoach, requireAuthUser, requireTeamOwnership } from '@/lib/coach/guards';
 import { sendUserPush } from '@/lib/coach/push';
 import { assignmentNewPush } from '@/lib/coach/assignment-push';
+import { getPushTemplates } from '@/lib/notifications/templates-server';
 import { getPaywallMode } from '@/lib/settings';
 import { isPaywalled } from '@/lib/paywall';
 
@@ -282,10 +283,13 @@ export async function POST(request: NextRequest) {
 
   // Уведомления игрокам — только web-push (PWA). Telegram временно
   // отключён, см. CLAUDE.md. Не блокируем ответ тренеру.
-  // Текст — в assignmentNewPush (станет редактируемым в админке).
-  const push = assignmentNewPush();
+  // Текст — шаблон assignmentNew из админки ({name} — игрок, {coach} — тренер).
+  const templates = await getPushTemplates();
+  const coach = `${auth.user.firstName ?? ''} ${auth.user.lastName ?? ''}`.trim();
   Promise.allSettled(
-    filtered.map((athleteId) => sendUserPush(athleteId, push)),
+    filtered.map((athleteId) =>
+      sendUserPush(athleteId, assignmentNewPush(templates, { name: memberById.get(athleteId)?.firstName, coach })),
+    ),
   ).catch(() => { });
 
   return NextResponse.json({ created: created.length, assignments: created });

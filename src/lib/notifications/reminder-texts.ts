@@ -1,24 +1,17 @@
 // Тексты напоминаний о тренировке. Вариант выбирается детерминированно по
 // локальной дате юзера — так один и тот же человек в один день видит один текст,
 // а изо дня в день они чередуются. Без новых полей в БД и без рандома
-// (рандом ломал бы воспроизводимость и тесты).
+// (рандом ломал бы воспроизводимость и тесты). Сами тексты — шаблоны
+// dailyReminder1/2, их редактирует админ (./templates.ts).
 
-export interface ReminderVariant {
-  title: (name: string | null) => string;
-  body: (dayLabel: string) => string;
-}
+import {
+  DEFAULT_PUSH_TEMPLATES,
+  renderPush,
+  type PushTemplateKey,
+  type PushTemplates,
+} from '@/lib/notifications/templates';
 
-export const DAILY_REMINDER_VARIANTS: ReminderVariant[] = [
-  {
-    title: (name) => (name ? `Привет, ${name}! Время тренировки 💪` : 'Время тренировки 💪'),
-    body: (dayLabel) =>
-      `Стабильность — признак мастерства. Не забудь потренироваться — сегодня у тебя «${dayLabel}».`,
-  },
-  {
-    title: (name) => (name ? `${name}, дисциплина бьёт класс! 🔥` : 'Дисциплина бьёт класс! 🔥'),
-    body: (dayLabel) => `Пора тренироваться! Сегодня у тебя «${dayLabel}».`,
-  },
-];
+export const DAILY_REMINDER_TEMPLATES: PushTemplateKey[] = ['dailyReminder1', 'dailyReminder2'];
 
 /**
  * Индекс варианта по локальной дате (YYYY-MM-DD) и id пользователя.
@@ -41,8 +34,8 @@ export function buildDailyReminder(
   userId: string,
   name: string | null,
   dayLabel: string,
+  templates: PushTemplates = DEFAULT_PUSH_TEMPLATES,
 ): { title: string; body: string } {
-  const idx = pickReminderVariantIndex(localDate, userId, DAILY_REMINDER_VARIANTS.length);
-  const v = DAILY_REMINDER_VARIANTS[idx]!;
-  return { title: v.title(name), body: v.body(dayLabel) };
+  const idx = pickReminderVariantIndex(localDate, userId, DAILY_REMINDER_TEMPLATES.length);
+  return renderPush(templates, DAILY_REMINDER_TEMPLATES[idx]!, { name, day: dayLabel });
 }

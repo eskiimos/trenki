@@ -15,7 +15,7 @@ import {
 import {
   Users, Activity, Video, Dumbbell, Bell, Star, MessageSquare,
   Film, BarChart3, Settings, Zap, GraduationCap, Blocks, Gamepad2,
-  Link2, Ticket, ShieldCheck, Send, AlarmClock, Lock, ScanSearch, Palette,
+  Link2, Ticket, ShieldCheck, Send, AlarmClock, Lock, ScanSearch, Palette, MessageSquareText,
   ArrowRight, LayoutDashboard, AlertTriangle,
   CreditCard,
 } from 'lucide-react';
@@ -343,7 +343,13 @@ export default function AdminDashboardPage() {
               href="/admin/reminders"
               icon={AlarmClock}
               title="Время уведомлений"
-              desc="Когда слать пуши (ежедн. + предтрен.)"
+              desc="Когда слать пуши (утро, вечер, перед тренировкой)"
+            />
+            <NavCard
+              href="/admin/push-texts"
+              icon={MessageSquareText}
+              title="Тексты уведомлений"
+              desc="Что пишем в пушах по каждому сценарию"
             />
           </div>
         </div>

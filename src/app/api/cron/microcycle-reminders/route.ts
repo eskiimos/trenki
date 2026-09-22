@@ -33,6 +33,10 @@ import { MicrocycleStatus } from '@/generated/prisma';
 import { getReminderSettings } from '@/lib/settings';
 import { buildDailyReminder } from '@/lib/notifications/reminder-texts';
 import { pushTag } from '@/lib/notifications/push-tag';
+import { localDateStr as localDateIn, localMinuteOfDay as localMinuteIn } from '@/lib/notifications/local-time';
+import { getPushTemplates } from '@/lib/notifications/templates-server';
+import { runEngagementNudges, type EngagementRunResult } from '@/lib/notifications/engagement-runner';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,22 +58,8 @@ export async function GET(request: NextRequest) {
   const pad = (n: number) => String(n).padStart(2, '0');
   // Локальная дата (YYYY-MM-DD) и минуты-от-полуночи в таймзоне юзера (Intl).
   // Дефолт — МСК (если tz битый).
-  const localDateStr = (tz: string): string => {
-    try { return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(now); }
-    catch { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(now); }
-  };
-  const localMinuteOfDay = (tz: string): number => {
-    const read = (zone: string) => {
-      const parts = new Intl.DateTimeFormat('en-US', {
-        timeZone: zone, hour: '2-digit', minute: '2-digit', hour12: false,
-      }).formatToParts(now);
-      const h = Number(parts.find((p) => p.type === 'hour')?.value ?? '0');
-      const m = Number(parts.find((p) => p.type === 'minute')?.value ?? '0');
-      // hour12:false может дать "24" в полночь — нормализуем через %24.
-      return ((Number.isFinite(h) ? h : 0) % 24) * 60 + (Number.isFinite(m) ? m : 0);
-    };
-    try { return read(tz); } catch { return read('Europe/Moscow'); }
-  };
+  const localDateStr = (tz: string): string => localDateIn(now, tz);
+  const localMinuteOfDay = (tz: string): number => localMinuteIn(now, tz);
   // UTC-дата дня цикла как YYYY-MM-DD — для сравнения с локальной датой юзера.
   const dayDateStr = (ws: Date, dow: number): string => {
     const d = getMicrocycleDayDate(ws, dow);
@@ -127,6 +117,8 @@ export async function GET(request: NextRequest) {
   let sent = 0;
   let offHour = 0;      // ещё не наступило локальное время напоминания
   let alreadySent = 0;  // сегодня уже слали (дедуп)
+  // Тексты — из админки (шаблоны dailyReminder1/2), читаем один раз за тик
+  const templates = dueByUser.size > 0 ? await getPushTemplates() : null;
   for (const [userId, info] of dueByUser) {
     // Шлём, когда локальное время юзера >= целевого; дедуп по локальной дате —
     // поминутный крон не задвоит, а пропущенный тик догонится тем же днём.
@@ -142,7 +134,7 @@ export async function GET(request: NextRequest) {
     if (claim.count !== 1) { alreadySent++; continue; }
 
     // Текст чередуется по дням (детерминированно от локальной даты и userId).
-    const text = buildDailyReminder(info.localDate, userId, info.name, info.label);
+    const text = buildDailyReminder(info.localDate, userId, info.name, info.label, templates!);
     sendUserPush(userId, {
       title: text.title,
       body: text.body,
@@ -154,6 +146,18 @@ export async function GET(request: NextRequest) {
     sent++;
   }
 
+  // Вечерние вовлекающие пуши (серия, пропуск, новичкам) едут на этом же
+  // поминутном кроне: им нужно местное время игрока, а отдельной поминутной
+  // строки в crontab у engagement-nudges нет. Идут ПОСЛЕ напоминаний — чтобы
+  // видеть сегодняшний lastReminderOn. Ошибка нуджей не ломает напоминания.
+  let nudges: EngagementRunResult | { error: string };
+  try {
+    nudges = await runEngagementNudges(now);
+  } catch (error) {
+    logger.error('engagement nudges (minute tick) failed', error);
+    nudges = { error: 'failed' };
+  }
+
   return NextResponse.json({
     cycles: cycles.length,
     sent,
@@ -162,6 +166,7 @@ export async function GET(request: NextRequest) {
     offHour,
     alreadySent,
     targetTime: dailyTime,
+    nudges,
     durationMs: Date.now() - startedAt,
   });
 }

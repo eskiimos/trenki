@@ -1,20 +1,17 @@
 import { pushTag } from '@/lib/notifications/push-tag';
+import { DEFAULT_PUSH_TEMPLATES, renderPush, type PushTemplates } from '@/lib/notifications/templates';
 
-// Пуши о заданиях тренера. Тексты собраны в одном месте: по решению владельца
-// (21.09) тексты уведомлений станут редактируемыми в админке — подменять их
-// придётся только здесь, роуты заданий трогать не нужно.
-// Эмодзи в тексте допустимы: пуш — системное уведомление, не экран приложения.
-
-export const ASSIGNMENT_NEW_PUSH_TEXT = {
-  title: 'Задание от тренера!',
-  body: 'Привет, чемпион! Тебе прилетела тренировка от тренера. Вперёд к выполнению 💪',
-} as const;
+// Пуши о заданиях тренера. Текст атлету — шаблон assignmentNew, его редактирует
+// админ (решение владельца 21.09). Эмодзи в тексте допустимы: пуш — системное
+// уведомление, не экран приложения.
 
 /** Атлету: тренер назначил задание. Повторное задание заменяет прошлый пуш в шторке. */
-export function assignmentNewPush() {
+export function assignmentNewPush(
+  templates: PushTemplates = DEFAULT_PUSH_TEMPLATES,
+  vars: { name?: string | null; coach?: string | null } = {},
+) {
   return {
-    title: ASSIGNMENT_NEW_PUSH_TEXT.title,
-    body: ASSIGNMENT_NEW_PUSH_TEXT.body,
+    ...renderPush(templates, 'assignmentNew', vars),
     url: '/profile/assignments',
     tag: pushTag('assignment-new'),
   };

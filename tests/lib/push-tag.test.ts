@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LEGACY_PUSH_TAG, pushTag, resolvePushTag } from '@/lib/notifications/push-tag';
 import {
-  ASSIGNMENT_NEW_PUSH_TEXT,
   assignmentDonePush,
   assignmentNewPush,
 } from '@/lib/coach/assignment-push';
@@ -98,7 +97,6 @@ describe('assignment-push', () => {
     expect(p.body).toBe(
       'Привет, чемпион! Тебе прилетела тренировка от тренера. Вперёд к выполнению 💪',
     );
-    expect(p).toMatchObject(ASSIGNMENT_NEW_PUSH_TEXT);
     expect(p.url).toBe('/profile/assignments');
     expect(p.tag).toBe(pushTag('assignment-new'));
   });

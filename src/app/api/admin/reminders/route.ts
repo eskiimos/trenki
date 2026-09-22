@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
     const s = await getReminderSettings();
     return NextResponse.json({
       dailyTime: s.dailyTime,
+      nudgeTime: s.nudgeTime,
       preworkoutEarlyMin: s.preworkoutEarlyMin,
       preworkoutLateMin: s.preworkoutLateMin,
     });
@@ -29,6 +30,9 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
     const dailyTimeRaw = typeof body.dailyTime === 'string' ? body.dailyTime.trim() : '';
+    // Вкладка, открытая до появления поля, не шлёт nudgeTime — берём сохранённое
+    const nudgeTimeRaw =
+      typeof body.nudgeTime === 'string' ? body.nudgeTime.trim() : (await getReminderSettings()).nudgeTime;
     const early = Number(body.preworkoutEarlyMin);
     const late = Number(body.preworkoutLateMin);
 
@@ -45,6 +49,26 @@ export async function PATCH(request: NextRequest) {
     if (targetMin < 6 * 60 || targetMin > 22 * 60) {
       return NextResponse.json(
         { error: 'Время ежедневного напоминания — в диапазоне 06:00–22:00' },
+        { status: 400 },
+      );
+    }
+    const nudgeHm = parseHHMM(nudgeTimeRaw);
+    if (!nudgeHm) {
+      return NextResponse.json({ error: 'Время вечерних напоминаний — формат ЧЧ:ММ' }, { status: 400 });
+    }
+    const nudgeMin = nudgeHm.hour * 60 + nudgeHm.minute;
+    if (nudgeMin < 9 * 60 || nudgeMin > 21 * 60) {
+      return NextResponse.json(
+        { error: 'Время вечерних напоминаний — в диапазоне 09:00–21:00' },
+        { status: 400 },
+      );
+    }
+    // Вечерние пуши — строго после утреннего напоминания по циклу: в день
+    // напоминания из вечерних уходит только «серия», и это правило держится,
+    // только если напоминание успело уйти раньше.
+    if (nudgeMin <= targetMin) {
+      return NextResponse.json(
+        { error: 'Вечерние пуши должны идти позже ежедневного напоминания' },
         { status: 400 },
       );
     }
@@ -66,6 +90,10 @@ export async function PATCH(request: NextRequest) {
 
     const normTime = `${String(hm.hour).padStart(2, '0')}:${String(hm.minute).padStart(2, '0')}`;
     await setAppSetting(SETTING_KEYS.dailyTime, normTime);
+    await setAppSetting(
+      SETTING_KEYS.nudgeTime,
+      `${String(nudgeHm.hour).padStart(2, '0')}:${String(nudgeHm.minute).padStart(2, '0')}`,
+    );
     await setAppSetting(SETTING_KEYS.preworkoutEarlyMin, String(early));
     await setAppSetting(SETTING_KEYS.preworkoutLateMin, String(late));
 
@@ -73,6 +101,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       dailyTime: s.dailyTime,
+      nudgeTime: s.nudgeTime,
       preworkoutEarlyMin: s.preworkoutEarlyMin,
       preworkoutLateMin: s.preworkoutLateMin,
     });

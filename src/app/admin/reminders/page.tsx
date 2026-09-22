@@ -9,11 +9,13 @@ import {
   AdminButton,
   inputStyle,
 } from '@/components/admin/ui';
-import { AlarmClock, BellRing, CalendarClock, Check, AlertTriangle } from 'lucide-react';
+import { AlarmClock, BellRing, CalendarClock, Check, AlertTriangle, Moon } from 'lucide-react';
+import Link from 'next/link';
 
 // Админка: время уведомлений (читается крон-роутами из app_settings).
 export default function RemindersAdminPage() {
   const [dailyTime, setDailyTime] = useState('10:00');
+  const [nudgeTime, setNudgeTime] = useState('18:00');
   const [early, setEarly] = useState('30');
   const [late, setLate] = useState('10');
   const [loading, setLoading] = useState(true);
@@ -27,6 +29,7 @@ export default function RemindersAdminPage() {
         if (res.ok) {
           const d = await res.json();
           setDailyTime(d.dailyTime ?? '10:00');
+          setNudgeTime(d.nudgeTime ?? '18:00');
           setEarly(String(d.preworkoutEarlyMin ?? 30));
           setLate(String(d.preworkoutLateMin ?? 10));
         }
@@ -47,6 +50,7 @@ export default function RemindersAdminPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           dailyTime,
+          nudgeTime,
           preworkoutEarlyMin: Number(early),
           preworkoutLateMin: Number(late),
         }),
@@ -57,6 +61,7 @@ export default function RemindersAdminPage() {
         return;
       }
       setDailyTime(d.dailyTime);
+      setNudgeTime(d.nudgeTime);
       setEarly(String(d.preworkoutEarlyMin));
       setLate(String(d.preworkoutLateMin));
       setMsg({ type: 'ok', text: 'Сохранено' });
@@ -121,6 +126,28 @@ export default function RemindersAdminPage() {
             <div style={hintStyle}>
               Каждый игрок получит пуш в это время по своему часовому поясу. Диапазон 06:00–22:00, по
               умолчанию 10:00.
+            </div>
+          </AdminCard>
+
+          {/* Вечерние вовлекающие пуши */}
+          <AdminCard>
+            <SectionTitle icon={Moon}>Вечерние пуши: серия, пропуск, новичкам</SectionTitle>
+            <input
+              type="time"
+              min="09:00"
+              max="21:00"
+              value={nudgeTime}
+              onChange={(e) => setNudgeTime(e.target.value)}
+              style={{ ...inputStyle, maxWidth: 200, colorScheme: 'dark' }}
+            />
+            <div style={hintStyle}>
+              «Серия под угрозой», «Пропуск 2 дня», «Гантели запылились» и сообщения новичкам — не
+              больше одного пуша в день, по местному времени игрока. Диапазон 09:00–21:00, по умолчанию
+              18:00: дети тренируются после школы, а серию можно спасти только сегодня. Тексты —{' '}
+              <Link href="/admin/push-texts" style={{ color: 'var(--color-brand)' }}>
+                в «Текстах уведомлений»
+              </Link>
+              .
             </div>
           </AdminCard>
 

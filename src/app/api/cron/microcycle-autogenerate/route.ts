@@ -25,6 +25,8 @@ import { getPaywallMode } from '@/lib/settings';
 import { isPaywalled } from '@/lib/paywall';
 import { getMicrocycleWeekStart } from '@/lib/microcycle/week-start';
 import { UserRole } from '@/generated/prisma';
+import { getPushTemplates } from '@/lib/notifications/templates-server';
+import { renderPush } from '@/lib/notifications/templates';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,7 +49,7 @@ export async function GET(request: NextRequest) {
       role: UserRole.ATHLETE,
       profile: { is: { autoGenerateMicrocycle: true } },
     },
-    select: { id: true, accessTier: true, premiumUntil: true, isAdmin: true },
+    select: { id: true, firstName: true, accessTier: true, premiumUntil: true, isAdmin: true },
   });
   const eligible = candidates.filter((u) => !isPaywalled(u, mode));
   const paywalledSkipped = candidates.length - eligible.length;
@@ -56,6 +58,8 @@ export async function GET(request: NextRequest) {
   // Cron всегда стартует цикл с ближайшего понедельника — логика
   // «новая неделя». Ручной generate (через endpoint) использует today.
   const startDate = getMicrocycleWeekStart(new Date());
+  // Текст пуша «неделя готова» — из админки (шаблон microcycleReady)
+  const templates = await getPushTemplates();
   let created = 0;
   let existing = 0;
   let noProfile = 0;
@@ -68,8 +72,7 @@ export async function GET(request: NextRequest) {
         created++;
         // Push (web-only, Telegram отключён). Не блокируем цикл.
         sendUserPush(u.id, {
-          title: 'Новый микроцикл готов',
-          body: 'ИИ-тренер собрал тебе неделю. Открой календарь.',
+          ...renderPush(templates, 'microcycleReady', { name: u.firstName }),
           url: '/calendar',
         }).catch((err) => console.error('push failed', u.id, err));
       } else if (result.status === 'EXISTING') {

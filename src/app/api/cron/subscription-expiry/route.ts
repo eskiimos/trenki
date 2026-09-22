@@ -19,6 +19,8 @@ import { prisma } from '@/lib/prisma';
 import { sendUserPush } from '@/lib/coach/push';
 import { getPaywallMode } from '@/lib/settings';
 import { AccessTier } from '@/generated/prisma';
+import { getPushTemplates } from '@/lib/notifications/templates-server';
+import { renderPush } from '@/lib/notifications/templates';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,6 +65,8 @@ export async function GET(request: NextRequest) {
 
   let sent = 0;
   let alreadySent = 0;
+  // Текст — из админки (шаблон subscriptionExpiry)
+  const templates = candidates.length > 0 ? await getPushTemplates() : null;
   for (const u of candidates) {
     if (!u.premiumUntil) continue;
     const iso = u.premiumUntil.toISOString();
@@ -83,8 +87,7 @@ export async function GET(request: NextRequest) {
     // premiumUntil всегда > now (фильтр gt), поэтому days >= 1; при <24ч — «менее суток».
     const when = msLeft < DAY_MS ? 'менее чем через сутки' : `через ${days} ${pluralDays(days)}`;
     sendUserPush(u.id, {
-      title: 'Подписка скоро закончится',
-      body: `Доступ ко всем возможностям заканчивается ${when}. Продли, чтобы не потерять прогресс.`,
+      ...renderPush(templates!, 'subscriptionExpiry', { name: u.firstName, when }),
       url: '/profile',
     }).catch((err) => console.error('subscription-expiry push failed', u.id, err));
     sent++;
