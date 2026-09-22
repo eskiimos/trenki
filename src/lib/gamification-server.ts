@@ -13,6 +13,7 @@ import {
   TEMPO_MULTIPLIER,
 } from '@/lib/gamification';
 import { WorkoutStatus } from '@/generated/prisma';
+import { countedWorkoutWhere, REAL_WORKOUTS } from '@/lib/stats/workout-definition';
 
 export interface GamificationSummary {
   xp: number;
@@ -131,21 +132,50 @@ export async function getGamificationSummary(userId: string): Promise<Gamificati
 }
 
 /** Активность за последние 7 дней: завершённые тренировки и модули. */
+export interface WeekGains {
+  power: number;
+  speed: number;
+  endurance: number;
+  technique: number;
+  flexibility: number;
+  /** Потенциал — среднее 5 характеристик, прирост = среднее приростов. */
+  potential: number;
+}
+
+/**
+ * Активность за 7 дней для родителя (кабинет и недельный отчёт): тренировки по
+ * общему правилу REAL_WORKOUTS (завершённые и досрочно завершённые, без
+ * синтетики) — раньше считались только полные, и при серии 3 дня отчёт мог
+ * показать «0 тренировок»; модули; прирост характеристик.
+ */
 export async function getWeekActivity(
   userId: string,
-): Promise<{ workouts: number; modules: number }> {
+): Promise<{ workouts: number; modules: number; gains: WeekGains }> {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const [workouts, modules] = await Promise.all([
+  const [workouts, modules, history] = await Promise.all([
     prisma.workoutSession.count({
-      where: { userId, status: WorkoutStatus.COMPLETED, completedAt: { gte: weekAgo } },
+      where: { ...countedWorkoutWhere(REAL_WORKOUTS), userId, completedAt: { gte: weekAgo } },
     }),
     prisma.workoutSessionVideo.count({
       where: {
         completed: true,
         completedAt: { gte: weekAgo },
-        session: { userId, status: { in: [WorkoutStatus.COMPLETED, WorkoutStatus.PARTIAL] } },
+        session: { userId, synthetic: false, status: { in: [WorkoutStatus.COMPLETED, WorkoutStatus.PARTIAL] } },
       },
     }),
+    prisma.characteristicHistory.findMany({
+      where: { userId, createdAt: { gte: weekAgo } },
+      select: { gainPower: true, gainSpeed: true, gainEndurance: true, gainTechnique: true, gainFlexibility: true },
+    }),
   ]);
-  return { workouts, modules };
+  const gains: WeekGains = { power: 0, speed: 0, endurance: 0, technique: 0, flexibility: 0, potential: 0 };
+  for (const h of history) {
+    gains.power += h.gainPower;
+    gains.speed += h.gainSpeed;
+    gains.endurance += h.gainEndurance;
+    gains.technique += h.gainTechnique;
+    gains.flexibility += h.gainFlexibility;
+  }
+  gains.potential = (gains.power + gains.speed + gains.endurance + gains.technique + gains.flexibility) / 5;
+  return { workouts, modules, gains };
 }

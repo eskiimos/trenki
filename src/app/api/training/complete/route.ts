@@ -12,6 +12,7 @@ import { requireAuthUser } from '@/lib/coach/guards';
 import { tempoMultiplierToday, XP_PER_COMPLETED_WORKOUT, XP_PER_COMPLETED_MODULE } from '@/lib/gamification';
 import { sendFirstWorkoutEmail } from '@/lib/email-campaigns';
 import { logger } from '@/lib/logger';
+import { settleParentTasks } from '@/lib/parent-tasks-server';
 
 /**
  * POST /api/training/complete
@@ -343,6 +344,11 @@ export async function POST(request: NextRequest) {
         }
       })();
     }
+
+    // Задания от родителя: тренировка с целью задания (и досрочная — тоже
+    // тренировка) могла добить счётчик. Fire-and-forget: закрытие и письмо
+    // родителю не должны задерживать ответ.
+    void settleParentTasks(user.id);
 
     // FIRST_WORKOUT-письмо: только после ПЕРВОЙ полной (COMPLETED) тренировки.
     // Fire-and-forget — НЕ блокируем ответ роута (как auto-complete выше).

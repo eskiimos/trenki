@@ -15,6 +15,7 @@ import TempoBadge from '@/components/TempoBadge';
 import PotentialRing from '@/components/PotentialRing';
 import StatusPathModal from '@/components/StatusPathModal';
 import { StatusIcon } from '@/components/gamification/icons';
+import ParentTasksBlock, { type ParentTaskView } from '@/components/parent/ParentTasksBlock';
 
 interface ChildCard {
   id: string;
@@ -44,6 +45,12 @@ interface ChildCard {
     tempoActive?: boolean;
   };
   week: { workouts: number; modules: number };
+  /** Задания от родителей (п.9б): активные и закрытые за месяц, с прогрессом */
+  tasks: ParentTaskView[];
+  /** Кем этот родитель приходится ребёнку (запомнено с прошлого задания) */
+  relation: string | null;
+  /** У ребёнка нет доступа — задания не выдаём (они ведут в платную тренировку) */
+  paywalled: boolean;
 }
 
 /** «1 тренировка / 2 тренировки / 5 тренировок» */
@@ -289,6 +296,15 @@ const ChildCardView = ({
           <PotentialRing ratings={child.ratings} potential={child.potential} grayed={false} />
         </div>
       )}
+
+      {/* Задания от родителя (п.9б «Середина сентября») */}
+      <ParentTasksBlock
+        childId={child.id}
+        tasks={child.tasks ?? []}
+        paywalled={!!child.paywalled}
+        defaultRelation={child.relation ?? null}
+        onChanged={onLinkChanged}
+      />
 
       {/* Подписка ребёнка */}
       <div className="rounded-xl bg-white/5 p-3 mt-2">

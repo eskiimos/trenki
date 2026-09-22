@@ -72,6 +72,8 @@ model User {
   microcycles           Microcycle[]
   parentLinks           ParentLink[]            @relation("ParentLinks") // я — родитель этих связей
   childLinks            ParentLink[]            @relation("ChildLinks") // я — ребёнок этих связей
+  parentTasksGiven      ParentTask[]            @relation("ParentTasksGiven") // я — родитель, дал задания
+  parentTasksReceived   ParentTask[]            @relation("ParentTasksReceived") // я — ребёнок, получил задания
   parentInvites         ParentInvite[]
 
   @@index([referralCode])
@@ -1163,12 +1165,51 @@ model ParentLink {
   // Запрос ребёнка на отвязку: ребёнок сам связь не рвёт, только просит.
   // null — запроса нет; дата — ждёт подтверждения родителя в кабинете.
   unlinkRequestedAt DateTime?
+  // Кто этот родитель ребёнку — для подписи «Мама дала задание». Запоминается
+  // при первом задании (родитель выбирает), дальше подставляется по умолчанию.
+  relation          ParentRelation?
   parent            User      @relation("ParentLinks", fields: [parentId], references: [id], onDelete: Cascade)
   child             User      @relation("ChildLinks", fields: [childId], references: [id], onDelete: Cascade)
 
   @@unique([parentId, childId])
   @@index([childId])
   @@map("parent_links")
+}
+
+enum ParentRelation {
+  MOTHER
+  FATHER
+  OTHER
+}
+
+enum ParentTaskStatus {
+  ACTIVE
+  COMPLETED
+  CANCELED
+}
+
+// Задание от родителя (правка «Середина сентября», п.9б, формат «счётчик»):
+// родитель выбирает цель и сколько тренировок на неё сделать. Ребёнок видит
+// «Мама дала задание: Мощный бросок 1/3». Прогресс не хранится — считается по
+// реальным тренировкам ребёнка с этой целью после выдачи задания
+// (src/lib/parent-tasks-server.ts), статус COMPLETED ставится при достижении.
+model ParentTask {
+  id          String           @id @default(cuid())
+  parentId    String
+  childId     String
+  relation    ParentRelation   @default(OTHER) // кто дал — снимок на момент выдачи
+  goal        TrainingGoal
+  target      Int // сколько тренировок с этой целью
+  dueDate     DateTime
+  status      ParentTaskStatus @default(ACTIVE)
+  createdAt   DateTime         @default(now())
+  completedAt DateTime?
+  parent      User             @relation("ParentTasksGiven", fields: [parentId], references: [id], onDelete: Cascade)
+  child       User             @relation("ParentTasksReceived", fields: [childId], references: [id], onDelete: Cascade)
+
+  @@index([childId, status])
+  @@index([parentId, createdAt])
+  @@map("parent_tasks")
 }
 
 model ParentInvite {

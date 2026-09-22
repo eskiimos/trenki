@@ -1,10 +1,10 @@
 /**
  * Cron: еженедельный email-дайджест родителям (role=PARENT) о прогрессе детей.
  *
- *   0 10 * * 1 curl -s -H "Authorization: Bearer $CRON_SECRET" \
+ *   0 18 * * 0 curl -s -H "Authorization: Bearer $CRON_SECRET" \
  *     http://localhost:3000/api/cron/parent-digest
  *
- * Раз в неделю (утро понедельника — итоги прошедшей недели). Кандидаты: родители
+ * Раз в неделю (на проде — воскресенье 18:00, итоги недели). Кандидаты: родители
  * с email и хотя бы одним привязанным ребёнком, кому не слали ≥ 6 дней (6, а не 7 —
  * чтобы недельный крон не «уплывал» на день из-за минутных сдвигов запуска).
  *
@@ -19,6 +19,9 @@ import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
 import { getGamificationSummary, getWeekActivity } from '@/lib/gamification-server';
 import { buildParentDigest, formatWeekLabel, type DigestChild } from '@/lib/parent-digest';
+import { unsubscribeUrl } from '@/lib/email-campaigns';
+import { recentParentTasksWhere, withProgress } from '@/lib/parent-tasks-server';
+import { goalLabel } from '@/lib/parent-tasks';
 import { logger } from '@/lib/logger';
 import { UserRole } from '@/generated/prisma';
 
@@ -43,6 +46,8 @@ export async function GET(request: NextRequest) {
   const where = {
     role: UserRole.PARENT,
     email: { not: null },
+    // Отписка от писем (ссылка в каждом письме) — уважаем и здесь
+    emailOptOut: false,
     parentLinks: { some: {} }, // есть хотя бы один привязанный ребёнок
     ...dueCondition,
   };
@@ -96,9 +101,18 @@ export async function GET(request: NextRequest) {
 
       const children: DigestChild[] = await Promise.all(
         links.map(async ({ child }) => {
-          const [g, week] = await Promise.all([
+          const weekAgo = new Date(now.getTime() - 7 * DAY_MS);
+          const [g, week, tasks] = await Promise.all([
             getGamificationSummary(child.id),
             getWeekActivity(child.id),
+            // Задания от родителей: активные и выполненные за неделю
+            prisma.parentTask
+              .findMany({
+                where: recentParentTasksWhere(child.id, weekAgo),
+                orderBy: { createdAt: 'desc' },
+                take: 5,
+              })
+              .then(withProgress),
           ]);
           return {
             name: [child.firstName, child.lastName].filter(Boolean).join(' ') || 'Хоккеист',
@@ -109,18 +123,33 @@ export async function GET(request: NextRequest) {
             weekWorkouts: week.workouts,
             weekModules: week.modules,
             potential: child.profile?.potential ?? null,
+            gains: week.gains,
+            tasks: tasks.map((t) => ({
+              goalLabel: goalLabel(t.goal),
+              done: t.done,
+              target: t.target,
+              completed: t.status === 'COMPLETED',
+              expired: t.status === 'ACTIVE' && t.dueDate.getTime() < now.getTime(),
+            })),
           };
         }),
       );
 
-      const digest = buildParentDigest({ children, weekLabel });
+      const unsub = unsubscribeUrl(parent.id);
+      const digest = buildParentDigest({ children, weekLabel, unsubscribeUrl: unsub });
       if (!digest) {
         // Пустая неделя у всех — claim остаётся, следующая попытка через неделю.
         skippedEmpty++;
         continue;
       }
 
-      const res = await sendEmail({ to: parent.email!, subject: digest.subject, html: digest.html });
+      const res = await sendEmail({
+        to: parent.email!,
+        subject: digest.subject,
+        html: digest.html,
+        text: digest.text,
+        headers: { 'List-Unsubscribe': `<${unsub}>` },
+      });
       if (res.success) {
         sent++;
       } else {

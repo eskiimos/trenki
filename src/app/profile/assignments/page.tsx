@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { GoalIcon } from '@/components/training/icons';
+import { goalLabel, relationWords, taskDisplayState } from '@/lib/parent-tasks';
+import { plural } from '@/lib/plural';
 
 interface Assignment {
   id: string;
@@ -18,22 +21,51 @@ interface Assignment {
   team: { id: string; name: string } | null;
 }
 
+// Задание от родителя (п.9б «Середина сентября»): цель + сколько тренировок.
+// Прогресс считает сервер по реальным тренировкам с этой целью; кнопки «Готово»
+// нет — выполнить можно только тренировками.
+interface ParentTaskItem {
+  id: string;
+  relation: string;
+  goal: string;
+  target: number;
+  done: number;
+  status: 'ACTIVE' | 'COMPLETED' | 'CANCELED';
+  dueDate: string;
+}
+
 export default function MyAssignmentsPage() {
   const router = useRouter();
   const [list, setList] = useState<Assignment[]>([]);
+  const [parentTasks, setParentTasks] = useState<ParentTaskItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'active' | 'completed' | 'all'>('active');
 
   useEffect(() => {
     (async () => {
-      const res = await fetch('/api/assignments?role=athlete', { cache: 'no-store' });
+      const [res, pres] = await Promise.all([
+        fetch('/api/assignments?role=athlete', { cache: 'no-store' }),
+        fetch('/api/parent-tasks', { cache: 'no-store' }).catch(() => null),
+      ]);
       if (res.ok) {
         const d = await res.json();
         setList(d.assignments ?? []);
       }
+      if (pres?.ok) {
+        const d = await pres.json();
+        setParentTasks(d.tasks ?? []);
+      }
       setLoading(false);
     })();
   }, []);
+
+  const now = new Date();
+  const visibleParentTasks = parentTasks.filter((t) =>
+    filter === 'all' ? true : filter === 'completed' ? t.status === 'COMPLETED' : t.status === 'ACTIVE',
+  );
+  const visibleCoach = list.filter((a) =>
+    filter === 'all' ? true : filter === 'completed' ? a.status === 'COMPLETED' : a.status !== 'COMPLETED',
+  );
 
   const handleStart = async (a: Assignment) => {
     await fetch(`/api/assignments/${a.id}/status`, {
@@ -104,7 +136,7 @@ export default function MyAssignmentsPage() {
 
         <div className="mt-5 flex flex-col gap-3">
           {loading && <div className="text-center py-6" style={{ color: '#AEABBB' }}>Загрузка...</div>}
-          {!loading && list.length === 0 && (
+          {!loading && list.length === 0 && parentTasks.length === 0 && (
             <div
               className="text-center py-10 font-overpass"
               style={{ color: '#AEABBB', fontSize: 14, background: '#060919', borderRadius: 14, border: '1px dashed #26252F' }}
@@ -112,7 +144,7 @@ export default function MyAssignmentsPage() {
               Заданий пока нет
             </div>
           )}
-          {!loading && list.length > 0 && list.filter((a) => filter === 'all' ? true : filter === 'completed' ? a.status === 'COMPLETED' : a.status !== 'COMPLETED').length === 0 && (
+          {!loading && list.length + parentTasks.length > 0 && visibleCoach.length + visibleParentTasks.length === 0 && (
             <div
               className="text-center py-10 font-overpass"
               style={{ color: '#AEABBB', fontSize: 14, background: '#060919', borderRadius: 14, border: '1px dashed #26252F' }}
@@ -120,7 +152,52 @@ export default function MyAssignmentsPage() {
               Нет заданий в этой категории
             </div>
           )}
-          {list.filter((a) => filter === 'all' ? true : filter === 'completed' ? a.status === 'COMPLETED' : a.status !== 'COMPLETED').map((a) => (
+          {visibleParentTasks.map((t) => {
+            const state = taskDisplayState(t, now);
+            const done = Math.min(t.done, t.target);
+            return (
+              <div key={t.id} style={{ background: '#060919', border: '1px solid rgba(161,255,74,0.25)', borderRadius: 14, padding: '14px 16px' }}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="font-overpass" style={{ color: '#A1FF4A', fontSize: 12, fontWeight: 800 }}>
+                    {relationWords(t.relation).gave}
+                  </div>
+                  <ParentTaskBadge state={state} />
+                </div>
+                <div className="font-overpass mt-2 flex items-center gap-2" style={{ fontWeight: 800, fontSize: 14 }}>
+                  <GoalIcon goal={t.goal} size={20} color="#A1FF4A" />
+                  {goalLabel(t.goal)}
+                </div>
+                <div className="mt-3" style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.round((done / t.target) * 100)}%`, height: '100%', background: '#A1FF4A', borderRadius: 999 }} />
+                </div>
+                <div className="font-overpass mt-2 flex justify-between" style={{ color: '#9B99AA', fontSize: 11 }}>
+                  <span>
+                    {done} из {t.target} {plural(t.target, ['тренировки', 'тренировок', 'тренировок'])}
+                  </span>
+                  <span>Срок: {new Date(t.dueDate).toLocaleDateString('ru-RU')}</span>
+                </div>
+                {t.status === 'ACTIVE' && (
+                  <button
+                    onClick={() => router.push(`/training/assessment?goal=${t.goal}`)}
+                    className="w-full mt-3 font-overpass uppercase"
+                    style={{
+                      background: '#A1FF4A',
+                      color: '#101530',
+                      fontWeight: 900,
+                      fontSize: 12,
+                      padding: '10px 16px',
+                      borderRadius: 999,
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Тренироваться
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          {visibleCoach.map((a) => (
             <div key={a.id} style={{ background: '#060919', border: '1px solid #26252F', borderRadius: 14, padding: '14px 16px' }}>
               <div className="flex items-center justify-between">
                 <div className="font-overpass" style={{ color: '#AEABBB', fontSize: 12 }}>
@@ -184,6 +261,21 @@ export default function MyAssignmentsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function ParentTaskBadge({ state }: { state: 'active' | 'completed' | 'expired' | 'canceled' }) {
+  const map = {
+    active:    { label: 'В работе',   bg: '#1a1f3a', fg: '#A1FF4A' },
+    completed: { label: 'Готово',     bg: '#A1FF4A', fg: '#101530' },
+    expired:   { label: 'Срок вышел', bg: '#1a1f3a', fg: '#FF8C4A' },
+    canceled:  { label: 'Отменено',   bg: '#1a1f3a', fg: '#AEABBB' },
+  } as const;
+  const s = map[state];
+  return (
+    <span className="font-overpass uppercase shrink-0" style={{ background: s.bg, color: s.fg, padding: '3px 9px', borderRadius: 999, fontSize: 9, fontWeight: 900, letterSpacing: '0.05em' }}>
+      {s.label}
+    </span>
   );
 }
 

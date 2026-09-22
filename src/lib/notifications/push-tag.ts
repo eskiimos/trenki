@@ -13,6 +13,8 @@ export const LEGACY_PUSH_TAG = 'trenki-notification';
 export type PushKind =
   /** Атлету: тренер назначил задание. */
   | 'assignment-new'
+  /** Ребёнку: родитель дал задание (ключ — id задания: разные задания не затирают друг друга). */
+  | 'parent-task-new'
   /** Тренеру: атлет закрыл задание. */
   | 'assignment-done'
   /**

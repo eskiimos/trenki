@@ -1004,13 +1004,18 @@ const TrainingsSection = () => {
     // всегда ИИ-тренер: шаг тура просит нажать именно его.
     const { isActive: tourActive } = useTour();
     const [activeTasks, setActiveTasks] = useState<number | null>(null);
+    // Одно задание от родителя — показываем его прямо на кнопке
+    const [singleTask, setSingleTask] = useState<{ caption: string; title: string } | null>(null);
     useEffect(() => {
         let cancelled = false;
         (async () => {
             try {
                 const res = await fetch('/api/assignments/summary', { cache: 'no-store' });
                 const data = res.ok ? await res.json() : null;
-                if (!cancelled) setActiveTasks(Number(data?.active) || 0);
+                if (!cancelled) {
+                    setActiveTasks(Number(data?.active) || 0);
+                    setSingleTask(data?.single ?? null);
+                }
             } catch {
                 if (!cancelled) setActiveTasks(0);
             }
@@ -1139,9 +1144,13 @@ const TrainingsSection = () => {
                 >
                     <div style={{ width: 40, height: 40, borderRadius: 999, background: 'rgba(161,255,74,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><ClipboardList size={20} color="#A1FF4A" aria-hidden /></div>
                     <div className="text-left flex-1 min-w-0">
-                        <div style={{ color: '#A1FF4A', fontSize: 11, fontFamily: 'Overpass', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Мои задания</div>
+                        <div style={{ color: '#A1FF4A', fontSize: 11, fontFamily: 'Overpass', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>
+                            {singleTask ? singleTask.caption : 'Мои задания'}
+                        </div>
                         <div style={{ color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                            {activeTasks} {plural(activeTasks, ['задание', 'задания', 'заданий'])} {plural(activeTasks, ['ждёт', 'ждут', 'ждут'])}
+                            {singleTask
+                                ? singleTask.title
+                                : `${activeTasks} ${plural(activeTasks, ['задание', 'задания', 'заданий'])} ${plural(activeTasks, ['ждёт', 'ждут', 'ждут'])}`}
                         </div>
                     </div>
                     <ChevronRight size={20} color="#A1FF4A" aria-hidden />

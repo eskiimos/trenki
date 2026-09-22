@@ -51,6 +51,18 @@ export default function TrainingAssessmentPage() {
     energyState: null as EnergyStateValue | null,
   });
 
+  // Пришли из задания родителя («Тренироваться») — цель уже выбрана за атлета:
+  // /training/assessment?goal=POWERFUL_SHOT. Читаем из location, а не через
+  // useSearchParams, чтобы не заворачивать страницу в Suspense.
+  useEffect(() => {
+    try {
+      const goal = new URLSearchParams(window.location.search).get('goal');
+      if (goal && GOAL_LABELS[goal]) {
+        setFormData((prev) => (prev.goal ? prev : { ...prev, goal: goal as TrainingGoal }));
+      }
+    } catch {}
+  }, []);
+
   // C-4: предложение сделать тренировку из активного цикла вместо быстрой.
   const [cycleOffer, setCycleOffer] = useState<{ sessionId: string; label: string } | null>(null);
   // Если отказался от цикла — день закроем, только когда быстрая реально создана
@@ -59,6 +71,11 @@ export default function TrainingAssessmentPage() {
 
   useEffect(() => {
     if (tourActive) return; // в туре не предлагаем цикл (см. tourActive выше)
+    // Из задания родителя (?goal=) цикл не предлагаем: засчитывается только
+    // тренировка с целью задания, а у дня цикла своя цель.
+    try {
+      if (new URLSearchParams(window.location.search).has('goal')) return;
+    } catch {}
     let cancelled = false;
     (async () => {
       try {
