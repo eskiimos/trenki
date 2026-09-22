@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/admin/pose-references/[videoId]/frames — кадры эталона (gzip JSON)
- * через наш сервер: подписанные ссылки Cloudinary браузер по CSP не качает.
+ * через наш сервер из закрытого S3 (pose/references/…).
  * Клиент распаковывает сам (DecompressionStream). Только админ.
  */
 export async function GET(request: NextRequest, ctx: { params: Promise<{ videoId: string }> }) {

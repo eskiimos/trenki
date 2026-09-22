@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodePoseFrames, encodePoseFrames } from '@/lib/pose-storage';
+import { decodePoseFrames, encodePoseFrames, poseFramesKey, rawAssetId } from '@/lib/pose-storage';
 
 describe('pose-storage codec', () => {
   it('encode/decode round-trip восстанавливает фрейм-документ', () => {
@@ -47,5 +47,24 @@ describe('pose-storage codec', () => {
     });
     const back = decodePoseFrames(payload);
     expect(Object.keys(back).sort()).toEqual(['fps', 'frames']);
+  });
+});
+
+describe('rawAssetId — id raw-ассета в Cloudinary', () => {
+  it('дописывает расширение, под которым Cloudinary хранит файл (иначе скачивание — 404)', () => {
+    expect(rawAssetId('trenki/pose-references/abc')).toBe('trenki/pose-references/abc.json.gz');
+  });
+  it('не дублирует уже полный id', () => {
+    expect(rawAssetId('trenki/pose-sessions/x.json.gz')).toBe('trenki/pose-sessions/x.json.gz');
+  });
+});
+
+describe('poseFramesKey — закрытые объекты в S3', () => {
+  it('сессии и эталоны — в своих папках, с расширением', () => {
+    expect(poseFramesKey('sessions', 'cmx1')).toBe('pose/sessions/cmx1.json.gz');
+    expect(poseFramesKey('references', 'cmv9')).toBe('pose/references/cmv9.json.gz');
+  });
+  it('id не может выйти из папки', () => {
+    expect(poseFramesKey('sessions', '../../videos/x')).toBe('pose/sessions/videosx.json.gz');
   });
 });

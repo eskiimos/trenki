@@ -32,12 +32,12 @@ SESSION_SECRET=... npm test  # если ещё не в env
 ```
 Покрывают чистые библиотеки. БД не подключается — для интеграционных тестов нужна отдельная инфраструктура.
 
-## Pose-сессии (MediaPipe)
-- Запись кадров скелета — `PoseTracker.tsx` → `POST /api/pose-sessions`.
-- Кадры пакуются в gzip-JSON и заливаются в Cloudinary как `resource_type: 'raw'`, `type: 'authenticated'`. В БД пишется только `framesUrl` (Cloudinary public_id) и `framesEncoding`.
-- Доступ: атлет видит только свои сессии, тренер — только сессии атлетов своих команд со статусом ACTIVE (`src/lib/pose-access.ts` + `src/lib/coach/athlete-access.ts`); одной роли COACH недостаточно — это был IDOR. Оценку (PATCH) ставит только тренер команды атлета. На чтение (`GET /api/pose-sessions/[id]`) возвращается signed URL с TTL 1 час. Клиент сам качает и распаковывает (`DecompressionStream('gzip')`).
-- Старые сессии до миграции лежат в `PoseSession.frames` (JSONB). Они продолжают работать через legacy-ветку, пока не пройдёт бэкфилл — `tsx prisma/migrate-pose-frames-to-cloudinary.ts [--delete-source]`.
-- Без `CLOUDINARY_*` env-переменных запись pose-сессий деградирует до старого JSONB-режима с warning'ом — нормально для dev, в проде Cloudinary должен быть настроен.
+## Pose-данные (MediaPipe): сессии атлетов и эталоны тренеров
+- Запись кадров скелета — `PoseTracker.tsx` → `POST /api/pose-sessions`. Эталоны движений тренеров — `/admin/pose` (обработка в браузере админа, `src/components/admin/pose/`).
+- Кадры — gzip-JSON в НАШЕМ S3 закрытым объектом (`pose/sessions/<id>.json.gz`, `pose/references/<videoId>.json.gz`, `src/lib/pose-storage.ts`). В БД — только `framesUrl` (`s3://…`) и сводка. Наружу кадры отдаёт только наш API после проверки доступа. До 22.09 кадры лежали в Cloudinary — перенос `/api/cron/pose-storage-migrate`.
+- Доступ: атлет видит только свои сессии, тренер — только сессии атлетов своих команд со статусом ACTIVE (`src/lib/pose-access.ts` + `src/lib/coach/athlete-access.ts`); одной роли COACH недостаточно — это был IDOR. Оценку (PATCH) ставит только тренер команды атлета. На чтение `GET /api/pose-sessions/[id]` отдаёт ссылку на `/api/pose-sessions/[id]/frames` (та же проверка доступа, gzip из S3). Клиент распаковывает сам (`DecompressionStream('gzip')`).
+- Совсем старые сессии лежат в `PoseSession.frames` (JSONB) — их тоже переносит `/api/cron/pose-storage-migrate`, до переноса работает legacy-ветка.
+- Без `S3_*` env-переменных запись pose-сессий деградирует до старого JSONB-режима с warning'ом (эталоны — в `.pose-dev/`) — нормально для dev, в проде S3 должен быть настроен.
 
 ## Видео (S3 + серверная обработка)
 - Новые видео и шортсы заливаются только файлом в наше S3 (`s3://uploads/…`), Kinescope для новых записей скрыт (решение владельца 16.09.2026). Старые Kinescope-записи читаются как раньше.
@@ -49,7 +49,7 @@ SESSION_SECRET=... npm test  # если ещё не в env
 - Не возвращать чтение `telegramId`/`userId` из query/body — это IDOR.
 - Не удалять deprecated-поля схемы (Profile.strength/endurance/... и Video.muscleGroupOld/*) без бэкфилла и тестов — там реальные данные пользователей.
 - Не запускать `prisma migrate reset`/`prisma db push --accept-data-loss` на проде.
-- Не возвращать pose-кадры в БД напрямую — только в Cloudinary.
+- Не возвращать pose-кадры в БД напрямую — только в S3 (решение владельца 22.09: pose-данные переехали из Cloudinary в S3).
 
 ## Что ещё в долгу (после P0+P1)
 - Удалить deprecated-поля Profile/Video после бэкфилла.

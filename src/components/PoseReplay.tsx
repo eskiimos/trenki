@@ -24,7 +24,7 @@ interface SessionPayload {
 }
 
 /**
- * Скачивает gzip-сжатый JSON с Cloudinary и распаковывает через нативный
+ * Скачивает gzip-сжатый JSON (наш /api/pose-sessions/[id]/frames, из S3) и распаковывает через нативный
  * DecompressionStream (поддерживается всеми текущими браузерами и iOS Safari 16+).
  */
 async function fetchPoseFramesFromUrl(url: string): Promise<number[][]> {
@@ -77,7 +77,7 @@ export default function PoseReplay({ sessionId, open }: Props) {
           framesEncoding?: string | null;
         };
 
-        // Новые сессии — кадры лежат в Cloudinary, бэкенд дал signed URL.
+        // Новые сессии — кадры в нашем S3, бэкенд дал ссылку на свой /frames.
         // Старые (до бэкфилла) — frames приходят inline в `frames`.
         let frames: number[][] = [];
         if (s.framesUrl) {

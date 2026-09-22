@@ -1011,14 +1011,14 @@ model TrainingAssignment {
 
 // Эталон движений тренера по видео (п.1 «Середина сентября», пилот трекинга):
 // видео прогоняется через MediaPipe Pose (heavy) в браузере админа, точки
-// скелета по кадрам лежат в Cloudinary (как и pose-сессии — не в БД), здесь
+// скелета по кадрам лежат в нашем S3 (pose/references/, как и pose-сессии — не в БД), здесь
 // только ссылка и сводка. Одно видео — один эталон; повторная обработка
 // перезаписывает. Смотрят пока только админы (/admin/pose).
 model PoseReference {
   id               String   @id @default(cuid())
   videoId          String   @unique
   video            Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
-  framesUrl        String // Cloudinary public_id (или dev-путь без Cloudinary)
+  framesUrl        String // s3://pose/references/<videoId>.json.gz (dev без S3 — dev:<файл>)
   framesEncoding   String   @default("json-gzip")
   formatVersion    Int      @default(1)
   model            String // pose_landmarker_heavy / _full / _lite
@@ -1043,10 +1043,9 @@ model PoseSession {
   avgConfidence  Float?
   fps            Int? // Частота сэмплирования скелета (кадров в секунду)
   /// DEPRECATED. Раньше хранили массив до 9000 кадров прямо в Postgres JSONB.
-  /// Новые сессии пишут в Cloudinary (см. framesUrl). Старые читаем из этой колонки,
-  /// пока не пройдёт бэкфилл.
+  /// Новые сессии пишут в S3 (см. framesUrl). Старые переносит /api/cron/pose-storage-migrate.
   frames         Json?
-  /// Cloudinary public_id raw-ассета с gzip-JSON. signed URL генерируется на каждый GET.
+  /// s3://pose/sessions/<id>.json.gz (до 22.09 — Cloudinary public_id). Кадры отдаёт /api/pose-sessions/[id]/frames.
   framesUrl      String?
   /// Формат payload (`json-gzip` пока единственный поддерживаемый).
   framesEncoding String?

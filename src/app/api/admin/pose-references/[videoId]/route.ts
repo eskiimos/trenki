@@ -124,7 +124,7 @@ export async function PUT(request: NextRequest, ctx: Ctx) {
     return NextResponse.json({ reference });
   } catch (error) {
     if (error instanceof PoseStorageNotConfigured) {
-      return NextResponse.json({ error: 'Хранилище эталонов (Cloudinary) не настроено' }, { status: 503 });
+      return NextResponse.json({ error: 'Хранилище (S3) не настроено' }, { status: 503 });
     }
     logger.error('pose reference save failed', error, { videoId: video.id });
     return NextResponse.json({ error: 'Не удалось сохранить эталон' }, { status: 500 });

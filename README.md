@@ -25,7 +25,7 @@ PWA для персональных тренировок юных хоккеис
 - **Next.js 16** (App Router, standalone), **React 19**, TypeScript strict, **Tailwind 4**.
 - **Prisma 6** + PostgreSQL. Клиент генерируется в `src/generated/prisma`, миграции пишутся вручную в `prisma/migrations/<timestamp>_<name>/migration.sql`.
 - **jose** — JWT сессий (HS256). **Resend** — письма. **web-push** — пуши.
-- Хранилища: **S3 (reg.ru)** для видео и шортсов, **Cloudinary** для аватаров, обложек и pose-кадров, **Kinescope** — для старого контента.
+- Хранилища: **S3 (reg.ru)** для видео и шортсов, **Cloudinary** для аватаров и обложек, **Kinescope** — для старого контента.
 - **MediaPipe Tasks Vision** (с CDN) — запись скелета в pose-сессиях.
 - **T-Bank** интернет-эквайринг, чеки 54-ФЗ через облачную кассу банка.
 - **Vitest** — unit-тесты, **ESLint 9** (flat config).
@@ -74,7 +74,7 @@ npm test && npm run lint && npx tsc --noEmit
 | Крон | `CRON_SECRET` | Bearer для `/api/cron/*` |
 | Почта | `RESEND_API_KEY` | письма; в dev не нужен |
 | Push | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | web-push; ключи обязательны, subject по умолчанию указывает на старый домен, задавайте `mailto:admin@trenki.app` |
-| Cloudinary | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | аватары, обложки, pose-кадры |
+| Cloudinary | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | аватары, обложки |
 | S3 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | видео и шортсы; нужны все пять |
 | Kinescope | `KINESCOPE_API_KEY` | чтение старого контента (ссылки, превью, длительность); новые видео и шортсы туда не заливаются, поле ссылки в админке — только у старых записей |
 | Оплата | `TBANK_TERMINAL_KEY`, `TBANK_PASSWORD`, `TBANK_API_BASE` | боевая касса; `API_BASE` необязателен, по умолчанию `https://securepay.tinkoff.ru/v2` |
@@ -123,7 +123,8 @@ instrumentation.ts проверка обязательных env при стар
 
 - Быстрая: `/training/assessment` → `POST /api/training/generate-v3` → `/training/workout`. Алгоритм в `src/lib/training-algorithm-v3.ts`: матрицы целей и типов нагрузки, ступени сложности по потенциалу, RPE, возрастные модификаторы. Завершение начисляет прирост характеристик (`CharacteristicHistory`).
 - Микроцикл: `src/lib/microcycle/*`. Неделя из 5 дней с намерением (`MicrocycleIntent`), цель дня восстанавливается из намерения и номера цикла, быстрая тренировка может закрыть день цикла. Автосборка — крон по воскресеньям для профилей с `autoGenerateMicrocycle`.
-- Pose-сессии: `PoseTracker` пишет кадры скелета (3 fps, до 2 минут) → `POST /api/pose-sessions` → gzip-JSON в Cloudinary (`framesUrl`), тренер смотрит через signed URL на час. В атлетском плеере кнопка камеры сейчас скрыта, у тренера просмотр работает.
+- Pose-сессии: `PoseTracker` пишет кадры скелета (3 fps, до 2 минут) → `POST /api/pose-sessions` → gzip-JSON в S3 (`pose/sessions/…`), тренер смотрит через `/api/pose-sessions/[id]/frames`. В атлетском плеере кнопка камеры сейчас скрыта.
+- Эталоны движений тренеров: `/admin/pose` — видео прогоняется через MediaPipe Pose (heavy) в браузере админа, кадры в S3 (`pose/references/…`), просмотр со скелетом и графиками углов.
 
 ### Геймификация
 
@@ -156,7 +157,7 @@ instrumentation.ts проверка обязательных env при стар
 | Шортсы | S3, публично | прямая ссылка |
 | Обложки | Cloudinary (`/api/upload`, `kind=short` → 9:16) или S3 | прямая ссылка |
 | Аватары, логотипы клубов | Cloudinary | прямая ссылка |
-| Pose-кадры | Cloudinary raw, authenticated | signed URL на час |
+| Pose-кадры (сессии, эталоны) | S3 закрытый, `pose/…` | через наш API после проверки доступа |
 | Старый контент | Kinescope | через `/api/kinescope/metadata`; новое туда не заливается |
 
 Обработка видео: админ заливает любой файл с телефона или камеры (mov/mp4/m4v/webm до 4 ГБ) в `s3://uploads/…`. При сохранении карточки видео или шортса создаётся задача `MediaJob`. Воркер (`src/lib/media/worker.ts`) крутится внутри процесса Next, по одной задаче:
@@ -179,6 +180,7 @@ instrumentation.ts проверка обязательных env при стар
 | `microcycle-reminders` | каждую минуту | напоминания по дням цикла; заодно вечерние вовлекающие пуши (серия, пропуск 2 дня, новичкам, «запылились») по местному времени игрока — время в `/admin/reminders` |
 | `subscription-expiry` | раз в час или в день | пуш «подписка скоро закончится» за 3 дня; молчит при paywall `off` |
 | `engagement-nudges` | ежедневно (устарело) | то же, что вечерние пуши из `microcycle-reminders`; оставлен для старой строки crontab и ручного запуска |
+| `pose-storage-migrate` | вручную, разово | перенос pose-кадров (сессии, эталоны) из Cloudinary/JSONB в S3; `?deleteSource=1` удаляет исходники в Cloudinary |
 | `inactivity-email` | ежедневно | письмо неактивным; за рубильником `emailCampaigns.enabled` |
 | `microcycle-autogenerate` | воскресенье | сборка микроцикла на неделю |
 | `parent-digest` | воскресенье 18:00 | дайджест родителям |

@@ -1,48 +1,30 @@
 /**
- * Хранилище записанных pose-сессий (скелет атлета).
+ * Хранилище pose-данных: записанные сессии атлетов (скелет с камеры) и эталоны
+ * движений тренеров.
  *
- * Раньше: `PoseSession.frames` — JSONB-колонка с массивом до 9000 кадров (~5–10 МБ
- * на сессию). При нескольких тысячах сессий — десятки ГБ в Postgres.
+ * Кадры сериализуем в JSON, gzip-сжимаем и кладём в НАШ S3 (reg.ru) закрытым
+ * объектом: pose/sessions/<id>.json.gz, pose/references/<videoId>.json.gz. В БД
+ * — только ссылка `s3://pose/...` и сводка. Наружу объект не отдаётся: клиент
+ * получает кадры через наш API после проверки доступа (src/lib/pose-access.ts).
  *
- * Сейчас: сериализуем массив кадров в JSON, gzip-сжимаем и заливаем в Cloudinary
- * как private raw-ассет. В БД храним только `framesUrl` и `framesEncoding`.
- *
- * Безопасность:
- *  - Тип ассета `authenticated`: публичный URL без подписи возвращает 401.
- *  - На GET /api/pose-sessions/[id] бэкенд проверяет доступ (владелец сессии или
- *    тренер его ACTIVE-команды, см. src/lib/pose-access.ts — одной роли COACH
- *    недостаточно, это был IDOR) и подписывает временный URL (TTL 1 час) через
- *    `cloudinary.utils.private_download_url`.
+ * История: до 22.09 кадры лежали в Cloudinary (raw, authenticated), а ещё
+ * раньше — в JSONB-колонке PoseSession.frames. Старые записи переносит
+ * /api/cron/pose-storage-migrate; до переноса они читаются отсюда же
+ * (loadPoseFrames понимает и старые Cloudinary-id).
  */
 
 import { v2 as cloudinary } from 'cloudinary';
 import { gzipSync, gunzipSync } from 'zlib';
+import { deleteS3ObjectStrict, getObjectBuffer, getS3Config, isS3Url, putObjectBuffer, s3KeyFromUrl } from '@/lib/s3';
 
-const CLOUDINARY_FOLDER = 'trenki/pose-sessions';
 export const POSE_FRAMES_ENCODING = 'json-gzip';
-const SIGNED_URL_TTL_SEC = 60 * 60; // 1 час
+const RAW_FORMAT = 'json.gz';
 
-function ensureConfigured(): void {
-  if (
-    !process.env.CLOUDINARY_CLOUD_NAME ||
-    !process.env.CLOUDINARY_API_KEY ||
-    !process.env.CLOUDINARY_API_SECRET
-  ) {
-    throw new Error('Cloudinary не настроен (CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET)');
-  }
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-  });
-}
+export type PoseFramesKind = 'sessions' | 'references';
 
+/** S3 настроен — pose-данные можно сохранять. */
 export function isPoseStorageConfigured(): boolean {
-  return Boolean(
-    process.env.CLOUDINARY_CLOUD_NAME &&
-      process.env.CLOUDINARY_API_KEY &&
-      process.env.CLOUDINARY_API_SECRET,
-  );
+  return getS3Config() !== null;
 }
 
 export interface PoseFramesDocument {
@@ -50,10 +32,7 @@ export interface PoseFramesDocument {
   frames: number[][];
 }
 
-/**
- * Сериализует кадры (JSON → gzip → Buffer). Возвращает payload и его размер
- * (для метрик/лимитов).
- */
+/** Кадры сессии → gzip JSON. */
 export function encodePoseFrames(doc: PoseFramesDocument): Buffer {
   const json = Buffer.from(JSON.stringify(doc), 'utf8');
   return gzipSync(json, { level: 9 });
@@ -71,69 +50,70 @@ export function decodePoseFrames(buf: Buffer): PoseFramesDocument {
   };
 }
 
-/**
- * Складываем gzip-payload в Cloudinary. Возвращаем public_id, по которому
- * потом подпишем URL.
- */
-export async function uploadPoseFrames(
-  sessionId: string,
-  payload: Buffer,
-  opts: { folder?: string } = {},
-): Promise<string> {
-  ensureConfigured();
-  // folder — для эталонов тренеров (trenki/pose-references), по умолчанию — сессии атлетов
-  const publicId = `${opts.folder ?? CLOUDINARY_FOLDER}/${sessionId}`;
-  await new Promise<void>((resolve, reject) => {
-    cloudinary.uploader
-      .upload_stream(
-        {
-          resource_type: 'raw',
-          type: 'authenticated', // публичный URL без подписи — 401
-          public_id: publicId,
-          overwrite: true,
-          // gzip-payload — храним как есть.
-          format: 'json.gz',
-        },
-        (err) => (err ? reject(err) : resolve()),
-      )
-      .end(payload);
-  });
-  return publicId;
+/** Ключ объекта в S3 для записи сессии или эталона. */
+export function poseFramesKey(kind: PoseFramesKind, id: string): string {
+  return `pose/${kind}/${id.replace(/[^a-zA-Z0-9_-]/g, '')}.${RAW_FORMAT}`;
 }
 
-/**
- * Возвращает signed-URL на чтение pose-кадров. Только владелец/тренер должны
- * получать этот URL — проверка делается выше по стеку.
- */
-export function signPoseFramesUrl(publicId: string): string {
-  ensureConfigured();
-  return cloudinary.utils.private_download_url(publicId, 'json.gz', {
-    resource_type: 'raw',
-    type: 'authenticated',
-    expires_at: Math.floor(Date.now() / 1000) + SIGNED_URL_TTL_SEC,
-  });
+/** Сохранить gzip-кадры в S3; возвращает ссылку для БД (`s3://pose/...`). */
+export async function savePoseFrames(kind: PoseFramesKind, id: string, gzip: Buffer): Promise<string> {
+  const key = poseFramesKey(kind, id);
+  await putObjectBuffer(key, gzip, 'application/gzip');
+  return `s3://${key}`;
 }
 
-/**
- * Скачивает gzip-payload (для бэкфилла и серверного fallback'а).
- */
-export async function downloadPoseFrames(publicId: string): Promise<Buffer> {
-  ensureConfigured();
-  const url = signPoseFramesUrl(publicId);
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Cloudinary download failed: HTTP ${res.status}`);
+/** Прочитать gzip-кадры по ссылке из БД: S3 или (до переноса) старый Cloudinary-id. */
+export async function loadPoseFrames(framesUrl: string): Promise<Buffer> {
+  if (isS3Url(framesUrl)) {
+    const key = s3KeyFromUrl(framesUrl);
+    if (!key) throw new Error('pose frames: пустой ключ S3');
+    return getObjectBuffer(key);
   }
-  return Buffer.from(await res.arrayBuffer());
+  return downloadLegacyCloudinary(framesUrl);
 }
 
+/** Удалить кадры по ссылке из БД (S3 или старый Cloudinary). */
+export async function deletePoseFrames(framesUrl: string): Promise<void> {
+  if (isS3Url(framesUrl)) {
+    await deleteS3ObjectStrict(framesUrl);
+    return;
+  }
+  cloudinaryConfig();
+  await cloudinary.uploader.destroy(rawAssetId(framesUrl), { resource_type: 'raw', type: 'authenticated' });
+}
+
+// ── Старые записи в Cloudinary (до 22.09) — только чтение и удаление для переноса ──
+
 /**
- * Удалить ассет (для скрипта бэкфилла, если что-то пошло не так).
+ * Полный id raw-ассета в Cloudinary. При загрузке с format:'json.gz' Cloudinary
+ * дописывал расширение к public_id (проверено на проде: хранится
+ * «…/<id>.json.gz»), а в БД лежит id без расширения. Для raw скачивание и
+ * удаление требуют именно полный id — с «format» отдельно API отвечал 404.
  */
-export async function deletePoseFrames(publicId: string): Promise<void> {
-  ensureConfigured();
-  await cloudinary.uploader.destroy(publicId, {
+export function rawAssetId(publicId: string): string {
+  return publicId.endsWith(`.${RAW_FORMAT}`) ? publicId : `${publicId}.${RAW_FORMAT}`;
+}
+
+function cloudinaryConfig(): void {
+  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    throw new Error('Cloudinary не настроен — старую запись не прочитать');
+  }
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+}
+
+async function downloadLegacyCloudinary(publicId: string): Promise<Buffer> {
+  cloudinaryConfig();
+  // format не передаём: у raw он уже в id (rawAssetId)
+  const url = cloudinary.utils.private_download_url(rawAssetId(publicId), undefined as unknown as string, {
     resource_type: 'raw',
     type: 'authenticated',
+    expires_at: Math.floor(Date.now() / 1000) + 600,
   });
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Cloudinary download failed: HTTP ${res.status}`);
+  return Buffer.from(await res.arrayBuffer());
 }

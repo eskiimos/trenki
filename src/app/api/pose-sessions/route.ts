@@ -8,7 +8,7 @@ import {
   POSE_FRAMES_ENCODING,
   encodePoseFrames,
   isPoseStorageConfigured,
-  uploadPoseFrames,
+  savePoseFrames,
 } from '@/lib/pose-storage';
 import { logger } from '@/lib/logger';
 
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
   const video = await prisma.video.findUnique({ where: { id: videoId } });
   if (!video) return NextResponse.json({ error: 'Video not found' }, { status: 404 });
 
-  // Сначала создаём запись без кадров, чтобы получить cuid для public_id.
+  // Сначала создаём запись без кадров, чтобы получить cuid для ключа в S3.
   const session = await prisma.poseSession.create({
     data: {
       athleteId: auth.user.id,
@@ -73,11 +73,11 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  // Затем — заливаем кадры в Cloudinary, если есть.
+  // Затем — кладём кадры в наш S3 (закрытый объект pose/sessions/<id>.json.gz).
   if (frames && frames.length > 0) {
     if (!isPoseStorageConfigured()) {
       // Dev-фолбэк: храним в БД JSONB, как раньше. Это не должно случаться в проде.
-      logger.warn('pose-frames: Cloudinary не настроен, пишем в БД JSONB');
+      logger.warn('pose-frames: S3 не настроен, пишем в БД JSONB');
       await prisma.poseSession.update({
         where: { id: session.id },
         data: { frames },
@@ -85,11 +85,11 @@ export async function POST(request: NextRequest) {
     } else {
       try {
         const payload = encodePoseFrames({ fps, frames });
-        const publicId = await uploadPoseFrames(session.id, payload);
+        const framesUrl = await savePoseFrames('sessions', session.id, payload);
         await prisma.poseSession.update({
           where: { id: session.id },
           data: {
-            framesUrl: publicId,
+            framesUrl,
             framesEncoding: POSE_FRAMES_ENCODING,
           },
         });

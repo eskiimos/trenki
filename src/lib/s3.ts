@@ -224,6 +224,34 @@ export async function uploadFileToObject(
   }
 }
 
+/**
+ * Небольшой объект из памяти одним PUT (pose-данные: сотни КБ — единицы МБ).
+ * Без ACL — объект закрытый, читается только через наш сервер.
+ */
+export async function putObjectBuffer(key: string, body: Buffer, contentType: string): Promise<void> {
+  const config = requireConfig();
+  await getTransferClient(config).send(
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+      Body: body,
+      ContentLength: body.length,
+      ContentType: contentType,
+    }),
+  );
+}
+
+/** Небольшой объект целиком в память (pose-данные). */
+export async function getObjectBuffer(key: string, signal?: AbortSignal): Promise<Buffer> {
+  const config = requireConfig();
+  const res = await getTransferClient(config).send(
+    new GetObjectCommand({ Bucket: config.bucket, Key: key }),
+    { abortSignal: signal },
+  );
+  if (!res.Body) throw new Error(`S3: пустое тело объекта ${key}`);
+  return Buffer.from(await res.Body.transformToByteArray());
+}
+
 /** Ключи объектов по префиксу (с пагинацией) — для уборки брошенных исходников. */
 export async function listObjects(
   prefix: string,

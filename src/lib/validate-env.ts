@@ -26,9 +26,9 @@ const REQUIRED_IN_PROD: RequiredEnv[] = [
   { name: 'RESEND_API_KEY', reason: 'Email-OTP не отправится — регистрация по email невозможна' },
   { name: 'NEXT_PUBLIC_VAPID_PUBLIC_KEY', reason: 'Подписка на push-уведомления упадёт на клиенте' },
   { name: 'VAPID_PRIVATE_KEY', reason: 'POST /api/push/send вернёт 500' },
-  { name: 'CLOUDINARY_CLOUD_NAME', reason: 'Загрузка превью видео и pose-сессий упадёт' },
-  { name: 'CLOUDINARY_API_KEY', reason: 'Загрузка превью видео и pose-сессий упадёт' },
-  { name: 'CLOUDINARY_API_SECRET', reason: 'Загрузка превью видео и pose-сессий упадёт' },
+  { name: 'CLOUDINARY_CLOUD_NAME', reason: 'Загрузка превью, аватаров и логотипов упадёт' },
+  { name: 'CLOUDINARY_API_KEY', reason: 'Загрузка превью, аватаров и логотипов упадёт' },
+  { name: 'CLOUDINARY_API_SECRET', reason: 'Загрузка превью, аватаров и логотипов упадёт' },
 ];
 
 export interface EnvCheckResult {

@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { requireAuthUser, requireCoach } from '@/lib/coach/guards';
 import { isCoachOfAthlete } from '@/lib/coach/athlete-access';
 import { canReviewPoseSession, canViewPoseSession } from '@/lib/pose-access';
-import { POSE_FRAMES_ENCODING, signPoseFramesUrl } from '@/lib/pose-storage';
+import { POSE_FRAMES_ENCODING } from '@/lib/pose-storage';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +12,8 @@ export const dynamic = 'force-dynamic';
  * Атлет видит только свою сессию, тренер — сессии атлетов своих команд (ACTIVE).
  *
  * Кадры скелета НЕ возвращаются в ответе:
- *  - новые сессии: возвращаем `framesUrl` (signed, TTL 1 час) — клиент сам качает с Cloudinary;
+ *  - новые сессии: возвращаем `framesUrl` — наш же адрес /api/pose-sessions/[id]/frames,
+ *    который отдаёт gzip из закрытого S3 после той же проверки доступа;
  *  - старые сессии (до миграции): возвращаем `frames` напрямую из БД.
  */
 export async function GET(
@@ -43,13 +44,13 @@ export async function GET(
   }
 
   // Не возвращаем сырую `frames` JSON-колонку наружу: она тяжёлая и используется
-  // только как legacy-фолбэк. Вместо неё — signed URL.
+  // только как legacy-фолбэк. Вместо неё — ссылка на наш /frames.
   let framesUrl: string | null = null;
   let framesEncoding: string | null = null;
   let legacyFrames: number[][] | null = null;
 
   if (session.framesUrl) {
-    framesUrl = signPoseFramesUrl(session.framesUrl);
+    framesUrl = `/api/pose-sessions/${session.id}/frames`;
     framesEncoding = session.framesEncoding ?? POSE_FRAMES_ENCODING;
   } else if (session.frames) {
     // Старая сессия: до бэкфилла отдаём кадры напрямую, чтобы плеер тренера
