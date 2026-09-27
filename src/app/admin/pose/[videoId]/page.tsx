@@ -5,6 +5,7 @@ import { AdminPage, PageHeader, AdminCard, SectionTitle, AdminButton } from '@/c
 import { PersonStanding, RefreshCw } from 'lucide-react';
 import ReferenceProcessor from '@/components/admin/pose/ReferenceProcessor';
 import ReferenceViewer from '@/components/admin/pose/ReferenceViewer';
+import type { Segment } from '@/lib/pose/segments';
 
 // Эталон движений одного видео: обработать (в браузере) или посмотреть.
 
@@ -19,6 +20,7 @@ interface Detail {
     durationSec: number;
     detectedRatio: number;
     legsVisibleRatio: number;
+    segments: Segment[] | null;
     updatedAt: string;
   } | null;
 }
@@ -74,13 +76,24 @@ export default function PoseReferencePage({ params }: { params: Promise<{ videoI
               <Stat label="Ноги видны целиком" value={pct(ref.legsVisibleRatio)} hint="таз, колени, голеностопы" />
               <Stat label="Кадров" value={String(ref.frameCount)} hint={`${ref.fps} в секунду`} />
               <Stat
+                label="Рабочих отрезков"
+                value={String(ref.segments?.length ?? 0)}
+                hint="упражнение без объяснений"
+              />
+              <Stat
                 label="Обработано"
                 value={new Date(ref.updatedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
                 hint={ref.model.replace('pose_landmarker_', 'модель ')}
               />
             </div>
           </AdminCard>
-          <ReferenceViewer key={ref.updatedAt} videoId={videoId} playbackUrl={data.playbackUrl} />
+          <ReferenceViewer
+            key={ref.updatedAt}
+            videoId={videoId}
+            playbackUrl={data.playbackUrl}
+            durationMs={Math.round(ref.durationSec * 1000)}
+            segments={ref.segments ?? []}
+          />
           <div>
             <AdminButton type="button" tone="secondary" icon={RefreshCw} onClick={() => setReprocess(true)}>
               Обработать заново
@@ -94,7 +107,7 @@ export default function PoseReferencePage({ params }: { params: Promise<{ videoI
           <SectionTitle>{ref ? 'Обработать заново' : 'Обработать видео'}</SectionTitle>
           <p style={{ color: 'var(--color-muted)', fontSize: 14, lineHeight: 1.5, margin: '0 0 16px' }}>
             Браузер скачает видео, загрузит модель распознавания и пройдёт по видео 10 раз в секунду. На компьютере это
-            примерно 1–2 минуты на минуту видео. Результат сохранится на платформе{ref ? ' и заменит текущий эталон' : ''}.
+            примерно 1–2 минуты на минуту видео. Результат сохранится на платформе{ref ? ' и заменит текущий эталон вместе с разметкой рабочих отрезков' : ''}.
           </p>
           <ReferenceProcessor
             videoId={videoId}

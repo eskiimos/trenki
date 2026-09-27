@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { gunzipSync } from 'zlib';
 import { prisma } from '@/lib/prisma';
+import type { Prisma } from '@/generated/prisma';
 import { requireAdminAsync } from '@/lib/admin-session';
 import { getSessionUserId } from '@/lib/auth-server';
 import { resolveVideoUrl } from '@/lib/s3';
 import { logger } from '@/lib/logger';
 import { referenceSource } from '@/lib/pose/reference-source';
 import { PoseStorageNotConfigured, saveReferenceFrames } from '@/lib/pose/reference-storage';
+import { detectSegments } from '@/lib/pose/segments';
 import {
   MAX_REFERENCE_GZIP_BYTES,
   MAX_REFERENCE_JSON_BYTES,
@@ -27,6 +29,7 @@ const REFERENCE_SELECT = {
   durationSec: true,
   detectedRatio: true,
   legsVisibleRatio: true,
+  segments: true,
   updatedAt: true,
 } as const;
 
@@ -104,6 +107,9 @@ export async function PUT(request: NextRequest, ctx: Ctx) {
   if (invalid) return NextResponse.json({ error: invalid }, { status: 400 });
 
   const summary = summarizeReference(doc);
+  // Рабочие отрезки размечаем сразу: без них оценка считала бы объяснения
+  // частью упражнения. Админ потом правит их на таймлайне.
+  const segments = detectSegments(doc.frames, doc.durationMs);
   try {
     const framesUrl = await saveReferenceFrames(video.id, gzip);
     const data = {
@@ -112,6 +118,8 @@ export async function PUT(request: NextRequest, ctx: Ctx) {
       model: doc.model,
       fps: doc.fps,
       ...summary,
+      // Prisma ждёт JSON-значение, а не наш тип
+      segments: segments as unknown as Prisma.InputJsonValue,
       createdById: await getSessionUserId(request),
     };
     const reference = await prisma.poseReference.upsert({
@@ -120,7 +128,7 @@ export async function PUT(request: NextRequest, ctx: Ctx) {
       update: data,
       select: REFERENCE_SELECT,
     });
-    logger.info('pose reference saved', { videoId: video.id, ...summary, gzipBytes: gzip.length });
+    logger.info('pose reference saved', { videoId: video.id, ...summary, segments: segments.length, gzipBytes: gzip.length });
     return NextResponse.json({ reference });
   } catch (error) {
     if (error instanceof PoseStorageNotConfigured) {

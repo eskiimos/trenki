@@ -1027,6 +1027,10 @@ model PoseReference {
   durationSec      Float
   detectedRatio    Float // доля кадров, где тренер найден
   legsVisibleRatio Float // доля кадров, где таз, колени и голеностопы видны
+  /// Рабочие отрезки видео [{startMs,endMs}] — только упражнение, без объяснений
+  /// и пауз. Считаются автоматически при обработке, правятся админом на таймлайне.
+  /// По ним же в будущем оценивается выполнение у ребёнка.
+  segments         Json?
   createdById      String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt

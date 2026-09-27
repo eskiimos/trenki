@@ -8,8 +8,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { AdminButton } from '@/components/admin/ui';
 import { ANGLE_LABELS, frameAngles, frameIndexAt, type AngleKey, type PoseReferenceDoc } from '@/lib/pose/reference';
+import { detectSegments, type Segment } from '@/lib/pose/segments';
 import { containRect, drawSkeleton } from './draw';
 import AngleChart from './AngleChart';
+import SegmentTimeline from './SegmentTimeline';
 
 const LEFT = '#3987e5';
 const RIGHT = '#d95926';
@@ -21,7 +23,17 @@ async function loadDoc(videoId: string): Promise<PoseReferenceDoc> {
   return JSON.parse(text) as PoseReferenceDoc;
 }
 
-export default function ReferenceViewer({ videoId, playbackUrl }: { videoId: string; playbackUrl: string }) {
+export default function ReferenceViewer({
+  videoId,
+  playbackUrl,
+  durationMs,
+  segments,
+}: {
+  videoId: string;
+  playbackUrl: string;
+  durationMs: number;
+  segments: Segment[];
+}) {
   const [doc, setDoc] = useState<PoseReferenceDoc | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showSkeleton, setShowSkeleton] = useState(true);
@@ -132,6 +144,28 @@ export default function ReferenceViewer({ videoId, playbackUrl }: { videoId: str
         {!doc && <span style={{ color: 'var(--color-muted)', fontSize: 13 }}>Загружаю эталон…</span>}
       </div>
 
+      {/* Рабочие отрезки: что учитывать в оценке, а что — объяснения */}
+      <SegmentTimeline
+        durationMs={durationMs}
+        initial={segments}
+        currentMs={currentMs}
+        onSeek={seek}
+        onAuto={doc ? () => detectSegments(doc.frames, doc.durationMs) : null}
+        onSave={async (next) => {
+          try {
+            const res = await fetch(`/api/admin/pose-references/${videoId}/segments`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ segments: next }),
+            });
+            const d = await res.json().catch(() => ({}));
+            return res.ok ? null : d?.error || 'Не удалось сохранить разметку';
+          } catch {
+            return 'Сетевая ошибка';
+          }
+        }}
+      />
+
       {/* Углы в текущий момент — текстом (табличный вид графиков) */}
       {doc && now && (
         <div
@@ -161,6 +195,7 @@ export default function ReferenceViewer({ videoId, playbackUrl }: { videoId: str
             yTicks={[0, 45, 90, 135, 180]}
             currentMs={currentMs}
             durationMs={doc.durationMs}
+            segments={segments}
             onSeek={seek}
           />
           <AngleChart
@@ -171,6 +206,7 @@ export default function ReferenceViewer({ videoId, playbackUrl }: { videoId: str
             yTicks={[0, 45, 90, 135, 180]}
             currentMs={currentMs}
             durationMs={doc.durationMs}
+            segments={segments}
             onSeek={seek}
           />
           <AngleChart
@@ -181,6 +217,7 @@ export default function ReferenceViewer({ videoId, playbackUrl }: { videoId: str
             yTicks={[0, 30, 60, 90]}
             currentMs={currentMs}
             durationMs={doc.durationMs}
+            segments={segments}
             onSeek={seek}
           />
           <div style={{ color: 'var(--color-muted)', fontSize: 12, lineHeight: 1.5 }}>

@@ -7,6 +7,7 @@
 // линия — текущий момент видео.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Segment } from '@/lib/pose/segments';
 
 export interface AngleSeries {
   label: string;
@@ -53,6 +54,7 @@ export default function AngleChart({
   yTicks,
   currentMs,
   durationMs,
+  segments,
   onSeek,
 }: {
   title: string;
@@ -62,6 +64,8 @@ export default function AngleChart({
   yTicks: number[];
   currentMs: number;
   durationMs: number;
+  /** Рабочие отрезки — подсвечены; остальное в оценку не идёт. */
+  segments?: Segment[];
   onSeek: (ms: number) => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -160,6 +164,17 @@ export default function AngleChart({
             if (h) onSeek(h.ms);
           }}
         >
+          {/* Рабочие отрезки — то, что учитывается в оценке */}
+          {(segments ?? []).map((s) => (
+            <rect
+              key={`${s.startMs}-${s.endMs}`}
+              x={x(s.startMs)}
+              y={PAD.t}
+              width={Math.max(1, x(s.endMs) - x(s.startMs))}
+              height={H - PAD.t - PAD.b}
+              fill="rgba(161,255,74,0.07)"
+            />
+          ))}
           {yTicks.map((d) => (
             <g key={d}>
               <line x1={PAD.l} x2={W - PAD.r} y1={y(d)} y2={y(d)} stroke="rgba(255,255,255,0.08)" vectorEffect="non-scaling-stroke" />
