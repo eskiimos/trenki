@@ -121,3 +121,23 @@ describe('parseSegments', () => {
     expect(parseSegments(Array.from({ length: MAX_SEGMENTS + 1 }, (_, i) => ({ startMs: i * 10, endMs: i * 10 + 5 })), 10_000)).toBeNull();
   });
 });
+
+describe('удержания и растяжка (правка 27.09: видео про шпагат)', () => {
+  it('поза «сидит в растяжке» без движения — это работа, а не пауза', () => {
+    const frames: number[][] = [];
+    for (let i = 0; i * 100 <= 60_000; i++) {
+      const sec = (i * 100) / 1000;
+      const hold = sec >= 20 && sec < 50; // 30 секунд неподвижного удержания
+      frames.push(frame(i * 100, hold ? 95 : 178));
+    }
+    const segs = detectSegments(frames, 60_000);
+    expect(segs).toHaveLength(1);
+    expect(segs[0]!.startMs).toBeGreaterThan(18_000);
+    expect(segs[0]!.endMs).toBeLessThan(52_000);
+  });
+
+  it('объяснение стоя прямо остаётся паузой', () => {
+    const frames = Array.from({ length: 301 }, (_, i) => frame(i * 100, 178));
+    expect(detectSegments(frames, 30_000)).toEqual([]);
+  });
+});

@@ -19,6 +19,13 @@ const MOTION_ANGLES: AngleKey[] = ['kneeL', 'kneeR', 'hipL', 'hipR', 'elbowL', '
 export const SEGMENT_DEFAULTS = {
   /** Градусов в секунду суммарно по суставам — ниже этого тренер «стоит и говорит». */
   motionThreshold: 25,
+  /**
+   * Насколько поза отличается от «стою прямо», градусов. Растяжка и удержания
+   * (шпагат, планка, «стульчик») почти без движения, но тело в рабочем
+   * положении — по одной скорости они терялись (на видео про шпагат
+   * автоматика находила 0:40 работы из 8:48).
+   */
+  postureThreshold: 30,
   /** Окно сглаживания, мс: короткий взмах рукой во время объяснения не считается упражнением. */
   smoothMs: 1500,
   /** Отрезок короче — не упражнение. */
@@ -29,10 +36,15 @@ export const SEGMENT_DEFAULTS = {
 
 export const MAX_SEGMENTS = 200;
 
-/** Скорость изменения углов на кадр, градусов в секунду. Нет позы — 0. */
-export function motionSeries(frames: number[][]): { times: number[]; motion: number[] } {
+/**
+ * По кадрам: скорость изменения углов (градусов в секунду) и «нерасслабленность»
+ * позы — максимальное отклонение от стойки прямо (ноги 180°, корпус 0°).
+ * Кадр без тренера — нули.
+ */
+export function motionSeries(frames: number[][]): { times: number[]; motion: number[]; posture: number[] } {
   const times = frames.map((f) => f[0]!);
   const motion = new Array<number>(frames.length).fill(0);
+  const posture = new Array<number>(frames.length).fill(0);
   let prevAngles: Record<AngleKey, number | null> | null = null;
   let prevT = times[0] ?? 0;
   for (let i = 0; i < frames.length; i++) {
@@ -44,6 +56,10 @@ export function motionSeries(frames: number[][]): { times: number[]; motion: num
       continue;
     }
     const a = frameAngles(f);
+    posture[i] = Math.max(
+      ...[a.kneeL, a.kneeR, a.hipL, a.hipR].map((x) => (x == null ? 0 : Math.max(0, 180 - x))),
+      a.trunk == null ? 0 : Math.abs(a.trunk),
+    );
     if (prevAngles) {
       const dtSec = Math.max(0.001, (t - prevT) / 1000);
       let sum = 0;
@@ -57,7 +73,7 @@ export function motionSeries(frames: number[][]): { times: number[]; motion: num
     prevAngles = a;
     prevT = t;
   }
-  return { times, motion };
+  return { times, motion, posture };
 }
 
 /** Скользящее среднее по времени (окно ±smoothMs/2). */
@@ -77,9 +93,10 @@ function smooth(times: number[], values: number[], smoothMs: number): number[] {
 }
 
 /**
- * Автоматическая разметка: рабочие отрезки по скорости изменения углов.
- * Пороги подобраны под 10 кадров в секунду; удержания (планка, «стульчик»)
- * автоматика посчитает паузой — это правится руками на таймлайне.
+ * Автоматическая разметка: рабочий отрезок — там, где тренер двигается или
+ * стоит в рабочем положении (растяжка, планка, «стульчик»). Пороги подобраны
+ * под 10 кадров в секунду. Объяснение стоя и паузы отсекаются; спорные куски
+ * админ правит на таймлайне.
  */
 export function detectSegments(
   frames: number[][],
@@ -88,14 +105,15 @@ export function detectSegments(
 ): Segment[] {
   const o = { ...SEGMENT_DEFAULTS, ...opts };
   if (frames.length === 0) return [];
-  const { times, motion } = motionSeries(frames);
+  const { times, motion, posture } = motionSeries(frames);
   const level = smooth(times, motion, o.smoothMs);
+  const pose = smooth(times, posture, o.smoothMs);
 
-  // Сырые куски «движение есть»
+  // Работа = тренер двигается ИЛИ стоит в рабочем положении (растяжка, удержание)
   const raw: Segment[] = [];
   let start: number | null = null;
   for (let i = 0; i < level.length; i++) {
-    const active = level[i]! >= o.motionThreshold;
+    const active = level[i]! >= o.motionThreshold || pose[i]! >= o.postureThreshold;
     if (active && start === null) start = times[i]!;
     if (!active && start !== null) {
       raw.push({ startMs: start, endMs: times[i]! });
