@@ -33,12 +33,21 @@ export async function PUT(request: NextRequest, ctx: { params: Promise<{ videoId
   }
 
   try {
-    await prisma.poseReference.update({
-      where: { videoId },
-      data: { segments: segments as unknown as Prisma.InputJsonValue },
+    const saved = await prisma.$transaction(async (tx) => {
+      // Share the background writer's lock so an edit cannot be lost at publication.
+      await tx.$queryRaw`SELECT id FROM videos WHERE id = ${videoId} FOR UPDATE`;
+      const current = await tx.poseReference.findUnique({ where: { videoId }, select: { durationSec: true } });
+      if (!current) return null;
+      const normalized = parseSegments(body.segments, Math.round(current.durationSec * 1000))!;
+      await tx.poseReference.update({
+        where: { videoId },
+        data: { segments: normalized as unknown as Prisma.InputJsonValue },
+      });
+      return normalized;
     });
-    logger.info('pose reference segments saved', { videoId, segments: segments.length });
-    return NextResponse.json({ segments });
+    if (!saved) return NextResponse.json({ error: 'Эталона нет' }, { status: 404 });
+    logger.info('pose reference segments saved', { videoId, segments: saved.length });
+    return NextResponse.json({ segments: saved });
   } catch (error) {
     logger.error('pose reference segments save failed', error, { videoId });
     return NextResponse.json({ error: 'Не удалось сохранить разметку' }, { status: 500 });

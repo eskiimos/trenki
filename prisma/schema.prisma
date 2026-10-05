@@ -229,6 +229,7 @@ model Video {
   trainer             Trainer               @relation(fields: [trainerId], references: [id]) // ведущий автор (primary)
   coauthors           VideoTrainer[]        // соавторы-тренеры (мульти-тренер, включая ведущего)
   poseReference       PoseReference?        // эталон движений тренера (скелет по кадрам), см. PoseReference
+  poseReferenceJob    PoseReferenceJob?
   workoutSessions     WorkoutSessionVideo[]
   scheduledWorkouts   ScheduledWorkout[]
   trainingAssignments TrainingAssignment[]
@@ -1014,6 +1015,36 @@ model TrainingAssignment {
 // скелета по кадрам лежат в нашем S3 (pose/references/, как и pose-сессии — не в БД), здесь
 // только ссылка и сводка. Одно видео — один эталон; повторная обработка
 // перезаписывает. Смотрят пока только админы (/admin/pose).
+model PoseWorkerState {
+  id          String   @id
+  heartbeatAt DateTime
+  @@map("pose_worker_state")
+}
+
+model PoseReferenceJob {
+  id                 String         @id @default(cuid())
+  videoId            String         @unique
+  video              Video          @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  sourceUrl          String
+  referenceUpdatedAt DateTime? // Снимок эталона: чужую новую разметку не перезаписываем
+  status             MediaJobStatus @default(QUEUED)
+  stage              String?
+  progress           Int            @default(0)
+  attempts           Int            @default(0)
+  interruptions      Int            @default(0)
+  runToken           String? // Владение попыткой: умерший воркер не может применить результат
+  error              String?
+  retryAt            DateTime?
+  heartbeatAt        DateTime?
+  startedAt          DateTime?
+  finishedAt         DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([status, createdAt])
+  @@map("pose_reference_jobs")
+}
+
 model PoseReference {
   id               String   @id @default(cuid())
   videoId          String   @unique

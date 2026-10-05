@@ -21,6 +21,7 @@ export const REFERENCE_FPS = 10;
  * заметно крупнее на сервере с 2 ГБ памяти опасен.
  */
 export const MAX_REFERENCE_FRAMES = 40 * 60 * 10;
+export const MAX_REFERENCE_DURATION_MS = 40 * 60 * 1000;
 export const MAX_REFERENCE_GZIP_BYTES = 15 * 1024 * 1024;
 export const MAX_REFERENCE_JSON_BYTES = 60 * 1024 * 1024;
 
@@ -235,6 +236,7 @@ export function validateReferenceDoc(raw: unknown): string | null {
   if (!(POSE_MODELS as readonly unknown[]).includes(d.model)) return 'Неизвестная модель';
   if (!Number.isInteger(d.fps) || (d.fps as number) < 1 || (d.fps as number) > 30) return 'fps — от 1 до 30';
   if (!Number.isInteger(d.durationMs) || (d.durationMs as number) <= 0) return 'Нет длительности видео';
+  if ((d.durationMs as number) > MAX_REFERENCE_DURATION_MS) return 'Длительность эталона — не больше 40 минут';
   if (!Number.isInteger(d.width) || !Number.isInteger(d.height)) return 'Нет размера кадра';
   if (!Array.isArray(d.frames) || d.frames.length === 0) return 'Нет кадров';
   if (d.frames.length > MAX_REFERENCE_FRAMES) return 'Слишком много кадров';
@@ -242,9 +244,13 @@ export function validateReferenceDoc(raw: unknown): string | null {
   const maxT = (d.durationMs as number) + 2000;
   for (const f of d.frames as unknown[]) {
     if (!Array.isArray(f) || (f.length !== 1 && f.length !== FRAME_LEN)) return 'Неверный формат кадра';
-    for (const x of f) if (!Number.isInteger(x) || Math.abs(x as number) > 1_000_000) return 'Неверные числа в кадре';
+    for (let j = 0; j < f.length; j++) {
+      const x = f[j];
+      // The timestamp can reach 2 400 000 ms; the coordinate bound must not truncate long lessons.
+      if (!Number.isInteger(x) || (j > 0 && Math.abs(x as number) > 1_000_000)) return 'Неверные числа в кадре';
+    }
     const t = f[0] as number;
-    if (t < prevT || t > maxT) return 'Время кадров должно идти по порядку';
+    if (t < 0 || t < prevT || t > maxT) return 'Время кадров должно идти по порядку';
     prevT = t;
   }
   return null;

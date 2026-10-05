@@ -28,6 +28,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      pose-worker:
+        condition: service_started
     environment:
       - NODE_ENV=production
       # Граница календарного дня (стрик/темп/лига) — Москва, не UTC: без TZ
@@ -114,6 +116,42 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  pose-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.pose-worker
+    container_name: trenki-pose-worker
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_REGION=${S3_REGION}
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    restart: always
+    stop_grace_period: 30s
+    # One CPU-bound inference at a time, with resources reserved for the site.
+    cpus: 0.75
+    mem_limit: 1g
+    init: false # tini is already the image entrypoint
+    networks:
+      - trenki-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "node", "-e", "const f=require('fs');try{process.exit(Date.now()-Number(f.readFileSync('/tmp/trenki-pose-worker-alive','utf8'))<120000?0:1)}catch{process.exit(1)}"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   nginx:
     image: nginx:latest

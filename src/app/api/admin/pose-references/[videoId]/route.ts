@@ -122,11 +122,15 @@ export async function PUT(request: NextRequest, ctx: Ctx) {
       segments: segments as unknown as Prisma.InputJsonValue,
       createdById: await getSessionUserId(request),
     };
-    const reference = await prisma.poseReference.upsert({
-      where: { videoId: video.id },
-      create: { videoId: video.id, ...data },
-      update: data,
-      select: REFERENCE_SELECT,
+    const reference = await prisma.$transaction(async (tx) => {
+      // Same lock as the background writer: a manual save wins or causes its stale result to be rejected.
+      await tx.$queryRaw`SELECT id FROM videos WHERE id = ${video.id} FOR UPDATE`;
+      return tx.poseReference.upsert({
+        where: { videoId: video.id },
+        create: { videoId: video.id, ...data },
+        update: data,
+        select: REFERENCE_SELECT,
+      });
     });
     logger.info('pose reference saved', { videoId: video.id, ...summary, segments: segments.length, gzipBytes: gzip.length });
     return NextResponse.json({ reference });
