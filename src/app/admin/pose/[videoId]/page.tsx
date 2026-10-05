@@ -104,7 +104,7 @@ export default function PoseReferencePage({ params }: { params: Promise<{ videoI
 
       {data && (!ref || reprocess) && (
         <AdminCard>
-          <SectionTitle>{ref ? 'Обработать заново' : 'Обработать видео'}</SectionTitle>
+          <SectionTitle>{ref ? 'Повторный анализ' : 'Анализ видео из платформы'}</SectionTitle>
           <p style={{ color: 'var(--color-muted)', fontSize: 14, lineHeight: 1.5, margin: '0 0 16px' }}>
             Браузер скачает видео, загрузит модель распознавания и пройдёт по видео 10 раз в секунду. На компьютере это
             примерно 1–2 минуты на минуту видео. Результат сохранится на платформе{ref ? ' и заменит текущий эталон вместе с разметкой рабочих отрезков' : ''}.

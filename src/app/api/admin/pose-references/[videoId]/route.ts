@@ -65,7 +65,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   return NextResponse.json({
     video: rest,
     sourceUrl: source.kind === 's3' ? `/api/admin/pose-references/${video.id}/source` : source.path,
-    playbackUrl: await resolveVideoUrl(videoUrl),
+    playbackUrl: await resolveVideoUrl(source.kind === 's3' ? `s3://${source.key}` : videoUrl),
     reference: poseReference,
   });
 }
