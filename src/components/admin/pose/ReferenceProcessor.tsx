@@ -272,7 +272,7 @@ export default function ReferenceProcessor({
           </AdminButton>
         ) : (
           <AdminButton type="button" icon={Play} onClick={run}>
-            {phase === 'error' ? 'Попробовать снова' : 'Обработать видео'}
+            {phase === 'error' ? 'Попробовать снова' : 'Запустить анализ'}
           </AdminButton>
         )}
       </div>
