@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MigrationError, downloadSize, migrateRecord, migrateWithRetry, parseKinescopeId, parseOptions, selectDownloadAsset, targetKey, trustedDownloadUrl, verifyProbe } from '../../scripts/lib/kinescope-migration.mjs';
+import { MigrationError, downloadSize, migrateRecord, migrateWithRetry, parseContentRange, parseKinescopeId, parseOptions, selectDownloadAsset, targetKey, trustedDownloadUrl, verifyProbe } from '../../scripts/lib/kinescope-migration.mjs';
 
 const record = { type: 'VIDEO', id: 'card123456', videoUrl: 'https://kinescope.io/video123456', isPublished: true };
 const asset = (quality = '1080p', overrides = {}) => ({
@@ -67,6 +67,13 @@ describe('проверка видео и запуск миграции', () => {
   it('использует длину готового MP4 из HTTP, включая аудио; ограничивает размер скачивания', () => {
     expect(downloadSize('316259965')).toBe(316259965);
     for (const header of [null, '', 'NaN', '-1', '0', String(6 * 1024 ** 3)]) expect(() => downloadSize(header)).toThrow();
+  });
+  it('проверяет начало, конец и общий размер части, не принимает смену файла или неверный диапазон', () => {
+    expect(parseContentRange('bytes 0-63/316259965')).toEqual({ start: 0, end: 63, total: 316259965, bytes: 64 });
+    expect(parseContentRange('bytes 64-127/316259965', 64, 316259965).bytes).toBe(64);
+    for (const header of ['bytes 65-127/316259965', 'bytes 64-63/316259965', 'bytes 64-127/100', 'bytes 64-127/400000000', 'bytes */316259965', 'unknown']) {
+      expect(() => parseContentRange(header, 64, 316259965)).toThrow();
+    }
   });
   it('записывает журнал проверенной копии перед заменой адреса; сохраняет ту же карточку', async () => {
     const io = ports();

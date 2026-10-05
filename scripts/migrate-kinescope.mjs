@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { pipeline } from 'node:stream/promises';
 import { Readable, Transform, Writable } from 'node:stream';
 import { spawn } from 'node:child_process';
-import { MigrationError, downloadSize, migrateWithRetry, parseKinescopeId, parseOptions, selectDownloadAsset, trustedDownloadUrl } from './lib/kinescope-migration.mjs';
+import { MigrationError, downloadSize, migrateWithRetry, parseContentRange, parseKinescopeId, parseOptions, selectDownloadAsset, trustedDownloadUrl } from './lib/kinescope-migration.mjs';
 
 // Run on the production server/container: DB and S3 credentials stay in env.
 // Default is a read-only inventory. Nothing in Kinescope is changed/deleted.
@@ -202,21 +202,15 @@ async function downloadOne(asset, signal) {
   let response;
   let watcher;
   try {
-    let url = asset.url;
-    for (let redirect = 0; redirect <= 4; redirect++) {
-      if (!trustedDownloadUrl(url)) throw new MigrationError('Kinescope вернул недопустимый адрес скачивания');
-      response = await fetch(url, { redirect: 'manual', signal: AbortSignal.any([signal, AbortSignal.timeout(40 * 60_000)]) });
-      if (![301, 302, 303, 307, 308].includes(response.status)) break;
-      const location = response.headers.get('location');
-      await response.body?.cancel();
-      if (!location || redirect === 4) throw new MigrationError('Некорректное перенаправление скачивания');
-      url = new URL(location, url).href;
-    }
+    const chunkBytes = 8 * 1024 ** 2;
+    response = await fetchRange(asset.url, `bytes=0-${chunkBytes - 1}`, signal);
     if (!response.ok || !response.body) throw new MigrationError(`Скачивание Kinescope: HTTP ${response.status}`, [403, 429].includes(response.status) || response.status >= 500);
     const sha = createHash('sha256');
     // API asset.file_size describes the video asset; the served MP4 can also
     // contain audio. Actual Content-Length is authoritative for completeness.
-    const expectedBytes = downloadSize(response.headers.get('content-length'));
+    const ranged = response.status === 206;
+    const expectedBytes = ranged ? parseContentRange(response.headers.get('content-range')).total
+      : downloadSize(response.headers.get('content-length'));
     const currentDisk = await statfs(tmpdir());
     if (currentDisk.bavail * currentDisk.bsize < expectedBytes + 250 * 1024 ** 2) throw new MigrationError('Недостаточно места для готового MP4');
     let bytes = 0;
@@ -225,7 +219,8 @@ async function downloadOne(asset, signal) {
       if (bytes > expectedBytes) throw new MigrationError('Скачанный файл больше заявленного HTTP-размера');
       sha.update(chunk);
     });
-    await pipeline(Readable.fromWeb(response.body), watcher.stream, createWriteStream(path, { flags: 'wx', mode: 0o600 }), { signal });
+    const source = ranged ? Readable.from(rangeChunks(asset.url, response, expectedBytes, chunkBytes, signal)) : Readable.fromWeb(response.body);
+    await pipeline(source, watcher.stream, createWriteStream(path, { flags: 'wx', mode: 0o600 }), { signal });
     if (bytes !== expectedBytes) throw new MigrationError('Скачанный файл неполный');
     return { directory, path, bytes, sha256: sha.digest('hex') };
   } catch (error) {
@@ -233,6 +228,47 @@ async function downloadOne(asset, signal) {
     await rm(directory, { recursive: true, force: true });
     throw error;
   } finally { watcher?.close(); }
+}
+
+async function fetchRange(initialUrl, range, signal) {
+  let url = initialUrl;
+  for (let redirect = 0; redirect <= 4; redirect++) {
+    if (!trustedDownloadUrl(url)) throw new MigrationError('Kinescope вернул недопустимый адрес скачивания');
+    const response = await fetch(url, { redirect: 'manual', headers: { Range: range },
+      signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)]) });
+    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
+    const location = response.headers.get('location');
+    await response.body?.cancel();
+    if (!location || redirect === 4) throw new MigrationError('Некорректное перенаправление скачивания');
+    url = new URL(location, url).href;
+  }
+}
+
+async function* rangeChunks(url, firstResponse, total, chunkBytes, signal) {
+  let offset = 0;
+  while (offset < total) {
+    const end = Math.min(offset + chunkBytes - 1, total - 1);
+    for (let attempt = 1; ; attempt++) {
+      let response;
+      try {
+        response = offset === 0 && attempt === 1 ? firstResponse : await fetchRange(url, `bytes=${offset}-${end}`, signal);
+        if (response.status !== 206) throw new MigrationError(`Range Kinescope: HTTP ${response.status}`, [403, 429].includes(response.status) || response.status >= 500);
+        const part = parseContentRange(response.headers.get('content-range'), offset, total);
+        if (part.end !== end || part.bytes > chunkBytes) throw new MigrationError('Kinescope вернул неверную часть файла');
+        // At most 8 MiB is buffered; only a complete validated chunk reaches
+        // the file/hash, so retrying a broken chunk cannot duplicate bytes.
+        const buffer = Buffer.from(await response.arrayBuffer());
+        if (buffer.length !== part.bytes) throw new MigrationError('Неполная часть видео', true);
+        yield buffer;
+        offset = end + 1;
+        break;
+      } catch (error) {
+        await response?.body?.cancel().catch(() => {});
+        if (signal.aborted || attempt >= 3 || (error instanceof MigrationError && !error.retryable)) throw error;
+        await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+      }
+    }
+  }
 }
 
 function probeCommand(args, signal) {

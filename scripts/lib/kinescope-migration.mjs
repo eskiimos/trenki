@@ -59,6 +59,17 @@ export function downloadSize(header) {
   return bytes;
 }
 
+export function parseContentRange(header, offset = 0, expectedTotal = 0) {
+  const match = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(header ?? '');
+  if (!match) throw new MigrationError('Некорректный Content-Range скачивания');
+  const start = Number(match[1]);
+  const end = Number(match[2]);
+  const total = downloadSize(match[3]);
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start !== offset || end < start
+    || end >= total || (expectedTotal && total !== expectedTotal)) throw new MigrationError('Диапазон файла изменился при скачивании');
+  return { start, end, total, bytes: end - start + 1 };
+}
+
 export function verifyProbe(probe, metadataDuration, hasAudio = false) {
   const video = probe.streams?.find((s) => s.codec_type === 'video' && s.codec_name !== 'mjpeg' && s.codec_name !== 'png');
   const audio = probe.streams?.filter((s) => s.codec_type === 'audio') ?? [];
