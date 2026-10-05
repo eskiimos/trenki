@@ -204,6 +204,51 @@ cd /home/trenki && flock -w 600 /tmp/trenki-deploy.lock \
 
 Не запускать на проде `prisma migrate reset` и `prisma db push --accept-data-loss`. Скрипты `prisma/clear-users.ts` и `prisma/delete-videos.ts` деструктивны.
 
+## Перенос Kinescope → S3
+
+`scripts/migrate-kinescope.mjs` переносит существующие карточки `Video` и `Short`.
+По умолчанию только проверяет одну карточку; `--limit 1000` проверяет весь каталог,
+включая черновики. Нужны серверные `DATABASE_URL`, `KINESCOPE_API_KEY`, `S3_*` и
+`ffprobe` (уже включены в production-контейнер). Токены в аргументы не передаются.
+
+На сервере после сборки образа:
+
+```bash
+cd /home/trenki
+mkdir -p migration-reports/kinescope
+chown 1001:1001 migration-reports/kinescope
+chmod 700 migration-reports/kinescope
+
+# Сверка без скачивания видео, записи в S3 и изменений БД.
+docker-compose -f docker-compose.production.yml --env-file .env.production run --rm --no-deps -T app \
+  node scripts/migrate-kinescope.mjs --dry-run --limit 1000
+
+# Сначала одна карточка. Журнал находится в постоянном каталоге хоста.
+docker-compose -f docker-compose.production.yml --env-file .env.production run --rm --no-deps -T \
+  -v /home/trenki/migration-reports/kinescope:/migration-reports app \
+  node scripts/migrate-kinescope.mjs --apply --limit 1 --journal /migration-reports/migration.jsonl
+
+# Остальные карточки, последовательно. Уже перенесённые пропускаются.
+docker-compose -f docker-compose.production.yml --env-file .env.production run --rm --no-deps -T \
+  -v /home/trenki/migration-reports/kinescope:/migration-reports app \
+  node scripts/migrate-kinescope.mjs --apply --limit 1000 --journal /migration-reports/migration.jsonl
+```
+
+Для выбора используйте `--type VIDEO|SHORT` и `--id <id карточки>`. Выбирается
+готовая MP4-копия лучшего доступного качества до 1080p. Файл скачивается потоком,
+проверяется через ffprobe, загружается в S3 и полностью читается обратно для
+сверки SHA-256. Адрес меняется только после проверки и записи журнала с исходным
+адресом. Если карточку изменили или у неё есть незавершённая задача `MediaJob`,
+перенос её пропускает. ID, публикация, длительность и остальные поля сохраняются;
+в Kinescope ничего не удаляется. Занятия остаются приватными, шортсы — публичными.
+
+После прерывания повторите ту же команду: мигрированные карточки уже имеют адрес
+S3, а проверенные копии используют стабильные ключи и не загружаются повторно.
+Не запускайте две миграции одновременно. Строки `switched` в журнале содержат
+`oldUrl` и `newUrl` для адресного отката с проверкой текущего адреса; файлы S3
+автоматически не удаляются. Неудачи возвращают ненулевой код и перечисляются как
+`failed`; токены и временные подписанные ссылки в журнал не попадают.
+
 ## Тесты
 
 ```bash
