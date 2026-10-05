@@ -21,6 +21,7 @@ export default function BackgroundQueue({ videoId, hasReference = false, onDone 
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const completed = useRef<string | null>(null);
   const doneCallback = useRef(onDone);
   useEffect(() => { doneCallback.current = onDone; }, [onDone]);
@@ -62,7 +63,10 @@ export default function BackgroundQueue({ videoId, hasReference = false, onDone 
     finally { setBusy(false); }
   }, [videoId, hasReference]);
   const active = data?.jobs.some((j) => ['QUEUED', 'PROCESSING'].includes(j.status));
-  const shown = videoId ? data?.jobs ?? [] : data?.jobs.filter((j) => ['QUEUED', 'PROCESSING', 'FAILED'].includes(j.status)) ?? [];
+  const priority: Record<string, number> = { PROCESSING: 0, FAILED: 1, QUEUED: 2 };
+  const shown = videoId ? data?.jobs ?? [] : (data?.jobs.filter((j) => ['QUEUED', 'PROCESSING', 'FAILED'].includes(j.status)) ?? [])
+    .sort((a, b) => priority[a.status]! - priority[b.status]!);
+  const visible = videoId || expanded ? shown : shown.slice(0, 3);
   const localJob = videoId ? data?.jobs[0] : undefined;
   return (
     <AdminCard>
@@ -79,7 +83,7 @@ export default function BackgroundQueue({ videoId, hasReference = false, onDone 
       {message && <p role="status" style={{ fontSize: 13 }}>{message}</p>}
       {error && <p role="alert" style={{ fontSize: 13, color: 'var(--color-danger)' }}>{error}</p>}
       <div className="flex flex-col" style={{ gap: 12, marginTop: 16 }}>
-        {shown.map((job) => (
+        {visible.map((job) => (
           <div key={job.id} style={{ borderTop: '1px solid var(--color-border)', paddingTop: 12 }}>
             {!videoId && <Link href={`/admin/pose/${job.videoId}`} style={{ fontSize: 14, fontWeight: 700 }}>{job.video.title}</Link>}
             <p role="status" style={{ fontSize: 13, margin: '4px 0' }}>{labels[job.status]}{job.status === 'PROCESSING' ? ` · ${stages[job.stage ?? ''] ?? 'Анализ'} · ${job.progress}%` : ''}</p>
@@ -91,6 +95,11 @@ export default function BackgroundQueue({ videoId, hasReference = false, onDone 
           </div>
         ))}
       </div>
+      {!videoId && shown.length > 3 && <div style={{ marginTop: 12 }}>
+        <AdminButton type="button" tone="secondary" onClick={() => setExpanded((value) => !value)}>
+          {expanded ? 'Свернуть очередь' : `Показать остальные задачи (${shown.length - 3})`}
+        </AdminButton>
+      </div>}
     </AdminCard>
   );
 }
