@@ -1,20 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { AdminPage, PageHeader, AdminButton, SectionTitle } from '@/components/admin/ui';
 import { Activity, Plus, PersonStanding } from 'lucide-react';
 import PlatformVideos from '@/components/admin/pose/PlatformVideos';
+import BackgroundQueue from '@/components/admin/pose/BackgroundQueue';
 
 export default function PoseReferencesPage() {
   const [scope, setScope] = useState<'references' | 'library'>('references');
+  const [revision, setRevision] = useState(0);
+  const refresh = useCallback(() => setRevision((n) => n + 1), []);
 
   return (
     <AdminPage width="narrow">
       <PageHeader title="Эталоны движений" icon={PersonStanding} backHref="/admin" />
       <p style={{ color: 'var(--color-muted)', fontSize: 14, lineHeight: 1.5, margin: '0 0 24px' }}>
         Выберите готовое видео из платформы — загружать файл повторно не нужно. Анализ распознает движения тренера
-        и сохранит эталон. Обработка идёт в вашем браузере — лучше с компьютера.
+        и сохранит эталон. Запустите фоновую обработку — она продолжится после закрытия страницы.
       </p>
+      <div style={{ marginBottom: 24 }}><BackgroundQueue onDone={refresh} /></div>
 
       <div className="flex flex-wrap gap-2" style={{ marginBottom: 24 }}>
         <AdminButton
@@ -44,7 +48,7 @@ export default function PoseReferencesPage() {
           Здесь доступны и неопубликованные видео. Файлы, которые ещё обрабатываются, и Kinescope в список не входят.
         </p>
       )}
-      <PlatformVideos key={scope} scope={scope} />
+      <PlatformVideos key={`${scope}-${revision}`} scope={scope} />
     </AdminPage>
   );
 }

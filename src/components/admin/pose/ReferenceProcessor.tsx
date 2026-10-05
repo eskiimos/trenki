@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Play, Square, AlertTriangle } from 'lucide-react';
 import { AdminButton } from '@/components/admin/ui';
-import { POSE_REFERENCE_FORMAT, REFERENCE_FPS, encodeFrame, type PoseReferenceDoc } from '@/lib/pose/reference';
+import { MAX_REFERENCE_DURATION_MS, POSE_REFERENCE_FORMAT, REFERENCE_FPS, encodeFrame, type PoseReferenceDoc } from '@/lib/pose/reference';
 import { createLandmarker, REFERENCE_MODEL, type Landmarker } from './landmarker';
 import { containRect, drawSkeleton } from './draw';
 
@@ -139,7 +139,10 @@ export default function ReferenceProcessor({
       // 3) Кадры
       setPhase('process');
       const duration = video.duration;
-      const n = Math.max(1, Math.floor(duration * REFERENCE_FPS) + 1);
+      if (!Number.isFinite(duration) || duration <= 0 || duration * 1000 > MAX_REFERENCE_DURATION_MS) {
+        throw new Error('Нужен видеофайл длительностью до 40 минут');
+      }
+      const n = Math.max(1, Math.ceil(duration * REFERENCE_FPS));
       const frames: number[][] = [];
       const startedAt = performance.now();
       let found = 0;

@@ -7,6 +7,10 @@ const mocks = vi.hoisted(() => ({
   findMany: vi.fn(),
   findUnique: vi.fn(),
   upsert: vi.fn(),
+  referenceFind: vi.fn(),
+  referenceUpdate: vi.fn(),
+  transaction: vi.fn(),
+  queryRaw: vi.fn(),
   openObjectStream: vi.fn(),
   saveReferenceFrames: vi.fn(),
   resolveVideoUrl: vi.fn(),
@@ -14,7 +18,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/admin-session', () => ({ requireAdminAsync: mocks.admin }));
 vi.mock('@/lib/prisma', () => ({
-  prisma: { video: { findMany: mocks.findMany, findUnique: mocks.findUnique }, poseReference: { upsert: mocks.upsert } },
+  prisma: { $transaction: mocks.transaction, video: { findMany: mocks.findMany, findUnique: mocks.findUnique }, poseReference: { upsert: mocks.upsert, findUnique: mocks.referenceFind, update: mocks.referenceUpdate } },
 }));
 vi.mock('@/lib/auth-server', () => ({ getSessionUserId: mocks.sessionUserId }));
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), error: vi.fn() } }));
@@ -31,6 +35,7 @@ vi.mock('@/lib/pose/reference-storage', async (importOriginal) => ({
 import { GET as listVideos } from '@/app/api/admin/pose-references/route';
 import { GET as getVideo, PUT as saveReference } from '@/app/api/admin/pose-references/[videoId]/route';
 import { GET as getSource } from '@/app/api/admin/pose-references/[videoId]/source/route';
+import { PUT as saveSegments } from '@/app/api/admin/pose-references/[videoId]/segments/route';
 
 const request = (query = '') => new NextRequest(`https://trenki.example.test/api/admin/pose-references${query}`);
 const ctx = { params: Promise.resolve({ videoId: 'platform-video' }) };
@@ -41,6 +46,7 @@ const video = (id = 'platform-video', videoUrl = 's3://videos/ready.mp4') => ({
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.admin.mockResolvedValue(null);
+  mocks.transaction.mockImplementation((fn) => fn({ $queryRaw: mocks.queryRaw, poseReference: { upsert: mocks.upsert, findUnique: mocks.referenceFind, update: mocks.referenceUpdate } }));
   mocks.resolveVideoUrl.mockResolvedValue('https://storage.example.test/playback.mp4');
   mocks.sessionUserId.mockResolvedValue('admin-user');
   vi.stubEnv('S3_ENDPOINT', 'https://storage.example.test');
@@ -56,6 +62,7 @@ describe('выбор видео платформы для pose', () => {
     mocks.admin.mockResolvedValue(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }));
     expect((await listVideos(request('?scope=library'))).status).toBe(401);
     expect((await getSource(request(), ctx)).status).toBe(401);
+    expect((await saveSegments(request(), ctx)).status).toBe(401);
     expect(mocks.findMany).not.toHaveBeenCalled();
     expect(mocks.findUnique).not.toHaveBeenCalled();
     expect(mocks.openObjectStream).not.toHaveBeenCalled();
@@ -117,6 +124,18 @@ describe('выбор видео платформы для pose', () => {
     mocks.findMany.mockResolvedValue([]);
     await listVideos(request('?scope=references'));
     expect(mocks.findMany.mock.calls[0]![0].where.AND).toContainEqual({ poseReference: { isNot: null } });
+  });
+
+  it('ручная разметка блокирует ту же карточку и учитывает актуальную длительность эталона', async () => {
+    mocks.referenceFind.mockResolvedValueOnce({ durationSec: 4 }).mockResolvedValueOnce({ durationSec: 2 });
+    const upload = new NextRequest('https://trenki.example.test/api/admin/pose-references/platform-video/segments', {
+      method: 'PUT', body: JSON.stringify({ segments: [{ startMs: 500, endMs: 3500 }] }),
+    });
+    const result = await saveSegments(upload, ctx);
+    expect(result.status).toBe(200);
+    expect(await result.json()).toEqual({ segments: [{ startMs: 500, endMs: 2000 }] });
+    expect(mocks.queryRaw).toHaveBeenCalled();
+    expect(mocks.referenceUpdate).toHaveBeenCalledWith({ where: { videoId: 'platform-video' }, data: { segments: [{ startMs: 500, endMs: 2000 }] } });
   });
 
   it('выбранное HTTPS-видео скачивается через admin API и эталон сохраняется к тому же Video', async () => {

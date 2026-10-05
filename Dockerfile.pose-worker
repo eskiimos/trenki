@@ -1,0 +1,29 @@
+# Linux/glibc is required by the official MediaPipe Python wheel.
+FROM node:22-bookworm-slim AS build
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY package.json package-lock.json ./
+COPY prisma ./prisma
+RUN npm ci --legacy-peer-deps --ignore-scripts
+RUN npx prisma generate
+COPY tsconfig.json ./
+COPY src/lib ./src/lib
+COPY workers ./workers
+# Keep the generated Prisma client/engine at its native relative path.
+RUN ./node_modules/.bin/esbuild workers/pose-worker.ts --bundle --platform=node --packages=external --external:../generated/prisma --outfile=dist/pose-worker.cjs
+RUN npm prune --omit=dev --legacy-peer-deps --ignore-scripts
+
+FROM node:22-bookworm-slim AS runner
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv ffmpeg libgl1 libglib2.0-0 ca-certificates curl openssl tini && rm -rf /var/lib/apt/lists/*
+COPY workers/requirements.txt /tmp/pose-requirements.txt
+RUN python3 -m venv /opt/pose && /opt/pose/bin/pip install --no-cache-dir -r /tmp/pose-requirements.txt
+RUN mkdir -p /opt/pose/models && curl --fail --location --retry 3 https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task -o /opt/pose/models/pose_landmarker_heavy.task && python3 -c "import hashlib,pathlib; assert hashlib.sha256(pathlib.Path('/opt/pose/models/pose_landmarker_heavy.task').read_bytes()).hexdigest() == '64437af838a65d18e5ba7a0d39b465540069bc8aae8308de3e318aad31fcbc7b'"
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/src/generated/prisma ./src/generated/prisma
+COPY --from=build /app/dist/pose-worker.cjs ./src/lib/pose-worker.cjs
+COPY workers/pose_analyze.py ./workers/pose_analyze.py
+ENV NODE_ENV=production TZ=Europe/Moscow OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+USER node
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["node", "src/lib/pose-worker.cjs"]

@@ -5,6 +5,7 @@ import { AdminPage, PageHeader, AdminCard, SectionTitle, AdminButton } from '@/c
 import { PersonStanding, RefreshCw } from 'lucide-react';
 import ReferenceProcessor from '@/components/admin/pose/ReferenceProcessor';
 import ReferenceViewer from '@/components/admin/pose/ReferenceViewer';
+import BackgroundQueue from '@/components/admin/pose/BackgroundQueue';
 import type { Segment } from '@/lib/pose/segments';
 
 // Эталон движений одного видео: обработать (в браузере) или посмотреть.
@@ -66,6 +67,7 @@ export default function PoseReferencePage({ params }: { params: Promise<{ videoI
           <span style={{ fontSize: 14, fontWeight: 700 }}>{error}</span>
         </AdminCard>
       )}
+      {data && <div style={{ marginBottom: 16 }}><BackgroundQueue videoId={videoId} hasReference={!!ref} onDone={load} /></div>}
 
       {data && ref && !reprocess && (
         <div className="flex flex-col" style={{ gap: 16 }}>
@@ -96,7 +98,7 @@ export default function PoseReferencePage({ params }: { params: Promise<{ videoI
           />
           <div>
             <AdminButton type="button" tone="secondary" icon={RefreshCw} onClick={() => setReprocess(true)}>
-              Обработать заново
+              Ручной повторный анализ в браузере
             </AdminButton>
           </div>
         </div>
@@ -104,7 +106,8 @@ export default function PoseReferencePage({ params }: { params: Promise<{ videoI
 
       {data && (!ref || reprocess) && (
         <AdminCard>
-          <SectionTitle>{ref ? 'Повторный анализ' : 'Анализ видео из платформы'}</SectionTitle>
+          <details>
+          <summary style={{ cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>Обработать в браузере вручную</summary>
           <p style={{ color: 'var(--color-muted)', fontSize: 14, lineHeight: 1.5, margin: '0 0 16px' }}>
             Браузер скачает видео, загрузит модель распознавания и пройдёт по видео 10 раз в секунду. На компьютере это
             примерно 1–2 минуты на минуту видео. Результат сохранится на платформе{ref ? ' и заменит текущий эталон вместе с разметкой рабочих отрезков' : ''}.
@@ -117,6 +120,7 @@ export default function PoseReferencePage({ params }: { params: Promise<{ videoI
               void load();
             }}
           />
+          </details>
         </AdminCard>
       )}
     </AdminPage>

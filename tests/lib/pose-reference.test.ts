@@ -110,6 +110,14 @@ describe('validateReferenceDoc', () => {
   const { lm, world } = standing();
   const ok = { v: 1, model: 'pose_landmarker_heavy', fps: 10, durationMs: 1000, width: 640, height: 360, frames: [encodeFrame(0, lm, world), [100]] };
 
+  it('принимает кадры после 16:40 и до 40 минут, сохраняя отдельные ограничения координат', () => {
+    expect(validateReferenceDoc({ ...ok, durationMs: 2400000, frames: [encodeFrame(0, lm, world), encodeFrame(2399900, lm, world)] })).toBeNull();
+    expect(validateReferenceDoc({ ...ok, durationMs: 2400001 })).toMatch(/40 минут/);
+    expect(validateReferenceDoc({ ...ok, frames: [[-1]] })).toMatch(/по порядку/);
+    const bad = encodeFrame(0, lm, world); bad[1] = 1000001;
+    expect(validateReferenceDoc({ ...ok, frames: [bad] })).toMatch(/числа/);
+  });
+
   it('корректный документ проходит', () => {
     expect(validateReferenceDoc(ok)).toBeNull();
   });
