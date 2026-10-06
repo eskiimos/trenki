@@ -2,7 +2,8 @@
 
 import { use, useCallback, useEffect, useState } from 'react';
 import { AdminPage, PageHeader, AdminCard, SectionTitle, AdminButton } from '@/components/admin/ui';
-import { PersonStanding, RefreshCw } from 'lucide-react';
+import Link from 'next/link';
+import { PersonStanding, RefreshCw, Camera } from 'lucide-react';
 import ReferenceProcessor from '@/components/admin/pose/ReferenceProcessor';
 import ReferenceViewer from '@/components/admin/pose/ReferenceViewer';
 import BackgroundQueue from '@/components/admin/pose/BackgroundQueue';
@@ -72,6 +73,9 @@ export default function PoseReferencePage({ params }: { params: Promise<{ videoI
       {data && ref && !reprocess && (
         <div className="flex flex-col" style={{ gap: 16 }}>
           <AdminCard>
+            <Link href={`/admin/pose/test/${videoId}`} className="inline-flex items-center gap-2" style={{ color: 'var(--color-brand)', fontWeight: 700, marginBottom: 16 }}>
+              <Camera size={18} aria-hidden /> Проверить эталон с камерой
+            </Link>
             <SectionTitle>Эталон</SectionTitle>
             <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', fontSize: 14 }}>
               <Stat label="Тренер найден" value={pct(ref.detectedRatio)} hint="доля кадров" />

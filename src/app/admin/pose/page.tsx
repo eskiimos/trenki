@@ -2,7 +2,8 @@
 
 import { useCallback, useState } from 'react';
 import { AdminPage, PageHeader, AdminButton, SectionTitle } from '@/components/admin/ui';
-import { Activity, Plus, PersonStanding } from 'lucide-react';
+import Link from 'next/link';
+import { Activity, Plus, PersonStanding, Camera } from 'lucide-react';
 import PlatformVideos from '@/components/admin/pose/PlatformVideos';
 import BackgroundQueue from '@/components/admin/pose/BackgroundQueue';
 
@@ -21,6 +22,9 @@ export default function PoseReferencesPage() {
       <div style={{ marginBottom: 24 }}><BackgroundQueue onDone={refresh} /></div>
 
       <div className="flex flex-wrap gap-2" style={{ marginBottom: 24 }}>
+        <Link href="/admin/pose/test" className="inline-flex items-center gap-2" style={{ border: '1px solid var(--border-lime)', borderRadius: 999, padding: '10px 16px', color: 'var(--color-brand)', fontSize: 14, fontWeight: 700 }}>
+          <Camera size={18} aria-hidden /> Тест оценки с камерой
+        </Link>
         <AdminButton
           type="button"
           tone={scope === 'references' ? 'primary' : 'secondary'}
