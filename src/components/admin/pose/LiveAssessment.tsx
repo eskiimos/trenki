@@ -32,7 +32,6 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
   const [delayMs, setDelayMs] = useState(500);
   const [buffering, setBuffering] = useState(false);
   const [positionMs, setPositionMs] = useState(0);
-  const [videoReady, setVideoReady] = useState(false);
   const trainerRef = useRef<HTMLVideoElement>(null);
   const trainerCanvasRef = useRef<HTMLCanvasElement>(null);
   const phaseRef = useRef<Phase>('ready');
@@ -131,7 +130,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
 
   const start = async () => {
     const video = trainerRef.current;
-    if (!video || !loaded || !prepared || cameraStatus !== 'ready') return;
+    if (!video || !loaded || !prepared || !prepared.segments.length || cameraStatus !== 'ready') return;
     setMessage(null);
     if (phase === 'finished' || video.ended) {
       resetScore();
@@ -144,12 +143,16 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
   };
 
   const segments = loaded?.detail.reference?.segments ?? [];
-  const canStart = !!prepared && !!segments.length && videoReady && cameraStatus === 'ready';
+  // Preloading is a browser hint. Let the user's tap start loading/playback,
+  // even if the trainer has not emitted loadedmetadata yet.
+  const canStart = !!prepared && !!segments.length && cameraStatus === 'ready';
   const optionsLocked = phase === 'running' || phase === 'paused';
   const statusText = phase === 'finished' ? 'Тест завершён'
     : phase === 'paused' ? 'Пауза'
     : buffering && phase === 'running' ? 'Видео загружается — оценка на паузе'
     : phase === 'running' ? live?.message || 'Определяю положение тела…'
+    : !segments.length ? 'Для оценки разметьте рабочие отрезки в эталоне. Камеру можно включить для проверки.'
+    : cameraStatus === 'loading' ? 'Включаю камеру и загружаю распознавание…'
     : cameraStatus === 'ready' ? 'Встаньте так, чтобы камера видела всё тело, и запустите тренировку'
     : 'Включите камеру, затем запустите тренировку';
 
@@ -179,8 +182,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
       <VideoPanel label={`Тренер · ${time(positionMs)} / ${time(loaded.doc.durationMs)}`}>
         <video ref={trainerRef} src={loaded.detail.playbackUrl} controls playsInline preload="metadata"
           style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-          onLoadedMetadata={() => setVideoReady(true)}
-          onError={() => { setVideoReady(false); pause(); setMessage('Не удалось загрузить видео. Откройте тест заново, чтобы обновить ссылку'); }}
+          onError={() => { pause(); setMessage('Не удалось загрузить видео. Откройте тест заново, чтобы обновить ссылку'); }}
           onPlay={() => {
             if (cameraStatus !== 'ready' || !segments.length) { trainerRef.current?.pause(); return; }
             if (phaseRef.current === 'finished') resetScore();
@@ -236,7 +238,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
       {cameraError || message}
     </AdminCard>}
     <div className="flex flex-wrap gap-3">
-      {cameraStatus === 'off' && <AdminButton icon={Camera} disabled={!segments.length} onClick={() => void startCamera()}>Включить камеру</AdminButton>}
+      {cameraStatus === 'off' && <AdminButton icon={Camera} onClick={() => void startCamera()}>Включить камеру</AdminButton>}
       <AdminButton icon={Play} disabled={!canStart || phase === 'running'} onClick={() => void start()}>
         {phase === 'running' ? 'Тренировка идёт' : phase === 'paused' ? 'Продолжить' : phase === 'finished' ? 'Новая тренировка' : 'Запустить тренировку'}
       </AdminButton>
