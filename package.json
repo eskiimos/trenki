@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "npm run generate:icons && next build",
+    "dev": "npm run prepare:pose && next dev",
+    "build": "npm run generate:icons && npm run prepare:pose && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
@@ -12,7 +12,8 @@
     "test:coverage": "vitest run --coverage",
     "postinstall": "prisma generate",
     "seed": "tsx prisma/seed.ts",
-    "generate:icons": "node scripts/generate-icons.js"
+    "generate:icons": "node scripts/generate-icons.js",
+    "prepare:pose": "node scripts/prepare-pose-assets.cjs"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
@@ -20,6 +21,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1104.0",
     "@aws-sdk/s3-request-presigner": "^3.1104.0",
+    "@mediapipe/tasks-vision": "0.10.14",
     "@prisma/client": "^6.16.1",
     "@prisma/extension-accelerate": "^2.0.2",
     "@react-email/render": "^2.0.0",

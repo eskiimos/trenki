@@ -66,3 +66,6 @@ __pycache__
 
 # Old project
 old-project/
+
+# Генерируются и проверяются заново внутри builder
+public/mediapipe/

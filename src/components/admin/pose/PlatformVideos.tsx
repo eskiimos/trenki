@@ -19,7 +19,7 @@ const mmss = (sec: number) => {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 };
 
-export default function PlatformVideos({ scope }: { scope: 'references' | 'library' }) {
+export default function PlatformVideos({ scope, purpose = 'reference' }: { scope: 'references' | 'library'; purpose?: 'reference' | 'assessment' }) {
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<VideoRow[] | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -100,7 +100,7 @@ export default function PlatformVideos({ scope }: { scope: 'references' | 'libra
         />
       )}
       {rows?.map((video) => (
-        <Link key={video.id} href={`/admin/pose/${video.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+        <Link key={video.id} href={purpose === 'assessment' ? `/admin/pose/test/${video.id}` : `/admin/pose/${video.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
           <AdminCard style={{ padding: '12px 14px' }}>
             <div className="flex items-center gap-3">
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -116,7 +116,7 @@ export default function PlatformVideos({ scope }: { scope: 'references' | 'libra
                 </div>
               </div>
               <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-brand)', flexShrink: 0 }}>
-                {video.poseReference ? 'Открыть эталон' : 'Выбрать видео'}
+                {purpose === 'assessment' ? 'Тест с камерой' : video.poseReference ? 'Открыть эталон' : 'Выбрать видео'}
               </span>
               <ChevronRight size={20} style={{ color: 'var(--color-muted)', flexShrink: 0 }} aria-hidden />
             </div>

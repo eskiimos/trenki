@@ -60,3 +60,6 @@ logs/
 
 # локальные эталоны трекинга без Cloudinary (dev)
 /.pose-dev/
+
+# MediaPipe WASM и модель: воспроизводимо готовятся перед dev/build
+/public/mediapipe/
