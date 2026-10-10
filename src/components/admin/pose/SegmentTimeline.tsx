@@ -6,8 +6,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Plus, RotateCcw, Trash2, Undo2 } from 'lucide-react';
-import { AdminButton } from '@/components/admin/ui';
-import { activeMs, normalizeSegments, type Segment } from '@/lib/pose/segments';
+import { AdminButton, inputStyle } from '@/components/admin/ui';
+import { activeMs, normalizeSegments, parseSegments, type Segment } from '@/lib/pose/segments';
+import { assessmentPreset, ASSESSMENT_PROFILES } from '@/lib/pose/assessment-settings';
+import AssessmentSettingsEditor from './AssessmentSettingsEditor';
 
 const BAR_H = 44;
 const MIN_SEGMENT_MS = 500;
@@ -40,6 +42,7 @@ export default function SegmentTimeline({
   const [segments, setSegments] = useState<Segment[]>(initial);
   const [saved, setSaved] = useState<Segment[]>(initial);
   const [saving, setSaving] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<Drag | null>(null);
@@ -96,7 +99,14 @@ export default function SegmentTimeline({
 
   const addAtPlayhead = () => {
     const start = Math.min(currentMs, Math.max(0, durationMs - MIN_SEGMENT_MS));
-    const next = normalizeSegments([...segments, { startMs: start, endMs: Math.min(durationMs, start + NEW_SEGMENT_MS) }], durationMs);
+    const existing = indexAt(start);
+    if (existing >= 0) {
+      setSelectedIndex(existing);
+      setMsg({ type: 'err', text: 'В этом месте уже есть рабочий отрезок. Выберите паузу или поправьте его границы.' });
+      return;
+    }
+    const nextStart = segments.find((s) => s.startMs > start)?.startMs ?? durationMs;
+    const next = normalizeSegments([...segments, { startMs: start, endMs: Math.min(nextStart, start + NEW_SEGMENT_MS) }], durationMs);
     setSegments(next);
     setMsg(null);
   };
@@ -112,22 +122,29 @@ export default function SegmentTimeline({
   };
 
   const save = async () => {
+    const normalized = parseSegments(segments, durationMs);
+    if (!normalized) return;
     setSaving(true);
     setMsg(null);
-    const error = await onSave(segments);
+    let error: string | null;
+    try { error = await onSave(normalized); } catch { error = 'Не удалось сохранить разметку'; }
     setSaving(false);
     if (error) {
       setMsg({ type: 'err', text: error });
       return;
     }
-    setSaved(segments);
+    setSegments(normalized);
+    setSaved(normalized);
     setMsg({ type: 'ok', text: 'Разметка сохранена' });
   };
 
   const total = activeMs(segments);
+  const valid = parseSegments(segments, durationMs) !== null;
+  const selected = Math.min(selectedIndex, segments.length - 1);
+  const selectedSegment = segments[selected];
 
   return (
-    <div>
+    <fieldset disabled={saving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <div className="flex items-baseline justify-between gap-3 flex-wrap" style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 13, fontWeight: 800 }}>Рабочие отрезки</div>
         <div style={{ color: 'var(--color-muted)', fontSize: 12 }}>
@@ -174,6 +191,7 @@ export default function SegmentTimeline({
                 type="button"
                 aria-label={`${edge === 'start' ? 'Начало' : 'Конец'} отрезка ${mmss(edge === 'start' ? s.startMs : s.endMs)}`}
                 onPointerDown={(e) => {
+                  if (saving) return;
                   e.stopPropagation();
                   e.preventDefault();
                   dragRef.current = { index: i, edge };
@@ -213,7 +231,7 @@ export default function SegmentTimeline({
       )}
 
       <div className="flex flex-wrap gap-2" style={{ marginTop: 12 }}>
-        <AdminButton type="button" size="sm" icon={Check} disabled={!dirty || saving} onClick={save}>
+        <AdminButton type="button" size="sm" icon={Check} disabled={!dirty || saving || !valid} onClick={save}>
           {saving ? 'Сохраняю…' : 'Сохранить разметку'}
         </AdminButton>
         <AdminButton type="button" size="sm" tone="secondary" icon={Plus} onClick={addAtPlayhead}>
@@ -242,6 +260,23 @@ export default function SegmentTimeline({
           </AdminButton>
         )}
       </div>
-    </div>
+      {selectedSegment && <div style={{ marginTop: 20, borderTop: '1px solid var(--border-hairline)', paddingTop: 16 }}>
+        <label style={{ fontSize: 13, fontWeight: 700 }}>Настройки оценки отрезка
+          <select aria-label="Настройки оценки отрезка" value={selected} style={{ ...inputStyle, margin: '6px 0 12px' }} onChange={(e) => setSelectedIndex(Number(e.target.value))}>
+            {segments.map((segment, index) => <option key={index} value={index}>
+              {index + 1}. {mmss(segment.startMs)} — {mmss(segment.endMs)} · {ASSESSMENT_PROFILES[segment.assessment?.profile ?? 'balanced']}
+            </option>)}
+          </select>
+        </label>
+        <AssessmentSettingsEditor value={selectedSegment.assessment ?? assessmentPreset()} onChange={(assessment) => {
+          setSegments((prev) => prev.map((segment, index) => index === selected ? { ...segment, assessment } : segment));
+          setMsg(null);
+        }} />
+        {!valid && <p role="alert" style={{ color: 'var(--color-danger)', fontSize: 13 }}>
+          Задайте важность от 0 до 5 и хотя бы один обязательный сустав с ненулевой важностью. Отрезки с разными настройками не должны пересекаться.
+        </p>}
+        <p style={{ color: 'var(--color-muted)', fontSize: 12 }}>Сохраните разметку, чтобы применить настройки в тесте. Повторная авторазметка заменяет отрезки и возвращает профиль «Всё тело».</p>
+      </div>}
+    </fieldset>
   );
 }

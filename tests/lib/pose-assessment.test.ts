@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
   accumulateAssessmentSample,
   assessmentSampleDuration,
+  assessmentSummaryReliability,
+  assessmentSettingsAt,
   createAssessmentAccumulator,
   evaluatePoseAssessment,
   prepareAssessmentReference,
   summarizeAssessment,
 } from '../../src/lib/pose/assessment';
 import { encodeFrame, LANDMARKS, LM, type Landmark, type PoseReferenceDoc } from '../../src/lib/pose/reference';
+import { assessmentPreset } from '../../src/lib/pose/assessment-settings';
 import type { Segment } from '../../src/lib/pose/segments';
 
 type PointOverrides = Record<number, Partial<Landmark>>;
@@ -205,6 +208,7 @@ describe('time and joint weighted session summary', () => {
     accumulateAssessmentSample(accumulator, evaluatePoseAssessment(ref, [0], 0), 100);
     expect(summarizeAssessment(accumulator)).toEqual({
       score: 50, similarityScore: 100, coverageRatio: 0.5, activeMs: 200, scoredMs: 100, samples: 2,
+      cameraMissingMs: 100, cameraPartialMs: 0, referenceUnavailableMs: 0, referenceCoverageRatio: 1,
     });
   });
 
@@ -229,16 +233,16 @@ describe('time and joint weighted session summary', () => {
   });
 
   it('penalizes camera joint gaps while invisible reference joints are outside the denominator', () => {
-    const partial = pose(0, {}, [LM.lAnkle, LM.rAnkle, LM.lWrist, LM.rWrist]);
+    const partial = pose(0, {}, [LM.lWrist]);
     const fullReference = reference();
     const cameraPartial = evaluatePoseAssessment(fullReference, partial, 0, 'same');
     expect(cameraPartial.status).toBe('scored');
-    expect(cameraPartial.comparedAngles).toBe(5);
+    expect(cameraPartial.comparedAngles).toBe(8);
     expect(cameraPartial.score).toBe(100);
     const accumulator = createAssessmentAccumulator();
     accumulateAssessmentSample(accumulator, cameraPartial, 100);
-    expect(summarizeAssessment(accumulator).score).toBe(59);
-    expect(summarizeAssessment(accumulator).coverageRatio).toBeCloseTo(5 / 8.5);
+    expect(summarizeAssessment(accumulator).score).toBe(91);
+    expect(summarizeAssessment(accumulator).coverageRatio).toBeCloseTo(7.75 / 8.5);
 
     const teacherPartial = evaluatePoseAssessment(reference([partial]), pose(), 0, 'same');
     const second = createAssessmentAccumulator();
@@ -253,6 +257,7 @@ describe('time and joint weighted session summary', () => {
     accumulateAssessmentSample(accumulator, evaluatePoseAssessment(reference(), camera, 0), 100);
     expect(summarizeAssessment(accumulator)).toEqual({
       score: null, similarityScore: null, coverageRatio: 0, activeMs: 100, scoredMs: 0, samples: 1,
+      cameraMissingMs: 0, cameraPartialMs: 100, referenceUnavailableMs: 0, referenceCoverageRatio: 1,
     });
   });
 
@@ -263,5 +268,101 @@ describe('time and joint weighted session summary', () => {
     expect(summarizeAssessment(accumulator).activeMs).toBe(0);
     accumulateAssessmentSample(accumulator, result, 10000);
     expect(summarizeAssessment(accumulator).activeMs).toBe(500);
+  });
+});
+
+describe('per-segment assessment profiles', () => {
+  const withProfile = (profile: 'balanced' | 'legs' | 'arms' | 'core', frames = [pose()]) =>
+    reference(frames, [{ startMs: 0, endMs: 1000, assessment: assessmentPreset(profile) }]);
+
+  it('ignores disabled arms for a leg exercise and increases their impact for an arm exercise', () => {
+    const wrongArm = pose(0, { [LM.lWrist]: { x: 0.6, y: -0.2 } });
+    expect(evaluatePoseAssessment(withProfile('legs'), wrongArm, 0, 'same').score).toBe(100);
+    const balanced = evaluatePoseAssessment(withProfile('balanced'), wrongArm, 0, 'same');
+    const arms = evaluatePoseAssessment(withProfile('arms'), wrongArm, 0, 'same');
+    expect(arms.score).toBeLessThan(balanced.score!);
+    expect(arms.angleErrors.some((angle) => angle.key === 'kneeL')).toBe(false);
+  });
+
+  it('requires the important leg joints even when many other angles are visible', () => {
+    const hiddenAnkle = pose(0, {}, [LM.lAnkle]);
+    expect(evaluatePoseAssessment(withProfile('legs'), hiddenAnkle, 0, 'same').status).toBe('insufficient_visibility');
+    expect(evaluatePoseAssessment(withProfile('arms'), hiddenAnkle, 0, 'same').status).toBe('scored');
+    expect(evaluatePoseAssessment(withProfile('legs', [hiddenAnkle]), pose(), 0, 'same').status).toBe('no_reference_pose');
+  });
+
+  it('allows a core-only profile to compare its one required angle', () => {
+    const hiddenLegs = pose(0, {}, [LM.lKnee, LM.rKnee, LM.lWrist, LM.rWrist]);
+    const result = evaluatePoseAssessment(withProfile('core'), hiddenLegs, 0, 'same');
+    expect(result.status).toBe('scored');
+    expect(result.comparedAngles).toBe(1);
+    expect(result.score).toBe(100);
+  });
+
+  it('maps unilateral required joints to the chosen side mode', () => {
+    const settings = assessmentPreset('core');
+    settings.profile = 'custom'; settings.weights.trunk = 0; settings.weights.kneeL = 1; settings.requiredAngles = ['kneeL'];
+    const ref = reference([pose()], [{ startMs: 0, endMs: 1000, assessment: settings }]);
+    const rightHidden = pose(0, {}, [LM.rAnkle]);
+    expect(evaluatePoseAssessment(ref, rightHidden, 0, 'same').score).toBe(100);
+    expect(evaluatePoseAssessment(ref, rightHidden, 0, 'opposite').score).toBeNull();
+  });
+
+  it('applies the configured tolerance and keeps the shape beyond the noise floor', () => {
+    const radians = 20 * Math.PI / 180;
+    const camera = pose(0, { [LM.lWrist]: { x: 0.2 + 0.3 * Math.sin(radians), y: -0.2 + 0.3 * Math.cos(radians) } });
+    const tolerant = assessmentPreset(); tolerant.toleranceDeg = 25;
+    expect(evaluatePoseAssessment(withProfile('balanced'), camera, 0, 'same').score).toBeLessThan(100);
+    expect(evaluatePoseAssessment(reference([pose()], [{ startMs: 0, endMs: 1000, assessment: tolerant }]), camera, 0, 'same').score).toBe(100);
+  });
+
+  it('never borrows a teacher frame from an adjacent different exercise', () => {
+    const ref = reference([pose(400), pose(700)], [
+      { startMs: 0, endMs: 500, assessment: assessmentPreset('legs') },
+      { startMs: 500, endMs: 1000, assessment: assessmentPreset('arms') },
+    ]);
+    expect(evaluatePoseAssessment(ref, pose(), 500, 'same').status).toBe('reference_gap');
+    expect(assessmentSettingsAt(ref, 100).profile).toBe('legs');
+    expect(assessmentSettingsAt(ref, 600).profile).toBe('arms');
+  });
+
+  it('selects the next work profile while the trainer is explaining', () => {
+    const ref = reference([pose()], [{ startMs: 500, endMs: 1000, assessment: assessmentPreset('arms') }]);
+    expect(assessmentSettingsAt(ref, 0).profile).toBe('arms');
+  });
+});
+
+describe('overall result reliability', () => {
+  const good = () => evaluatePoseAssessment(reference(), pose(), 0, 'same');
+  const credit = (accumulator: ReturnType<typeof createAssessmentAccumulator>, sample: ReturnType<typeof good>, count: number) => {
+    for (let i = 0; i < count; i++) accumulateAssessmentSample(accumulator, sample, 500);
+  };
+  it('does not endorse a perfect percentage from a short observation', () => {
+    const acc = createAssessmentAccumulator(); credit(acc, good(), 5);
+    expect(summarizeAssessment(acc).score).toBe(100);
+    expect(assessmentSummaryReliability(summarizeAssessment(acc)).reliable).toBe(false);
+    credit(acc, good(), 1);
+    expect(assessmentSummaryReliability(summarizeAssessment(acc)).reliable).toBe(true);
+  });
+  it('separates low movement similarity from poor observation quality', () => {
+    const acc = createAssessmentAccumulator(); credit(acc, { ...good(), score: 0 }, 6);
+    expect(summarizeAssessment(acc).score).toBe(0);
+    expect(assessmentSummaryReliability(summarizeAssessment(acc)).reliable).toBe(true);
+  });
+  it('keeps camera losses in the denominator and exposes their duration', () => {
+    const acc = createAssessmentAccumulator(); credit(acc, good(), 6);
+    credit(acc, evaluatePoseAssessment(reference(), [0], 0), 6);
+    const summary = summarizeAssessment(acc);
+    expect(summary).toMatchObject({ score: 50, similarityScore: 100, cameraMissingMs: 3000, coverageRatio: 0.5 });
+    expect(assessmentSummaryReliability(summary).reliable).toBe(false);
+  });
+  it('does not endorse a result computed from a tiny usable part of the teacher reference', () => {
+    const acc = createAssessmentAccumulator(); credit(acc, good(), 6);
+    credit(acc, evaluatePoseAssessment(reference([[0]]), pose(), 0), 6);
+    const summary = summarizeAssessment(acc);
+    expect(summary.score).toBe(100);
+    expect(summary.referenceCoverageRatio).toBe(0.5);
+    expect(summary.referenceUnavailableMs).toBe(3000);
+    expect(assessmentSummaryReliability(summary).message).toMatch(/эталона/);
   });
 });

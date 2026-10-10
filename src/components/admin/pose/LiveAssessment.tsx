@@ -7,8 +7,10 @@ import { AdminButton, AdminCard, SectionTitle, inputStyle } from '@/components/a
 import { frameIndexAt } from '@/lib/pose/reference';
 import {
   accumulateAssessmentSample, assessmentSampleDuration, createAssessmentAccumulator, evaluatePoseAssessment,
-  prepareAssessmentReference, summarizeAssessment,
+  prepareAssessmentReference, summarizeAssessment, assessmentSettingsAt, assessmentSummaryReliability,
 } from '@/lib/pose/assessment';
+import { ASSESSMENT_PROFILES } from '@/lib/pose/assessment-settings';
+import { advanceReadiness, checkAssessmentReadiness, initialReadiness, READINESS_MAX_GAP_MS } from '@/lib/pose/readiness';
 import { containRect, drawSkeleton } from './draw';
 import { loadAssessmentReference } from './reference-client';
 import { usePoseCamera } from './usePoseCamera';
@@ -32,6 +34,8 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
   const [delayMs, setDelayMs] = useState(500);
   const [buffering, setBuffering] = useState(false);
   const [positionMs, setPositionMs] = useState(0);
+  const [readiness, setReadiness] = useState(initialReadiness);
+  const readinessRef = useRef(initialReadiness());
   const trainerRef = useRef<HTMLVideoElement>(null);
   const trainerCanvasRef = useRef<HTMLCanvasElement>(null);
   const phaseRef = useRef<Phase>('ready');
@@ -39,6 +43,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
   const clockRef = useRef<{ mediaMs: number; capturedAtMs: number } | null>(null);
   const accumulatorRef = useRef(createAssessmentAccumulator());
   const prepared = useMemo(() => loaded ? prepareAssessmentReference(loaded.doc, loaded.detail.reference?.segments ?? []) : null, [loaded]);
+  const clearReadiness = useCallback(() => { const next = initialReadiness(); readinessRef.current = next; setReadiness(next); }, []);
 
   const changePhase = useCallback((next: Phase) => { phaseRef.current = next; setPhase(next); }, []);
   const markBuffering = useCallback((next: boolean) => { bufferingRef.current = next; setBuffering(next); }, []);
@@ -58,6 +63,12 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
   const { videoRef: cameraVideoRef, canvasRef: cameraCanvasRef, status: cameraStatus, error: cameraError, start: startCamera, stop: stopCamera } = usePoseCamera({
     onFrame: (frame, capturedAtMs) => {
       const video = trainerRef.current;
+      if (prepared && video) {
+        const settings = assessmentSettingsAt(prepared, phaseRef.current === 'finished' ? 0 : video.currentTime * 1000 - delayMs);
+        const next = advanceReadiness(readinessRef.current, checkAssessmentReadiness(frame, settings, sideMode), capturedAtMs, JSON.stringify({ settings, sideMode }));
+        readinessRef.current = next;
+        setReadiness(next);
+      }
       if (!prepared || !video || phaseRef.current !== 'running' || bufferingRef.current || video.paused || video.seeking || video.readyState < 3) {
         clockRef.current = null;
         return;
@@ -75,8 +86,10 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
       setSummary(summarizeAssessment(accumulatorRef.current));
     },
     onUnavailable: () => {
+      const wasTraining = phaseRef.current === 'running' || phaseRef.current === 'paused';
+      clearReadiness();
       pause();
-      setMessage('Тренировка на паузе. Проверьте камеру и нажмите «Продолжить»');
+      setMessage(wasTraining ? 'Тренировка на паузе. Проверьте камеру и нажмите «Продолжить»' : 'Проверка готовности прервана. Вернитесь к камере и дождитесь окончания отсчёта.');
     },
   });
 
@@ -93,12 +106,17 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
     if (!loaded) return;
     let raf = 0;
     let previous = '';
+    let lastPositionUpdate = -Infinity;
     const tick = () => {
       raf = requestAnimationFrame(tick);
       const video = trainerRef.current;
       const canvas = trainerCanvasRef.current;
       if (!video || !canvas) return;
       const ms = video.currentTime * 1000;
+      if (performance.now() - lastPositionUpdate >= 100) {
+        lastPositionUpdate = performance.now();
+        setPositionMs(ms);
+      }
       const index = frameIndexAt(loaded.doc.frames, ms);
       const dpr = window.devicePixelRatio || 1;
       const w = video.clientWidth, h = video.clientHeight;
@@ -113,7 +131,6 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
         drawSkeleton(ctx, frame && Math.abs(frame[0] - ms) <= 150 ? frame : undefined,
           containRect(w, h, video.videoWidth || loaded.doc.width, video.videoHeight || loaded.doc.height), dpr);
       }
-      setPositionMs(ms);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
@@ -126,11 +143,25 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
     setLive(null);
     markBuffering(false);
     stopCamera();
+    clearReadiness();
+  };
+
+  const readyForPlayback = (video: HTMLVideoElement) => {
+    if (!prepared || !prepared.segments.length || cameraStatus !== 'ready') return false;
+    const settings = assessmentSettingsAt(prepared, phaseRef.current === 'finished' || video.ended ? 0 : video.currentTime * 1000 - delayMs);
+    const gate = readinessRef.current;
+    return gate.ready && gate.signature === JSON.stringify({ settings, sideMode }) && gate.lastFrameMs !== null
+      && performance.now() - gate.lastFrameMs <= READINESS_MAX_GAP_MS && !document.hidden;
   };
 
   const start = async () => {
     const video = trainerRef.current;
-    if (!video || !loaded || !prepared || !prepared.segments.length || cameraStatus !== 'ready') return;
+    if (!video || !loaded || !prepared) return;
+    if (!readyForPlayback(video)) {
+      clearReadiness();
+      setMessage('Проверка готовности прервана. Дождитесь нового отсчёта перед запуском.');
+      return;
+    }
     setMessage(null);
     if (phase === 'finished' || video.ended) {
       resetScore();
@@ -145,7 +176,11 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
   const segments = loaded?.detail.reference?.segments ?? [];
   // Preloading is a browser hint. Let the user's tap start loading/playback,
   // even if the trainer has not emitted loadedmetadata yet.
-  const canStart = !!prepared && !!segments.length && cameraStatus === 'ready';
+  const settings = prepared ? assessmentSettingsAt(prepared, phase === 'finished' ? 0 : positionMs - delayMs) : null;
+  const canStart = !!settings && !!segments.length && cameraStatus === 'ready' && readiness.ready
+    && readiness.signature === JSON.stringify({ settings, sideMode });
+  const reliability = assessmentSummaryReliability(summary);
+  const overallScore = reliability.reliable ? summary.score : null;
   const optionsLocked = phase === 'running' || phase === 'paused';
   const statusText = phase === 'finished' ? 'Тест завершён'
     : phase === 'paused' ? 'Пауза'
@@ -153,7 +188,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
     : phase === 'running' ? live?.message || 'Определяю положение тела…'
     : !segments.length ? 'Для оценки разметьте рабочие отрезки в эталоне. Камеру можно включить для проверки.'
     : cameraStatus === 'loading' ? 'Включаю камеру и загружаю распознавание…'
-    : cameraStatus === 'ready' ? 'Встаньте так, чтобы камера видела всё тело, и запустите тренировку'
+    : cameraStatus === 'ready' ? readiness.ready ? 'Камера готова. Запустите тренировку' : readiness.message
     : 'Включите камеру, затем запустите тренировку';
 
   if (loadError) return <AdminCard tone="danger" role="alert">
@@ -173,6 +208,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
         Повторяйте движения тренера. Оценка идёт только в рабочих отрезках; объяснения и паузы не учитываются.
         Камера обрабатывается на вашем устройстве, запись не отправляется на сервер.
       </p>
+      {settings && <p style={{ color: 'var(--color-muted)', fontSize: 13 }}>Профиль оценки: {ASSESSMENT_PROFILES[settings.profile]} · допуск {settings.toleranceDeg}°. <Link href={`/admin/pose/${videoId}`} style={{ textDecoration: 'underline' }}>Настроить отрезки</Link></p>}
       {!segments.length && <p role="alert" style={{ color: 'var(--color-danger)', marginBottom: 0 }}>
         В эталоне нет рабочих отрезков. <Link href={`/admin/pose/${videoId}`} style={{ textDecoration: 'underline' }}>Разметьте упражнение в эталоне</Link>, затем откройте тест заново.
       </p>}
@@ -184,7 +220,8 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
           style={{ width: '100%', height: '100%', objectFit: 'contain' }}
           onError={() => { pause(); setMessage('Не удалось загрузить видео. Откройте тест заново, чтобы обновить ссылку'); }}
           onPlay={() => {
-            if (cameraStatus !== 'ready' || !segments.length) { trainerRef.current?.pause(); return; }
+            // Native video controls must obey the same readiness gate as Start.
+            if (phaseRef.current !== 'running' && !readyForPlayback(trainerRef.current!)) { trainerRef.current?.pause(); return; }
             if (phaseRef.current === 'finished') resetScore();
             changePhase('running');
           }}
@@ -200,6 +237,10 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
         <video ref={cameraVideoRef} muted autoPlay playsInline
           style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scaleX(-1)' }} />
         <canvas ref={cameraCanvasRef} style={{ ...overlayStyle, transform: 'scaleX(-1)' }} />
+        {cameraStatus === 'ready' && phase !== 'running' && segments.length > 0 && <div aria-hidden="true"
+          style={{ position: 'absolute', top: 10, left: 10, right: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.7)', color: '#fff', textAlign: 'center', fontSize: 16, fontWeight: 700, pointerEvents: 'none' }}>
+          {canStart ? 'Камера готова' : readiness.sinceMs !== null ? `Подготовка · ${readiness.secondsLeft}` : 'Проверьте положение перед камерой'}
+        </div>}
         {cameraStatus !== 'ready' && <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'var(--color-muted)', padding: 20, textAlign: 'center' }}>
           {cameraStatus === 'loading' ? 'Включаю камеру и загружаю распознавание…' : 'Камера выключена'}
         </div>}
@@ -211,14 +252,16 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
         <div>
           <SectionTitle>{phase === 'finished' ? 'Результат занятия' : 'Текущая оценка'}</SectionTitle>
           <div data-testid="live-score" style={{ fontSize: 48, fontWeight: 800, color: 'var(--color-brand)', lineHeight: 1 }}>
-            {percent(phase === 'finished' ? summary.score : phase === 'running' ? live?.score ?? null : null)}
+            {percent(phase === 'finished' ? overallScore : phase === 'running' ? live?.score ?? null : null)}
           </div>
         </div>
         <div className="flex flex-wrap gap-6">
-          <Metric label="Оценка занятия" value={percent(summary.score)} />
+          <Metric label="Оценка занятия" value={percent(overallScore)} />
           <Metric label="Сходство видимых поз" value={percent(summary.similarityScore)} />
           <Metric label="Покрытие оценки" value={summary.activeMs ? `${Math.round(summary.coverageRatio * 100)}%` : '—'} />
           <Metric label="Рабочее время" value={time(summary.activeMs)} />
+          <Metric label="Достоверность данных" value={phase === 'finished' ? reliability.reliable ? 'Достаточно' : 'Недостаточно'
+            : phase === 'running' ? live?.status === 'scored' ? 'Достаточно' : live?.status === 'inactive' ? 'Отдых' : 'Недостаточно' : '—'} />
         </div>
       </div>
       <p role="status" style={{ fontSize: 14, fontWeight: 600, margin: '16px 0 0' }}>{statusText}</p>
@@ -228,6 +271,14 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
         </span>)}
       </div>}
       {phase === 'finished' && summary.activeMs === 0 && <p style={{ color: 'var(--color-muted)', fontSize: 13 }}>Вы не дошли до рабочего отрезка с пригодным эталоном. Итоговой оценки пока нет.</p>}
+      {(summary.activeMs > 0 || summary.referenceUnavailableMs > 0 || phase === 'finished') && <div style={{ fontSize: 13, marginTop: 12 }}>
+        <p role="status" style={{ color: reliability.reliable ? 'var(--color-brand)' : 'var(--color-muted)' }}>{reliability.message}</p>
+        <div className="flex flex-wrap gap-4">
+          <Metric label="Человек не распознан" value={time(summary.cameraMissingMs)} />
+          <Metric label="Не хватало видимости суставов" value={time(summary.cameraPartialMs)} />
+          <Metric label="Непригодные кадры эталона" value={time(summary.referenceUnavailableMs)} />
+        </div>
+      </div>}
       <p style={{ color: 'var(--color-muted)', fontSize: 12, marginBottom: 0 }}>
         Экспериментальная оценка сходства поз по углам суставов. Итог учитывает видимость тела: пропущенные камерой движения снижают результат.
         Ракурс и освещение влияют на точность; это тест алгоритма, а не оценка тренера.
@@ -237,30 +288,38 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
     {(cameraError || message) && <AdminCard tone={cameraError ? 'danger' : 'default'} role={cameraError ? 'alert' : 'status'}>
       {cameraError || message}
     </AdminCard>}
+    {cameraStatus === 'ready' && phase !== 'running' && segments.length > 0 && <AdminCard tone={canStart ? 'accent' : 'default'}>
+      <SectionTitle>Проверка готовности · {settings && ASSESSMENT_PROFILES[settings.profile]}</SectionTitle>
+      <div data-testid="readiness-status" role="status" style={{ fontSize: 16, fontWeight: 700 }}>
+        {canStart ? 'Готово — можно начинать' : readiness.sinceMs !== null ? `Подготовка · ${readiness.secondsLeft}` : 'Проверьте положение перед камерой'}
+      </div>
+      <p style={{ fontSize: 13, marginBottom: 0 }}>{readiness.message}</p>
+      <p style={{ color: 'var(--color-muted)', fontSize: 12, marginBottom: 0 }}>Нужные части тела должны быть видны 3 секунды подряд. Затем нажмите кнопку запуска. При потере видимости отсчёт начнётся заново.</p>
+    </AdminCard>}
     <div className="flex flex-wrap gap-3">
-      {cameraStatus === 'off' && <AdminButton icon={Camera} onClick={() => void startCamera()}>Включить камеру</AdminButton>}
+      {cameraStatus === 'off' && <AdminButton icon={Camera} onClick={() => { clearReadiness(); void startCamera(); }}>Включить камеру</AdminButton>}
       <AdminButton icon={Play} disabled={!canStart || phase === 'running'} onClick={() => void start()}>
         {phase === 'running' ? 'Тренировка идёт' : phase === 'paused' ? 'Продолжить' : phase === 'finished' ? 'Новая тренировка' : 'Запустить тренировку'}
       </AdminButton>
       {phase === 'running' && <AdminButton tone="secondary" icon={Pause} onClick={pause}>Пауза</AdminButton>}
       {(phase === 'running' || phase === 'paused') && <AdminButton tone="secondary" icon={Square} onClick={finish}>Завершить</AdminButton>}
-      {cameraStatus !== 'off' && <AdminButton tone="secondary" icon={CameraOff} onClick={() => { pause(); stopCamera(); }}>Выключить камеру</AdminButton>}
+      {cameraStatus !== 'off' && <AdminButton tone="secondary" icon={CameraOff} onClick={() => { pause(); stopCamera(); clearReadiness(); }}>Выключить камеру</AdminButton>}
       {phase !== 'running' && <AdminButton tone="secondary" icon={RotateCcw} onClick={() => {
-        resetScore(); changePhase('ready'); setMessage(null); const v = trainerRef.current; if (v) v.currentTime = 0;
+        resetScore(); clearReadiness(); changePhase('ready'); setMessage(null); const v = trainerRef.current; if (v) v.currentTime = 0;
       }}>Сбросить тест</AdminButton>}
     </div>
     <AdminCard>
       <SectionTitle>Как повторять движения</SectionTitle>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label style={{ fontSize: 13 }}>Стороны тела
-          <select aria-label="Стороны тела" value={sideMode} disabled={optionsLocked} onChange={(e) => { setSideMode(e.target.value as 'same' | 'opposite'); resetScore(); }} style={{ ...inputStyle, marginTop: 6 }}>
+          <select aria-label="Стороны тела" value={sideMode} disabled={optionsLocked} onChange={(e) => { setSideMode(e.target.value as 'same' | 'opposite'); resetScore(); clearReadiness(); }} style={{ ...inputStyle, marginTop: 6 }}>
             <option value="opposite">Зеркально, как перед тренером</option>
             <option value="same">Та же сторона тела, что у тренера</option>
           </select>
         </label>
         <label style={{ fontSize: 13 }}>Время на повтор движения: {(delayMs / 1000).toFixed(1)} с
           <input aria-label="Задержка повторения движения" type="range" min={0} max={1500} step={100} value={delayMs} disabled={optionsLocked}
-            onChange={(e) => { setDelayMs(Number(e.target.value)); resetScore(); }} style={{ width: '100%', marginTop: 16, accentColor: 'var(--color-brand)' }} />
+            onChange={(e) => { setDelayMs(Number(e.target.value)); resetScore(); clearReadiness(); }} style={{ width: '100%', marginTop: 16, accentColor: 'var(--color-brand)' }} />
         </label>
       </div>
       <p style={{ color: 'var(--color-muted)', fontSize: 13, marginBottom: 0 }}>Поставьте камеру на уровне таза, отойдите так, чтобы были видны руки и стопы. По возможности повторите ракурс тренера.</p>

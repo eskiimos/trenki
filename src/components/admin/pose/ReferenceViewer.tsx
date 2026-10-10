@@ -28,25 +28,27 @@ export default function ReferenceViewer({
   playbackUrl,
   durationMs,
   segments,
+  updatedAt,
 }: {
   videoId: string;
   playbackUrl: string;
   durationMs: number;
   segments: Segment[];
+  updatedAt: string;
 }) {
-  const [doc, setDoc] = useState<PoseReferenceDoc | null>(null);
+  const [loadedDoc, setLoadedDoc] = useState<{ videoId: string; doc: PoseReferenceDoc } | null>(null);
+  const doc = loadedDoc?.videoId === videoId ? loadedDoc.doc : null;
   const [error, setError] = useState<string | null>(null);
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [currentMs, setCurrentMs] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const versionRef = useRef(updatedAt);
 
   useEffect(() => {
     let cancelled = false;
-    setDoc(null);
-    setError(null);
     loadDoc(videoId)
-      .then((d) => !cancelled && setDoc(d))
+      .then((d) => { if (!cancelled) { setLoadedDoc({ videoId, doc: d }); setError(null); } })
       .catch((e) => !cancelled && setError(e instanceof Error ? e.message : 'Ошибка'));
     return () => {
       cancelled = true;
@@ -156,9 +158,10 @@ export default function ReferenceViewer({
             const res = await fetch(`/api/admin/pose-references/${videoId}/segments`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ segments: next }),
+              body: JSON.stringify({ segments: next, expectedUpdatedAt: versionRef.current }),
             });
             const d = await res.json().catch(() => ({}));
+            if (res.ok && typeof d.updatedAt === 'string') versionRef.current = d.updatedAt;
             return res.ok ? null : d?.error || 'Не удалось сохранить разметку';
           } catch {
             return 'Сетевая ошибка';
