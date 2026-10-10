@@ -5,17 +5,16 @@ import {
   frameIndexAt,
   hasPose,
   jointAngle,
-  LM,
   point2d,
   point3d,
   validateReferenceDoc,
-  type AngleKey,
   type PoseReferenceDoc,
 } from '@/lib/pose/reference';
-import { isActiveAt, parseSegments, type Segment } from '@/lib/pose/segments';
+import { parseSegments, type Segment } from '@/lib/pose/segments';
 
 export type AssessmentSideMode = 'same' | 'opposite';
-export type AssessmentAngleKey = AngleKey | 'shoulderL' | 'shoulderR';
+export type { AssessmentAngleKey } from './assessment-settings';
+import { ASSESSMENT_ANGLES as ANGLES, REQUIRED_POINTS, OPPOSITE, assessmentPreset, type AssessmentAngleKey, type AssessmentSettings } from './assessment-settings';
 export type AssessmentGroup = 'legs' | 'arms' | 'trunk';
 export type AssessmentStatus =
   | 'scored'
@@ -32,6 +31,8 @@ export const ASSESSMENT_MAX_FRAME_DISTANCE_MS = 150;
 export const ASSESSMENT_MIN_ANGLES = 4;
 export const ASSESSMENT_MIN_VISIBILITY = 0.6;
 export const ASSESSMENT_MAX_SAMPLE_MS = 500;
+export const ASSESSMENT_MIN_COVERAGE = 0.75;
+export const ASSESSMENT_MIN_SCORED_MS = 3000;
 
 export interface AssessmentClock { mediaMs: number; capturedAtMs: number }
 
@@ -45,35 +46,11 @@ export function assessmentSampleDuration(previous: AssessmentClock | null, curre
   return Math.min(elapsed, ASSESSMENT_MAX_SAMPLE_MS);
 }
 
-const ANGLES: AssessmentAngleKey[] = [
-  'kneeL', 'kneeR', 'hipL', 'hipR', 'elbowL', 'elbowR', 'shoulderL', 'shoulderR', 'trunk',
-];
-const WEIGHTS: Record<AssessmentAngleKey, number> = {
-  kneeL: 1, kneeR: 1, hipL: 1, hipR: 1,
-  elbowL: 0.75, elbowR: 0.75, shoulderL: 1, shoulderR: 1, trunk: 1,
-};
 const GROUPS: Record<AssessmentGroup, { label: string; angles: AssessmentAngleKey[] }> = {
   legs: { label: 'Ноги и таз', angles: ['kneeL', 'kneeR', 'hipL', 'hipR'] },
   arms: { label: 'Руки и плечи', angles: ['elbowL', 'elbowR', 'shoulderL', 'shoulderR'] },
   trunk: { label: 'Корпус', angles: ['trunk'] },
 };
-const OPPOSITE: Record<AssessmentAngleKey, AssessmentAngleKey> = {
-  kneeL: 'kneeR', kneeR: 'kneeL', hipL: 'hipR', hipR: 'hipL',
-  elbowL: 'elbowR', elbowR: 'elbowL', shoulderL: 'shoulderR', shoulderR: 'shoulderL',
-  trunk: 'trunk',
-};
-const REQUIRED_POINTS: Record<AssessmentAngleKey, number[]> = {
-  kneeL: [LM.lHip, LM.lKnee, LM.lAnkle],
-  kneeR: [LM.rHip, LM.rKnee, LM.rAnkle],
-  hipL: [LM.lShoulder, LM.lHip, LM.lKnee],
-  hipR: [LM.rShoulder, LM.rHip, LM.rKnee],
-  elbowL: [LM.lShoulder, LM.lElbow, LM.lWrist],
-  elbowR: [LM.rShoulder, LM.rElbow, LM.rWrist],
-  shoulderL: [LM.lHip, LM.lShoulder, LM.lElbow],
-  shoulderR: [LM.rHip, LM.rShoulder, LM.rElbow],
-  trunk: [LM.lShoulder, LM.rShoulder, LM.lHip, LM.rHip],
-};
-
 type Angles = Record<AssessmentAngleKey, number | null>;
 interface AssessmentReferenceFrame {
   timeMs: number;
@@ -118,13 +95,13 @@ export interface PoseAssessmentResult {
   angleErrors: AssessmentAngleError[];
 }
 
-function usablePoint(frame: number[], id: number): boolean {
+export function usableAssessmentPoint(frame: number[], id: number): boolean {
   const { x, y, v } = point2d(frame, id);
   return Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(v)
     && x >= 0 && x <= 1 && y >= 0 && y <= 1 && v >= ASSESSMENT_MIN_VISIBILITY;
 }
 
-function assessmentAngles(frame: number[]): Angles {
+export function assessmentAngles(frame: number[]): Angles {
   const angles: Angles = { ...frameAngles(frame), shoulderL: null, shoulderR: null };
   if (!hasPose(frame)) return angles;
   for (const key of ['shoulderL', 'shoulderR'] as const) {
@@ -133,7 +110,7 @@ function assessmentAngles(frame: number[]): Angles {
     angles[key] = Number.isFinite(degrees) ? degrees : null;
   }
   for (const key of ANGLES) {
-    if (!REQUIRED_POINTS[key].every((id) => usablePoint(frame, id))) angles[key] = null;
+    if (!REQUIRED_POINTS[key].every((id) => usableAssessmentPoint(frame, id))) angles[key] = null;
   }
   return angles;
 }
@@ -152,9 +129,9 @@ export function prepareAssessmentReference(doc: PoseReferenceDoc, segments: Segm
   };
 }
 
-/** Small deviations tolerate model noise; a difference of 65° or more scores zero. */
-function angleScore(errorDeg: number): number {
-  return Math.max(0, Math.min(100, 100 * (1 - Math.max(0, errorDeg - 5) / 60)));
+/** Configured tolerance is the noise floor; the next 60° reduce similarity to zero. */
+function angleScore(errorDeg: number, toleranceDeg: number): number {
+  return Math.max(0, Math.min(100, 100 * (1 - Math.max(0, errorDeg - toleranceDeg) / 60)));
 }
 
 function unavailable(status: Exclude<AssessmentStatus, 'scored'>, message: string): PoseAssessmentResult {
@@ -175,19 +152,26 @@ export function evaluatePoseAssessment(
   if (!Number.isFinite(videoTimeMs) || videoTimeMs < 0 || videoTimeMs >= reference.durationMs) {
     return unavailable('out_of_range', 'Время вне длительности эталона.');
   }
-  if (!isActiveAt(reference.segments, videoTimeMs)) return unavailable('inactive', 'Объяснение или отдых — оценка приостановлена.');
+  const segment = reference.segments.find((s) => videoTimeMs >= s.startMs && videoTimeMs < s.endMs);
+  if (!segment) return unavailable('inactive', 'Объяснение или отдых — оценка приостановлена.');
   const index = frameIndexAt(reference.times, videoTimeMs);
   const teacher = reference.frames[index];
   // A frame outside the current work interval must not leak across its boundary.
   if (!teacher || Math.abs(teacher.timeMs - videoTimeMs) > ASSESSMENT_MAX_FRAME_DISTANCE_MS
-    || !isActiveAt(reference.segments, teacher.timeMs)) {
+    || teacher.timeMs < segment.startMs || teacher.timeMs >= segment.endMs) {
     return unavailable('reference_gap', 'Для этого момента нет близкого кадра эталона.');
   }
-  const referenceAngles = ANGLES.filter((key) => teacher.angles[key] != null);
-  if (!teacher.hasPose || referenceAngles.length < ASSESSMENT_MIN_ANGLES) {
+  const settings = segment.assessment ?? assessmentPreset();
+  const enabled = ANGLES.filter((key) => settings.weights[key] > 0);
+  const minAngles = Math.min(ASSESSMENT_MIN_ANGLES, enabled.length);
+  const totalWeight = enabled.reduce((sum, key) => sum + settings.weights[key], 0);
+  const referenceAngles = enabled.filter((key) => teacher.angles[key] != null);
+  const expectedWeight = referenceAngles.reduce((sum, key) => sum + settings.weights[key], 0);
+  if (!teacher.hasPose || referenceAngles.length < minAngles
+    || settings.requiredAngles.some((key) => teacher.angles[key] == null)
+    || expectedWeight / totalWeight < ASSESSMENT_MIN_COVERAGE) {
     return { ...unavailable('no_reference_pose', 'На этом кадре эталона тренер виден недостаточно.'), referenceTimeMs: teacher.timeMs };
   }
-  const expectedWeight = referenceAngles.reduce((sum, key) => sum + WEIGHTS[key], 0);
   if (!hasPose(cameraFrame)) {
     return {
       ...unavailable('no_camera_pose', 'Камера не видит человека. Встаньте целиком в кадр.'),
@@ -202,7 +186,7 @@ export function evaluatePoseAssessment(
     if (cameraDeg == null) continue;
     const referenceDeg = teacher.angles[key]!;
     const errorDeg = Math.abs(referenceDeg - cameraDeg);
-    angleErrors.push({ key, cameraKey, referenceDeg, cameraDeg, errorDeg, score: angleScore(errorDeg), weight: WEIGHTS[key] });
+    angleErrors.push({ key, cameraKey, referenceDeg, cameraDeg, errorDeg, score: angleScore(errorDeg, settings.toleranceDeg), weight: settings.weights[key] });
   }
   const comparedWeight = angleErrors.reduce((sum, error) => sum + error.weight, 0);
   const base = {
@@ -212,9 +196,10 @@ export function evaluatePoseAssessment(
     referenceTimeMs: teacher.timeMs,
     angleErrors,
   };
-  if (angleErrors.length < ASSESSMENT_MIN_ANGLES) {
+  if (angleErrors.length < minAngles || base.coverageRatio < ASSESSMENT_MIN_COVERAGE
+    || settings.requiredAngles.some((key) => camera[sideMode === 'opposite' ? OPPOSITE[key] : key] == null)) {
     return {
-      ...unavailable('insufficient_visibility', 'Недостаточно видимых суставов. Отойдите от камеры, чтобы тело помещалось целиком.'),
+      ...unavailable('insufficient_visibility', 'Не видны обязательные суставы или слишком мала видимая часть тела. Измените положение перед камерой.'),
       ...base,
     };
   }
@@ -241,6 +226,9 @@ export interface AssessmentAccumulator {
   expectedWeightMs: number;
   comparedWeightMs: number;
   scoreWeightMs: number;
+  cameraMissingMs: number;
+  cameraPartialMs: number;
+  referenceUnavailableMs: number;
 }
 export interface AssessmentSummary {
   /** Similarity multiplied by joint/time coverage; loss of camera pose cannot inflate it. */
@@ -251,10 +239,14 @@ export interface AssessmentSummary {
   activeMs: number;
   scoredMs: number;
   samples: number;
+  cameraMissingMs: number;
+  cameraPartialMs: number;
+  referenceUnavailableMs: number;
+  referenceCoverageRatio: number;
 }
 
 export function createAssessmentAccumulator(): AssessmentAccumulator {
-  return { activeMs: 0, scoredMs: 0, samples: 0, expectedWeightMs: 0, comparedWeightMs: 0, scoreWeightMs: 0 };
+  return { activeMs: 0, scoredMs: 0, samples: 0, expectedWeightMs: 0, comparedWeightMs: 0, scoreWeightMs: 0, cameraMissingMs: 0, cameraPartialMs: 0, referenceUnavailableMs: 0 };
 }
 
 /**
@@ -268,8 +260,14 @@ export function accumulateAssessmentSample(
   deltaMs: number,
 ): void {
   if (!Number.isFinite(deltaMs) || deltaMs <= 0) return;
-  if (!['scored', 'no_camera_pose', 'insufficient_visibility'].includes(result.status) || result.expectedWeight <= 0) return;
   const ms = Math.min(deltaMs, ASSESSMENT_MAX_SAMPLE_MS);
+  if (result.status === 'no_reference_pose' || result.status === 'reference_gap') {
+    accumulator.referenceUnavailableMs += ms;
+    return;
+  }
+  if (!['scored', 'no_camera_pose', 'insufficient_visibility'].includes(result.status) || result.expectedWeight <= 0) return;
+  if (result.status === 'no_camera_pose') accumulator.cameraMissingMs += ms;
+  if (result.status === 'insufficient_visibility') accumulator.cameraPartialMs += ms;
   accumulator.samples++;
   accumulator.activeMs += ms;
   accumulator.expectedWeightMs += result.expectedWeight * ms;
@@ -287,5 +285,29 @@ export function summarizeAssessment(accumulator: AssessmentAccumulator): Assessm
     similarityScore: assessed ? Math.round(scoreWeightMs / comparedWeightMs) : null,
     coverageRatio: expectedWeightMs > 0 ? comparedWeightMs / expectedWeightMs : 0,
     activeMs, scoredMs, samples,
+    cameraMissingMs: accumulator.cameraMissingMs,
+    cameraPartialMs: accumulator.cameraPartialMs,
+    referenceUnavailableMs: accumulator.referenceUnavailableMs,
+    referenceCoverageRatio: activeMs + accumulator.referenceUnavailableMs > 0 ? activeMs / (activeMs + accumulator.referenceUnavailableMs) : 0,
   };
+}
+
+/** Raw score remains diagnostic; present the overall result only with sufficient observations. */
+export function assessmentSummaryReliability(summary: AssessmentSummary): { reliable: boolean; message: string } {
+  if (summary.referenceUnavailableMs > 0 && summary.referenceCoverageRatio < ASSESSMENT_MIN_COVERAGE) {
+    return { reliable: false, message: 'Недостаточно пригодных кадров эталона. Проверьте видео и рабочие отрезки.' };
+  }
+  if (summary.scoredMs < ASSESSMENT_MIN_SCORED_MS) {
+    return { reliable: false, message: 'Недостаточно данных для надёжной оценки: нужно хотя бы 3 секунды распознанного выполнения.' };
+  }
+  if (summary.coverageRatio < ASSESSMENT_MIN_COVERAGE) {
+    return { reliable: false, message: 'Недостаточно данных для надёжной оценки: камера видела меньше 75% нужных суставов и рабочего времени.' };
+  }
+  return { reliable: true, message: 'Данных достаточно для сравнения с эталоном.' };
+}
+
+/** Readiness uses the current work profile, or the next one during explanations. */
+export function assessmentSettingsAt(reference: PreparedAssessmentReference, timeMs: number): AssessmentSettings {
+  const segment = reference.segments.find((s) => timeMs < s.endMs) ?? reference.segments[0];
+  return segment?.assessment ?? assessmentPreset();
 }

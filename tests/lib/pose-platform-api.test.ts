@@ -35,6 +35,7 @@ vi.mock('@/lib/pose/reference-storage', async (importOriginal) => ({
 import { GET as listVideos } from '@/app/api/admin/pose-references/route';
 import { GET as getVideo, PUT as saveReference } from '@/app/api/admin/pose-references/[videoId]/route';
 import { GET as getSource } from '@/app/api/admin/pose-references/[videoId]/source/route';
+import { assessmentPreset } from '@/lib/pose/assessment-settings';
 import { PUT as saveSegments } from '@/app/api/admin/pose-references/[videoId]/segments/route';
 
 const request = (query = '') => new NextRequest(`https://trenki.example.test/api/admin/pose-references${query}`);
@@ -128,14 +129,15 @@ describe('выбор видео платформы для pose', () => {
 
   it('ручная разметка блокирует ту же карточку и учитывает актуальную длительность эталона', async () => {
     mocks.referenceFind.mockResolvedValueOnce({ durationSec: 4 }).mockResolvedValueOnce({ durationSec: 2 });
+    mocks.referenceUpdate.mockResolvedValue({ updatedAt: new Date('2026-10-10T10:00:00.000Z') });
     const upload = new NextRequest('https://trenki.example.test/api/admin/pose-references/platform-video/segments', {
       method: 'PUT', body: JSON.stringify({ segments: [{ startMs: 500, endMs: 3500 }] }),
     });
     const result = await saveSegments(upload, ctx);
     expect(result.status).toBe(200);
-    expect(await result.json()).toEqual({ segments: [{ startMs: 500, endMs: 2000 }] });
+    expect(await result.json()).toEqual({ segments: [{ startMs: 500, endMs: 2000 }], updatedAt: '2026-10-10T10:00:00.000Z' });
     expect(mocks.queryRaw).toHaveBeenCalled();
-    expect(mocks.referenceUpdate).toHaveBeenCalledWith({ where: { videoId: 'platform-video' }, data: { segments: [{ startMs: 500, endMs: 2000 }] } });
+    expect(mocks.referenceUpdate).toHaveBeenCalledWith({ where: { videoId: 'platform-video' }, data: { segments: [{ startMs: 500, endMs: 2000 }] }, select: { updatedAt: true } });
   });
 
   it('выбранное HTTPS-видео скачивается через admin API и эталон сохраняется к тому же Video', async () => {
@@ -162,5 +164,34 @@ describe('выбор видео платформы для pose', () => {
       where: { videoId: 'platform-video' },
       create: expect.objectContaining({ videoId: 'platform-video', framesUrl: 's3://pose/references/platform-video.json.gz', frameCount: 2, createdById: 'admin-user' }),
     }));
+  });
+});
+
+describe('настройки оценки рабочих отрезков', () => {
+  const upload = (body: unknown) => new NextRequest('https://trenki.example.test/api/admin/pose-references/platform-video/segments', { method: 'PUT', body: JSON.stringify(body) });
+  it('сохраняет профиль и допуски вместе с отрезками и возвращает новую версию', async () => {
+    const currentVersion = '2026-10-10T10:00:00.000Z';
+    const nextVersion = '2026-10-10T10:01:00.000Z';
+    mocks.referenceFind.mockResolvedValue({ durationSec: 10, updatedAt: new Date(currentVersion) });
+    mocks.referenceUpdate.mockResolvedValue({ updatedAt: new Date(nextVersion) });
+    const segments = [{ startMs: 1000, endMs: 5000, assessment: { ...assessmentPreset('arms'), toleranceDeg: 12 } }];
+    const result = await saveSegments(upload({ segments, expectedUpdatedAt: currentVersion }), ctx);
+    expect(result.status).toBe(200);
+    expect(await result.json()).toEqual({ segments, updatedAt: nextVersion });
+    expect(mocks.referenceUpdate.mock.calls[0]![0].data.segments).toEqual(segments);
+  });
+  it('отвергает некорректные правила до записи в БД', async () => {
+    mocks.referenceFind.mockResolvedValue({ durationSec: 10 });
+    const result = await saveSegments(upload({ segments: [{ startMs: 0, endMs: 1000, assessment: { profile: 'legs' } }] }), ctx);
+    expect(result.status).toBe(400);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.referenceUpdate).not.toHaveBeenCalled();
+  });
+  it('не накладывает устаревшие правки на заменённый эталон или изменения другого администратора', async () => {
+    mocks.referenceFind.mockResolvedValue({ durationSec: 10, updatedAt: new Date('2026-10-10T10:01:00.000Z') });
+    const result = await saveSegments(upload({ segments: [{ startMs: 0, endMs: 1000 }], expectedUpdatedAt: '2026-10-10T10:00:00.000Z' }), ctx);
+    expect(result.status).toBe(409);
+    expect(mocks.queryRaw).toHaveBeenCalled();
+    expect(mocks.referenceUpdate).not.toHaveBeenCalled();
   });
 });

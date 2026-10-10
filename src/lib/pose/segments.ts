@@ -7,10 +7,12 @@
 // таймлайне. Чистая логика без БД — тесты в tests/lib/pose-segments.test.ts.
 
 import { frameAngles, hasPose, type AngleKey } from '@/lib/pose/reference';
+import { parseAssessmentSettings, type AssessmentSettings } from './assessment-settings';
 
 export interface Segment {
   startMs: number;
   endMs: number;
+  assessment?: AssessmentSettings;
 }
 
 /** Углы, по которым судим о движении: ноги, таз, руки, корпус. */
@@ -141,13 +143,14 @@ export function normalizeSegments(segments: Segment[], durationMs: number): Segm
     .map((s) => ({
       startMs: Math.max(0, Math.round(Math.min(s.startMs, s.endMs))),
       endMs: Math.min(durationMs, Math.round(Math.max(s.startMs, s.endMs))),
+      ...(s.assessment ? { assessment: s.assessment } : {}),
     }))
     .filter((s) => s.endMs > s.startMs)
     .sort((a, b) => a.startMs - b.startMs);
   const out: Segment[] = [];
   for (const s of clean) {
     const last = out[out.length - 1];
-    if (last && s.startMs <= last.endMs) last.endMs = Math.max(last.endMs, s.endMs);
+    if (last && s.startMs <= last.endMs && JSON.stringify(last.assessment) === JSON.stringify(s.assessment)) last.endMs = Math.max(last.endMs, s.endMs);
     else out.push(s);
   }
   return out;
@@ -165,14 +168,18 @@ export function isActiveAt(segments: Segment[], ms: number): boolean {
 
 /** Разметка из БД/запроса: что угодно → валидный список или ошибка. */
 export function parseSegments(raw: unknown, durationMs: number): Segment[] | null {
-  if (!Array.isArray(raw)) return null;
+  if (!Array.isArray(raw) || raw.length > MAX_SEGMENTS) return null;
   const out: Segment[] = [];
   for (const item of raw) {
     if (!item || typeof item !== 'object') return null;
     const { startMs, endMs } = item as Record<string, unknown>;
     if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return null;
-    out.push({ startMs: Number(startMs), endMs: Number(endMs) });
+    const assessment = 'assessment' in item ? parseAssessmentSettings(item.assessment) : undefined;
+    if (assessment === null) return null;
+    out.push({ startMs: Number(startMs), endMs: Number(endMs), ...(assessment ? { assessment } : {}) });
   }
-  if (out.length > MAX_SEGMENTS) return null;
-  return normalizeSegments(out, durationMs);
+  const normalized = normalizeSegments(out, durationMs);
+  // Adjacent profiles stay distinct; conflicting overlaps must be corrected explicitly.
+  if (normalized.some((segment, index) => index > 0 && segment.startMs < normalized[index - 1]!.endMs)) return null;
+  return normalized;
 }

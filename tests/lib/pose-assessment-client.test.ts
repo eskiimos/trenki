@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { gzipSync } from 'node:zlib';
+import { assessmentPreset } from '../../src/lib/pose/assessment-settings';
 import { loadAssessmentReference } from '../../src/components/admin/pose/reference-client';
 
 const doc = { v: 1, model: 'pose_landmarker_heavy', fps: 10, durationMs: 1000, width: 640, height: 360, frames: [[0], [100]] };
@@ -61,4 +62,12 @@ describe('admin assessment reference loading', () => {
     await expect(loadAssessmentReference('test', controller.signal)).rejects.toThrow();
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
+});
+
+
+it('keeps per-segment exercise rules when loading the saved reference', async () => {
+  const configured = { ...detail, reference: { ...reference, segments: [{ startMs: 0, endMs: 1000, assessment: assessmentPreset('arms') }] } };
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(json(configured)).mockResolvedValueOnce(frames()).mockResolvedValueOnce(json(configured)));
+  const result = await loadAssessmentReference('test', new AbortController().signal);
+  expect(result.detail.reference?.segments?.[0]?.assessment).toEqual(assessmentPreset('arms'));
 });

@@ -99,6 +99,7 @@ export default function PoseReferencePage({ params }: { params: Promise<{ videoI
             playbackUrl={data.playbackUrl}
             durationMs={Math.round(ref.durationSec * 1000)}
             segments={ref.segments ?? []}
+            updatedAt={ref.updatedAt}
           />
           <div>
             <AdminButton type="button" tone="secondary" icon={RefreshCw} onClick={() => setReprocess(true)}>
@@ -114,7 +115,7 @@ export default function PoseReferencePage({ params }: { params: Promise<{ videoI
           <summary style={{ cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>Обработать в браузере вручную</summary>
           <p style={{ color: 'var(--color-muted)', fontSize: 14, lineHeight: 1.5, margin: '0 0 16px' }}>
             Браузер скачает видео, загрузит модель распознавания и пройдёт по видео 10 раз в секунду. На компьютере это
-            примерно 1–2 минуты на минуту видео. Результат сохранится на платформе{ref ? ' и заменит текущий эталон вместе с разметкой рабочих отрезков' : ''}.
+            примерно 1–2 минуты на минуту видео. Результат сохранится на платформе{ref ? ' и заменит текущий эталон вместе с разметкой и настройками оценки' : ''}.
           </p>
           <ReferenceProcessor
             videoId={videoId}
