@@ -42,7 +42,7 @@ export function checkAssessmentReadiness(frame: number[], settings: AssessmentSe
   return { good: true, message: 'Нужные части тела видны. Сохраняйте положение перед камерой.' };
 }
 
-/** Every second of countdown needs fresh good frames; one old observation cannot unlock Start. */
+/** Every second of countdown needs fresh good frames; one old observation cannot trigger playback. */
 export function advanceReadiness(previous: ReadinessGate, check: ReadinessCheck, nowMs: number, signature: string): ReadinessGate {
   if (!check.good || !Number.isFinite(nowMs)) return { ...initialReadiness(), signature, message: check.message };
   const continuous = previous.sinceMs !== null && previous.lastFrameMs !== null
@@ -51,6 +51,6 @@ export function advanceReadiness(previous: ReadinessGate, check: ReadinessCheck,
   const remaining = Math.max(0, READINESS_HOLD_MS - (nowMs - sinceMs));
   return {
     sinceMs, lastFrameMs: nowMs, signature, ready: remaining === 0, secondsLeft: Math.ceil(remaining / 1000),
-    message: remaining === 0 ? 'Камера готова. Нажмите «Запустить тренировку».' : check.message,
+    message: remaining === 0 ? 'Камера готова к тренировке.' : check.message,
   };
 }

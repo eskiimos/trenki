@@ -36,7 +36,7 @@ describe('camera preparation', () => {
     const gate = advanceReadiness(readyGate(), { good: false, message: 'Missing knee' }, 3200, 'legs:same');
     expect(gate.ready).toBe(false); expect(gate.sinceMs).toBeNull(); expect(gate.message).toBe('Missing knee');
   });
-  it('does not let a stale observation or frozen timestamp unlock the start button', () => {
+  it('does not let a stale observation or frozen timestamp trigger automatic playback', () => {
     const first = advanceReadiness(initialReadiness(), good, 0, 'legs:same');
     expect(advanceReadiness(first, good, 4000, 'legs:same').ready).toBe(false);
     expect(advanceReadiness(readyGate(), good, 3000, 'legs:same').ready).toBe(false);
