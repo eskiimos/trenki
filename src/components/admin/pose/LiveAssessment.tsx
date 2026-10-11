@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, CameraOff, Pause, Play, RotateCcw, Square } from 'lucide-react';
+import { Camera, CameraOff, Pause, Play, RotateCcw, Square, Volume2, VolumeX } from 'lucide-react';
 import { AdminButton, AdminCard, SectionTitle, inputStyle } from '@/components/admin/ui';
 import { frameIndexAt } from '@/lib/pose/reference';
 import {
@@ -17,6 +17,7 @@ import { advanceReadiness, checkAssessmentReadiness, initialReadiness } from '@/
 import { containRect, drawSkeleton } from './draw';
 import { loadAssessmentReference } from './reference-client';
 import { usePoseCamera } from './usePoseCamera';
+import { useAssessmentAudio } from './useAssessmentAudio';
 
 type LoadedReference = Awaited<ReturnType<typeof loadAssessmentReference>>;
 type Assessment = ReturnType<typeof evaluateTemporalAssessment>['result'];
@@ -26,6 +27,7 @@ const percent = (value: number | null) => value === null ? '—' : `${Math.round
 const time = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
 
 export default function LiveAssessment({ videoId }: { videoId: string }) {
+  const audio = useAssessmentAudio();
   const [loaded, setLoaded] = useState<LoadedReference | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
@@ -147,6 +149,16 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
     },
   });
 
+  const observeAudio = audio.observe;
+  useEffect(() => {
+    const video = trainerRef.current;
+    observeAudio({ phase, playing: !!video && !video.paused && !video.seeking && video.readyState >= 3,
+      countdown: phase === 'preparing' && !primingVideo && readiness.sinceMs !== null && !readiness.ready ? readiness.secondsLeft : null,
+      readinessMessage: readiness.message, buffering,
+      interrupted: !!cameraError || !!message?.startsWith('Запуск прерван.'),
+      status: live?.status, guidance: feedback?.cameraJoints.length ? feedback.message : null });
+  }, [observeAudio, phase, primingVideo, readiness, buffering, live?.status, feedback, cameraError, message]);
+
   useEffect(() => {
     const video = trainerRef.current;
     const playbackId = playbackIdRef;
@@ -232,6 +244,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
     const video = trainerRef.current;
     if (!video || !loaded || !prepared?.segments.length || cameraStatus !== 'ready'
       || phaseRef.current === 'running' || phaseRef.current === 'preparing') return;
+    audio.unlock();
     const returnPhase = phaseRef.current === 'paused' ? 'paused' : 'ready';
     setMessage(null);
     if (phaseRef.current === 'finished' || video.ended) {
@@ -308,6 +321,8 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
       </p>}
     </AdminCard>
     <div style={{ marginTop: 12 }}><AdminButton tone="secondary" onClick={() => setFocusMode(true)}>Режим тренировки</AdminButton></div>
+    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '12px 0 0' }}>Включите звук перед тем, как отойти от телефона: услышите отсчёт, начало и подсказки. Проверьте громкость устройства. Если русский голос недоступен, останутся короткие сигналы и текст на экране.</p>
+    {audio.enabled && <div style={{ marginTop: 8 }}><AdminButton tone="secondary" icon={Volume2} onClick={audio.test}>Проверить звук</AdminButton></div>}
     </div>
 
     <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${styles.videoGrid}`}>
@@ -387,6 +402,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
     </AdminCard>
     </div>
 
+    {audio.enabled && audio.notice && <p role="status" style={{ color: 'var(--color-muted)', fontSize: 12, margin: 0 }}>{audio.notice}</p>}
     {(cameraError || message) && <AdminCard tone={cameraError ? 'danger' : 'default'} role={cameraError ? 'alert' : 'status'}>
       {cameraError || message}
     </AdminCard>}
@@ -399,6 +415,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
       <p style={{ color: 'var(--color-muted)', fontSize: 12, marginBottom: 0 }}>Нажмите кнопку подготовки и отойдите от телефона. Когда нужные части тела будут видны 3 секунды подряд, тренировка начнётся автоматически. При потере видимости отсчёт начнётся заново.</p>
     </AdminCard></div>}
     <div className={`flex flex-wrap gap-3 ${styles.controls}`}>
+      <AdminButton tone="secondary" icon={audio.enabled ? Volume2 : VolumeX} aria-label={audio.enabled ? 'Выключить звук' : 'Включить звук'} aria-pressed={audio.enabled} onClick={audio.toggle}>Звук: {audio.enabled ? 'вкл' : 'выкл'}</AdminButton>
       {cameraStatus === 'off' && <AdminButton icon={Camera} onClick={() => { clearReadiness(); void startCamera(); }}>Включить камеру</AdminButton>}
       <AdminButton icon={Play} disabled={!canStart || phase === 'running' || phase === 'preparing'} onClick={() => void start()}>
         {phase === 'running' ? 'Тренировка идёт' : phase === 'preparing' ? 'Подготовка…' : phase === 'paused' ? 'Продолжить' : phase === 'finished' ? 'Новая тренировка' : 'Подготовиться и начать'}
