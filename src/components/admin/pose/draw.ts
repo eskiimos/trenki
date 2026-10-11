@@ -20,7 +20,7 @@ export function containRect(boxW: number, boxH: number, videoW: number, videoH: 
 
 const MIN_VIS = 0.5;
 
-export function drawSkeleton(ctx: CanvasRenderingContext2D, frame: number[] | undefined, rect: Rect, dpr: number) {
+export function drawSkeleton(ctx: CanvasRenderingContext2D, frame: number[] | undefined, rect: Rect, dpr: number, highlights: number[] = []) {
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   if (!frame || !hasPose(frame)) return;
   ctx.save();
@@ -39,6 +39,7 @@ export function drawSkeleton(ctx: CanvasRenderingContext2D, frame: number[] | un
       const pa = at(a);
       const pb = at(b);
       if (pa.v < MIN_VIS || pb.v < MIN_VIS) continue;
+      if (pass === 1) ctx.strokeStyle = highlights.includes(a) || highlights.includes(b) ? '#FFB547' : '#A1FF4A';
       ctx.beginPath();
       ctx.moveTo(pa.x, pa.y);
       ctx.lineTo(pb.x, pb.y);
@@ -49,8 +50,8 @@ export function drawSkeleton(ctx: CanvasRenderingContext2D, frame: number[] | un
     const p = at(i);
     if (p.v < MIN_VIS) continue;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-    ctx.fillStyle = '#F9F8FE';
+    ctx.arc(p.x, p.y, highlights.includes(i) ? 6 : 4, 0, Math.PI * 2);
+    ctx.fillStyle = highlights.includes(i) ? '#FFB547' : '#F9F8FE';
     ctx.fill();
     ctx.lineWidth = 2;
     ctx.strokeStyle = '#060919';

@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { encodeFrame } from '@/lib/pose/reference';
 import { containRect, drawSkeleton } from './draw';
-import { createLandmarker, type Landmarker } from './landmarker';
+import { createCameraDetector, createMainDetector, type CameraDetector } from './camera-detector';
 
 export type PoseCameraStatus = 'off' | 'loading' | 'ready';
 
-interface Options {
-  onFrame: (frame: number[], timestampMs: number) => void;
+interface Options<T> {
+  onFrame: (frame: number[], timestampMs: number, context: T | undefined) => void;
+  captureContext?: () => T;
+  highlights?: () => number[];
   onUnavailable?: () => void;
 }
 
@@ -17,7 +19,8 @@ interface CameraSession {
   destroyed: boolean;
   video: HTMLVideoElement | null;
   stream: MediaStream | null;
-  landmarker: Landmarker | null;
+  landmarker: CameraDetector | null;
+  controller: AbortController;
   animationFrame: number | null;
   removeListeners: Array<() => void>;
 }
@@ -39,6 +42,7 @@ function cameraError(error: unknown): string {
 function disposeSession(session: CameraSession) {
   if (session.destroyed) return;
   session.destroyed = true;
+  session.controller.abort();
   if (session.animationFrame !== null) cancelAnimationFrame(session.animationFrame);
   session.removeListeners.forEach((remove) => remove());
   session.removeListeners = [];
@@ -54,19 +58,20 @@ function disposeSession(session: CameraSession) {
 }
 
 /** Камера и распознавание работают локально; кадров и звука на сервере нет. */
-export function usePoseCamera({ onFrame, onUnavailable }: Options) {
+export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highlights }: Options<T>) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sessionRef = useRef<CameraSession | null>(null);
   const generationRef = useRef(0);
   const mountedRef = useRef(false);
   const pendingRef = useRef<Promise<void> | null>(null);
-  const callbacksRef = useRef({ onFrame, onUnavailable });
+  const callbacksRef = useRef({ onFrame, onUnavailable, captureContext, highlights });
   const [status, setStatus] = useState<PoseCameraStatus>('off');
   const [error, setError] = useState<string | null>(null);
+  const [execution, setExecution] = useState<'worker' | 'main' | null>(null);
   const [delegate, setDelegate] = useState<'GPU' | 'CPU' | null>(null);
 
-  useEffect(() => { callbacksRef.current = { onFrame, onUnavailable }; }, [onFrame, onUnavailable]);
+  useEffect(() => { callbacksRef.current = { onFrame, onUnavailable, captureContext, highlights }; }, [onFrame, onUnavailable, captureContext, highlights]);
 
   const clearDrawing = useCallback(() => {
     const canvas = canvasRef.current;
@@ -87,6 +92,7 @@ export function usePoseCamera({ onFrame, onUnavailable }: Options) {
     if (mountedRef.current) {
       setStatus('off');
       setDelegate(null);
+      setExecution(null);
     }
   }, [release]);
 
@@ -109,6 +115,7 @@ export function usePoseCamera({ onFrame, onUnavailable }: Options) {
       video: null,
       stream: null,
       landmarker: null,
+      controller: new AbortController(),
       animationFrame: null,
       removeListeners: [],
     };
@@ -116,6 +123,7 @@ export function usePoseCamera({ onFrame, onUnavailable }: Options) {
     setStatus('loading');
     setError(null);
     setDelegate(null);
+      setExecution(null);
     const isCurrent = () => mountedRef.current && !session.destroyed &&
       sessionRef.current === session && generationRef.current === session.generation;
     const fail = (message: string) => {
@@ -123,6 +131,7 @@ export function usePoseCamera({ onFrame, onUnavailable }: Options) {
       release();
       setStatus('off');
       setDelegate(null);
+      setExecution(null);
       setError(message);
       callbacksRef.current.onUnavailable?.();
     };
@@ -160,16 +169,18 @@ export function usePoseCamera({ onFrame, onUnavailable }: Options) {
         await video.play();
         if (!isCurrent()) return;
         phase = 'model';
-        const landmarker = await createLandmarker('pose_landmarker_lite');
+        const landmarker = await createCameraDetector(session.controller.signal);
         if (!isCurrent()) {
           try { landmarker.close(); } catch { /* already closed */ }
           return;
         }
         session.landmarker = landmarker;
         setDelegate(landmarker.delegate);
+        setExecution(landmarker.execution);
         setStatus('ready');
 
-        const intervalMs = landmarker.delegate === 'GPU' ? 100 : 200;
+        let intervalMs = landmarker.delegate === 'GPU' ? 100 : 200;
+        let busy = false;
         let lastDetectionMs = -Infinity;
         let lastVideoTime = -1;
         let lastFreshFrameMs = performance.now();
@@ -195,32 +206,44 @@ export function usePoseCamera({ onFrame, onUnavailable }: Options) {
               video.videoWidth > 0 && video.currentTime !== lastVideoTime;
             if (fresh) lastFreshFrameMs = now;
             if (now - lastFreshFrameMs > 1000) notifyUnavailable();
-            if (fresh && now - lastDetectionMs >= intervalMs) {
+            if (fresh && !busy && now - lastDetectionMs >= intervalMs) {
               const timestampMs = Math.max(now, lastDetectionMs + 1);
               lastDetectionMs = timestampMs;
               lastVideoTime = video.currentTime;
               unavailable = false;
-              try {
-                const result = landmarker.detectForVideo(video, timestampMs);
+              busy = true;
+              const capture = callbacksRef.current.captureContext?.();
+              const detector = session.landmarker!;
+              void detector.detect(video, timestampMs).then(result => {
+                if (!isCurrent()) return;
+                if (document.hidden || performance.now() - timestampMs > 1000) { notifyUnavailable(); return; }
                 const frame = encodeFrame(timestampMs, result.landmarks?.[0], result.worldLandmarks?.[0]);
+                callbacksRef.current.onFrame(frame, timestampMs, capture);
                 const canvas = canvasRef.current;
                 const context = canvas?.getContext('2d');
                 if (canvas && context) {
                   const { width, height } = canvas.getBoundingClientRect();
                   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-                  const pixelWidth = Math.round(width * dpr);
-                  const pixelHeight = Math.round(height * dpr);
-                  if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
-                    canvas.width = pixelWidth;
-                    canvas.height = pixelHeight;
-                  }
-                  drawSkeleton(context, frame, containRect(width, height, video.videoWidth, video.videoHeight), dpr);
+                  const pixelWidth = Math.round(width * dpr), pixelHeight = Math.round(height * dpr);
+                  if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) { canvas.width = pixelWidth; canvas.height = pixelHeight; }
+                  drawSkeleton(context, frame, containRect(width, height, video.videoWidth, video.videoHeight), dpr, callbacksRef.current.highlights?.());
                 }
-                callbacksRef.current.onFrame(frame, timestampMs);
-              } catch {
-                fail('Распознавание движений остановилось. Включите камеру снова; если ошибка повторяется, попробуйте другой браузер.');
-                return;
-              }
+              }).catch(async () => {
+                if (!isCurrent()) return;
+                if (detector.execution === 'worker') {
+                  // Stop scoring before changing execution mode. No stale result
+                  // may cross this boundary, and the user explicitly resumes.
+                  notifyUnavailable(); detector.close(); setStatus('loading');
+                  try {
+                    const fallback = await createMainDetector(session.controller.signal);
+                    if (!isCurrent()) { fallback.close(); return; }
+                    session.landmarker = fallback;
+                    intervalMs = fallback.delegate === 'GPU' ? 100 : 200;
+                    setDelegate(fallback.delegate); setExecution('main'); setStatus('ready');
+                    lastFreshFrameMs = performance.now(); lastVideoTime = -1;
+                  } catch { fail('Не удалось восстановить распознавание. Включите камеру снова.'); }
+                } else fail('Распознавание движений остановилось. Включите камеру снова; если ошибка повторяется, попробуйте другой браузер.');
+              }).finally(() => { busy = false; });
             }
           }
           if (isCurrent()) session.animationFrame = requestAnimationFrame(loop);
@@ -241,5 +264,5 @@ export function usePoseCamera({ onFrame, onUnavailable }: Options) {
     return pending;
   }, [clearDrawing, release]);
 
-  return { videoRef, canvasRef, status, error, start, stop, delegate };
+  return { videoRef, canvasRef, status, error, start, stop, delegate, execution };
 }

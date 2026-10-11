@@ -71,6 +71,8 @@ async function main() {
   for (const filename of WASM_FILES) {
     await fs.copyFile(path.join(packageDirectory, 'wasm', filename), path.join(wasmDirectory, filename));
   }
+  await fs.copyFile(path.join(packageDirectory, 'vision_bundle.cjs'), path.join(publicDirectory, VISION_VERSION, 'vision_bundle.js'));
+  await fs.copyFile(path.join(__dirname, 'pose-camera-worker.js'), path.join(publicDirectory, VISION_VERSION, 'pose-camera-worker.js'));
   for (const model of MODELS) await prepareModel(modelDirectory, model);
   process.stdout.write(`MediaPipe: WASM ${VISION_VERSION}, lite/heavy-модели готовы на нашем домене.\n`);
 }
