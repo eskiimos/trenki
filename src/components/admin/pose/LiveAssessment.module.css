@@ -1,0 +1,24 @@
+.root { display: flex; flex-direction: column; gap: 16px; }
+.focusHeader, .focusScore { display: none; }
+.focus {
+  position: fixed; inset: 0; z-index: 100; width: 100%; height: 100vh; height: 100dvh;
+  padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  background: var(--color-night); gap: 8px; overflow: auto; box-sizing: border-box;
+}
+.focus .normalOnly { display: none; }
+.focus .focusHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0; font-size: 13px; }
+.focus .focusHeader button { flex-shrink: 0; min-height: 44px; }
+.focus .videoGrid { flex: 1; min-height: 120px; grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; gap: 8px; }
+.focus .videoPanel { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.focus .videoPanel > div:first-child { font-size: 11px !important; margin-bottom: 4px !important; }
+.focus .videoBox { flex: 1; min-height: 0; aspect-ratio: auto !important; }
+.focus .focusScore { display: block; flex-shrink: 0; padding: 8px 12px; background: var(--color-surface); border-radius: 10px; }
+.focus .controls { justify-content: center; gap: 8px; flex-shrink: 0; }
+.focus .controls button { min-height: 44px; padding: 8px 12px !important; font-size: 13px !important; }
+@media (orientation: landscape) {
+  .focus .videoGrid { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; }
+}
+@media (max-height: 440px) and (orientation: landscape) {
+  .focus .focusScore { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .focus .focusScore p { margin: 0 !important; max-width: 55%; }
+}

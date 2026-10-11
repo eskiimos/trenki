@@ -6,9 +6,12 @@ import { Camera, CameraOff, Pause, Play, RotateCcw, Square } from 'lucide-react'
 import { AdminButton, AdminCard, SectionTitle, inputStyle } from '@/components/admin/ui';
 import { frameIndexAt } from '@/lib/pose/reference';
 import {
-  accumulateAssessmentSample, assessmentSampleDuration, createAssessmentAccumulator, evaluatePoseAssessment,
+  accumulateAssessmentSample, assessmentSampleDuration, createAssessmentAccumulator,
   prepareAssessmentReference, summarizeAssessment, assessmentSettingsAt, assessmentSummaryReliability,
 } from '@/lib/pose/assessment';
+import { createTemporalState, evaluateTemporalAssessment, createTempoAccumulator, accumulateTempo, summarizeTempo } from '@/lib/pose/temporal-assessment';
+import { createFeedbackState, updateLiveFeedback, highlightPoints, type LiveFeedback } from '@/lib/pose/live-feedback';
+import styles from './LiveAssessment.module.css';
 import { ASSESSMENT_PROFILES } from '@/lib/pose/assessment-settings';
 import { advanceReadiness, checkAssessmentReadiness, initialReadiness } from '@/lib/pose/readiness';
 import { containRect, drawSkeleton } from './draw';
@@ -16,7 +19,7 @@ import { loadAssessmentReference } from './reference-client';
 import { usePoseCamera } from './usePoseCamera';
 
 type LoadedReference = Awaited<ReturnType<typeof loadAssessmentReference>>;
-type Assessment = ReturnType<typeof evaluatePoseAssessment>;
+type Assessment = ReturnType<typeof evaluateTemporalAssessment>['result'];
 type Phase = 'ready' | 'preparing' | 'running' | 'paused' | 'finished';
 const emptySummary = () => summarizeAssessment(createAssessmentAccumulator());
 const percent = (value: number | null) => value === null ? '—' : `${Math.round(value)}%`;
@@ -32,15 +35,27 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [sideMode, setSideMode] = useState<'same' | 'opposite'>('opposite');
   const [delayMs, setDelayMs] = useState(500);
+  const [automaticTiming, setAutomaticTiming] = useState(true);
+  const [focusMode, setFocusMode] = useState(false);
+  const [feedback, setFeedback] = useState<LiveFeedback | null>(null);
+  const [tempo, setTempo] = useState<number | null>(null);
+  const [tempoSummary, setTempoSummary] = useState<number | null>(null);
+  const [adjustmentMs, setAdjustmentMs] = useState(0);
+  const temporalRef = useRef(createTemporalState());
+  const tempoAccumulatorRef = useRef(createTempoAccumulator());
+  const feedbackStateRef = useRef(createFeedbackState());
+  const feedbackRef = useRef<LiveFeedback | null>(null);
   const [buffering, setBuffering] = useState(false);
   const [primingVideo, setPrimingVideo] = useState(false);
   const [positionMs, setPositionMs] = useState(0);
   const [readiness, setReadiness] = useState(initialReadiness);
   const readinessRef = useRef(initialReadiness());
+  const rootRef = useRef<HTMLDivElement>(null);
   const trainerRef = useRef<HTMLVideoElement>(null);
   const trainerCanvasRef = useRef<HTMLCanvasElement>(null);
   const phaseRef = useRef<Phase>('ready');
   const playbackIdRef = useRef(0);
+  const captureRevisionRef = useRef(0);
   const preparationRef = useRef<{ priming: boolean; primed: boolean; returnPhase: Phase } | null>(null);
   const bufferingRef = useRef(false);
   const clockRef = useRef<{ mediaMs: number; capturedAtMs: number } | null>(null);
@@ -50,27 +65,36 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
 
   const changePhase = useCallback((next: Phase) => { phaseRef.current = next; setPhase(next); }, []);
   const markBuffering = useCallback((next: boolean) => { bufferingRef.current = next; setBuffering(next); }, []);
+  const clearTracking = useCallback(() => {
+    temporalRef.current = createTemporalState(); feedbackStateRef.current = createFeedbackState();
+    feedbackRef.current = null; setFeedback(null); setTempo(null); setAdjustmentMs(0); clockRef.current = null;
+  }, []);
   const pause = useCallback(() => {
-    playbackIdRef.current++;
+    playbackIdRef.current++; captureRevisionRef.current++;
     const preparation = preparationRef.current;
     preparationRef.current = null;
     setPrimingVideo(false);
     trainerRef.current?.pause();
     clockRef.current = null;
     setLive(null);
+    clearTracking();
     if (phaseRef.current === 'running') changePhase('paused');
     else if (phaseRef.current === 'preparing') changePhase(preparation?.returnPhase ?? 'ready');
-  }, [changePhase]);
+  }, [changePhase, clearTracking]);
   const resetScore = useCallback(() => {
     accumulatorRef.current = createAssessmentAccumulator();
-    clockRef.current = null;
+    tempoAccumulatorRef.current = createTempoAccumulator(); setTempoSummary(null); clearTracking();
     setSummary(emptySummary());
     setLive(null);
-  }, []);
+  }, [clearTracking]);
 
-  const { videoRef: cameraVideoRef, canvasRef: cameraCanvasRef, status: cameraStatus, error: cameraError, start: startCamera, stop: stopCamera } = usePoseCamera({
-    onFrame: (frame, capturedAtMs) => {
+  const { videoRef: cameraVideoRef, canvasRef: cameraCanvasRef, status: cameraStatus, error: cameraError, start: startCamera, stop: stopCamera, execution } = usePoseCamera({
+    captureContext: () => ({ mediaMs: (trainerRef.current?.currentTime ?? 0) * 1000, rate: trainerRef.current?.playbackRate ?? 1,
+      epoch: captureRevisionRef.current, running: phaseRef.current === 'running' && !bufferingRef.current }),
+    highlights: () => highlightPoints(feedbackRef.current?.cameraJoints ?? []),
+    onFrame: (frame, capturedAtMs, capture) => {
       const video = trainerRef.current;
+      if (!capture || capture.epoch !== captureRevisionRef.current) return;
       if (prepared && video) {
         const settings = assessmentSettingsAt(prepared, phaseRef.current === 'finished' ? 0 : video.currentTime * 1000 - delayMs);
         const next = advanceReadiness(readinessRef.current, checkAssessmentReadiness(frame, settings, sideMode), capturedAtMs, JSON.stringify({ settings, sideMode }));
@@ -90,19 +114,28 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
           });
         }
       }
-      if (!prepared || !video || phaseRef.current !== 'running' || bufferingRef.current || video.paused || video.seeking || video.readyState < 3) {
-        clockRef.current = null;
+      if (!prepared || !video || phaseRef.current !== 'running' || !capture.running || bufferingRef.current || video.paused || video.seeking || video.readyState < 3) {
+        clearTracking();
         return;
       }
-      // Inference is synchronous. Compare the camera snapshot with the media
-      // position at capture, rather than the later position after inference.
-      const mediaMs = video.currentTime * 1000 - Math.max(0, performance.now() - capturedAtMs) * video.playbackRate;
-      const result = evaluatePoseAssessment(prepared, frame, mediaMs - delayMs, sideMode);
+      // The playback clock is sampled when the camera image is captured,
+      // before asynchronous Worker processing or a seek/pause can change it.
+      const mediaMs = capture.mediaMs;
+      const previousProfile = temporalRef.current.signature;
+      const aligned = evaluateTemporalAssessment(temporalRef.current, prepared, frame, mediaMs, capturedAtMs, delayMs, sideMode, automaticTiming, capture.rate);
+      if (temporalRef.current.signature !== previousProfile) feedbackStateRef.current = createFeedbackState();
+      const result = aligned.result;
       const current = { mediaMs, capturedAtMs };
-      const elapsed = assessmentSampleDuration(clockRef.current, current, video.playbackRate);
+      const elapsed = assessmentSampleDuration(clockRef.current, current, capture.rate);
       clockRef.current = current;
-      // A jump in the playback clock is a seek, never extra time spent exercising.
-      if (elapsed > 0) accumulateAssessmentSample(accumulatorRef.current, result, elapsed);
+      if (elapsed > 0) {
+        accumulateAssessmentSample(accumulatorRef.current, result, elapsed);
+        accumulateTempo(tempoAccumulatorRef.current, aligned.tempoScore, elapsed);
+      }
+      const rules = assessmentSettingsAt(prepared, mediaMs - aligned.delayMs);
+      const presentation = updateLiveFeedback(feedbackStateRef.current, result, capturedAtMs, rules.toleranceDeg);
+      feedbackRef.current = presentation; setFeedback(presentation);
+      setTempo(aligned.tempoScore); setTempoSummary(summarizeTempo(tempoAccumulatorRef.current)); setAdjustmentMs(aligned.adjustmentMs);
       setLive(result);
       setSummary(summarizeAssessment(accumulatorRef.current));
     },
@@ -129,6 +162,25 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
     return () => { controller.abort(); };
   }, [videoId, retry]);
 
+  useEffect(() => {
+    if (!focusMode) return;
+    const overflow = document.body.style.overflow;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    document.body.style.overflow = 'hidden';
+    rootRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    const exit = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFocusMode(false);
+      if (event.key !== 'Tab') return;
+      const items = Array.from(rootRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], video[controls]') ?? [])
+        .filter(element => element.getClientRects().length > 0);
+      const first = items[0], last = items.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener('keydown', exit);
+    return () => { document.body.style.overflow = overflow; document.removeEventListener('keydown', exit); previousFocus?.focus(); };
+  }, [focusMode]);
+
   // The trainer overlay follows the media clock, including pauses and seeks.
   useEffect(() => {
     if (!loaded) return;
@@ -148,7 +200,8 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
       const index = frameIndexAt(loaded.doc.frames, ms);
       const dpr = window.devicePixelRatio || 1;
       const w = video.clientWidth, h = video.clientHeight;
-      const signature = `${index}:${w}:${h}:${dpr}`;
+      const joints = feedbackRef.current?.referenceJoints ?? [];
+      const signature = `${index}:${w}:${h}:${dpr}:${joints.join()}`;
       if (signature === previous) return;
       previous = signature;
       canvas.width = Math.round(w * dpr);
@@ -157,7 +210,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
       if (ctx) {
         const frame = loaded.doc.frames[index];
         drawSkeleton(ctx, frame && Math.abs(frame[0] - ms) <= 150 ? frame : undefined,
-          containRect(w, h, video.videoWidth || loaded.doc.width, video.videoHeight || loaded.doc.height), dpr);
+          containRect(w, h, video.videoWidth || loaded.doc.width, video.videoHeight || loaded.doc.height), dpr, highlightPoints(joints));
       }
     };
     raf = requestAnimationFrame(tick);
@@ -168,6 +221,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
     pause();
     clockRef.current = null;
     changePhase('finished');
+    setFocusMode(false);
     setLive(null);
     markBuffering(false);
     stopCamera();
@@ -186,7 +240,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
     }
     clearReadiness();
     clockRef.current = null;
-    const playbackId = ++playbackIdRef.current;
+    const playbackId = ++playbackIdRef.current; captureRevisionRef.current++;
     preparationRef.current = { priming: true, primed: false, returnPhase };
     setPrimingVideo(true);
     changePhase('preparing');
@@ -218,7 +272,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
     : phase === 'paused' ? 'Пауза'
     : phase === 'preparing' ? primingVideo ? 'Подготавливаю видео…' : readiness.message
     : buffering && phase === 'running' ? 'Видео загружается — оценка на паузе'
-    : phase === 'running' ? live?.message || 'Определяю положение тела…'
+    : phase === 'running' ? feedback?.message || live?.message || 'Определяю положение тела…'
     : !segments.length ? 'Для оценки разметьте рабочие отрезки в эталоне. Камеру можно включить для проверки.'
     : cameraStatus === 'loading' ? 'Включаю камеру и загружаю распознавание…'
     : cameraStatus === 'ready' ? 'Нажмите «Подготовиться и начать», затем отойдите в кадр'
@@ -233,7 +287,14 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
   </AdminCard>;
   if (!loaded) return <p role="status" style={{ color: 'var(--color-muted)' }}>Загружаю видео и эталон…</p>;
 
-  return <div className="flex flex-col gap-4">
+  const displayedScore = phase === 'finished' ? overallScore : phase === 'running' ? feedback?.score ?? null : null;
+  const displayedTempo = phase === 'finished' ? reliability.reliable ? tempoSummary : null : phase === 'running' ? tempo : null;
+  return <div ref={rootRef} role={focusMode ? 'dialog' : undefined} aria-modal={focusMode || undefined} aria-label={focusMode ? 'Тренировка с оценкой' : undefined} className={`${styles.root} ${focusMode ? styles.focus : ''}`} data-testid="assessment-root" data-inference-execution={execution ?? 'none'}>
+    <div className={styles.focusHeader}>
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{loaded.detail.video.title}</span>
+      <AdminButton tone="secondary" onClick={() => setFocusMode(false)}>Выйти из режима</AdminButton>
+    </div>
+    <div className={styles.normalOnly}>
     <AdminCard>
       <SectionTitle>Выбранное занятие</SectionTitle>
       <div style={{ fontSize: 18, fontWeight: 700 }}>{loaded.detail.video.title}</div>
@@ -246,8 +307,10 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
         В эталоне нет рабочих отрезков. <Link href={`/admin/pose/${videoId}`} style={{ textDecoration: 'underline' }}>Разметьте упражнение в эталоне</Link>, затем откройте тест заново.
       </p>}
     </AdminCard>
+    <div style={{ marginTop: 12 }}><AdminButton tone="secondary" onClick={() => setFocusMode(true)}>Режим тренировки</AdminButton></div>
+    </div>
 
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${styles.videoGrid}`}>
       <VideoPanel label={`Тренер · ${time(positionMs)} / ${time(loaded.doc.durationMs)}`}>
         <video ref={trainerRef} src={loaded.detail.playbackUrl} controls playsInline preload="metadata"
           style={{ width: '100%', height: '100%', objectFit: 'contain' }}
@@ -257,9 +320,10 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
             if (phaseRef.current !== 'running' && !preparationRef.current?.priming) trainerRef.current?.pause();
           }}
           onPause={() => { if (phaseRef.current === 'running') pause(); }}
-          onWaiting={() => { markBuffering(true); clockRef.current = null; setLive(null); }}
+          onWaiting={() => { captureRevisionRef.current++; markBuffering(true); clearTracking(); setLive(null); }}
           onPlaying={() => markBuffering(false)}
-          onSeeking={() => { clockRef.current = null; resetScore(); setMessage('После перемотки оценка считается заново'); }}
+          onRateChange={() => { captureRevisionRef.current++; clearTracking(); }}
+          onSeeking={() => { captureRevisionRef.current++; clearReadiness(); resetScore(); setMessage('После перемотки оценка считается заново'); }}
           onEnded={finish}
         />
         <canvas ref={trainerCanvasRef} style={overlayStyle} />
@@ -278,15 +342,21 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
       </VideoPanel>
     </div>
 
-    <AdminCard tone={phase === 'running' && live?.score !== null && live?.score !== undefined ? 'accent' : 'default'}>
+    <div className={styles.focusScore}>
+      <div className="flex gap-6 items-center"><Metric label={phase === 'finished' ? 'Итог' : 'Сходство'} value={percent(displayedScore)} /><Metric label="Попадание в темп" value={percent(displayedTempo)} /></div>
+      <p role="status" style={{ fontSize: 13, margin: '8px 0 0' }}>{statusText}</p>
+    </div>
+    <div className={styles.normalOnly}>
+    <AdminCard tone={phase === 'running'  && live?.score !== null && live?.score !== undefined ? 'accent' : 'default'}>
       <div className="flex flex-wrap items-center gap-4 justify-between">
         <div>
           <SectionTitle>{phase === 'finished' ? 'Результат занятия' : 'Текущая оценка'}</SectionTitle>
           <div data-testid="live-score" style={{ fontSize: 48, fontWeight: 800, color: 'var(--color-brand)', lineHeight: 1 }}>
-            {percent(phase === 'finished' ? overallScore : phase === 'running' ? live?.score ?? null : null)}
+            {percent(displayedScore)}
           </div>
         </div>
         <div className="flex flex-wrap gap-6">
+          <Metric label="Попадание в темп" value={percent(displayedTempo)} />
           <Metric label="Оценка занятия" value={percent(overallScore)} />
           <Metric label="Сходство видимых поз" value={percent(summary.similarityScore)} />
           <Metric label="Покрытие оценки" value={summary.activeMs ? `${Math.round(summary.coverageRatio * 100)}%` : '—'} />
@@ -296,11 +366,11 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
         </div>
       </div>
       <p role="status" style={{ fontSize: 14, fontWeight: 600, margin: '16px 0 0' }}>{statusText}</p>
-      {!!live?.feedback.length && phase === 'running' && <div className="flex flex-wrap gap-3" style={{ marginTop: 12 }}>
+      {!!live?.feedback.length && phase === 'running' && <details style={{ marginTop: 12 }}><summary style={{ cursor: 'pointer', fontSize: 13 }}>Оценки по группам суставов</summary><div className="flex flex-wrap gap-3" style={{ marginTop: 8 }}>
         {live.feedback.map((item) => <span key={item.group} style={{ border: '1px solid var(--border-hairline)', borderRadius: 8, padding: '6px 10px', fontSize: 13 }}>
           {item.label}: {percent(item.score)}
         </span>)}
-      </div>}
+      </div></details>}
       {phase === 'finished' && summary.activeMs === 0 && <p style={{ color: 'var(--color-muted)', fontSize: 13 }}>Вы не дошли до рабочего отрезка с пригодным эталоном. Итоговой оценки пока нет.</p>}
       {(summary.activeMs > 0 || summary.referenceUnavailableMs > 0 || phase === 'finished') && <div style={{ fontSize: 13, marginTop: 12 }}>
         <p role="status" style={{ color: reliability.reliable ? 'var(--color-brand)' : 'var(--color-muted)' }}>{reliability.message}</p>
@@ -315,19 +385,20 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
         Ракурс и освещение влияют на точность; это тест алгоритма, а не оценка тренера.
       </p>
     </AdminCard>
+    </div>
 
     {(cameraError || message) && <AdminCard tone={cameraError ? 'danger' : 'default'} role={cameraError ? 'alert' : 'status'}>
       {cameraError || message}
     </AdminCard>}
-    {cameraStatus === 'ready' && phase !== 'running' && segments.length > 0 && <AdminCard tone={readiness.ready ? 'accent' : 'default'}>
+    {cameraStatus === 'ready' && phase !== 'running' && segments.length > 0 && <div className={styles.normalOnly}><AdminCard tone={readiness.ready ? 'accent' : 'default'}>
       <SectionTitle>Проверка готовности · {settings && ASSESSMENT_PROFILES[settings.profile]}</SectionTitle>
       <div data-testid="readiness-status" role="status" style={{ fontSize: 16, fontWeight: 700 }}>
         {phase !== 'preparing' ? 'Нажмите кнопку подготовки' : primingVideo ? 'Подготавливаю видео…' : readiness.sinceMs !== null ? `Начинаем через ${readiness.secondsLeft}` : 'Проверьте положение перед камерой'}
       </div>
       <p style={{ fontSize: 13, marginBottom: 0 }}>{readiness.message}</p>
       <p style={{ color: 'var(--color-muted)', fontSize: 12, marginBottom: 0 }}>Нажмите кнопку подготовки и отойдите от телефона. Когда нужные части тела будут видны 3 секунды подряд, тренировка начнётся автоматически. При потере видимости отсчёт начнётся заново.</p>
-    </AdminCard>}
-    <div className="flex flex-wrap gap-3">
+    </AdminCard></div>}
+    <div className={`flex flex-wrap gap-3 ${styles.controls}`}>
       {cameraStatus === 'off' && <AdminButton icon={Camera} onClick={() => { clearReadiness(); void startCamera(); }}>Включить камеру</AdminButton>}
       <AdminButton icon={Play} disabled={!canStart || phase === 'running' || phase === 'preparing'} onClick={() => void start()}>
         {phase === 'running' ? 'Тренировка идёт' : phase === 'preparing' ? 'Подготовка…' : phase === 'paused' ? 'Продолжить' : phase === 'finished' ? 'Новая тренировка' : 'Подготовиться и начать'}
@@ -335,12 +406,12 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
       {phase === 'preparing' && <AdminButton tone="secondary" onClick={() => { pause(); clearReadiness(); }}>Отменить подготовку</AdminButton>}
       {phase === 'running' && <AdminButton tone="secondary" icon={Pause} onClick={pause}>Пауза</AdminButton>}
       {(phase === 'running' || phase === 'paused') && <AdminButton tone="secondary" icon={Square} onClick={finish}>Завершить</AdminButton>}
-      {cameraStatus !== 'off' && <AdminButton tone="secondary" icon={CameraOff} onClick={() => { pause(); stopCamera(); clearReadiness(); }}>Выключить камеру</AdminButton>}
-      {phase !== 'running' && <AdminButton tone="secondary" icon={RotateCcw} onClick={() => {
+      {!focusMode && cameraStatus !== 'off' && <AdminButton tone="secondary" icon={CameraOff} onClick={() => { pause(); stopCamera(); clearReadiness(); }}>Выключить камеру</AdminButton>}
+      {!focusMode && phase !== 'running' && <AdminButton tone="secondary" icon={RotateCcw} onClick={() => {
         pause(); resetScore(); clearReadiness(); changePhase('ready'); setMessage(null); const v = trainerRef.current; if (v) v.currentTime = 0;
       }}>Сбросить тест</AdminButton>}
     </div>
-    <AdminCard>
+    <div className={styles.normalOnly}><AdminCard>
       <SectionTitle>Как повторять движения</SectionTitle>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label style={{ fontSize: 13 }}>Стороны тела
@@ -351,20 +422,25 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
         </label>
         <label style={{ fontSize: 13 }}>Время на повтор движения: {(delayMs / 1000).toFixed(1)} с
           <input aria-label="Задержка повторения движения" type="range" min={0} max={1500} step={100} value={delayMs} disabled={optionsLocked}
-            onChange={(e) => { setDelayMs(Number(e.target.value)); resetScore(); clearReadiness(); }} style={{ width: '100%', marginTop: 16, accentColor: 'var(--color-brand)' }} />
+            onChange={(e) => { setDelayMs(Number(e.target.value)); resetScore(); clearReadiness(); }} style={{ width: '100%', marginTop: 16, appearance: 'auto', WebkitAppearance: 'slider-horizontal', accentColor: 'var(--color-brand)' }} />
         </label>
       </div>
+      <label style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 44, fontSize: 13, marginTop: 12 }}>
+        <input aria-label="Автоподстройка задержки" type="checkbox" checked={automaticTiming} disabled={optionsLocked} onChange={e => { setAutomaticTiming(e.target.checked); resetScore(); }} style={{ appearance: 'auto', WebkitAppearance: 'checkbox', width: 20, height: 20, accentColor: 'var(--color-brand)' }} />
+        Подстраивать задержку в пределах ±0,3 с
+      </label>
+      <p style={{ color: 'var(--color-muted)', fontSize: 12 }}>Попадание в темп — синхронность с учётом заданного времени реакции, а не число повторений в минуту. При неподвижной позе или неоднозначном движении процент темпа не показывается. {phase === 'running' && tempo !== null && `Текущая подстройка: ${adjustmentMs > 0 ? '+' : ''}${(adjustmentMs / 1000).toFixed(2)} с.`}</p>
       <p style={{ color: 'var(--color-muted)', fontSize: 13, marginBottom: 0 }}>Поставьте камеру на уровне таза, отойдите так, чтобы были видны руки и стопы. По возможности повторите ракурс тренера.</p>
-    </AdminCard>
+    </AdminCard></div>
   </div>;
 }
 
 const overlayStyle = { position: 'absolute' as const, inset: 0, width: '100%', height: '100%', pointerEvents: 'none' as const };
 function VideoPanel({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><div style={{ color: 'var(--color-muted)', fontSize: 12, marginBottom: 8 }}>{label}</div>
-    <div style={{ position: 'relative', aspectRatio: '4 / 3', background: '#000', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>{children}</div>
+  return <div className={styles.videoPanel}><div style={{ color: 'var(--color-muted)', fontSize: 12, marginBottom: 8 }}>{label}</div>
+    <div className={styles.videoBox} style={{ position: 'relative', aspectRatio: '4 / 3', background: '#000', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>{children}</div>
   </div>;
 }
 function Metric({ label, value }: { label: string; value: string }) {
-  return <div><div style={{ color: 'var(--color-muted)', fontSize: 12 }}>{label}</div><div style={{ fontSize: 20, fontWeight: 700 }}>{value}</div></div>;
+  return <div className={styles.videoPanel}><div style={{ color: 'var(--color-muted)', fontSize: 12 }}>{label}</div><div style={{ fontSize: 20, fontWeight: 700 }}>{value}</div></div>;
 }
