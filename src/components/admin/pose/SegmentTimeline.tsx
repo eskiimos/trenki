@@ -7,12 +7,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Plus, RotateCcw, Trash2, Undo2 } from 'lucide-react';
 import { AdminButton, inputStyle } from '@/components/admin/ui';
-import { activeMs, normalizeSegments, parseSegments, type Segment } from '@/lib/pose/segments';
+import { activeMs, parseSegments, type Segment } from '@/lib/pose/segments';
 import { assessmentPreset, ASSESSMENT_PROFILES } from '@/lib/pose/assessment-settings';
+import { editSegmentRange, formatSegmentTime, MIN_SEGMENT_MS, moveSegmentBoundary, parseSegmentTime } from '@/lib/pose/segment-editor';
 import AssessmentSettingsEditor from './AssessmentSettingsEditor';
 
 const BAR_H = 44;
-const MIN_SEGMENT_MS = 500;
 /** Новый отрезок по кнопке — столько секунд от текущего момента. */
 const NEW_SEGMENT_MS = 5000;
 
@@ -21,7 +21,7 @@ const mmss = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 
-type Drag = { index: number; edge: 'start' | 'end' };
+type Drag = { index: number; edge: 'start' | 'end'; pointerId: number };
 
 export default function SegmentTimeline({
   durationMs,
@@ -46,10 +46,19 @@ export default function SegmentTimeline({
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<Drag | null>(null);
+  const [activeDrag, setActiveDrag] = useState<Drag | null>(null);
+  const [manualNew, setManualNew] = useState(false);
+  const [startText, setStartText] = useState<string | null>(null);
+  const [endText, setEndText] = useState<string | null>(null);
+  const resetInput = () => { setManualNew(false); setStartText(null); setEndText(null); setMsg(null); };
 
   useEffect(() => {
     setSegments(initial);
     setSaved(initial);
+    setSelectedIndex(0);
+    setManualNew(false);
+    setStartText(null);
+    setEndText(null);
   }, [initial]);
 
   const dirty = useMemo(() => JSON.stringify(segments) !== JSON.stringify(saved), [segments, saved]);
@@ -66,31 +75,24 @@ export default function SegmentTimeline({
   useEffect(() => {
     const move = (e: PointerEvent) => {
       const drag = dragRef.current;
-      if (!drag) return;
+      if (!drag || e.pointerId !== drag.pointerId) return;
       e.preventDefault();
       const ms = Math.round(msFromClientX(e.clientX));
-      setSegments((prev) => {
-        const next = prev.map((s) => ({ ...s }));
-        const seg = next[drag.index];
-        if (!seg) return prev;
-        const prevEnd = drag.index > 0 ? next[drag.index - 1]!.endMs : 0;
-        const nextStart = drag.index < next.length - 1 ? next[drag.index + 1]!.startMs : durationMs;
-        if (drag.edge === 'start') seg.startMs = Math.max(prevEnd, Math.min(ms, seg.endMs - MIN_SEGMENT_MS));
-        else seg.endMs = Math.min(nextStart, Math.max(ms, seg.startMs + MIN_SEGMENT_MS));
-        return next;
-      });
+      setSegments((prev) => moveSegmentBoundary(prev, drag.index, drag.edge, ms, durationMs));
     };
-    const up = () => {
-      if (dragRef.current) {
+    const up = (e: PointerEvent) => {
+      if (dragRef.current?.pointerId === e.pointerId) {
         dragRef.current = null;
-        setSegments((prev) => normalizeSegments(prev, durationMs));
+        setActiveDrag(null);
       }
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
     return () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [durationMs]);
@@ -98,6 +100,7 @@ export default function SegmentTimeline({
   const indexAt = (ms: number) => segments.findIndex((s) => ms >= s.startMs && ms < s.endMs);
 
   const addAtPlayhead = () => {
+    resetInput();
     const start = Math.min(currentMs, Math.max(0, durationMs - MIN_SEGMENT_MS));
     const existing = indexAt(start);
     if (existing >= 0) {
@@ -106,12 +109,13 @@ export default function SegmentTimeline({
       return;
     }
     const nextStart = segments.find((s) => s.startMs > start)?.startMs ?? durationMs;
-    const next = normalizeSegments([...segments, { startMs: start, endMs: Math.min(nextStart, start + NEW_SEGMENT_MS) }], durationMs);
-    setSegments(next);
-    setMsg(null);
+    const result = editSegmentRange(segments, null, Math.round(start), Math.round(Math.min(nextStart, start + NEW_SEGMENT_MS)), durationMs);
+    if (result.error) { setMsg({ type: 'err', text: result.error }); return; }
+    if ('segments' in result) { setSegments(result.segments); setSelectedIndex(result.selectedIndex); }
   };
 
   const removeAtPlayhead = () => {
+    resetInput();
     const i = indexAt(currentMs);
     if (i < 0) {
       setMsg({ type: 'err', text: 'Поставьте видео на отрезок, который надо убрать' });
@@ -135,6 +139,7 @@ export default function SegmentTimeline({
     }
     setSegments(normalized);
     setSaved(normalized);
+    setSelectedIndex(Math.max(0, normalized.findIndex((s) => selectedSegment && s.startMs <= selectedSegment.startMs && s.endMs >= selectedSegment.endMs)));
     setMsg({ type: 'ok', text: 'Разметка сохранена' });
   };
 
@@ -142,6 +147,21 @@ export default function SegmentTimeline({
   const valid = parseSegments(segments, durationMs) !== null;
   const selected = Math.min(selectedIndex, segments.length - 1);
   const selectedSegment = segments[selected];
+  const startValue = startText ?? formatSegmentTime(selectedSegment?.startMs ?? 0);
+  const endValue = endText ?? formatSegmentTime(selectedSegment?.endMs ?? 0);
+  const pendingInput = manualNew || startValue !== formatSegmentTime(selectedSegment?.startMs ?? 0) || endValue !== formatSegmentTime(selectedSegment?.endMs ?? 0);
+  const applyRange = () => {
+    const start = parseSegmentTime(startValue);
+    const end = parseSegmentTime(endValue);
+    if (start === null || end === null) { setMsg({ type: 'err', text: 'Введите время как 1:23.500 или в секундах: 83,5.' }); return; }
+    const result = editSegmentRange(segments, manualNew ? null : selected, start, end, durationMs);
+    if (result.error) { setMsg({ type: 'err', text: result.error }); return; }
+    if ('segments' in result) {
+      setSegments(result.segments);
+      setSelectedIndex(result.selectedIndex);
+      resetInput();
+    }
+  };
 
   return (
     <fieldset disabled={saving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
@@ -156,7 +176,7 @@ export default function SegmentTimeline({
       <div
         ref={barRef}
         onClick={(e) => {
-          if (dragRef.current) return;
+          if (saving || dragRef.current) return;
           onSeek(msFromClientX(e.clientX));
         }}
         style={{
@@ -172,8 +192,8 @@ export default function SegmentTimeline({
       >
         {segments.map((s, i) => (
           <div
-            key={`${s.startMs}-${i}`}
-            title={`${mmss(s.startMs)} — ${mmss(s.endMs)}`}
+            key={i}
+            title={`${formatSegmentTime(s.startMs)} — ${formatSegmentTime(s.endMs)}`}
             style={{
               position: 'absolute',
               left: pct(s.startMs),
@@ -189,12 +209,30 @@ export default function SegmentTimeline({
               <button
                 key={edge}
                 type="button"
-                aria-label={`${edge === 'start' ? 'Начало' : 'Конец'} отрезка ${mmss(edge === 'start' ? s.startMs : s.endMs)}`}
+                role="slider"
+                aria-label={`${edge === 'start' ? 'Начало' : 'Конец'} отрезка ${i + 1}`}
+                aria-valuemin={edge === 'start' ? segments[i - 1]?.endMs ?? 0 : s.startMs + MIN_SEGMENT_MS}
+                aria-valuemax={edge === 'start' ? s.endMs - MIN_SEGMENT_MS : segments[i + 1]?.startMs ?? durationMs}
+                aria-valuenow={edge === 'start' ? s.startMs : s.endMs}
+                aria-valuetext={formatSegmentTime(edge === 'start' ? s.startMs : s.endMs)}
                 onPointerDown={(e) => {
-                  if (saving) return;
+                  if (saving || !e.isPrimary || e.button !== 0) return;
                   e.stopPropagation();
                   e.preventDefault();
-                  dragRef.current = { index: i, edge };
+                  resetInput();
+                  setSelectedIndex(i);
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  dragRef.current = { index: i, edge, pointerId: e.pointerId };
+                  setActiveDrag(dragRef.current);
+                }}
+                onKeyDown={(e) => {
+                  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+                  e.preventDefault();
+                  resetInput();
+                  setSelectedIndex(i);
+                  const value = edge === 'start' ? s.startMs : s.endMs;
+                  const next = e.key === 'Home' ? 0 : e.key === 'End' ? durationMs : value + (e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 1000 : 100);
+                  setSegments((prev) => moveSegmentBoundary(prev, i, edge, next, durationMs));
                 }}
                 onClick={(e) => e.stopPropagation()}
                 style={{
@@ -216,6 +254,11 @@ export default function SegmentTimeline({
         <div style={{ position: 'absolute', left: pct(currentMs), top: 0, bottom: 0, width: 2, background: '#F9F8FE', pointerEvents: 'none' }} />
       </div>
 
+      {selectedSegment && <div data-testid="segment-boundaries" style={{ marginTop: 8, fontSize: 13, lineHeight: 1.6, color: activeDrag ? 'var(--color-brand)' : 'var(--color-ink)' }}>
+        <b>Отрезок {selected + 1}{activeDrag ? ` · перемещаем ${activeDrag.edge === 'start' ? 'начало' : 'конец'}` : ''}</b>
+        <div>Начало {formatSegmentTime(selectedSegment.startMs)} · Конец {formatSegmentTime(selectedSegment.endMs)} · Длительность {formatSegmentTime(selectedSegment.endMs - selectedSegment.startMs)}</div>
+      </div>}
+
       <div style={{ color: 'var(--color-muted)', fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
         Зелёным — упражнение, тёмным — объяснения и паузы: их оценка учитывать не будет. Тяните края отрезка, чтобы
         поправить границы; клик по полосе перематывает видео.
@@ -223,7 +266,7 @@ export default function SegmentTimeline({
 
       {msg && (
         <div
-          role="status"
+          role={msg.type === 'err' ? 'alert' : 'status'}
           style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: msg.type === 'ok' ? 'var(--color-brand)' : 'var(--color-danger)' }}
         >
           {msg.text}
@@ -231,9 +274,16 @@ export default function SegmentTimeline({
       )}
 
       <div className="flex flex-wrap gap-2" style={{ marginTop: 12 }}>
-        <AdminButton type="button" size="sm" icon={Check} disabled={!dirty || saving || !valid} onClick={save}>
+        <AdminButton type="button" size="sm" icon={Check} disabled={!dirty || saving || !valid || pendingInput || !!activeDrag} onClick={save}>
           {saving ? 'Сохраняю…' : 'Сохранить разметку'}
         </AdminButton>
+        <AdminButton type="button" size="sm" tone="secondary" icon={Plus} onClick={() => {
+          resetInput();
+          const start = Math.max(0, Math.min(Math.round(currentMs), durationMs - MIN_SEGMENT_MS));
+          setStartText(formatSegmentTime(start));
+          setEndText(formatSegmentTime(Math.min(durationMs, start + NEW_SEGMENT_MS)));
+          setManualNew(true);
+        }}>Ввести отрезок</AdminButton>
         <AdminButton type="button" size="sm" tone="secondary" icon={Plus} onClick={addAtPlayhead}>
           Добавить отрезок
         </AdminButton>
@@ -247,6 +297,8 @@ export default function SegmentTimeline({
             tone="secondary"
             icon={RotateCcw}
             onClick={() => {
+              resetInput();
+              setSelectedIndex(0);
               setSegments(onAuto());
               setMsg(null);
             }}
@@ -255,23 +307,38 @@ export default function SegmentTimeline({
           </AdminButton>
         )}
         {dirty && (
-          <AdminButton type="button" size="sm" tone="secondary" icon={Undo2} disabled={saving} onClick={() => setSegments(saved)}>
+          <AdminButton type="button" size="sm" tone="secondary" icon={Undo2} disabled={saving} onClick={() => { resetInput(); setSegments(saved); setSelectedIndex(0); }}>
             Отменить правки
           </AdminButton>
         )}
       </div>
-      {selectedSegment && <div style={{ marginTop: 20, borderTop: '1px solid var(--border-hairline)', paddingTop: 16 }}>
-        <label style={{ fontSize: 13, fontWeight: 700 }}>Настройки оценки отрезка
-          <select aria-label="Настройки оценки отрезка" value={selected} style={{ ...inputStyle, margin: '6px 0 12px' }} onChange={(e) => setSelectedIndex(Number(e.target.value))}>
+      {(selectedSegment || manualNew) && <div style={{ marginTop: 20, borderTop: '1px solid var(--border-hairline)', paddingTop: 16 }}>
+        {selectedSegment && <label style={{ fontSize: 13, fontWeight: 700 }}>Выбранный отрезок
+          <select aria-label="Настройки оценки отрезка" value={selected} style={{ ...inputStyle, margin: '6px 0 12px' }} onChange={(e) => { resetInput(); setSelectedIndex(Number(e.target.value)); }}>
             {segments.map((segment, index) => <option key={index} value={index}>
-              {index + 1}. {mmss(segment.startMs)} — {mmss(segment.endMs)} · {ASSESSMENT_PROFILES[segment.assessment?.profile ?? 'balanced']}
+              {index + 1}. {formatSegmentTime(segment.startMs)} — {formatSegmentTime(segment.endMs)} · {ASSESSMENT_PROFILES[segment.assessment?.profile ?? 'balanced']}
             </option>)}
           </select>
-        </label>
-        <AssessmentSettingsEditor value={selectedSegment.assessment ?? assessmentPreset()} onChange={(assessment) => {
+        </label>}
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{manualNew ? 'Новый отрезок вручную' : 'Границы отрезка вручную'}</div>
+        <div className="flex flex-wrap gap-3">
+          <label style={{ flex: '1 1 140px', fontSize: 13 }}>Начало отрезка
+            <input type="text" inputMode="decimal" value={startValue} style={{ ...inputStyle, marginTop: 6 }} onChange={(e) => { setStartText(e.target.value); setMsg(null); }} />
+          </label>
+          <label style={{ flex: '1 1 140px', fontSize: 13 }}>Конец отрезка
+            <input type="text" inputMode="decimal" value={endValue} style={{ ...inputStyle, marginTop: 6 }} onChange={(e) => { setEndText(e.target.value); setMsg(null); }} />
+          </label>
+        </div>
+        <p style={{ color: 'var(--color-muted)', fontSize: 12 }}>Минуты:секунды, например 1:23.500, или секунды: 83,5. Минимальная длительность — 0,5 секунды.</p>
+        <div className="flex flex-wrap gap-2" style={{ marginBottom: 16 }}>
+          <AdminButton type="button" size="sm" tone="secondary" onClick={applyRange} disabled={!pendingInput}>{manualNew ? 'Добавить вручную' : 'Применить границы'}</AdminButton>
+          {pendingInput && <AdminButton type="button" size="sm" tone="secondary" onClick={resetInput}>Отменить ввод</AdminButton>}
+        </div>
+        {pendingInput && <p role="status" style={{ color: 'var(--color-muted)', fontSize: 12 }}>Примените границы или отмените ввод, затем сохраните разметку.</p>}
+        {selectedSegment && !manualNew && <AssessmentSettingsEditor value={selectedSegment.assessment ?? assessmentPreset()} onChange={(assessment) => {
           setSegments((prev) => prev.map((segment, index) => index === selected ? { ...segment, assessment } : segment));
           setMsg(null);
-        }} />
+        }} />}
         {!valid && <p role="alert" style={{ color: 'var(--color-danger)', fontSize: 13 }}>
           Задайте важность от 0 до 5 и хотя бы один обязательный сустав с ненулевой важностью. Отрезки с разными настройками не должны пересекаться.
         </p>}
