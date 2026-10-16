@@ -10,6 +10,12 @@
 // призыв к действию). Отмечен — компактная строка, тап по ней раскрывает
 // неделю. Ручной выбор живёт до следующего ответа сервера с другим статусом
 // (новый день → снова полный вид).
+//
+// Анимация сворачивания: grid-template-rows 0fr↔1fr (стандартный CSS-приём,
+// без max-height-костылей и JS-замеров). Контент НЕ размонтируется, иначе
+// анимировать было бы нечего. Параллельно анимируются opacity, паддинги
+// карточки и отступ заголовка — иначе при сворачивании была бы видимая
+// «дёрганная» смена размеров.
 
 import { useEffect, useRef, useState } from 'react';
 import { CalendarCheck, Check, ChevronDown, Star } from 'lucide-react';
@@ -51,7 +57,7 @@ export default function DailyCheckinCard() {
             setCollapsed(nowChecked);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     };
     load();
     // PWA живёт открытой сутками: без рефетча по возврату видимости наутро
@@ -93,7 +99,7 @@ export default function DailyCheckinCard() {
                 setTodayXp(fresh.todayXp ?? 0);
               }
             })
-            .catch(() => {});
+            .catch(() => { });
           return prev;
         }
         return prev.map((day) => (day.date === d.date ? { ...day, checked: true } : day));
@@ -116,13 +122,13 @@ export default function DailyCheckinCard() {
     <>
       <div className="flex items-center gap-2 min-w-0">
         <CalendarCheck size={20} className="text-brand shrink-0" aria-hidden />
-        <span className="text-white text-sm font-bold font-overpass uppercase tracking-wide truncate">
+        <span className="text-white text-sm font-bold font-overpass uppercase tracking-wide truncate translate-y-0.5">
           Ежедневный чекин
         </span>
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {justEarned !== null && (
-            /* Кит анимаций: награда всплывает и тает, потом остаётся пружинный бейдж */
+          /* Кит анимаций: награда всплывает и тает, потом остаётся пружинный бейдж */
           <span className="relative shrink-0 inline-flex items-center">
             <span className="anim-float-up absolute right-0 -top-4 inline-flex items-center gap-1 text-brand text-sm font-black font-overpass whitespace-nowrap">
               +{justEarned} XP
@@ -134,8 +140,11 @@ export default function DailyCheckinCard() {
           </span>
         )}
         {/* В компактном виде — статус дня и счётчик недели */}
-        {isCompact && justEarned === null && (
-          <span className="inline-flex items-center gap-1.5 text-xs font-bold font-overpass">
+        {justEarned === null && (
+          <span
+            className={`inline-flex items-center gap-1.5 text-xs font-bold font-overpass transition-opacity duration-200 ${isCompact ? 'opacity-0 pointer-events-none' : 'opacity-100'
+              }`}
+          >
             <Check size={14} className="text-brand" aria-hidden />
             <span className="text-brand">Сегодня</span>
             <span className="text-muted tabular-nums">{checkedCount}/7</span>
@@ -144,7 +153,7 @@ export default function DailyCheckinCard() {
         {canCollapse && (
           <ChevronDown
             size={18}
-            className="text-muted transition-transform"
+            className="text-muted transition-transform duration-300"
             style={{ transform: isCompact ? 'none' : 'rotate(180deg)' }}
             aria-hidden
           />
@@ -157,8 +166,10 @@ export default function DailyCheckinCard() {
     // Отступ сверху — как у StreakChip (12): без него карточка прилипала к
     // блоку серии (правка владельца)
     <section className="px-4" style={{ paddingTop: 'var(--space-3)', paddingBottom: 'var(--space-3)' }}>
+      {/* transition-all: паддинги карточки (p-4 ↔ px-4 py-3) плавно меняются
+          вместе с высотой контента — иначе «дёргается» в конце анимации */}
       <div
-        className={`rounded-2xl ${isCompact ? 'px-4 py-3' : 'p-4'}`}
+        className={`rounded-2xl transition-all duration-300 ease-in-out ${isCompact ? 'px-4 py-3' : 'p-4'}`}
         style={{ background: 'var(--color-surface)', border: '1px solid var(--border-hairline)' }}
       >
         {canCollapse ? (
@@ -166,9 +177,8 @@ export default function DailyCheckinCard() {
             type="button"
             onClick={() => setCollapsed((v) => !v)}
             aria-expanded={!isCompact}
-            className={`w-full flex items-center justify-between gap-2 bg-transparent border-0 p-0 text-left cursor-pointer ${
-              isCompact ? '' : 'mb-3'
-            }`}
+            className={`w-full flex items-center justify-between gap-2 bg-transparent border-0 p-0 text-left cursor-pointer transition-all duration-300 ${isCompact ? 'mb-0' : 'mb-3'
+              }`}
           >
             {header}
           </button>
@@ -176,69 +186,78 @@ export default function DailyCheckinCard() {
           <div className="flex items-center justify-between gap-2 mb-3">{header}</div>
         )}
 
-        {isCompact ? null : (
-          <>
-        {/* Неделя: Пн…Вс, награда растёт к выходным */}
-        <div className="grid grid-cols-7 gap-1 mb-3">
-          {week.map((day) => (
-            <div
-              key={day.date}
-              className="flex flex-col items-center rounded-lg py-1.5"
-              style={{
-                background: day.checked
-                  ? 'var(--lime-medium)'
-                  : day.isToday
-                    ? 'rgba(255,255,255,0.08)'
-                    : 'transparent',
-                border: `1px solid ${
-                  day.isToday ? 'var(--color-brand)' : day.checked ? 'transparent' : 'var(--border-hairline)'
-                }`,
-              }}
-            >
-              <span
-                className={`text-[10px] font-bold font-overpass uppercase ${
-                  day.isToday ? 'text-brand' : 'text-muted'
-                }`}
-              >
-                {WEEKDAY_SHORT[day.weekday]}
-              </span>
-              {day.checked ? (
-                /* anim-pop-success: свежепоставленная галочка «чпокает» */
-                <Check
-                  size={14}
-                  className={`text-brand mt-0.5 ${day.isToday && justEarned !== null ? 'anim-pop-success' : ''}`}
-                  aria-hidden
-                />
-              ) : (
-                <span className="text-[10px] text-muted mt-0.5 tabular-nums">+{day.xp}</span>
-              )}
-            </div>
-          ))}
-        </div>
-
-        <button
-          type="button"
-          onClick={checkin}
-          disabled={busy || checkedToday}
-          className="w-full rounded-full font-overpass font-extrabold uppercase text-[13px] tracking-[0.4px] py-2.5 transition-transform active:scale-95 disabled:active:scale-100"
-          style={
-            checkedToday
-              ? {
-                  background: 'transparent',
-                  border: '1px solid var(--border-hairline)',
-                  color: 'var(--color-muted)',
-                }
-              : {
-                  background: 'var(--color-brand)',
-                  border: 'none',
-                  color: 'var(--color-night)',
-                }
-          }
+        {/*
+          Обёртка-аккордеон: grid-template-rows 0fr ↔ 1fr анимирует высоту без
+          знания её значения в px. Внутренний div обязан иметь overflow-hidden
+          и min-h-0 — иначе контент не даст ряду сжаться до нуля. Контент
+          всегда в DOM: при сворачивании/раскрытии размонтировать нечего,
+          анимация идёт по grid-rows + opacity.
+        */}
+        <div
+          className={`grid transition-all duration-300 ease-in-out ${isCompact ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'
+            }`}
+          aria-hidden={isCompact}
         >
-          {checkedToday ? 'Сегодня отмечено' : busy ? 'Секунду…' : `Отметиться · +${todayXp} XP`}
-        </button>
-          </>
-        )}
+          <div className="overflow-hidden min-h-0">
+            {/* Неделя: Пн…Вс, награда растёт к выходным */}
+            <div className="grid grid-cols-7 gap-1 mb-3">
+              {week.map((day) => (
+                <div
+                  key={day.date}
+                  className="flex flex-col items-center rounded-lg py-1.5"
+                  style={{
+                    background: day.checked
+                      ? 'var(--lime-medium)'
+                      : day.isToday
+                        ? 'rgba(255,255,255,0.08)'
+                        : 'transparent',
+                    border: `1px solid ${day.isToday ? 'var(--color-brand)' : day.checked ? 'transparent' : 'var(--border-hairline)'
+                      }`,
+                  }}
+                >
+                  <span
+                    className={`text-[10px] font-bold font-overpass uppercase ${day.isToday ? 'text-brand' : 'text-muted'
+                      }`}
+                  >
+                    {WEEKDAY_SHORT[day.weekday]}
+                  </span>
+                  {day.checked ? (
+                    /* anim-pop-success: свежепоставленная галочка «чпокает» */
+                    <Check
+                      size={14}
+                      className={`text-brand mt-0.5 ${day.isToday && justEarned !== null ? 'anim-pop-success' : ''}`}
+                      aria-hidden
+                    />
+                  ) : (
+                    <span className="text-[10px] text-muted mt-0.5 tabular-nums">+{day.xp}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={checkin}
+              disabled={busy || checkedToday}
+              className="w-full rounded-full font-overpass font-extrabold uppercase text-[13px] tracking-[0.4px] py-2.5 transition-transform active:scale-95 disabled:active:scale-100"
+              style={
+                checkedToday
+                  ? {
+                    background: 'transparent',
+                    border: '1px solid var(--border-hairline)',
+                    color: 'var(--color-muted)',
+                  }
+                  : {
+                    background: 'var(--color-brand)',
+                    border: 'none',
+                    color: 'var(--color-night)',
+                  }
+              }
+            >
+              {checkedToday ? 'Сегодня отмечено' : busy ? 'Секунду…' : `Отметиться · +${todayXp} XP`}
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   );
