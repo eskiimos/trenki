@@ -142,7 +142,7 @@ export default function DailyCheckinCard() {
         {/* В компактном виде — статус дня и счётчик недели */}
         {justEarned === null && (
           <span
-            className={`inline-flex items-center gap-1.5 text-xs font-bold font-overpass transition-opacity duration-200 ${isCompact ? 'opacity-0 pointer-events-none' : 'opacity-100'
+            className={`inline-flex items-center gap-1.5 text-xs font-bold font-overpass transition-opacity duration-300 ${isCompact ? 'opacity-100 pointer-events-none' : 'opacity-0'
               }`}
           >
             <Check size={14} className="text-brand" aria-hidden />
