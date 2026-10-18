@@ -5,15 +5,15 @@
 // добавить и удалить по текущему моменту видео, автоматику — пересчитать.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Plus, RotateCcw, Trash2, Undo2 } from 'lucide-react';
+import { Check, Flag, Plus, RotateCcw, Trash2, Undo2, X } from 'lucide-react';
 import { AdminButton, inputStyle } from '@/components/admin/ui';
-import { activeMs, parseSegments, type Segment } from '@/lib/pose/segments';
+import { activeMs, MAX_SEGMENTS, parseSegments, type Segment } from '@/lib/pose/segments';
 import { assessmentPreset, ASSESSMENT_PROFILES } from '@/lib/pose/assessment-settings';
 import { editSegmentRange, formatSegmentTime, MIN_SEGMENT_MS, moveSegmentBoundary, parseSegmentTime } from '@/lib/pose/segment-editor';
 import AssessmentSettingsEditor from './AssessmentSettingsEditor';
 
 const BAR_H = 44;
-/** Новый отрезок по кнопке — столько секунд от текущего момента. */
+/** Default length for the manual input form only. Playback markers capture both clicks. */
 const NEW_SEGMENT_MS = 5000;
 
 const mmss = (ms: number) => {
@@ -27,6 +27,8 @@ export default function SegmentTimeline({
   durationMs,
   initial,
   currentMs,
+  getCurrentMs,
+  playbackReady,
   onSeek,
   onSave,
   onAuto,
@@ -34,6 +36,9 @@ export default function SegmentTimeline({
   durationMs: number;
   initial: Segment[];
   currentMs: number;
+  /** Read the player at the click itself; rendered time may lag behind a recent seek. */
+  getCurrentMs: () => number | null;
+  playbackReady: boolean;
   onSeek: (ms: number) => void;
   onSave: (segments: Segment[]) => Promise<string | null>;
   /** Пересчитать автоматически по кадрам эталона (null — кадры ещё не загружены). */
@@ -50,6 +55,7 @@ export default function SegmentTimeline({
   const [manualNew, setManualNew] = useState(false);
   const [startText, setStartText] = useState<string | null>(null);
   const [endText, setEndText] = useState<string | null>(null);
+  const [pendingStartMs, setPendingStartMs] = useState<number | null>(null);
   const resetInput = () => { setManualNew(false); setStartText(null); setEndText(null); setMsg(null); };
 
   useEffect(() => {
@@ -59,6 +65,7 @@ export default function SegmentTimeline({
     setManualNew(false);
     setStartText(null);
     setEndText(null);
+    setPendingStartMs(null);
   }, [initial]);
 
   const dirty = useMemo(() => JSON.stringify(segments) !== JSON.stringify(saved), [segments, saved]);
@@ -99,24 +106,41 @@ export default function SegmentTimeline({
 
   const indexAt = (ms: number) => segments.findIndex((s) => ms >= s.startMs && ms < s.endMs);
 
-  const addAtPlayhead = () => {
-    resetInput();
-    const start = Math.min(currentMs, Math.max(0, durationMs - MIN_SEGMENT_MS));
-    const existing = indexAt(start);
-    if (existing >= 0) {
-      setSelectedIndex(existing);
-      setMsg({ type: 'err', text: 'В этом месте уже есть рабочий отрезок. Выберите паузу или поправьте его границы.' });
+  const markAtPlayhead = () => {
+    const position = getCurrentMs();
+    if (position === null) {
+      setMsg({ type: 'err', text: 'Дождитесь загрузки видео, чтобы отметить время.' });
       return;
     }
-    const nextStart = segments.find((s) => s.startMs > start)?.startMs ?? durationMs;
-    const result = editSegmentRange(segments, null, Math.round(start), Math.round(Math.min(nextStart, start + NEW_SEGMENT_MS)), durationMs);
+    const time = Math.round(position);
+    if (pendingStartMs === null) {
+      const existing = indexAt(time);
+      if (existing >= 0) {
+        setSelectedIndex(existing);
+        setMsg({ type: 'err', text: 'В этом месте уже есть рабочий отрезок. Выберите паузу или поправьте его границы.' });
+        return;
+      }
+      if (time > durationMs - MIN_SEGMENT_MS || segments.length >= MAX_SEGMENTS) {
+        setMsg({ type: 'err', text: segments.length >= MAX_SEGMENTS ? `Можно добавить не больше ${MAX_SEGMENTS} отрезков.` : 'До конца видео должно оставаться минимум 0,5 секунды.' });
+        return;
+      }
+      resetInput();
+      setPendingStartMs(time);
+      return;
+    }
+    const result = editSegmentRange(segments, null, pendingStartMs, time, durationMs);
     if (result.error) { setMsg({ type: 'err', text: result.error }); return; }
-    if ('segments' in result) { setSegments(result.segments); setSelectedIndex(result.selectedIndex); }
+    if ('segments' in result) {
+      setSegments(result.segments);
+      setSelectedIndex(result.selectedIndex);
+      setPendingStartMs(null);
+      resetInput();
+    }
   };
 
   const removeAtPlayhead = () => {
     resetInput();
-    const i = indexAt(currentMs);
+    const i = indexAt(getCurrentMs() ?? currentMs);
     if (i < 0) {
       setMsg({ type: 'err', text: 'Поставьте видео на отрезок, который надо убрать' });
       return;
@@ -209,6 +233,7 @@ export default function SegmentTimeline({
               <button
                 key={edge}
                 type="button"
+                disabled={pendingStartMs !== null}
                 role="slider"
                 aria-label={`${edge === 'start' ? 'Начало' : 'Конец'} отрезка ${i + 1}`}
                 aria-valuemin={edge === 'start' ? segments[i - 1]?.endMs ?? 0 : s.startMs + MIN_SEGMENT_MS}
@@ -250,11 +275,18 @@ export default function SegmentTimeline({
             ))}
           </div>
         ))}
+        {pendingStartMs !== null && <div aria-hidden="true" style={{ position: 'absolute', left: pct(pendingStartMs), width: pct(Math.max(0, currentMs - pendingStartMs)), top: 0, bottom: 0, border: '2px dashed var(--color-brand)', background: 'rgba(161,255,74,0.12)', pointerEvents: 'none' }} />}
         {/* Текущий момент видео */}
         <div style={{ position: 'absolute', left: pct(currentMs), top: 0, bottom: 0, width: 2, background: '#F9F8FE', pointerEvents: 'none' }} />
       </div>
 
-      {selectedSegment && <div data-testid="segment-boundaries" style={{ marginTop: 8, fontSize: 13, lineHeight: 1.6, color: activeDrag ? 'var(--color-brand)' : 'var(--color-ink)' }}>
+      {pendingStartMs !== null && <div data-testid="pending-segment" style={{ marginTop: 8, fontSize: 13, lineHeight: 1.6, color: 'var(--color-brand)' }}>
+        <b>Начало отмечено: {formatSegmentTime(pendingStartMs)}</b>
+        <div>Текущее время {formatSegmentTime(currentMs)} · Длительность {formatSegmentTime(Math.max(0, currentMs - pendingStartMs))}</div>
+        <div style={{ color: 'var(--color-muted)', fontSize: 12 }}>Посмотрите видео или перемотайте до конца упражнения и нажмите «Закончить отрезок». Затем сохраните разметку.</div>
+      </div>}
+
+      {pendingStartMs === null && selectedSegment && <div data-testid="segment-boundaries" style={{ marginTop: 8, fontSize: 13, lineHeight: 1.6, color: activeDrag ? 'var(--color-brand)' : 'var(--color-ink)' }}>
         <b>Отрезок {selected + 1}{activeDrag ? ` · перемещаем ${activeDrag.edge === 'start' ? 'начало' : 'конец'}` : ''}</b>
         <div>Начало {formatSegmentTime(selectedSegment.startMs)} · Конец {formatSegmentTime(selectedSegment.endMs)} · Длительность {formatSegmentTime(selectedSegment.endMs - selectedSegment.startMs)}</div>
       </div>}
@@ -274,20 +306,21 @@ export default function SegmentTimeline({
       )}
 
       <div className="flex flex-wrap gap-2" style={{ marginTop: 12 }}>
-        <AdminButton type="button" size="sm" icon={Check} disabled={!dirty || saving || !valid || pendingInput || !!activeDrag} onClick={save}>
+        <AdminButton type="button" size="sm" icon={pendingStartMs === null ? Plus : Flag} disabled={!playbackReady || pendingInput || !!activeDrag} onClick={markAtPlayhead}>
+          {pendingStartMs === null ? 'Начать отрезок' : 'Закончить отрезок'}
+        </AdminButton>
+        {pendingStartMs !== null && <AdminButton type="button" size="sm" tone="secondary" icon={X} onClick={() => { setPendingStartMs(null); setMsg(null); }}>Отменить начало</AdminButton>}
+        <AdminButton type="button" size="sm" icon={Check} disabled={!dirty || saving || !valid || pendingInput || !!activeDrag || pendingStartMs !== null} onClick={save}>
           {saving ? 'Сохраняю…' : 'Сохранить разметку'}
         </AdminButton>
-        <AdminButton type="button" size="sm" tone="secondary" icon={Plus} onClick={() => {
+        <AdminButton type="button" size="sm" tone="secondary" icon={Plus} disabled={pendingStartMs !== null} onClick={() => {
           resetInput();
-          const start = Math.max(0, Math.min(Math.round(currentMs), durationMs - MIN_SEGMENT_MS));
+          const start = Math.max(0, Math.min(Math.round(getCurrentMs() ?? currentMs), durationMs - MIN_SEGMENT_MS));
           setStartText(formatSegmentTime(start));
           setEndText(formatSegmentTime(Math.min(durationMs, start + NEW_SEGMENT_MS)));
           setManualNew(true);
         }}>Ввести отрезок</AdminButton>
-        <AdminButton type="button" size="sm" tone="secondary" icon={Plus} onClick={addAtPlayhead}>
-          Добавить отрезок
-        </AdminButton>
-        <AdminButton type="button" size="sm" tone="secondary" icon={Trash2} onClick={removeAtPlayhead}>
+        <AdminButton type="button" size="sm" tone="secondary" icon={Trash2} disabled={pendingStartMs !== null} onClick={removeAtPlayhead}>
           Убрать отрезок
         </AdminButton>
         {onAuto && (
@@ -296,6 +329,7 @@ export default function SegmentTimeline({
             size="sm"
             tone="secondary"
             icon={RotateCcw}
+            disabled={pendingStartMs !== null}
             onClick={() => {
               resetInput();
               setSelectedIndex(0);
@@ -307,12 +341,12 @@ export default function SegmentTimeline({
           </AdminButton>
         )}
         {dirty && (
-          <AdminButton type="button" size="sm" tone="secondary" icon={Undo2} disabled={saving} onClick={() => { resetInput(); setSegments(saved); setSelectedIndex(0); }}>
+          <AdminButton type="button" size="sm" tone="secondary" icon={Undo2} disabled={saving || pendingStartMs !== null} onClick={() => { resetInput(); setSegments(saved); setSelectedIndex(0); }}>
             Отменить правки
           </AdminButton>
         )}
       </div>
-      {(selectedSegment || manualNew) && <div style={{ marginTop: 20, borderTop: '1px solid var(--border-hairline)', paddingTop: 16 }}>
+      {pendingStartMs === null && (selectedSegment || manualNew) && <div style={{ marginTop: 20, borderTop: '1px solid var(--border-hairline)', paddingTop: 16 }}>
         {selectedSegment && <label style={{ fontSize: 13, fontWeight: 700 }}>Выбранный отрезок
           <select aria-label="Настройки оценки отрезка" value={selected} style={{ ...inputStyle, margin: '6px 0 12px' }} onChange={(e) => { resetInput(); setSelectedIndex(Number(e.target.value)); }}>
             {segments.map((segment, index) => <option key={index} value={index}>

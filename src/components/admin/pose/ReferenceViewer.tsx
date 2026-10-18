@@ -5,10 +5,12 @@
 // углов по всему видео. Клик по графику перематывает видео.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, RotateCcw, RotateCw } from 'lucide-react';
 import { AdminButton } from '@/components/admin/ui';
 import { ANGLE_LABELS, frameAngles, frameIndexAt, type AngleKey, type PoseReferenceDoc } from '@/lib/pose/reference';
 import { detectSegments, type Segment } from '@/lib/pose/segments';
+import { clampReferenceSeek } from '@/lib/pose/reference-playback';
+import { formatSegmentTime } from '@/lib/pose/segment-editor';
 import { containRect, drawSkeleton } from './draw';
 import AngleChart from './AngleChart';
 import SegmentTimeline from './SegmentTimeline';
@@ -41,6 +43,7 @@ export default function ReferenceViewer({
   const [error, setError] = useState<string | null>(null);
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [currentMs, setCurrentMs] = useState(0);
+  const [mediaReady, setMediaReady] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const versionRef = useRef(updatedAt);
@@ -108,9 +111,18 @@ export default function ReferenceViewer({
     return () => cancelAnimationFrame(raf);
   }, [doc, showSkeleton]);
 
+  const getCurrentMs = () => {
+    const v = videoRef.current;
+    return v && v.readyState >= 1 ? clampReferenceSeek(v.currentTime * 1000, durationMs, v.duration) : null;
+  };
+
+  const syncCurrentTime = () => setCurrentMs(getCurrentMs() ?? 0);
+
   const seek = (ms: number) => {
     const v = videoRef.current;
-    if (v) v.currentTime = ms / 1000;
+    if (!v || v.readyState < 1) return;
+    v.currentTime = clampReferenceSeek(ms, durationMs, v.duration) / 1000;
+    syncCurrentTime();
   };
 
   const now = doc ? angles[frameIndexAt(doc.frames, currentMs)] : undefined;
@@ -126,6 +138,12 @@ export default function ReferenceViewer({
           controls
           playsInline
           preload="metadata"
+          onLoadedMetadata={() => { setMediaReady(true); syncCurrentTime(); }}
+          onEmptied={() => { setMediaReady(false); setCurrentMs(0); }}
+          onTimeUpdate={syncCurrentTime}
+          onSeeking={syncCurrentTime}
+          onSeeked={syncCurrentTime}
+          onEnded={syncCurrentTime}
           style={{ width: '100%', height: '100%', objectFit: 'contain' }}
         />
         {/* Холст точно по размеру видео (иначе скелет съедет); клики проходят к контролам */}
@@ -133,6 +151,11 @@ export default function ReferenceViewer({
       </div>
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="Перемотка видео">
+          <AdminButton type="button" size="sm" tone="secondary" icon={RotateCcw} aria-label="Назад на 5 секунд" disabled={!mediaReady} onClick={() => seek((getCurrentMs() ?? 0) - 5000)}>−5 сек</AdminButton>
+          <AdminButton type="button" size="sm" tone="secondary" icon={RotateCw} aria-label="Вперёд на 5 секунд" disabled={!mediaReady} onClick={() => seek((getCurrentMs() ?? 0) + 5000)}>+5 сек</AdminButton>
+          <span data-testid="reference-current-time" style={{ color: 'var(--color-muted)', fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>{formatSegmentTime(currentMs)}</span>
+        </div>
         <AdminButton
           type="button"
           size="sm"
@@ -151,6 +174,8 @@ export default function ReferenceViewer({
         durationMs={durationMs}
         initial={segments}
         currentMs={currentMs}
+        getCurrentMs={getCurrentMs}
+        playbackReady={mediaReady}
         onSeek={seek}
         onAuto={doc ? () => detectSegments(doc.frames, doc.durationMs) : null}
         onSave={async (next) => {
