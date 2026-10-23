@@ -9,6 +9,7 @@ export type PoseCameraStatus = 'off' | 'loading' | 'ready';
 
 interface Options<T> {
   onFrame: (frame: number[], timestampMs: number, context: T | undefined) => void;
+  facingMode?: 'user' | 'environment';
   captureContext?: () => T;
   highlights?: () => number[];
   onUnavailable?: () => void;
@@ -58,20 +59,21 @@ function disposeSession(session: CameraSession) {
 }
 
 /** Камера и распознавание работают локально; кадров и звука на сервере нет. */
-export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highlights }: Options<T>) {
+export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highlights, facingMode = 'user' }: Options<T>) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sessionRef = useRef<CameraSession | null>(null);
   const generationRef = useRef(0);
   const mountedRef = useRef(false);
   const pendingRef = useRef<Promise<void> | null>(null);
-  const callbacksRef = useRef({ onFrame, onUnavailable, captureContext, highlights });
+  const callbacksRef = useRef({ onFrame, onUnavailable, captureContext, highlights, facingMode });
   const [status, setStatus] = useState<PoseCameraStatus>('off');
   const [error, setError] = useState<string | null>(null);
   const [execution, setExecution] = useState<'worker' | 'main' | null>(null);
   const [delegate, setDelegate] = useState<'GPU' | 'CPU' | null>(null);
+  const [actualFacingMode, setActualFacingMode] = useState<'user' | 'environment' | null>(null);
 
-  useEffect(() => { callbacksRef.current = { onFrame, onUnavailable, captureContext, highlights }; }, [onFrame, onUnavailable, captureContext, highlights]);
+  useEffect(() => { callbacksRef.current = { onFrame, onUnavailable, captureContext, highlights, facingMode }; }, [onFrame, onUnavailable, captureContext, highlights, facingMode]);
 
   const clearDrawing = useCallback(() => {
     const canvas = canvasRef.current;
@@ -84,6 +86,7 @@ export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highl
     if (sessionRef.current) disposeSession(sessionRef.current);
     sessionRef.current = null;
     pendingRef.current = null;
+    if (mountedRef.current) setActualFacingMode(null);
     clearDrawing();
   }, [clearDrawing]);
 
@@ -144,7 +147,7 @@ export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highl
           return;
         }
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+          video: { facingMode: callbacksRef.current.facingMode, width: { ideal: 640 }, height: { ideal: 480 } },
           audio: false,
         });
         if (!isCurrent()) {
@@ -152,6 +155,8 @@ export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highl
           return;
         }
         session.stream = stream;
+        const actualMode = stream.getVideoTracks()[0]?.getSettings?.().facingMode;
+        setActualFacingMode(actualMode === 'user' || actualMode === 'environment' ? actualMode : null);
         const video = videoRef.current;
         if (!video) {
           fail('Не удалось открыть предпросмотр камеры. Обновите страницу и попробуйте снова.');
@@ -264,5 +269,5 @@ export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highl
     return pending;
   }, [clearDrawing, release]);
 
-  return { videoRef, canvasRef, status, error, start, stop, delegate, execution };
+  return { videoRef, canvasRef, status, error, start, stop, delegate, execution, actualFacingMode };
 }
