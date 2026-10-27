@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Overpass } from "next/font/google";
+import localFont from 'next/font/local';
 import Script from "next/script";
 import { headers } from "next/headers";
 import "./globals.css";
@@ -10,9 +10,15 @@ import AppLoader from "@/components/AppLoader";
 import MetrikaHits from "@/components/MetrikaHits";
 import SubscriptionModal from "@/components/SubscriptionModal";
 
-const overpass = Overpass({
-  subsets: ["cyrillic", "latin"],
-  variable: "--font-overpass",
+const overpass = localFont({
+  src: './fonts/Overpass-VariableFont_wght.ttf',
+  variable: '--font-overpass',
+  display: 'swap',
+  declarations: [
+    { prop: 'ascent-override', value: '105%' },
+    { prop: 'descent-override', value: '29%' },
+    { prop: 'line-gap-override', value: '0%' }
+  ],
 });
 
 export const metadata: Metadata = {
@@ -101,8 +107,8 @@ export default async function RootLayout({
         </Script>
         <noscript>
           <div>
-            <img src="https://mc.yandex.ru/watch/111857547" style={{position:'absolute',left:'-9999px'}} alt="" />
-            <img src="https://mc.yandex.ru/watch/107768196" style={{position:'absolute',left:'-9999px'}} alt="" />
+            <img src="https://mc.yandex.ru/watch/111857547" style={{ position: 'absolute', left: '-9999px' }} alt="" />
+            <img src="https://mc.yandex.ru/watch/107768196" style={{ position: 'absolute', left: '-9999px' }} alt="" />
           </div>
         </noscript>
         <MetrikaHits />
