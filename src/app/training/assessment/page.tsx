@@ -65,70 +65,132 @@ export default function TrainingAssessmentPage() {
   }, []);
 
   // C-4: предложение сделать тренировку из активного цикла вместо быстрой.
-  const [cycleOffer, setCycleOffer] = useState<{ sessionId: string; label: string; } | null>(null);
+  // const [cycleOffer, setCycleOffer] = useState<{ sessionId: string; label: string; } | null>(null);
   // Если отказался от цикла — день закроем, только когда быстрая реально создана
   // (в handleSubmit), а не на сам отказ, иначе уход без тренировки закрыл бы день.
   const declinedCycleSessionRef = useRef<string | null>(null);
 
+  // Стейты
+  const [cycleOffer, setCycleOffer] = useState<{ sessionId: string; label: string; } | null>(null);
+  const [isCycleModalVisible, setIsCycleModalVisible] = useState(false);
+  const [triggerStep1Anim, setTriggerStep1Anim] = useState(false);
+
+  // Боевой запрос к API
   useEffect(() => {
-    if (tourActive) return; // в туре не предлагаем цикл (см. tourActive выше)
-    // Из задания родителя (?goal=) цикл не предлагаем: засчитывается только
-    // тренировка с целью задания, а у дня цикла своя цель.
+    if (tourActive) return;
+
     try {
       if (new URLSearchParams(window.location.search).has('goal')) return;
     } catch { }
+
     let cancelled = false;
+
     (async () => {
       try {
         const res = await fetch('/api/microcycle/current');
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (!cancelled) setTriggerStep1Anim(true);
+          return;
+        }
+
         const data = await res.json();
         const mc = data.microcycle;
-        if (cancelled || !mc || mc.effectiveStatus !== 'ACTIVE') return;
+
+        if (cancelled || !mc || mc.effectiveStatus !== 'ACTIVE') {
+          if (!cancelled) setTriggerStep1Anim(true);
+          return;
+        }
+
         const todayIdx = todayCycleDayIndex(mc.weekStartDate, new Date());
         const day = pickCycleDayToOffer(mc.days || [], todayIdx);
+
         if (!cancelled && day && day.workoutSession) {
           setCycleOffer({
             sessionId: day.workoutSession.id,
             label: INTENT_LABELS[day.intent] || 'тренировка',
           });
+          // Даем React отрендерить элемент с translate-y-full, затем запускаем выезд наверх
+          setTimeout(() => {
+            if (!cancelled) setIsCycleModalVisible(true);
+          }, 50);
+        } else {
+          // Если на сегодня плана нет — сразу анимируем появление карточек энергии
+          if (!cancelled) setTriggerStep1Anim(true);
         }
       } catch {
-        // нет сети/цикла — просто не предлагаем
+        if (!cancelled) setTriggerStep1Anim(true);
       }
     })();
+
     return () => {
       cancelled = true;
     };
   }, [tourActive]);
 
-  const acceptCycleOffer = () => {
-    if (!cycleOffer) return;
-    router.push(`/training/workout?id=${cycleOffer.sessionId}`);
-  };
+  useEffect(() => {
+    const handlePopState = () => {
+      // Оставляем только возврат с шага 2 на шаг 1
+      if (step === 2) {
+        setStep(1);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    const handleTgBack = () => {
+      if (step === 2) {
+        window.history.back(); // Вызовет popstate и вернет на шаг 1
+      } else {
+        router.back(); // Если мы на шаге 1 — просто уходим со страницы
+      }
+    };
+
+    if (webApp) {
+      webApp.BackButton.show();
+      webApp.BackButton.onClick(handleTgBack);
+    }
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      if (webApp) {
+        webApp.BackButton.offClick(handleTgBack);
+        webApp.BackButton.hide();
+      }
+    };
+  }, [step, webApp, router]);
 
   const declineCycleOffer = () => {
-    if (!cycleOffer) return;
-    // Запоминаем день — закроем его в handleSubmit, когда быстрая создастся.
-    declinedCycleSessionRef.current = cycleOffer.sessionId;
-    setCycleOffer(null);
+    // Даем 150мс на то, чтобы кнопка успела визуально "прожаться"
+    setTimeout(() => {
+      if (!cycleOffer) return;
+      declinedCycleSessionRef.current = cycleOffer.sessionId;
+      setIsCycleModalVisible(false);
+
+      // Ждем пока модалка уедет вниз, затем анимируем карточки
+      setTimeout(() => {
+        setTriggerStep1Anim(true);
+      }, 350);
+    }, 150);
   };
+
+  const acceptCycleOffer = () => {
+    setTimeout(() => {
+      if (!cycleOffer) return;
+      router.push(`/training/session/${cycleOffer.sessionId}`);
+    }, 150);
+  };
+
+  // Функция для перехода на второй шаг (вместо обычного setStep)
+  const goToStep2 = () => {
+    window.history.pushState({ screen: 'step2' }, ''); // Пушим стейт для свайпа назад
+    setStep(2);
+  };
+
 
   // Логирование состояния пользователя
   useEffect(() => {
     console.log('👤 User state changed:', { user, userLoading });
   }, [user, userLoading]);
-
-  useEffect(() => {
-    if (webApp) {
-      webApp.BackButton.show();
-      webApp.BackButton.onClick(() => router.back());
-
-      return () => {
-        webApp.BackButton.hide();
-      };
-    }
-  }, [webApp, router]);
 
   const handleSubmit = async () => {
     if (!formData.energyState) {
@@ -197,6 +259,7 @@ export default function TrainingAssessmentPage() {
     } finally {
       setIsSubmitting(false);
     }
+
   };
 
   const isReady = !isSubmitting && !userLoading && !!formData.goal;
@@ -207,34 +270,48 @@ export default function TrainingAssessmentPage() {
 
       {/* C-4: предложение сделать тренировку из активного цикла вместо быстрой.
           В обучающем туре не показываем — перекрывает подсвеченные кнопки. */}
-      {/* {cycleOffer && !tourActive && ( */}
+      {/* Полноэкранный экран "У тебя активен цикл" */}
       {cycleOffer && !tourActive && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-black/60" />
-          <div className="relative w-full max-w-sm rounded-xl bg-[#0B0F2A] p-5 text-left shadow-lg border border-[rgba(68,92,255,0.35)]">
-            <div className="text-white text-base font-semibold">У тебя уже простроен цикл</div>
-            <div className="mt-2 text-white/80 text-sm">
-              По плану есть невыполненная тренировка —{' '}
-              <span className="text-[#A1FF4A] font-semibold">{cycleOffer.label}</span>. Всё равно сделать быструю тренировку?
+        <div
+          className={`fixed inset-0 z-100 bg-night flex flex-col px-4 pt-12 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isCycleModalVisible ? 'translate-y-0' : 'translate-y-full'
+            }`}
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 24px)' }}
+        >
+          {/* Иконка и заголовки (плавно проявляются с задержкой) */}
+          <div className={`flex-1 flex flex-col justify-center items-center text-center transition-all duration-700 delay-150 ${isCycleModalVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+            }`}>
+            <div className="w-20 h-20 mb-6 rounded-full bg-brand/10 flex items-center justify-center">
+              <img src="/icons/icon-cards.svg" alt="План" className="w-10 h-10" />
             </div>
-            {/* «Да, хочу быструю» — зелёная и первая (решение владельца, август-правки):
-                быстрая тренировка — то, зачем юзер сюда пришёл; цикл — второй вариант. */}
-            <div className="mt-4 flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={declineCycleOffer}
-                className="w-full rounded-lg bg-[#A1FF4A] px-3 py-2.5 text-sm font-semibold text-[#0B0F2A]"
-              >
-                Да, хочу быструю
-              </button>
-              <button
-                type="button"
-                onClick={acceptCycleOffer}
-                className="w-full rounded-lg border border-white/20 px-3 py-2.5 text-sm font-semibold text-white"
-              >
-                Сделать тренировку из цикла
-              </button>
-            </div>
+
+            <h2 className="font-overpass font-bold text-3xl text-ink tracking-tight mb-4">
+              А как же наш план?
+            </h2>
+
+            <p className="font-overpass text-[16px] text-muted leading-relaxed px-4">
+              У нас уже запланирована тренировка: <br />
+              <span className="text-brand font-bold text-[18px] block mt-2">{cycleOffer.label}</span>
+            </p>
+          </div>
+
+          {/* Кнопки действий (выплывают чуть позже) */}
+          <div className={`flex flex-col gap-3 mt-auto transition-all duration-700 delay-300 ${isCycleModalVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
+            }`}>
+            <button
+              type="button"
+              onClick={acceptCycleOffer}
+              className="w-full h-14 rounded-pill bg-brand text-night font-overpass font-bold text-[16px] tracking-[0.5px] uppercase transition-all active:scale-95"
+            >
+              Пашем по плану
+            </button>
+
+            <button
+              type="button"
+              onClick={declineCycleOffer}
+              className="w-full h-14 rounded-pill bg-surface border border-[var(--border-hairline)] text-ink font-overpass font-bold text-[16px] tracking-[0.5px] uppercase transition-all active:scale-95 hover:bg-elevated"
+            >
+              Погнали быструю
+            </button>
           </div>
         </div>
       )}
@@ -244,12 +321,18 @@ export default function TrainingAssessmentPage() {
         <button
           onClick={() => {
             setTimeout(() => {
-              step === 2 ? setStep(1) : router.back();
+              if (step === 2) {
+                window.history.back();
+              } else {
+                router.back();
+              }
             }, 150);
-          }} className="flex-shrink-0 absolute left-4 opacity-25 active:scale-85 active:opacity-40 transition-all duration-200"
+          }}
+          className="shrink-0 absolute left-4 opacity-25 active:scale-85 active:opacity-40 transition-all duration-200"
         >
           <img src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
         </button>
+
         <h1 className="font-overpass font-bold text-xs leading-6">
           БЫСТРАЯ ТРЕНИРОВКА
         </h1>
@@ -272,7 +355,8 @@ export default function TrainingAssessmentPage() {
           </div>
 
           {/* Горизонтальные карточки на всю ширину */}
-          <div className="flex flex-col gap-3 anim-stagger">
+          <div className={`flex flex-col gap-3 transition-opacity duration-300 ${triggerStep1Anim ? 'opacity-100 anim-stagger' : 'opacity-0'
+            }`}>
             {energyStates.map((state) => {
               const info = ENERGY_STATE_LABELS[state];
               if (!info) return null;
@@ -303,13 +387,13 @@ export default function TrainingAssessmentPage() {
                   key={state}
                   onClick={() => {
                     setFormData({ ...formData, energyState: state });
-                    setTimeout(() => setStep(2), 250);
+                    setTimeout(goToStep2, 250);
                   }}
                   className={`
-            relative flex items-center justify-between p-4 w-full rounded-[var(--radius-lg)]
+            relative flex items-center justify-between p-4 w-full rounded-(--radius-lg)
             transition-all duration-200 active:scale-95 border text-left
             ${isSelected
-                      ? 'bg-brand/10 border-[var(--border-lime)]'
+                      ? 'bg-brand/10 border-(--border-lime)'
                       : 'bg-surface border-transparent hover:bg-elevated'
                     }
           `}
@@ -347,7 +431,7 @@ export default function TrainingAssessmentPage() {
               paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)'
             }}
           >
-            <div className="p-4 rounded-[var(--radius-md)] bg-surface/50 border border-[var(--border-hairline)] flex gap-3 items-start">
+            <div className="p-4 rounded-md bg-surface/50 border border-(--border-hairline) flex gap-3 items-start">
               {/* Если нет этой иконки, можешь подставить любую другую или эмодзи 🤖 */}
               <img src="/icons/icon-cards.svg" alt="AI" className="w-5 h-5 shrink-0 mt-0.5 opacity-60 grayscale" />
               <p className="font-overpass text-[13px] text-muted leading-relaxed">
@@ -365,7 +449,7 @@ export default function TrainingAssessmentPage() {
               Шаг 2 из 2
             </div>
             <h2 className="font-overpass font-bold text-2xl text-ink tracking-tight">
-              Что будем тренировать?
+              Что будешь тренировать?
             </h2>
           </div>
           <div className="flex flex-col gap-3">
@@ -382,7 +466,9 @@ export default function TrainingAssessmentPage() {
                     if (formData.energyState === 'FULLY_CHARGED') animationClass = 'anim-energy-burst';
                     else if (formData.energyState === 'IN_TONE') animationClass = 'anim-pop-normal';
                     else if (formData.energyState === 'TIRED') animationClass = 'anim-sluggish';
-                  } return (
+                  }
+                  console.log(animationClass);
+                  return (
                     <button
                       key={goal}
                       onClick={() => setFormData({ ...formData, goal })}
@@ -400,7 +486,7 @@ export default function TrainingAssessmentPage() {
                         <img
                           src={`/images/AI_t/${iconFile}`}
                           alt=""
-                          className={`h-11 w-auto shrink-0 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-50 grayscale-[60%]'
+                          className={`h-11 w-auto shrink-0 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-50 grayscale-60'
                             } ${animationClass}`}
                         />
                       )}
@@ -424,7 +510,7 @@ export default function TrainingAssessmentPage() {
               onClick={handleSubmit}
               disabled={!isReady}
               className={`
-      pointer-events-auto w-full h-[56px] rounded-[var(--radius-pill)] flex items-center justify-center
+      pointer-events-auto w-full h-14 rounded-pill flex items-center justify-center
       font-overpass font-bold text-[16px] tracking-[0.5px] uppercase transition-all
       ${!isReady
                   ? 'bg-brand/20 text-brand/50 cursor-not-allowed'
@@ -441,8 +527,14 @@ export default function TrainingAssessmentPage() {
                 />
               ) : userLoading ? (
                 'Загрузка...'
-              ) : (
+              ) : formData.energyState === 'FULLY_CHARGED' ? (
                 'Погнали!'
+              ) : formData.energyState === 'IN_TONE' ? (
+                'Вперед'
+              ) : formData.energyState === 'TIRED' ? (
+                'Ну, попробуем'
+              ) : (
+                'Вперед'
               )}
             </button>
           </div>
