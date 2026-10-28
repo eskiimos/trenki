@@ -21,18 +21,18 @@ const INTENT_LABELS: Record<string, string> = {
 };
 
 const GOAL_ICONS: Record<string, string> = {
-  POWERFUL_SHOT:       'A_powerful_throw.svg',
-  OUTRUN_OPPONENT:     'Running_away_from_the_opponent.svg',
-  STRENGTH_STABILITY:  'Power_struggle_and_resilience.svg',
-  SOFT_HANDS:          'Soft_handles.svg',
+  POWERFUL_SHOT: 'A_powerful_throw.svg',
+  OUTRUN_OPPONENT: 'Running_away_from_the_opponent.svg',
+  STRENGTH_STABILITY: 'Power_struggle_and_resilience.svg',
+  SOFT_HANDS: 'Soft_handles.svg',
   FULL_GAME_ENDURANCE: 'Endurance_for_the_whole_game.svg',
-  AGILITY:             'maneuverability.svg',
-  SPORT_LONGEVITY:     'athletic_longevity.svg',
+  AGILITY: 'maneuverability.svg',
+  SPORT_LONGEVITY: 'athletic_longevity.svg',
 };
 
 type EnergyStateValue = 'FULLY_CHARGED' | 'IN_TONE' | 'TIRED';
 
-const energyStates: EnergyStateValue[] = ['FULLY_CHARGED', 'IN_TONE', 'TIRED'];
+const energyStates: EnergyStateValue[] = ['TIRED', 'IN_TONE', 'FULLY_CHARGED'];
 
 export default function TrainingAssessmentPage() {
   const router = useRouter();
@@ -43,7 +43,8 @@ export default function TrainingAssessmentPage() {
   const { isActive: tourActive } = useTour();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+  const [step, setStep] = useState(1);
+
   // Состояние формы. По умолчанию ничего не выбрано — атлет сам
   // указывает энергию и цель перед генерацией.
   const [formData, setFormData] = useState({
@@ -60,11 +61,11 @@ export default function TrainingAssessmentPage() {
       if (goal && GOAL_LABELS[goal]) {
         setFormData((prev) => (prev.goal ? prev : { ...prev, goal: goal as TrainingGoal }));
       }
-    } catch {}
+    } catch { }
   }, []);
 
   // C-4: предложение сделать тренировку из активного цикла вместо быстрой.
-  const [cycleOffer, setCycleOffer] = useState<{ sessionId: string; label: string } | null>(null);
+  const [cycleOffer, setCycleOffer] = useState<{ sessionId: string; label: string; } | null>(null);
   // Если отказался от цикла — день закроем, только когда быстрая реально создана
   // (в handleSubmit), а не на сам отказ, иначе уход без тренировки закрыл бы день.
   const declinedCycleSessionRef = useRef<string | null>(null);
@@ -75,7 +76,7 @@ export default function TrainingAssessmentPage() {
     // тренировка с целью задания, а у дня цикла своя цель.
     try {
       if (new URLSearchParams(window.location.search).has('goal')) return;
-    } catch {}
+    } catch { }
     let cancelled = false;
     (async () => {
       try {
@@ -122,7 +123,7 @@ export default function TrainingAssessmentPage() {
     if (webApp) {
       webApp.BackButton.show();
       webApp.BackButton.onClick(() => router.back());
-      
+
       return () => {
         webApp.BackButton.hide();
       };
@@ -198,32 +199,15 @@ export default function TrainingAssessmentPage() {
     }
   };
 
-  const [showInfoBlock, setShowInfoBlock] = useState(false);
-  const [isClosing, setIsClosing] = useState(false);
-
-  // Читаем из localStorage после монтирования
-  useEffect(() => {
-    const dismissed = localStorage.getItem('assessment_info_dismissed');
-    if (!dismissed) setShowInfoBlock(true);
-  }, []);
-
-  const handleCloseInfo = () => {
-    setIsClosing(true);
-    setTimeout(() => {
-      setShowInfoBlock(false);
-      setIsClosing(false);
-      localStorage.setItem('assessment_info_dismissed', '1');
-    }, 300);
-  };
-
-  const handleOpenInfo = () => {
-    setShowInfoBlock(true);
-  };
+  const isReady = !isSubmitting && !userLoading && !!formData.goal;
+  const isRageMode = isReady && formData.energyState === 'FULLY_CHARGED';
 
   return (
-    <div className="min-h-screen bg-[#101530] text-white p-4" style={{ paddingBottom: '100px', paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}>
+    <div className="w-full overflow-hidden relative">
+
       {/* C-4: предложение сделать тренировку из активного цикла вместо быстрой.
           В обучающем туре не показываем — перекрывает подсвеченные кнопки. */}
+      {/* {cycleOffer && !tourActive && ( */}
       {cycleOffer && !tourActive && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/60" />
@@ -256,275 +240,217 @@ export default function TrainingAssessmentPage() {
       )}
 
       {/* Заголовок с кнопкой назад */}
-      <div className="mb-6 flex items-center gap-3">
-        <button onClick={() => router.back()} className="flex-shrink-0">
+      <div className="mb-6 flex items-center justify-center p-4 relative">
+        <button
+          onClick={() => {
+            setTimeout(() => {
+              step === 2 ? setStep(1) : router.back();
+            }, 150);
+          }} className="flex-shrink-0 absolute left-4 opacity-25 active:scale-85 active:opacity-40 transition-all duration-200"
+        >
           <img src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
         </button>
-        <h1 style={{
-          fontFamily: 'Overpass',
-          fontWeight: 700,
-          fontSize: '12px',
-          lineHeight: '120%',
-          letterSpacing: '0.5px',
-          textTransform: 'uppercase',
-          color: '#F9F8FE',
-          flex: 1
-        }}>
+        <h1 className="font-overpass font-bold text-xs leading-6">
           БЫСТРАЯ ТРЕНИРОВКА
         </h1>
-        {/* Кнопка "i" — показывается когда блок скрыт */}
-        {!showInfoBlock && (
-          <button
-            onClick={handleOpenInfo}
-            style={{
-              width: '24px',
-              height: '24px',
-              borderRadius: '50%',
-              border: '1.5px solid rgba(255,255,255,0.4)',
-              background: 'transparent',
-              color: '#F9F8FE',
-              fontFamily: 'Overpass',
-              fontWeight: 700,
-              fontSize: '13px',
-              lineHeight: 1,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-            aria-label="Показать подсказку"
-          >
-            i
-          </button>
-        )}
       </div>
+      <div
+        className="flex transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
+        style={{ transform: `translateX(-${(step - 1) * 100}%)` }}
+      >
+        {/* Шаг 1: Состояние */}
+        <div className="w-full shrink-0 p-4 flex flex-col min-h-[calc(100vh-80px)]">
 
-      {/* Информационный блок */}
-      {showInfoBlock && (
-        <div 
-          className={`mb-6 transition-all duration-300 ${isClosing ? 'opacity-0 transform scale-95' : 'opacity-100 transform scale-100'}`}
-          style={{
-            width: '100%',
-            minHeight: '125px',
-            padding: '8px 8px 8px 16px',
-            gap: '8px',
-            borderRadius: '8px',
-            background: 'linear-gradient(180deg, rgba(87, 108, 255, 0) 0%, rgba(87, 108, 255, 0.5) 100%)',
-            display: 'flex',
-            flexDirection: 'column',
-            position: 'relative'
-          }}
-        >
-          {/* Верхняя часть с иконками */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-            <img src="/icons/icon-cards.svg" alt="ИИ" width={16} height={16} />
-            <button 
-              onClick={handleCloseInfo}
-              style={{ 
-                background: 'transparent', 
-                border: 'none', 
-                cursor: 'pointer',
-                padding: '0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
+          {/* Заголовок и индикатор шага */}
+          <div className="mb-6">
+            <div className="font-overpass font-bold text-[11px] text-muted tracking-widest uppercase mb-2">
+              Шаг 1 из 2
+            </div>
+            <h2 className="font-overpass font-bold text-2xl text-ink tracking-tight">
+              Как самочувствие?
+            </h2>
+          </div>
+
+          {/* Горизонтальные карточки на всю ширину */}
+          <div className="flex flex-col gap-3 anim-stagger">
+            {energyStates.map((state) => {
+              const info = ENERGY_STATE_LABELS[state];
+              if (!info) return null;
+
+              const isSelected = formData.energyState === state;
+
+              // Настройки визуализации для каждого состояния
+              let activeBars = 1;
+              let indicatorColor = 'bg-brand';
+              let description = '';
+
+              if (state === 'FULLY_CHARGED') {
+                activeBars = 3;
+                indicatorColor = 'bg-brand';
+                description = 'Максимальная интенсивность. Упор на развитие навыков и физики.';
+              } else if (state === 'IN_TONE') {
+                activeBars = 2;
+                indicatorColor = 'bg-ink'; // Белый
+                description = 'Сбалансированная нагрузка. Стандартный рабочий режим.';
+              } else if (state === 'TIRED') {
+                activeBars = 1;
+                indicatorColor = 'bg-[var(--color-danger)]'; // Оранжевый/красный из твоих токенов
+                description = 'Легкие упражнения, фокус на восстановление и раскисление.';
+              }
+
+              return (
+                <button
+                  key={state}
+                  onClick={() => {
+                    setFormData({ ...formData, energyState: state });
+                    setTimeout(() => setStep(2), 250);
+                  }}
+                  className={`
+            relative flex items-center justify-between p-4 w-full rounded-[var(--radius-lg)]
+            transition-all duration-200 active:scale-95 border text-left
+            ${isSelected
+                      ? 'bg-brand/10 border-[var(--border-lime)]'
+                      : 'bg-surface border-transparent hover:bg-elevated'
+                    }
+          `}
+                >
+                  {/* Левая часть: Текст */}
+                  <div className="flex flex-col gap-1.5 pr-4 flex-1">
+                    <span className={`font-overpass font-bold text-[17px] leading-none ${isSelected ? 'text-brand' : 'text-ink'}`}>
+                      {info.label}
+                    </span>
+                    <span className="font-overpass text-[13px] text-muted leading-snug">
+                      {description}
+                    </span>
+                  </div>
+
+                  {/* Правая часть: Индикатор энергии */}
+                  <div className="flex gap-1 shrink-0">
+                    {[1, 2, 3].map((barIndex) => (
+                      <div
+                        key={barIndex}
+                        className={`h-2 w-3.5 rounded-full transition-colors ${barIndex <= activeBars
+                          ? indicatorColor
+                          : 'bg-muted/20'
+                          }`}
+                      />
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Инфоблок-заглушка внизу (прижимается к низу через mt-auto) */}
+          <div className="mt-auto pt-8"
+            style={{
+              paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)'
+            }}
+          >
+            <div className="p-4 rounded-[var(--radius-md)] bg-surface/50 border border-[var(--border-hairline)] flex gap-3 items-start">
+              {/* Если нет этой иконки, можешь подставить любую другую или эмодзи 🤖 */}
+              <img src="/icons/icon-cards.svg" alt="AI" className="w-5 h-5 shrink-0 mt-0.5 opacity-60 grayscale" />
+              <p className="font-overpass text-[13px] text-muted leading-relaxed">
+                ИИ-тренер подстроит объем и интенсивность упражнений под твой текущий уровень энергии, чтобы избежать перетренированности.
+              </p>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Шаг 2: Цель */}
+        <div className="w-full shrink-0 p-4 flex flex-col min-h-[calc(100vh-120px)]">
+          <div className="mb-6">
+            <div className="font-overpass font-bold text-[11px] text-muted tracking-widest uppercase mb-2">
+              Шаг 2 из 2
+            </div>
+            <h2 className="font-overpass font-bold text-2xl text-ink tracking-tight">
+              Что будем тренировать?
+            </h2>
+          </div>
+          <div className="flex flex-col gap-3">
+            <div>
+              <div className="flex flex-col gap-3 anim-stagger">
+                {trainingGoals.map((goal) => {
+                  const info = GOAL_LABELS[goal];
+                  if (!info) return null;
+
+                  const isSelected = formData.goal === goal;
+                  const iconFile = GOAL_ICONS[goal];
+                  let animationClass = '';
+                  if (isSelected) {
+                    if (formData.energyState === 'FULLY_CHARGED') animationClass = 'anim-energy-burst';
+                    else if (formData.energyState === 'IN_TONE') animationClass = 'anim-pop-normal';
+                    else if (formData.energyState === 'TIRED') animationClass = 'anim-sluggish';
+                  } return (
+                    <button
+                      key={goal}
+                      onClick={() => setFormData({ ...formData, goal })}
+                      className={`
+                        w-full flex items-center gap-3 p-3 rounded-lg 
+                        font-overpass font-bold text-[16px] leading-[1.2] tracking-[0.5px] 
+                        transition-all duration-200 active:scale-95 text-left border
+                          ${isSelected
+                          ? 'bg-brand/10 border-(--border-lime)'
+                          : 'bg-surface border-transparent hover:bg-elevated'
+                        }
+                      `}
+                    >
+                      {iconFile && (
+                        <img
+                          src={`/images/AI_t/${iconFile}`}
+                          alt=""
+                          className={`h-11 w-auto shrink-0 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-50 grayscale-[60%]'
+                            } ${animationClass}`}
+                        />
+                      )}
+                      <span>{info.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          {/*  кнопка сабмит */}
+          <div
+            className="z-50 mt-auto pointer-events-none"
+            style={{
+              background: 'linear-gradient(to top, var(--color-night) 60%, transparent)',
+              paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)'
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!isReady}
+              className={`
+      pointer-events-auto w-full h-[56px] rounded-[var(--radius-pill)] flex items-center justify-center
+      font-overpass font-bold text-[16px] tracking-[0.5px] uppercase transition-all
+      ${!isReady
+                  ? 'bg-brand/20 text-brand/50 cursor-not-allowed'
+                  : 'bg-brand text-night active:scale-95 cursor-pointer'
+                }
+      ${isRageMode ? 'anim-button-rage' : (isReady ? 'anim-glow-pulse' : '')}
+    `}
             >
-              <img src="/icons/action-close.svg" alt="Закрыть" width={16} height={16} />
+              {isSubmitting ? (
+                <img
+                  src="/icons/loading.svg"
+                  alt="Загрузка"
+                  className="w-6 h-6 animate-spin"
+                />
+              ) : userLoading ? (
+                'Загрузка...'
+              ) : (
+                'Погнали!'
+              )}
             </button>
           </div>
-          
-          {/* Текст */}
-          <div style={{
-            fontFamily: 'Overpass',
-            fontWeight: 700,
-            fontSize: '14px',
-            lineHeight: '120%',
-            letterSpacing: '0.5px',
-            textTransform: 'uppercase',
-            color: '#F9F8FE',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px'
-          }}>
-            <div>
-              составим идеальный комплекс для твоей <span style={{color: '#A1FF4A'}}>быстрой тренировки</span>.
-            </div>
-            <div>
-              настрой фильтры и вперед!
-            </div>
-          </div>
         </div>
-      )}
 
-      {/* Вопросы */}
-      <div className="space-y-12">
-        <div className="animate-fadeIn space-y-12">
-          {/* Вопрос 1: Цель тренировки */}
-          <div>
-            <h2 className="mb-6" style={{
-              fontFamily: 'Overpass',
-              fontWeight: 700,
-              fontSize: '12px',
-              lineHeight: '120%',
-              letterSpacing: '0.5px',
-              textTransform: 'uppercase',
-              color: '#F9F8FE'
-            }}>
-              цель тренировки
-            </h2>
-            <div className="flex flex-wrap" style={{ gap: '12px' }}>
-              {trainingGoals.map((goal) => {
-                const info = GOAL_LABELS[goal];
-                if (!info) return null;
-                const isSelected = formData.goal === goal;
-                const iconFile = GOAL_ICONS[goal];
-                return (
-                  <div key={goal} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {iconFile && (
-                      <img
-                        src={`/images/AI_t/${iconFile}`}
-                        alt=""
-                        style={{ height: '44px', width: 'auto', display: 'block' }}
-                      />
-                    )}
-                    <button
-                      onClick={() => setFormData({ ...formData, goal })}
-                      className="transition-all duration-200 hover:scale-105"
-                      style={{
-                        height: '44px',
-                        paddingTop: '12px',
-                        paddingRight: '16px',
-                        paddingBottom: '12px',
-                        paddingLeft: '16px',
-                        borderRadius: '32px',
-                        backgroundColor: isSelected ? '#A1FF4A' : '#AEABBB33',
-                        color: isSelected ? '#060919' : '#F9F8FE',
-                        fontFamily: 'Overpass',
-                        fontWeight: 700,
-                        fontSize: '14px',
-                        lineHeight: '120%',
-                        letterSpacing: '0.5px',
-                        textAlign: 'center',
-                        opacity: 1,
-                        whiteSpace: 'nowrap',
-                        border: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {info.label}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
 
-          {/* Вопрос 2: Состояние */}
-          <div>
-            <h2 className="mb-6" style={{
-              fontFamily: 'Overpass',
-              fontWeight: 700,
-              fontSize: '12px',
-              lineHeight: '120%',
-              letterSpacing: '0.5px',
-              textTransform: 'uppercase',
-              color: '#F9F8FE'
-            }}>
-              твое состояние
-            </h2>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              {energyStates.map((state) => {
-                const info = ENERGY_STATE_LABELS[state];
-                if (!info) return null;
-                const isSelected = formData.energyState === state;
-                return (
-                  <button
-                    key={state}
-                    onClick={() => setFormData({ ...formData, energyState: state })}
-                    className="transition-all duration-200 hover:scale-105"
-                    style={{
-                      flex: 1,
-                      height: '44px',
-                      padding: '12px 16px',
-                      borderRadius: '32px',
-                      backgroundColor: isSelected ? '#A1FF4A' : '#AEABBB33',
-                      color: isSelected ? '#060919' : '#F9F8FE',
-                      fontFamily: 'Overpass',
-                      fontWeight: 700,
-                      fontSize: '14px',
-                      lineHeight: '120%',
-                      letterSpacing: '0.5px',
-                      textAlign: 'center',
-                      border: 'none',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {info.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+
       </div>
-
-      {/* Фиксированная кнопка "Вперед" */}
-      <div 
-        className="fixed bottom-0 left-0 right-0 p-4"
-        style={{
-          backgroundColor: '#101530',
-          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-          zIndex: 50
-        }}
-      >
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={!formData.goal || isSubmitting || userLoading}
-          className="w-full rounded-full font-medium transition-all uppercase flex items-center justify-center"
-          style={{
-            backgroundColor: '#A1FF4A',
-            color: '#060919',
-            opacity: (!formData.goal || isSubmitting || userLoading) ? 0.2 : 1,
-            fontFamily: 'Overpass, sans-serif',
-            fontWeight: 700,
-            fontSize: '16px',
-            letterSpacing: '0.5px',
-            cursor: (!formData.goal || isSubmitting || userLoading) ? 'not-allowed' : 'pointer',
-            height: '56px',
-            padding: '0 16px',
-          }}
-        >
-          {isSubmitting ? (
-            <img 
-              src="/icons/loading.svg" 
-              alt="Загрузка" 
-              width={24} 
-              height={24}
-              style={{
-                animation: 'spin 1s linear infinite'
-              }}
-            />
-          ) : userLoading ? (
-            'Загрузка...'
-          ) : (
-            'Вперед'
-          )}
-        </button>
-        <style jsx>{`
-          @keyframes spin {
-            from {
-              transform: rotate(0deg);
-            }
-            to {
-              transform: rotate(360deg);
-            }
-          }
-        `}</style>
-      </div>
-    </div>
+    </div >
   );
 }
