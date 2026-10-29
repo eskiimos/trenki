@@ -10,6 +10,7 @@
 // установленной PWA — там вместо кнопки подсказка «добавь на экран Домой».
 
 import { useEffect, useState } from 'react';
+import { useHomeSectionReady } from '@/components/HomePreloadBoundary';
 import { X, Bell, Share, ChevronRight } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { isIOS as detectIOS, isStandalone as detectStandalone } from '@/lib/platform';
@@ -31,6 +32,17 @@ export default function PushOptInBanner() {
   const [isStandalone, setIsStandalone] = useState(false);
   // Инструкция «на экран Домой» (правка владельца: плашка была инертной)
   const [guideOpen, setGuideOpen] = useState(false);
+  const [initialCheckTimedOut, setInitialCheckTimedOut] = useState(false);
+  useHomeSectionReady('push', mounted && (initialCheckTimedOut || dismissed || isSubscribed || permission === 'denied' || (!isLoading && checkedOnce)));
+
+  // A missing service-worker registration can leave ready pending forever.
+  // Hide this optional invitation for this visit if its initial check stalls;
+  // a late result must not insert a new row after the home page is revealed.
+  useEffect(() => {
+    if (!isLoading || checkedOnce) return;
+    const timer = setTimeout(() => setInitialCheckTimedOut(true), 3_000);
+    return () => clearTimeout(timer);
+  }, [isLoading, checkedOnce]);
 
   useEffect(() => {
     setMounted(true);
@@ -59,7 +71,7 @@ export default function PushOptInBanner() {
 
   // До монтирования (SSR/гидрация), после закрытия, при активной подписке или
   // жёстком запрете — ничего не рендерим.
-  if (!mounted || dismissed || isSubscribed || permission === 'denied') return null;
+  if (!mounted || initialCheckTimedOut || dismissed || isSubscribed || permission === 'denied') return null;
 
   // iOS во вкладке Safari: PushManager отсутствует вне standalone-PWA.
   if (!isSupported) {

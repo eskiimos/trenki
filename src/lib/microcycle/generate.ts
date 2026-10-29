@@ -1,6 +1,6 @@
 // Чистая функция генерации микроцикла для одного юзера. Используется
-// и эндпоинтом POST /api/microcycle/generate (по запросу атлета), и cron'ом
-// /api/cron/microcycle-autogenerate (массово в воскресенье вечером).
+// эндпоинтом POST /api/microcycle/generate (по явному запросу атлета).
+// Фоновая еженедельная генерация отключена.
 //
 // Неделя строится по методичке тренеров через planWeek (week-plan.ts):
 // 3 полноценных дня (Пн/Ср/Пт) + Вт «только разминка» + Чт «разминка+растяжка»,
@@ -43,9 +43,9 @@ export interface GenerateResult {
 }
 
 interface Options {
-  /** Подменяемое «сейчас» — для cron'а можно явно передать (тестируемость) */
+  /** Подменяемое «сейчас» для тестов. */
   now?: Date;
-  /** Явная стартовая дата (00:00 UTC). По умолчанию — сегодня. Cron шлёт Пн. */
+  /** Явная стартовая дата (00:00 UTC). Ручной endpoint передаёт сегодня. */
   startDate?: Date;
 }
 
@@ -79,8 +79,8 @@ export async function generateMicrocycleForUser(
 
   // Дата старта: ПЕРВЫЙ цикл — с сегодня (вводная неделя по дню старта,
   // методичка «старт с разных дней»). Последующие — со следующего понедельника
-  // (стандартная неделя Пн-Пт; «со след. недели всегда Пн-Пт»). Cron передаёт
-  // startDate явно (ближайший Пн).
+  // (стандартная неделя Пн-Пт; «со след. недели всегда Пн-Пт»). Ручной endpoint
+  // передаёт startDate явно (локальное сегодня пользователя).
   const weekStartDate =
     opts.startDate ?? (isFirstCycle ? getMicrocycleStartDate(now) : getMicrocycleWeekStart(now));
 
@@ -180,6 +180,7 @@ export async function generateMicrocycleForUser(
         cycleNumber,
         status: MicrocycleStatus.ACTIVE,
         adjustmentFactor,
+        requestedAt: now,
       },
     });
 
@@ -221,11 +222,11 @@ export async function generateMicrocycleForUser(
 
     return cycle.id;
     }, { timeout: 30_000 });
-  } catch (e: any) {
-    // Гонка: цикл на эту неделю создан параллельно (cron + ручной запрос) →
+  } catch (e: unknown) {
+    // Гонка: цикл на эту неделю создан параллельным ручным запросом →
     // unique violation по (userId, weekStartDate). Возвращаем существующий
     // вместо 500.
-    if (e?.code === 'P2002') {
+    if (e && typeof e === 'object' && 'code' in e && e.code === 'P2002') {
       const raced = await prisma.microcycle.findUnique({
         where: { userId_weekStartDate: { userId, weekStartDate } },
         include: { days: { orderBy: { dayOfWeek: 'asc' } } },

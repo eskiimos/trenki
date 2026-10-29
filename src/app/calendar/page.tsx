@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -12,6 +12,7 @@ import BottomNavigation from '@/components/BottomNavigation';
 import SwipeableWorkoutItem from '@/components/SwipeableWorkoutItem';
 import MicrocyclePreparingOverlay from '@/components/MicrocyclePreparingOverlay';
 import { EnergyIcon, GoalIcon } from '@/components/training/icons';
+import AppLoader from '@/components/AppLoader';
 
 interface ScheduledWorkout {
   id: string;
@@ -93,6 +94,7 @@ export default function CalendarPage() {
   const [coachAssignments, setCoachAssignments] = useState<CoachAssignment[]>([]);
   const [microcycle, setMicrocycle] = useState<ActiveMicrocycle | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   /** Сбой загрузки — раньше любая ошибка выглядела как «у тебя ничего не запланировано». */
   const [loadError, setLoadError] = useState<string | null>(null);
   /**
@@ -103,11 +105,14 @@ export default function CalendarPage() {
   const [cycleLoaded, setCycleLoaded] = useState(false);
   /** Защита от гонки: ответ устаревшего месяца не должен перезаписывать актуальный. */
   const reqIdRef = useRef(0);
+  const loadControllerRef = useRef<AbortController | null>(null);
   const [generatingCycle, setGeneratingCycle] = useState(false);
   const [cycleError, setCycleError] = useState<string | null>(null);
   // Пересборка дня «раскисление» под выбранную часть тела (низ/верх/всё).
   const [stretchRebuilding, setStretchRebuilding] = useState(false);
   const [stretchError, setStretchError] = useState<string | null>(null);
+  const calendarMonth = currentDate.getMonth();
+  const calendarYear = currentDate.getFullYear();
 
   const handleStretchBodyPart = async (
     sessionId: string,
@@ -136,14 +141,8 @@ export default function CalendarPage() {
     }
   };
 
-  useEffect(() => {
-    fetchCalendar();
-  }, [currentDate.getMonth(), currentDate.getFullYear()]);
-
-  // Ручная генерация микроцикла (кнопка «Собрать неделю»). Идемпотентна —
-  // если на эту неделю цикл уже есть, бэкенд вернёт существующий (мгновенно).
-  // Поэтому держим экран сборки минимум ~5с, чтобы анимация успела проиграться
-  // и создавалось ощущение, что ИИ реально собирает неделю.
+  // Сборка запускается только нажатием. Для существующего плана ниже
+  // запрашиваем подтверждение пересборки; анимацию держим минимум 5 секунд.
   const MIN_OVERLAY_MS = 5000;
   const handleGenerateMicrocycle = async () => {
     if (generatingCycle) return;
@@ -176,41 +175,48 @@ export default function CalendarPage() {
       if (elapsed < MIN_OVERLAY_MS) {
         await new Promise((r) => setTimeout(r, MIN_OVERLAY_MS - elapsed));
       }
-    } catch (err: any) {
-      setCycleError(err?.message || 'Ошибка');
+    } catch (err) {
+      setCycleError(err instanceof Error ? err.message : 'Ошибка');
     } finally {
       setGeneratingCycle(false);
     }
   };
 
-  const fetchCalendar = async () => {
+  const fetchCalendar = useCallback(async () => {
     const myId = ++reqIdRef.current;
+    loadControllerRef.current?.abort();
+    const controller = new AbortController();
+    loadControllerRef.current = controller;
+    const timeout = window.setTimeout(() => controller.abort(), 10_000);
     setIsLoading(true);
     setLoadError(null);
     try {
-      const month = currentDate.getMonth();
-      const year = currentDate.getFullYear();
+      const month = calendarMonth;
+      const year = calendarYear;
 
       const [scheduleRes, assignmentsRes, microcycleRes] = await Promise.all([
-        fetch(`/api/schedule?month=${month}&year=${year}`),
-        fetch('/api/assignments?role=athlete'),
-        fetch('/api/microcycle/current'),
+        fetch(`/api/schedule?month=${month}&year=${year}`, { signal: controller.signal }),
+        fetch('/api/assignments?role=athlete', { signal: controller.signal }),
+        fetch('/api/microcycle/current', { cache: 'no-store', signal: controller.signal }),
+      ]);
+      const [scheduleData, assignmentsData, microcycleData] = await Promise.all([
+        scheduleRes.ok ? scheduleRes.json() : null,
+        assignmentsRes.ok ? assignmentsRes.json() : null,
+        microcycleRes.ok ? microcycleRes.json() : null,
       ]);
       // Быстро перелистали месяцы — ответ устарел, применять его нельзя.
       if (reqIdRef.current !== myId) return;
 
       if (scheduleRes.ok) {
-        setScheduledWorkouts(await scheduleRes.json());
+        setScheduledWorkouts(scheduleData);
       } else {
         setLoadError('Не удалось загрузить расписание');
       }
       if (assignmentsRes.ok) {
-        const data = await assignmentsRes.json();
-        setCoachAssignments(data.assignments ?? []);
+        setCoachAssignments(assignmentsData.assignments ?? []);
       }
       if (microcycleRes.ok) {
-        const data = await microcycleRes.json();
-        setMicrocycle(data.microcycle);
+        setMicrocycle(microcycleData.microcycle);
         setCycleLoaded(true);
       } else {
         // Не выставляем cycleLoaded: иначе покажем «Собрать неделю» и юзер
@@ -221,9 +227,23 @@ export default function CalendarPage() {
       console.error('Error fetching calendar:', error);
       if (reqIdRef.current === myId) setLoadError('Нет связи с сервером');
     } finally {
-      if (reqIdRef.current === myId) setIsLoading(false);
+      clearTimeout(timeout);
+      if (reqIdRef.current === myId) {
+        setIsLoading(false);
+        setInitialLoading(false);
+      }
     }
-  };
+  }, [calendarMonth, calendarYear]);
+
+  useEffect(() => {
+    void fetchCalendar();
+    return () => {
+      // This ref is a request sequence, not a DOM node: invalidate the latest result.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      reqIdRef.current++;
+      loadControllerRef.current?.abort();
+    };
+  }, [fetchCalendar]);
 
   /** При смене месяца двигаем и выбранный день — иначе внизу остаётся «Сегодня,
    *  14 августа», пока пользователь смотрит сентябрь. */
@@ -485,13 +505,18 @@ export default function CalendarPage() {
   };
 
   return (
+    <>
+    <AppLoader ready={!initialLoading} />
     <div
       // .pb-nav — единый клиренс над таб-баром (safe-area + высота бара);
       // раньше здесь был свой calc(+128), разъезжавшийся с остальными экранами.
       className="min-h-screen pb-nav"
       style={{
         background: 'linear-gradient(182.77deg, #101530 69.24%, #060919 97.69%)',
+        visibility: initialLoading ? 'hidden' : 'visible',
       }}
+      inert={initialLoading}
+      aria-busy={isLoading}
     >
       {/* Header */}
       <header className="flex items-center px-4 pb-4 safe-top">
@@ -556,7 +581,7 @@ export default function CalendarPage() {
           <button
             type="button"
             onClick={handleGenerateMicrocycle}
-            disabled={generatingCycle}
+            disabled={generatingCycle || isLoading}
             className="w-full mb-4 rounded-2xl flex items-center gap-3 p-4 transition-transform active:scale-[0.98]"
             style={{
               background:
@@ -719,9 +744,9 @@ export default function CalendarPage() {
         </div>
 
         {/* Workouts List */}
-        {isLoading ? (
-          // Раньше `isLoading` не использовался в разметке вообще: пока летели три
-          // запроса, пользователь видел «Нет запланированных тренировок».
+        {initialLoading ? (
+          // Первую загрузку скрывает AppLoader; при перелистывании месяца
+          // сохраняем уже показанный календарь вместо скачка к скелетону.
           <div className="space-y-4" aria-busy="true">
             {[0, 1].map((i) => (
               <div
@@ -1003,5 +1028,6 @@ export default function CalendarPage() {
       {/* Анимация сборки недели */}
       <MicrocyclePreparingOverlay open={generatingCycle} />
     </div>
+    </>
   );
 }

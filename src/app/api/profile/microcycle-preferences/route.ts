@@ -1,7 +1,8 @@
 /**
  * PATCH /api/profile/microcycle-preferences
  *
- * Атлет включает/выключает авто-генерацию микроциклов.
+ * Legacy preference: automatic generation is disabled. Older clients may
+ * still clear the setting, but cannot enable it again.
  *
  * Body: { autoGenerate: boolean }
  * Auth: httpOnly session cookie.
@@ -29,6 +30,13 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
+  if (body.autoGenerate) {
+    return NextResponse.json(
+      { error: 'Цикл собирается только по нажатию кнопки', code: 'MANUAL_GENERATION_ONLY' },
+      { status: 409 },
+    );
+  }
+
   const profile = await prisma.profile.findUnique({
     where: { userId: auth.user.id },
     select: { id: true },
@@ -39,7 +47,7 @@ export async function PATCH(request: NextRequest) {
 
   const updated = await prisma.profile.update({
     where: { id: profile.id },
-    data: { autoGenerateMicrocycle: body.autoGenerate },
+    data: { autoGenerateMicrocycle: false },
     select: { autoGenerateMicrocycle: true },
   });
 

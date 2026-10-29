@@ -5,6 +5,7 @@ import { requireAuthUser } from '@/lib/coach/guards';
 import { goalsFromStoredDays } from '@/lib/microcycle/week-plan';
 import { resolveVideoUrl } from '@/lib/s3';
 import { pickTodayReminder } from '@/lib/training/today-reminder';
+import { ELIGIBLE_MICROCYCLE_WHERE } from '@/lib/microcycle/eligibility';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -30,7 +31,11 @@ async function findTodayCycleSessionId(userId: string): Promise<string | null> {
   const activeDays = await prisma.microcycleDay.findMany({
     where: {
       workoutSessionId: { not: null },
-      microcycle: { userId, status: { not: MicrocycleStatus.ARCHIVED } },
+      microcycle: {
+        userId,
+        status: { not: MicrocycleStatus.ARCHIVED },
+        AND: ELIGIBLE_MICROCYCLE_WHERE,
+      },
       workoutSession: { status: WorkoutStatus.PENDING },
     },
     select: {
@@ -134,7 +139,16 @@ export async function GET(request: NextRequest) {
 
       if (!workout) {
         const freshest = await prisma.workoutSession.findFirst({
-          where: { userId, status: WorkoutStatus.PENDING },
+          where: {
+            userId,
+            status: WorkoutStatus.PENDING,
+            // Старый крон создавал недели без согласия атлета. Их PENDING-дни
+            // не должны становиться «текущей тренировкой» при открытии меню.
+            OR: [
+              { microcycleDay: { is: null } },
+              { microcycleDay: { is: { microcycle: { is: ELIGIBLE_MICROCYCLE_WHERE } } } },
+            ],
+          },
           include,
           orderBy: { createdAt: 'desc' },
         });
