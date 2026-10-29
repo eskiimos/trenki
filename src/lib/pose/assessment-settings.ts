@@ -13,6 +13,8 @@ export const ASSESSMENT_PROFILES = {
 } as const;
 export type AssessmentProfile = keyof typeof ASSESSMENT_PROFILES;
 export interface AssessmentSettings {
+  /** Omitted on historical annotations; false marks theory/non-biomechanical work. */
+  enabled?: boolean;
   profile: AssessmentProfile;
   weights: Record<AssessmentAngleKey, number>;
   requiredAngles: AssessmentAngleKey[];
@@ -30,6 +32,13 @@ export const OPPOSITE: Record<AssessmentAngleKey, AssessmentAngleKey> = {
   kneeL: 'kneeR', kneeR: 'kneeL', hipL: 'hipR', hipR: 'hipL', elbowL: 'elbowR', elbowR: 'elbowL',
   shoulderL: 'shoulderR', shoulderR: 'shoulderL', trunk: 'trunk',
 };
+
+/** Whitelist points used by the enabled angles; shared hip/shoulder points are retained. */
+export function visibleAssessmentPoints(settings: AssessmentSettings, sideMode: 'same' | 'opposite' = 'same'): number[] {
+  if (settings.enabled === false) return [];
+  return [...new Set(ASSESSMENT_ANGLES.filter((key) => settings.weights[key] > 0)
+    .flatMap((key) => REQUIRED_POINTS[sideMode === 'opposite' ? OPPOSITE[key] : key]))].sort((a, b) => a - b);
+}
 /** Missing settings on existing references use this explicit, conservative default. */
 export function assessmentPreset(profile: Exclude<AssessmentProfile, 'custom'> = 'balanced'): AssessmentSettings {
   const weights: Record<AssessmentAngleKey, number> = {
@@ -53,6 +62,7 @@ export function assessmentPreset(profile: Exclude<AssessmentProfile, 'custom'> =
 export function parseAssessmentSettings(raw: unknown): AssessmentSettings | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const value = raw as Record<string, unknown>;
+  if ('enabled' in value && typeof value.enabled !== 'boolean') return null;
   if (typeof value.profile !== 'string' || !Object.hasOwn(ASSESSMENT_PROFILES, value.profile)) return null;
   if (typeof value.toleranceDeg !== 'number' || !Number.isFinite(value.toleranceDeg) || value.toleranceDeg < 0 || value.toleranceDeg > 30) return null;
   if (!value.weights || typeof value.weights !== 'object' || Array.isArray(value.weights)) return null;
@@ -64,9 +74,10 @@ export function parseAssessmentSettings(raw: unknown): AssessmentSettings | null
     if (typeof weight !== 'number' || !Number.isFinite(weight) || weight < 0 || weight > 5) return null;
     weights[key] = weight;
   }
-  if (!Array.isArray(value.requiredAngles) || !value.requiredAngles.length || value.requiredAngles.length > ASSESSMENT_ANGLES.length) return null;
+  if (!Array.isArray(value.requiredAngles) || (value.enabled !== false && !value.requiredAngles.length) || value.requiredAngles.length > ASSESSMENT_ANGLES.length) return null;
   if (value.requiredAngles.some((key) => !ASSESSMENT_ANGLES.includes(key) || weights[key as AssessmentAngleKey] <= 0)) return null;
   const inputRequired = value.requiredAngles;
   const requiredAngles = ASSESSMENT_ANGLES.filter((key) => inputRequired.includes(key));
-  return { profile: value.profile as AssessmentProfile, weights, requiredAngles, toleranceDeg: value.toleranceDeg };
+  return { profile: value.profile as AssessmentProfile, weights, requiredAngles, toleranceDeg: value.toleranceDeg,
+    ...('enabled' in value ? { enabled: value.enabled as boolean } : {}) };
 }

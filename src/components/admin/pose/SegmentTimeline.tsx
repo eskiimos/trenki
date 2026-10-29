@@ -32,6 +32,7 @@ export default function SegmentTimeline({
   onSeek,
   onSave,
   onAuto,
+  onChange,
 }: {
   durationMs: number;
   initial: Segment[];
@@ -43,6 +44,8 @@ export default function SegmentTimeline({
   onSave: (segments: Segment[]) => Promise<string | null>;
   /** Пересчитать автоматически по кадрам эталона (null — кадры ещё не загружены). */
   onAuto: (() => Segment[]) | null;
+  /** Preview edits without replacing the saved initial value. */
+  onChange?: (segments: Segment[]) => void;
 }) {
   const [segments, setSegments] = useState<Segment[]>(initial);
   const [saved, setSaved] = useState<Segment[]>(initial);
@@ -56,7 +59,11 @@ export default function SegmentTimeline({
   const [startText, setStartText] = useState<string | null>(null);
   const [endText, setEndText] = useState<string | null>(null);
   const [pendingStartMs, setPendingStartMs] = useState<number | null>(null);
-  const resetInput = () => { setManualNew(false); setStartText(null); setEndText(null); setMsg(null); };
+  const [repeatSeekText, setRepeatSeekText] = useState<string | null>(null);
+  const changeRef = useRef(onChange);
+  useEffect(() => { changeRef.current = onChange; }, [onChange]);
+  useEffect(() => { changeRef.current?.(segments); }, [segments]);
+  const resetInput = () => { setManualNew(false); setStartText(null); setEndText(null); setRepeatSeekText(null); setMsg(null); };
 
   useEffect(() => {
     setSegments(initial);
@@ -66,6 +73,7 @@ export default function SegmentTimeline({
     setStartText(null);
     setEndText(null);
     setPendingStartMs(null);
+    setRepeatSeekText(null);
   }, [initial]);
 
   const dirty = useMemo(() => JSON.stringify(segments) !== JSON.stringify(saved), [segments, saved]);
@@ -167,10 +175,14 @@ export default function SegmentTimeline({
     setMsg({ type: 'ok', text: 'Разметка сохранена' });
   };
 
-  const total = activeMs(segments);
+  const total = activeMs(segments.filter((segment) => segment.assessment?.enabled !== false));
   const valid = parseSegments(segments, durationMs) !== null;
   const selected = Math.min(selectedIndex, segments.length - 1);
   const selectedSegment = segments[selected];
+  const repeatSeekValue = repeatSeekText ?? formatSegmentTime(selectedSegment?.repeat?.seekToMs ?? Math.max(0, (selectedSegment?.startMs ?? 0) - 15000));
+  const repeatSeekMs = parseSegmentTime(repeatSeekValue);
+  const repeatInputInvalid = selectedSegment?.repeat?.enabled === true && (repeatSeekMs === null || repeatSeekMs > selectedSegment.startMs);
+  useEffect(() => { setRepeatSeekText(null); }, [selected]);
   const startValue = startText ?? formatSegmentTime(selectedSegment?.startMs ?? 0);
   const endValue = endText ?? formatSegmentTime(selectedSegment?.endMs ?? 0);
   const pendingInput = manualNew || startValue !== formatSegmentTime(selectedSegment?.startMs ?? 0) || endValue !== formatSegmentTime(selectedSegment?.endMs ?? 0);
@@ -192,7 +204,7 @@ export default function SegmentTimeline({
       <div className="flex items-baseline justify-between gap-3 flex-wrap" style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 13, fontWeight: 800 }}>Рабочие отрезки</div>
         <div style={{ color: 'var(--color-muted)', fontSize: 12 }}>
-          Чистое время упражнений <b style={{ color: 'var(--color-brand)' }}>{mmss(total)}</b> из {mmss(durationMs)}
+          Время биомеханики <b style={{ color: 'var(--color-brand)' }}>{mmss(total)}</b> из {mmss(durationMs)}
           {segments.length > 0 ? ` · ${segments.length} отр.` : ''}
         </div>
       </div>
@@ -224,9 +236,9 @@ export default function SegmentTimeline({
               width: pct(s.endMs - s.startMs),
               top: 0,
               bottom: 0,
-              background: 'rgba(161,255,74,0.30)',
-              borderLeft: '2px solid var(--color-brand)',
-              borderRight: '2px solid var(--color-brand)',
+              background: s.assessment?.enabled === false ? 'rgba(255,255,255,0.08)' : 'rgba(161,255,74,0.30)',
+              borderLeft: `2px solid ${s.assessment?.enabled === false ? 'var(--color-muted)' : 'var(--color-brand)'}`,
+              borderRight: `2px solid ${s.assessment?.enabled === false ? 'var(--color-muted)' : 'var(--color-brand)'}`,
             }}
           >
             {(['start', 'end'] as const).map((edge) => (
@@ -236,7 +248,7 @@ export default function SegmentTimeline({
                 disabled={pendingStartMs !== null}
                 role="slider"
                 aria-label={`${edge === 'start' ? 'Начало' : 'Конец'} отрезка ${i + 1}`}
-                aria-valuemin={edge === 'start' ? segments[i - 1]?.endMs ?? 0 : s.startMs + MIN_SEGMENT_MS}
+                aria-valuemin={edge === 'start' ? Math.max(segments[i - 1]?.endMs ?? 0, s.repeat?.seekToMs ?? 0) : s.startMs + MIN_SEGMENT_MS}
                 aria-valuemax={edge === 'start' ? s.endMs - MIN_SEGMENT_MS : segments[i + 1]?.startMs ?? durationMs}
                 aria-valuenow={edge === 'start' ? s.startMs : s.endMs}
                 aria-valuetext={formatSegmentTime(edge === 'start' ? s.startMs : s.endMs)}
@@ -292,7 +304,7 @@ export default function SegmentTimeline({
       </div>}
 
       <div style={{ color: 'var(--color-muted)', fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
-        Зелёным — упражнение, тёмным — объяснения и паузы: их оценка учитывать не будет. Тяните края отрезка, чтобы
+        Зелёным — упражнение с оценкой, серым — отрезок без биомеханики; тёмным — объяснения и паузы. Тяните края отрезка, чтобы
         поправить границы; клик по полосе перематывает видео.
       </div>
 
@@ -310,7 +322,7 @@ export default function SegmentTimeline({
           {pendingStartMs === null ? 'Начать отрезок' : 'Закончить отрезок'}
         </AdminButton>
         {pendingStartMs !== null && <AdminButton type="button" size="sm" tone="secondary" icon={X} onClick={() => { setPendingStartMs(null); setMsg(null); }}>Отменить начало</AdminButton>}
-        <AdminButton type="button" size="sm" icon={Check} disabled={!dirty || saving || !valid || pendingInput || !!activeDrag || pendingStartMs !== null} onClick={save}>
+        <AdminButton type="button" size="sm" icon={Check} disabled={!dirty || saving || !valid || pendingInput || !!activeDrag || pendingStartMs !== null || repeatInputInvalid} onClick={save}>
           {saving ? 'Сохраняю…' : 'Сохранить разметку'}
         </AdminButton>
         <AdminButton type="button" size="sm" tone="secondary" icon={Plus} disabled={pendingStartMs !== null} onClick={() => {
@@ -350,7 +362,7 @@ export default function SegmentTimeline({
         {selectedSegment && <label style={{ fontSize: 13, fontWeight: 700 }}>Выбранный отрезок
           <select aria-label="Настройки оценки отрезка" value={selected} style={{ ...inputStyle, margin: '6px 0 12px' }} onChange={(e) => { resetInput(); setSelectedIndex(Number(e.target.value)); }}>
             {segments.map((segment, index) => <option key={index} value={index}>
-              {index + 1}. {formatSegmentTime(segment.startMs)} — {formatSegmentTime(segment.endMs)} · {ASSESSMENT_PROFILES[segment.assessment?.profile ?? 'balanced']}
+              {index + 1}. {formatSegmentTime(segment.startMs)} — {formatSegmentTime(segment.endMs)} · {segment.assessment?.enabled === false ? 'Без биомеханики' : ASSESSMENT_PROFILES[segment.assessment?.profile ?? 'balanced']}
             </option>)}
           </select>
         </label>}
@@ -369,12 +381,51 @@ export default function SegmentTimeline({
           {pendingInput && <AdminButton type="button" size="sm" tone="secondary" onClick={resetInput}>Отменить ввод</AdminButton>}
         </div>
         {pendingInput && <p role="status" style={{ color: 'var(--color-muted)', fontSize: 12 }}>Примените границы или отмените ввод, затем сохраните разметку.</p>}
-        {selectedSegment && !manualNew && <AssessmentSettingsEditor value={selectedSegment.assessment ?? assessmentPreset()} onChange={(assessment) => {
+        {selectedSegment && !manualNew && <AssessmentSettingsEditor key={selected} value={selectedSegment.assessment ?? assessmentPreset()} onChange={(assessment) => {
           setSegments((prev) => prev.map((segment, index) => index === selected ? { ...segment, assessment } : segment));
           setMsg(null);
         }} />}
+        {selectedSegment && !manualNew && <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-hairline)' }}>
+          <label className="flex items-center gap-2" style={{ fontSize: 13, fontWeight: 700, minHeight: 44 }}>
+            <input aria-label="Предлагать повтор подхода" type="checkbox" checked={selectedSegment.repeat?.enabled === true}
+              disabled={selectedSegment.assessment?.enabled === false}
+              style={{ appearance: 'auto', WebkitAppearance: 'checkbox', width: 20, height: 20, accentColor: 'var(--color-brand)' }}
+              onChange={(e) => {
+                const repeat = selectedSegment.repeat ?? { enabled: true, seekToMs: Math.max(0, selectedSegment.startMs - 15000), promptDelayMs: 7000, promptDurationMs: 5000 };
+                setSegments((previous) => previous.map((segment, index) => index === selected ? { ...segment, repeat: { ...repeat, enabled: e.target.checked } } : segment));
+                setRepeatSeekText(null); setMsg(null);
+              }} /> Предлагать повтор подхода
+          </label>
+          {selectedSegment.repeat?.enabled && <div className="flex flex-col gap-3" style={{ marginTop: 12 }}>
+            <label style={{ fontSize: 13 }}>Вернуться к моменту видео
+              <input aria-label="Момент возврата для повтора" type="text" inputMode="decimal" value={repeatSeekValue} style={{ ...inputStyle, marginTop: 6 }} onChange={(e) => {
+                const value = e.target.value; setRepeatSeekText(value); setMsg(null);
+                const seekToMs = parseSegmentTime(value);
+                if (seekToMs === null || seekToMs > selectedSegment.startMs) return;
+                setSegments((previous) => previous.map((segment, index) => index === selected ? { ...segment, repeat: { ...selectedSegment.repeat!, seekToMs } } : segment));
+              }} />
+            </label>
+            <p style={{ color: 'var(--color-muted)', fontSize: 12, margin: 0 }}>Начало подхода — {formatSegmentTime(selectedSegment.startMs)}. Например, укажите момент за 10–20 секунд до него, чтобы спортсмен успел подготовиться. Формат 1:23.500 или секунды 83,5.</p>
+            {repeatInputInvalid && <p role="alert" style={{ color: 'var(--color-danger)', fontSize: 13, margin: 0 }}>Укажите время возврата от начала видео до начала выбранного подхода.</p>}
+            <div className="flex flex-wrap gap-3">
+              <label style={{ flex: '1 1 160px', fontSize: 13 }}>Предложить через, с
+                <input aria-label="Задержка предложения повтора" type="number" min={0} max={30} step={1} value={selectedSegment.repeat.promptDelayMs / 1000} style={{ ...inputStyle, marginTop: 6 }} onChange={(e) => {
+                  const promptDelayMs = Number(e.target.value) * 1000;
+                  setSegments((previous) => previous.map((segment, index) => index === selected ? { ...segment, repeat: { ...selectedSegment.repeat!, promptDelayMs } } : segment)); setMsg(null);
+                }} />
+              </label>
+              <label style={{ flex: '1 1 160px', fontSize: 13 }}>Показывать кнопку, с
+                <input aria-label="Время показа предложения повтора" type="number" min={1} max={15} step={1} value={selectedSegment.repeat.promptDurationMs / 1000} style={{ ...inputStyle, marginTop: 6 }} onChange={(e) => {
+                  const promptDurationMs = Number(e.target.value) * 1000;
+                  setSegments((previous) => previous.map((segment, index) => index === selected ? { ...segment, repeat: { ...selectedSegment.repeat!, promptDurationMs } } : segment)); setMsg(null);
+                }} />
+              </label>
+            </div>
+          </div>}
+          {selectedSegment.assessment?.enabled === false && <p style={{ color: 'var(--color-muted)', fontSize: 12 }}>Повтор не предлагается для теории и отрезков без биомеханики.</p>}
+        </div>}
         {!valid && <p role="alert" style={{ color: 'var(--color-danger)', fontSize: 13 }}>
-          Задайте важность от 0 до 5 и хотя бы один обязательный сустав с ненулевой важностью. Отрезки с разными настройками не должны пересекаться.
+          Проверьте настройки: важность 0–5, хотя бы один обязательный сустав, время возврата не позже начала подхода, задержка 0–30 с и показ 1–15 с. Отрезки с разными настройками не должны пересекаться.
         </p>}
         <p style={{ color: 'var(--color-muted)', fontSize: 12 }}>Сохраните разметку, чтобы применить настройки в тесте. Повторная авторазметка заменяет отрезки и возвращает профиль «Всё тело».</p>
       </div>}

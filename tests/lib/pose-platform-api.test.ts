@@ -74,6 +74,18 @@ describe('выбор видео платформы для pose', () => {
     expect(mocks.findMany).not.toHaveBeenCalled();
   });
 
+  it('в настройках ИИ-тренера учитывает современные теги вместе с историческими без изменения данных', async () => {
+    mocks.findUnique.mockResolvedValue({ ...video(), tags: ['хоккей', 'Теория'], videoTags: [{ tag: { name: 'Теория' } }, { tag: { name: 'тактика' } }], poseTrackingEnabled: null, updatedAt: new Date('2026-10-29T10:00:00.000Z') });
+    const response = await getVideo(request(), ctx);
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.video.tags).toEqual(['хоккей', 'Теория', 'тактика']);
+    expect(data.video.poseTrackingEnabled).toBeNull();
+    expect(data.video.updatedAt).toBe('2026-10-29T10:00:00.000Z');
+    expect(data.video).not.toHaveProperty('videoTags');
+    expect(mocks.findUnique).toHaveBeenCalledWith(expect.objectContaining({ select: expect.objectContaining({ videoTags: { select: { tag: { select: { name: true } } } } }) }));
+  });
+
   it('возвращает неопубликованное готовое видео без внутреннего URL хранилища', async () => {
     mocks.findMany.mockResolvedValue([video()]);
     const data = await (await listVideos(request('?scope=library'))).json();

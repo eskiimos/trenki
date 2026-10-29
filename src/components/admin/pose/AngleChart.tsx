@@ -13,6 +13,8 @@ export interface AngleSeries {
   label: string;
   color: string;
   values: Array<number | null>;
+  /** False visibility and excluded scoring are separate states in the UI. */
+  excluded?: boolean[];
 }
 
 const H = 150;
@@ -33,15 +35,17 @@ function downsample(times: number[], values: Array<number | null>) {
   for (let i = 0; i < n; i += k) {
     let sum = 0;
     let cnt = 0;
+    let gap = false;
     for (let j = i; j < Math.min(n, i + k); j++) {
       const x = values[j];
       if (x != null) {
         sum += x;
         cnt++;
-      }
+      } else gap = true;
     }
     t.push(times[Math.min(n - 1, i + Math.floor(k / 2))]!);
-    v.push(cnt ? sum / cnt : null);
+    // Never bridge a short disabled/theory interval while reducing a long video.
+    v.push(cnt && !gap ? sum / cnt : null);
   }
   return { t, v };
 }
@@ -132,19 +136,25 @@ export default function AngleChart({
       if (times[mid]! < hover.ms) lo = mid + 1;
       else hi = mid;
     }
-    return series.map((s) => s.values[lo] ?? null);
+    return { values: series.map((s) => s.values[lo] ?? null), excluded: series.map((s) => s.excluded?.[lo] ?? false) };
   }, [hover, times, series]);
+
+  const currentIndex = useMemo(() => {
+    let lo = 0, hi = Math.max(0, times.length - 1);
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (times[mid] < currentMs) lo = mid + 1; else hi = mid; }
+    return lo;
+  }, [times, currentMs]);
 
   return (
     <div>
       <div className="flex items-center justify-between gap-3 flex-wrap" style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 13, fontWeight: 800 }}>{title}</div>
-        {series.length > 1 && (
+        {series.length > 0 && (
           <div className="flex items-center gap-3" style={{ fontSize: 12, color: 'var(--color-muted)' }}>
             {series.map((s) => (
               <span key={s.label} className="inline-flex items-center gap-1.5">
                 <span aria-hidden style={{ width: 14, height: 2, borderRadius: 2, background: s.color, display: 'inline-block' }} />
-                {s.label}
+                {s.label}{s.excluded?.[currentIndex] ? ': —' : ''}
               </span>
             ))}
           </div>
@@ -172,7 +182,7 @@ export default function AngleChart({
               y={PAD.t}
               width={Math.max(1, x(s.endMs) - x(s.startMs))}
               height={H - PAD.t - PAD.b}
-              fill="rgba(161,255,74,0.07)"
+              fill={s.assessment?.enabled === false ? 'rgba(255,255,255,0.035)' : 'rgba(161,255,74,0.07)'}
             />
           ))}
           {yTicks.map((d) => (
@@ -235,7 +245,7 @@ export default function AngleChart({
               <div key={s.label} className="flex items-center gap-1.5">
                 <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, background: s.color, display: 'inline-block' }} />
                 <span>
-                  {s.label}: {hoverValues[i] != null ? `${hoverValues[i]}°` : 'не видно'}
+                  {s.label}: {hoverValues.excluded[i] ? '— · не учитывается' : hoverValues.values[i] != null ? `${hoverValues.values[i]}°` : 'не видно'}
                 </span>
               </div>
             ))}

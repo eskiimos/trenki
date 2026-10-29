@@ -3,6 +3,11 @@ import { assessmentPreset, parseAssessmentSettings } from '@/lib/pose/assessment
 import { normalizeSegments, parseSegments } from '@/lib/pose/segments';
 
 describe('persistent exercise assessment rules', () => {
+  it('saves a disabled segment after all joints were excluded, but requires joints when re-enabled', () => {
+    const disabled = { ...assessmentPreset(), enabled: false, weights: Object.fromEntries(Object.keys(assessmentPreset().weights).map((key) => [key, 0])), requiredAngles: [] };
+    expect(parseAssessmentSettings(disabled)?.enabled).toBe(false);
+    expect(parseAssessmentSettings({ ...disabled, enabled: true })).toBeNull();
+  });
   it.each(['balanced', 'legs', 'arms', 'core'] as const)('validates preset %s without shared mutable weights', (profile) => {
     const preset = assessmentPreset(profile);
     expect(parseAssessmentSettings(preset)).toEqual(preset);

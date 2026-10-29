@@ -10,6 +10,8 @@ export type PoseCameraStatus = 'off' | 'loading' | 'ready';
 interface Options<T> {
   onFrame: (frame: number[], timestampMs: number, context: T | undefined) => void;
   facingMode?: 'user' | 'environment';
+  trackingEnabled?: boolean;
+  visiblePoints?: () => readonly number[] | undefined;
   captureContext?: () => T;
   highlights?: () => number[];
   onUnavailable?: () => void;
@@ -59,21 +61,25 @@ function disposeSession(session: CameraSession) {
 }
 
 /** Камера и распознавание работают локально; кадров и звука на сервере нет. */
-export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highlights, facingMode = 'user' }: Options<T>) {
+export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highlights, facingMode = 'user', trackingEnabled = true, visiblePoints }: Options<T>) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sessionRef = useRef<CameraSession | null>(null);
   const generationRef = useRef(0);
   const mountedRef = useRef(false);
   const pendingRef = useRef<Promise<void> | null>(null);
-  const callbacksRef = useRef({ onFrame, onUnavailable, captureContext, highlights, facingMode });
+  const callbacksRef = useRef({ onFrame, onUnavailable, captureContext, highlights, facingMode, trackingEnabled, visiblePoints });
+  const trackingRevisionRef = useRef(0);
   const [status, setStatus] = useState<PoseCameraStatus>('off');
   const [error, setError] = useState<string | null>(null);
   const [execution, setExecution] = useState<'worker' | 'main' | null>(null);
   const [delegate, setDelegate] = useState<'GPU' | 'CPU' | null>(null);
   const [actualFacingMode, setActualFacingMode] = useState<'user' | 'environment' | null>(null);
 
-  useEffect(() => { callbacksRef.current = { onFrame, onUnavailable, captureContext, highlights, facingMode }; }, [onFrame, onUnavailable, captureContext, highlights, facingMode]);
+  useEffect(() => {
+    if (callbacksRef.current.trackingEnabled !== trackingEnabled) trackingRevisionRef.current++;
+    callbacksRef.current = { onFrame, onUnavailable, captureContext, highlights, facingMode, trackingEnabled, visiblePoints };
+  }, [onFrame, onUnavailable, captureContext, highlights, facingMode, trackingEnabled, visiblePoints]);
 
   const clearDrawing = useCallback(() => {
     const canvas = canvasRef.current;
@@ -190,6 +196,7 @@ export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highl
         let lastVideoTime = -1;
         let lastFreshFrameMs = performance.now();
         let unavailable = false;
+        let drawingSuspended = false;
         const notifyUnavailable = () => {
           clearDrawing();
           if (!unavailable) callbacksRef.current.onUnavailable?.();
@@ -207,6 +214,15 @@ export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highl
           if (!isCurrent()) return;
           if (!document.hidden) {
             const now = performance.now();
+            if (!callbacksRef.current.trackingEnabled) {
+              if (!drawingSuspended) clearDrawing();
+              drawingSuspended = true;
+              lastFreshFrameMs = now;
+              lastVideoTime = -1;
+              session.animationFrame = requestAnimationFrame(loop);
+              return;
+            }
+            drawingSuspended = false;
             const fresh = video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
               video.videoWidth > 0 && video.currentTime !== lastVideoTime;
             if (fresh) lastFreshFrameMs = now;
@@ -218,9 +234,11 @@ export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highl
               unavailable = false;
               busy = true;
               const capture = callbacksRef.current.captureContext?.();
+              const trackingRevision = trackingRevisionRef.current;
               const detector = session.landmarker!;
               void detector.detect(video, timestampMs).then(result => {
                 if (!isCurrent()) return;
+                if (!callbacksRef.current.trackingEnabled || trackingRevision !== trackingRevisionRef.current) return;
                 if (document.hidden || performance.now() - timestampMs > 1000) { notifyUnavailable(); return; }
                 const frame = encodeFrame(timestampMs, result.landmarks?.[0], result.worldLandmarks?.[0]);
                 callbacksRef.current.onFrame(frame, timestampMs, capture);
@@ -231,10 +249,11 @@ export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highl
                   const dpr = Math.min(window.devicePixelRatio || 1, 2);
                   const pixelWidth = Math.round(width * dpr), pixelHeight = Math.round(height * dpr);
                   if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) { canvas.width = pixelWidth; canvas.height = pixelHeight; }
-                  drawSkeleton(context, frame, containRect(width, height, video.videoWidth, video.videoHeight), dpr, callbacksRef.current.highlights?.());
+                  drawSkeleton(context, frame, containRect(width, height, video.videoWidth, video.videoHeight), dpr, callbacksRef.current.highlights?.(), callbacksRef.current.visiblePoints?.());
                 }
               }).catch(async () => {
                 if (!isCurrent()) return;
+                if (!callbacksRef.current.trackingEnabled || trackingRevision !== trackingRevisionRef.current) return;
                 if (detector.execution === 'worker') {
                   // Stop scoring before changing execution mode. No stale result
                   // may cross this boundary, and the user explicitly resumes.
