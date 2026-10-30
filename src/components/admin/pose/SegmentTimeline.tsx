@@ -362,30 +362,23 @@ export default function SegmentTimeline({
         {selectedSegment && <label style={{ fontSize: 13, fontWeight: 700 }}>Выбранный отрезок
           <select aria-label="Настройки оценки отрезка" value={selected} style={{ ...inputStyle, margin: '6px 0 12px' }} onChange={(e) => { resetInput(); setSelectedIndex(Number(e.target.value)); }}>
             {segments.map((segment, index) => <option key={index} value={index}>
-              {index + 1}. {formatSegmentTime(segment.startMs)} — {formatSegmentTime(segment.endMs)} · {segment.assessment?.enabled === false ? 'Без биомеханики' : ASSESSMENT_PROFILES[segment.assessment?.profile ?? 'balanced']}
+              {index + 1}. {formatSegmentTime(segment.startMs)} — {formatSegmentTime(segment.endMs)} · {segment.assessment?.enabled === false ? 'Без биомеханики' : ASSESSMENT_PROFILES[segment.assessment?.profile ?? 'balanced']}{segment.repeat?.enabled && segment.assessment?.enabled !== false ? ' · Повтор включён' : ''}
             </option>)}
           </select>
         </label>}
-        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{manualNew ? 'Новый отрезок вручную' : 'Границы отрезка вручную'}</div>
-        <div className="flex flex-wrap gap-3">
-          <label style={{ flex: '1 1 140px', fontSize: 13 }}>Начало отрезка
-            <input type="text" inputMode="decimal" value={startValue} style={{ ...inputStyle, marginTop: 6 }} onChange={(e) => { setStartText(e.target.value); setMsg(null); }} />
-          </label>
-          <label style={{ flex: '1 1 140px', fontSize: 13 }}>Конец отрезка
-            <input type="text" inputMode="decimal" value={endValue} style={{ ...inputStyle, marginTop: 6 }} onChange={(e) => { setEndText(e.target.value); setMsg(null); }} />
-          </label>
-        </div>
-        <p style={{ color: 'var(--color-muted)', fontSize: 12 }}>Минуты:секунды, например 1:23.500, или секунды: 83,5. Минимальная длительность — 0,5 секунды.</p>
-        <div className="flex flex-wrap gap-2" style={{ marginBottom: 16 }}>
-          <AdminButton type="button" size="sm" tone="secondary" onClick={applyRange} disabled={!pendingInput}>{manualNew ? 'Добавить вручную' : 'Применить границы'}</AdminButton>
-          {pendingInput && <AdminButton type="button" size="sm" tone="secondary" onClick={resetInput}>Отменить ввод</AdminButton>}
-        </div>
-        {pendingInput && <p role="status" style={{ color: 'var(--color-muted)', fontSize: 12 }}>Примените границы или отмените ввод, затем сохраните разметку.</p>}
-        {selectedSegment && !manualNew && <AssessmentSettingsEditor key={selected} value={selectedSegment.assessment ?? assessmentPreset()} onChange={(assessment) => {
-          setSegments((prev) => prev.map((segment, index) => index === selected ? { ...segment, assessment } : segment));
-          setMsg(null);
-        }} />}
-        {selectedSegment && !manualNew && <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-hairline)' }}>
+        {selectedSegment && !manualNew && <section aria-label="Повтор подхода" data-testid="segment-repeat-settings" style={{ marginBottom: 20, padding: 16, borderRadius: 12, border: '1px solid var(--border-lime)', background: 'var(--lime-subtle)' }}>
+          <div className="flex items-center justify-between gap-3 flex-wrap" style={{ marginBottom: 8 }}>
+            <h3 className="flex items-center gap-2" style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>
+              <RotateCcw size={20} style={{ color: 'var(--color-brand)', flexShrink: 0 }} aria-hidden />
+              Повтор подхода
+            </h3>
+            <span style={{ color: selectedSegment.repeat?.enabled && selectedSegment.assessment?.enabled !== false ? 'var(--color-brand)' : 'var(--color-muted)', fontSize: 12, fontWeight: 700 }}>
+              {selectedSegment.assessment?.enabled === false ? 'Без биомеханики' : selectedSegment.repeat?.enabled ? 'Включён' : 'Выключен'}
+            </span>
+          </div>
+          <p style={{ color: 'var(--color-muted)', fontSize: 13, margin: '0 0 8px', lineHeight: 1.5 }}>
+            Если повтор включён, после отрезка появится кнопка «Повторить подход» — в обычной тренировке и в тесте с камерой. Возврат начнётся только по нажатию кнопки.
+          </p>
           <label className="flex items-center gap-2" style={{ fontSize: 13, fontWeight: 700, minHeight: 44 }}>
             <input aria-label="Предлагать повтор подхода" type="checkbox" checked={selectedSegment.repeat?.enabled === true}
               disabled={selectedSegment.assessment?.enabled === false}
@@ -423,11 +416,31 @@ export default function SegmentTimeline({
             </div>
           </div>}
           {selectedSegment.assessment?.enabled === false && <p style={{ color: 'var(--color-muted)', fontSize: 12 }}>Повтор не предлагается для теории и отрезков без биомеханики.</p>}
-        </div>}
+          <p style={{ color: 'var(--color-muted)', fontSize: 12, margin: '12px 0 0', lineHeight: 1.5 }}>Изменения применятся после «Сохранить разметку».</p>
+        </section>}
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{manualNew ? 'Новый отрезок вручную' : 'Границы отрезка вручную'}</div>
+        <div className="flex flex-wrap gap-3">
+          <label style={{ flex: '1 1 140px', fontSize: 13 }}>Начало отрезка
+            <input type="text" inputMode="decimal" value={startValue} style={{ ...inputStyle, marginTop: 6 }} onChange={(e) => { setStartText(e.target.value); setMsg(null); }} />
+          </label>
+          <label style={{ flex: '1 1 140px', fontSize: 13 }}>Конец отрезка
+            <input type="text" inputMode="decimal" value={endValue} style={{ ...inputStyle, marginTop: 6 }} onChange={(e) => { setEndText(e.target.value); setMsg(null); }} />
+          </label>
+        </div>
+        <p style={{ color: 'var(--color-muted)', fontSize: 12 }}>Минуты:секунды, например 1:23.500, или секунды: 83,5. Минимальная длительность — 0,5 секунды.</p>
+        <div className="flex flex-wrap gap-2" style={{ marginBottom: 16 }}>
+          <AdminButton type="button" size="sm" tone="secondary" onClick={applyRange} disabled={!pendingInput}>{manualNew ? 'Добавить вручную' : 'Применить границы'}</AdminButton>
+          {pendingInput && <AdminButton type="button" size="sm" tone="secondary" onClick={resetInput}>Отменить ввод</AdminButton>}
+        </div>
+        {pendingInput && <p role="status" style={{ color: 'var(--color-muted)', fontSize: 12 }}>Примените границы или отмените ввод, затем сохраните разметку.</p>}
+        {selectedSegment && !manualNew && <AssessmentSettingsEditor key={selected} value={selectedSegment.assessment ?? assessmentPreset()} onChange={(assessment) => {
+          setSegments((prev) => prev.map((segment, index) => index === selected ? { ...segment, assessment } : segment));
+          setMsg(null);
+        }} />}
         {!valid && <p role="alert" style={{ color: 'var(--color-danger)', fontSize: 13 }}>
           Проверьте настройки: важность 0–5, хотя бы один обязательный сустав, время возврата не позже начала подхода, задержка 0–30 с и показ 1–15 с. Отрезки с разными настройками не должны пересекаться.
         </p>}
-        <p style={{ color: 'var(--color-muted)', fontSize: 12 }}>Сохраните разметку, чтобы применить настройки в тесте. Повторная авторазметка заменяет отрезки и возвращает профиль «Всё тело».</p>
+        <p style={{ color: 'var(--color-muted)', fontSize: 12 }}>Сохраните разметку, чтобы применить настройки повтора в тренировках и настройки оценки в тесте. Повторная авторазметка заменяет отрезки и возвращает профиль «Всё тело».</p>
       </div>}
     </fieldset>
   );

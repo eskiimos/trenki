@@ -12,6 +12,7 @@ import {
   setPublishIntent,
 } from '@/lib/media/jobs';
 import { kickMediaWorker } from '@/lib/media/worker';
+import { playbackRepeatSegments } from '@/lib/training/repeat-settings';
 
 export async function GET(
   request: NextRequest,
@@ -54,6 +55,9 @@ export async function GET(
         trainingGoals: true,
         isSfp: true,
         sports: true,
+        // Repeat prompts share the existing content gate. Do not select the
+        // skeleton, storage URL or the rest of the private reference record.
+        poseReference: { select: { segments: true, durationSec: true } },
         trainer: {
           select: {
             id: true,
@@ -87,9 +91,16 @@ export async function GET(
       avatar: c.trainer.avatar,
     }));
 
+    const { poseReference, ...publicVideo } = video;
+
     // Файлы из собственного S3 хранятся как s3://<key> — резолвим в presigned
     // GET (6 ч) только здесь, ПОСЛЕ paywall-гейта выше. Kinescope-URL — как есть.
-    return NextResponse.json({ ...video, coauthors, videoUrl: await resolveVideoUrl(video.videoUrl) });
+    return NextResponse.json({
+      ...publicVideo,
+      coauthors,
+      videoUrl: await resolveVideoUrl(video.videoUrl),
+      repeatSegments: playbackRepeatSegments(poseReference),
+    });
   } catch (error: any) {
     console.error('Error fetching video:', error);
     return NextResponse.json({ 
