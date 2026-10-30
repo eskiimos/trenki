@@ -20,7 +20,7 @@ export function containRect(boxW: number, boxH: number, videoW: number, videoH: 
 
 const MIN_VIS = 0.5;
 
-export function drawSkeleton(ctx: CanvasRenderingContext2D, frame: number[] | undefined, rect: Rect, dpr: number, highlights: number[] = []) {
+export function drawSkeleton(ctx: CanvasRenderingContext2D, frame: number[] | undefined, rect: Rect, dpr: number, highlights: number[] = [], allowedPoints?: readonly number[]) {
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   if (!frame || !hasPose(frame)) return;
   ctx.save();
@@ -36,6 +36,7 @@ export function drawSkeleton(ctx: CanvasRenderingContext2D, frame: number[] | un
     ctx.strokeStyle = pass === 0 ? 'rgba(6,9,25,0.85)' : '#A1FF4A';
     ctx.lineWidth = pass === 0 ? 6 : 3;
     for (const [a, b] of SKELETON_EDGES) {
+      if (allowedPoints && (!allowedPoints.includes(a) || !allowedPoints.includes(b))) continue;
       const pa = at(a);
       const pb = at(b);
       if (pa.v < MIN_VIS || pb.v < MIN_VIS) continue;
@@ -47,6 +48,7 @@ export function drawSkeleton(ctx: CanvasRenderingContext2D, frame: number[] | un
     }
   }
   for (let i = 11; i <= 32; i++) {
+    if (allowedPoints && !allowedPoints.includes(i)) continue;
     const p = at(i);
     if (p.v < MIN_VIS) continue;
     ctx.beginPath();

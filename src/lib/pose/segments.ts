@@ -8,11 +8,13 @@
 
 import { frameAngles, hasPose, type AngleKey } from '@/lib/pose/reference';
 import { parseAssessmentSettings, type AssessmentSettings } from './assessment-settings';
+import { parseSegmentRepeat, type SegmentRepeatSettings } from './coaching-settings';
 
 export interface Segment {
   startMs: number;
   endMs: number;
   assessment?: AssessmentSettings;
+  repeat?: SegmentRepeatSettings;
 }
 
 /** Углы, по которым судим о движении: ноги, таз, руки, корпус. */
@@ -144,13 +146,15 @@ export function normalizeSegments(segments: Segment[], durationMs: number): Segm
       startMs: Math.max(0, Math.round(Math.min(s.startMs, s.endMs))),
       endMs: Math.min(durationMs, Math.round(Math.max(s.startMs, s.endMs))),
       ...(s.assessment ? { assessment: s.assessment } : {}),
+      ...(s.repeat ? { repeat: s.repeat } : {}),
     }))
     .filter((s) => s.endMs > s.startMs)
     .sort((a, b) => a.startMs - b.startMs);
   const out: Segment[] = [];
   for (const s of clean) {
     const last = out[out.length - 1];
-    if (last && s.startMs <= last.endMs && JSON.stringify(last.assessment) === JSON.stringify(s.assessment)) last.endMs = Math.max(last.endMs, s.endMs);
+    if (last && s.startMs <= last.endMs && JSON.stringify(last.assessment) === JSON.stringify(s.assessment)
+      && JSON.stringify(last.repeat) === JSON.stringify(s.repeat)) last.endMs = Math.max(last.endMs, s.endMs);
     else out.push(s);
   }
   return out;
@@ -176,7 +180,11 @@ export function parseSegments(raw: unknown, durationMs: number): Segment[] | nul
     if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return null;
     const assessment = 'assessment' in item ? parseAssessmentSettings(item.assessment) : undefined;
     if (assessment === null) return null;
-    out.push({ startMs: Number(startMs), endMs: Number(endMs), ...(assessment ? { assessment } : {}) });
+    // Match normalization's historical rounding/reversed-range handling before validating absolute repeat time.
+    const normalizedStart = Math.max(0, Math.round(Math.min(Number(startMs), Number(endMs))));
+    const repeat = 'repeat' in item ? parseSegmentRepeat(item.repeat, normalizedStart) : undefined;
+    if (repeat === null) return null;
+    out.push({ startMs: Number(startMs), endMs: Number(endMs), ...(assessment ? { assessment } : {}), ...(repeat ? { repeat } : {}) });
   }
   const normalized = normalizeSegments(out, durationMs);
   // Adjacent profiles stay distinct; conflicting overlaps must be corrected explicitly.

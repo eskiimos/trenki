@@ -48,6 +48,10 @@ export async function GET(request: NextRequest, ctx: Ctx) {
       id: true,
       title: true,
       duration: true,
+      tags: true,
+      videoTags: { select: { tag: { select: { name: true } } } },
+      poseTrackingEnabled: true,
+      updatedAt: true,
       videoUrl: true,
       trainer: { select: { name: true, lastName: true } },
       poseReference: { select: REFERENCE_SELECT },
@@ -61,9 +65,9 @@ export async function GET(request: NextRequest, ctx: Ctx) {
       { status: 400 },
     );
   }
-  const { videoUrl, poseReference, ...rest } = video;
+  const { videoUrl, poseReference, videoTags, tags, ...rest } = video;
   return NextResponse.json({
-    video: rest,
+    video: { ...rest, tags: [...new Set([...(tags ?? []), ...(videoTags?.map(({ tag }) => tag.name) ?? [])])] },
     sourceUrl: source.kind === 's3' ? `/api/admin/pose-references/${video.id}/source` : source.path,
     playbackUrl: await resolveVideoUrl(source.kind === 's3' ? `s3://${source.key}` : videoUrl),
     reference: poseReference,

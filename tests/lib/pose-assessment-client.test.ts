@@ -37,6 +37,21 @@ describe('admin assessment reference loading', () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
+  it.each([{ tags: ['Теория'] }, { poseTrackingEnabled: false }])('loads an untracked video without a reference or pose downloads: %j', async (mode) => {
+    const fetcher = vi.fn().mockResolvedValueOnce(json({ ...detail, video: { ...detail.video, ...mode }, reference: null }));
+    vi.stubGlobal('fetch', fetcher);
+    const result = await loadAssessmentReference('test', new AbortController().signal);
+    expect(result.doc).toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a video policy changed during reference loading', async () => {
+    const versioned = { ...detail, video: { ...detail.video, updatedAt: '2026-10-29T10:00:00Z' } };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(json(versioned)).mockResolvedValueOnce(frames())
+      .mockResolvedValueOnce(json({ ...versioned, video: { ...versioned.video, updatedAt: '2026-10-29T11:00:00Z', poseTrackingEnabled: false } })));
+    await expect(loadAssessmentReference('test', new AbortController().signal)).rejects.toThrow('обновился');
+  });
+
   it('rejects a replaced reference instead of mixing old segments with new frames', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(json(detail)).mockResolvedValueOnce(frames())
       .mockResolvedValueOnce(json({ ...detail, reference: { ...reference, updatedAt: '2026-10-06T01:00:00Z' } })));

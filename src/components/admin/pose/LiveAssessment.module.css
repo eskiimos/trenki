@@ -1,5 +1,6 @@
 .root { display: flex; flex-direction: column; gap: 16px; }
 .focusHeader, .focusScore { display: none; }
+.repeatOffer { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px; border: 1px solid var(--color-brand); border-radius: 12px; background: var(--color-surface); font-size: 13px; }
 .focus {
   position: fixed; inset: 0; z-index: 100; width: 100%; height: 100vh; height: 100dvh;
   padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
@@ -9,6 +10,7 @@
 .focus .focusHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0; font-size: 13px; }
 .focus .focusHeader button { flex-shrink: 0; min-height: 44px; }
 .focus .videoGrid { flex: 1; min-height: 120px; grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; gap: 8px; }
+.focus.watchOnly .videoGrid { grid-template-columns: 1fr; grid-template-rows: 1fr; }
 .focus .videoPanel { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 .focus .videoPanel > div:first-child { font-size: 11px !important; margin-bottom: 4px !important; }
 .focus .videoBox { flex: 1; min-height: 0; aspect-ratio: auto !important; }

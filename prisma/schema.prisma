@@ -196,6 +196,8 @@ model Video {
   updatedAt   DateTime        @updatedAt
   rpeMax      Int?
   rpeMin      Int?
+  // null — auto: explicit theory tags disable biomechanics; admin can override either way.
+  poseTrackingEnabled Boolean?
   // Когда по видео отправлен push атлетам («доступно новое видео»). null —
   // ещё не уведомляли; защищает от повторной рассылки при редактировании.
   athletesNotifiedAt DateTime?

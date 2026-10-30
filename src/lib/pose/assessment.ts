@@ -154,6 +154,7 @@ export function evaluatePoseAssessment(
   }
   const segment = reference.segments.find((s) => videoTimeMs >= s.startMs && videoTimeMs < s.endMs);
   if (!segment) return unavailable('inactive', 'Объяснение или отдых — оценка приостановлена.');
+  if (segment.assessment?.enabled === false) return unavailable('inactive', 'Биомеханика отключена для этого отрезка — оценка не учитывается.');
   const index = frameIndexAt(reference.times, videoTimeMs);
   const teacher = reference.frames[index];
   // A frame outside the current work interval must not leak across its boundary.

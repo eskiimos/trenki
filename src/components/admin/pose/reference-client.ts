@@ -1,8 +1,9 @@
 import { validateReferenceDoc, type PoseReferenceDoc } from '@/lib/pose/reference';
 import { parseSegments, type Segment } from '@/lib/pose/segments';
+import { effectiveVideoTrackingEnabled } from '@/lib/pose/coaching-settings';
 
 export interface ReferenceDetail {
-  video: { id: string; title: string; duration: number; trainer: { name: string; lastName: string } | null };
+  video: { id: string; title: string; duration: number; trainer: { name: string; lastName: string } | null; tags?: string[]; poseTrackingEnabled?: boolean | null; updatedAt?: string };
   playbackUrl: string;
   reference: {
     model: string;
@@ -20,6 +21,7 @@ export async function loadAssessmentReference(videoId: string, signal: AbortSign
   const response = await fetch(path, { cache: 'no-store', signal });
   const detail: ReferenceDetail & { error?: string } = await response.json();
   if (!response.ok) throw new Error(detail.error || 'Не удалось загрузить видео');
+  if (!effectiveVideoTrackingEnabled(detail.video.poseTrackingEnabled, detail.video.tags)) return { detail, doc: null };
   if (!detail.reference) throw new Error('Сначала создайте эталон этого видео');
   if (typeof DecompressionStream === 'undefined') throw new Error('Для теста нужен современный браузер с поддержкой распаковки эталонов');
   const frames = await fetch(`${path}/frames`, { cache: 'no-store', signal });
@@ -35,7 +37,8 @@ export async function loadAssessmentReference(videoId: string, signal: AbortSign
   // Do not mix the metadata/segments of an old reference with a freshly replaced document.
   const check = await fetch(path, { cache: 'no-store', signal });
   const current: ReferenceDetail = await check.json();
-  if (!check.ok || current.reference?.updatedAt !== detail.reference.updatedAt) {
+  if (!check.ok || current.reference?.updatedAt !== detail.reference.updatedAt
+    || (detail.video.updatedAt !== undefined && current.video.updatedAt !== detail.video.updatedAt)) {
     throw new Error('Эталон обновился во время загрузки. Откройте тест заново');
   }
   return { detail, doc };

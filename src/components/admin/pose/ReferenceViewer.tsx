@@ -11,6 +11,7 @@ import { ANGLE_LABELS, frameAngles, frameIndexAt, type AngleKey, type PoseRefere
 import { detectSegments, type Segment } from '@/lib/pose/segments';
 import { clampReferenceSeek } from '@/lib/pose/reference-playback';
 import { formatSegmentTime } from '@/lib/pose/segment-editor';
+import { assessmentPreset, visibleAssessmentPoints } from '@/lib/pose/assessment-settings';
 import { containRect, drawSkeleton } from './draw';
 import AngleChart from './AngleChart';
 import SegmentTimeline from './SegmentTimeline';
@@ -31,12 +32,14 @@ export default function ReferenceViewer({
   durationMs,
   segments,
   updatedAt,
+  trackingEnabled = true,
 }: {
   videoId: string;
   playbackUrl: string;
   durationMs: number;
   segments: Segment[];
   updatedAt: string;
+  trackingEnabled?: boolean;
 }) {
   const [loadedDoc, setLoadedDoc] = useState<{ videoId: string; doc: PoseReferenceDoc } | null>(null);
   const doc = loadedDoc?.videoId === videoId ? loadedDoc.doc : null;
@@ -44,9 +47,11 @@ export default function ReferenceViewer({
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [currentMs, setCurrentMs] = useState(0);
   const [mediaReady, setMediaReady] = useState(false);
+  const [workingSegments, setWorkingSegments] = useState(segments);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const versionRef = useRef(updatedAt);
+  useEffect(() => { setWorkingSegments(segments); }, [segments]);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,21 +66,35 @@ export default function ReferenceViewer({
   // Углы по всем кадрам — один раз на документ
   const angles = useMemo(() => (doc ? doc.frames.map(frameAngles) : []), [doc]);
   const times = useMemo(() => (doc ? doc.frames.map((f) => f[0]!) : []), [doc]);
+  const selectedAngles = useMemo(() => {
+    let segmentIndex = 0;
+    const defaults = assessmentPreset();
+    return (doc?.frames ?? []).map((frame, index) => {
+      while (segmentIndex < workingSegments.length && frame[0] >= workingSegments[segmentIndex].endMs) segmentIndex++;
+      const segment = workingSegments[segmentIndex];
+      const settings = segment?.assessment ?? defaults;
+      const active = trackingEnabled && !!segment && frame[0] >= segment.startMs && frame[0] < segment.endMs && settings.enabled !== false;
+      const included = Object.fromEntries((Object.keys(ANGLE_LABELS) as AngleKey[]).map((key) => [key, active && settings.weights[key] > 0])) as Record<AngleKey, boolean>;
+      const values = Object.fromEntries((Object.keys(ANGLE_LABELS) as AngleKey[]).map((key) => [key, included[key] ? angles[index]?.[key] ?? null : null])) as Record<AngleKey, number | null>;
+      return { included, values };
+    });
+  }, [angles, doc, workingSegments, trackingEnabled]);
   // Серии для графиков — стабильные ссылки, иначе графики пересчитывались бы на каждом кадре видео
   const charts = useMemo(() => {
-    const col = (key: AngleKey) => angles.map((a) => a[key]);
+    const col = (key: AngleKey) => selectedAngles.map((a) => a.values[key]);
+    const excluded = (key: AngleKey) => selectedAngles.map((a) => !a.included[key]);
     return {
       knees: [
-        { label: 'Левое', color: LEFT, values: col('kneeL') },
-        { label: 'Правое', color: RIGHT, values: col('kneeR') },
+        { label: 'Левое', color: LEFT, values: col('kneeL'), excluded: excluded('kneeL') },
+        { label: 'Правое', color: RIGHT, values: col('kneeR'), excluded: excluded('kneeR') },
       ],
       hips: [
-        { label: 'Левый', color: LEFT, values: col('hipL') },
-        { label: 'Правый', color: RIGHT, values: col('hipR') },
+        { label: 'Левый', color: LEFT, values: col('hipL'), excluded: excluded('hipL') },
+        { label: 'Правый', color: RIGHT, values: col('hipR'), excluded: excluded('hipR') },
       ],
-      trunk: [{ label: 'Корпус', color: LEFT, values: col('trunk') }],
+      trunk: [{ label: 'Корпус', color: LEFT, values: col('trunk'), excluded: excluded('trunk') }],
     };
-  }, [angles]);
+  }, [selectedAngles]);
 
   // Отрисовка скелета синхронно с видео
   useEffect(() => {
@@ -104,12 +123,15 @@ export default function ReferenceViewer({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       const rect = containRect(w, h, video.videoWidth || doc.width, video.videoHeight || doc.height);
-      drawSkeleton(ctx, showSkeleton ? doc.frames[idx] : undefined, rect, dpr);
+      const segment = workingSegments.find((part) => ms >= part.startMs && ms < part.endMs);
+      const settings = segment?.assessment ?? assessmentPreset();
+      const allowed = trackingEnabled && segment && settings.enabled !== false ? visibleAssessmentPoints(settings) : [];
+      drawSkeleton(ctx, showSkeleton ? doc.frames[idx] : undefined, rect, dpr, [], allowed);
       setCurrentMs(ms);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [doc, showSkeleton]);
+  }, [doc, showSkeleton, workingSegments, trackingEnabled]);
 
   const getCurrentMs = () => {
     const v = videoRef.current;
@@ -125,7 +147,7 @@ export default function ReferenceViewer({
     syncCurrentTime();
   };
 
-  const now = doc ? angles[frameIndexAt(doc.frames, currentMs)] : undefined;
+  const now = doc ? selectedAngles[frameIndexAt(doc.frames, currentMs)] : undefined;
 
   if (error) return <div style={{ color: 'var(--color-danger)', fontSize: 14 }}>{error}</div>;
 
@@ -173,6 +195,7 @@ export default function ReferenceViewer({
       <SegmentTimeline
         durationMs={durationMs}
         initial={segments}
+        onChange={setWorkingSegments}
         currentMs={currentMs}
         getCurrentMs={getCurrentMs}
         playbackReady={mediaReady}
@@ -207,7 +230,8 @@ export default function ReferenceViewer({
               style={{ background: 'var(--color-night)', border: '1px solid var(--border-hairline)', borderRadius: 8, padding: '8px 10px' }}
             >
               <div style={{ color: 'var(--color-muted)', fontSize: 12 }}>{ANGLE_LABELS[k]}</div>
-              <div style={{ fontSize: 18, fontWeight: 800 }}>{now[k] != null ? `${now[k]}°` : '—'}</div>
+              <div style={{ fontSize: 18, fontWeight: 800 }}>{now.values[k] != null ? `${now.values[k]}°` : '—'}</div>
+              {!now.included[k] && <div style={{ color: 'var(--color-muted)', fontSize: 11 }}>Не учитывается</div>}
             </div>
           ))}
         </div>
@@ -223,7 +247,7 @@ export default function ReferenceViewer({
             yTicks={[0, 45, 90, 135, 180]}
             currentMs={currentMs}
             durationMs={doc.durationMs}
-            segments={segments}
+            segments={workingSegments}
             onSeek={seek}
           />
           <AngleChart
@@ -234,7 +258,7 @@ export default function ReferenceViewer({
             yTicks={[0, 45, 90, 135, 180]}
             currentMs={currentMs}
             durationMs={doc.durationMs}
-            segments={segments}
+            segments={workingSegments}
             onSeek={seek}
           />
           <AngleChart
@@ -245,7 +269,7 @@ export default function ReferenceViewer({
             yTicks={[0, 30, 60, 90]}
             currentMs={currentMs}
             durationMs={doc.durationMs}
-            segments={segments}
+            segments={workingSegments}
             onSeek={seek}
           />
           <div style={{ color: 'var(--color-muted)', fontSize: 12, lineHeight: 1.5 }}>

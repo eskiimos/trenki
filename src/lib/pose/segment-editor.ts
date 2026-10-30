@@ -27,6 +27,9 @@ export function editSegmentRange(
   }
   if (endMs - startMs < MIN_SEGMENT_MS) return { error: 'Конец должен быть позже начала минимум на 0,5 секунды.' };
   if (index !== null && !segments[index]) return { error: 'Выберите существующий отрезок.' };
+  if (index !== null && segments[index].repeat && segments[index].repeat.seekToMs > startMs) {
+    return { error: 'Начало отрезка не может быть раньше точки повтора. Сначала измените время возврата перед подходом.' };
+  }
   if (segments.some((s, i) => i !== index && startMs < s.endMs && endMs > s.startMs)) {
     return { error: 'Отрезок пересекается с другим рабочим отрезком. Измените начало или конец.' };
   }
@@ -40,7 +43,7 @@ export function editSegmentRange(
 export function moveSegmentBoundary(segments: Segment[], index: number, edge: 'start' | 'end', ms: number, durationMs: number): Segment[] {
   const segment = segments[index];
   if (!segment) return segments;
-  const startMs = edge === 'start' ? Math.max(segments[index - 1]?.endMs ?? 0, Math.min(Math.round(ms), segment.endMs - MIN_SEGMENT_MS)) : segment.startMs;
+  const startMs = edge === 'start' ? Math.max(segments[index - 1]?.endMs ?? 0, segment.repeat?.seekToMs ?? 0, Math.min(Math.round(ms), segment.endMs - MIN_SEGMENT_MS)) : segment.startMs;
   const endMs = edge === 'end' ? Math.min(segments[index + 1]?.startMs ?? durationMs, Math.max(Math.round(ms), segment.startMs + MIN_SEGMENT_MS)) : segment.endMs;
   return segments.map((s, i) => i === index ? { ...s, startMs, endMs } : s);
 }
