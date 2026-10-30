@@ -16,7 +16,7 @@ export interface SubscriptionStatus {
   freeLessonVideoId: string | null; // «урок недели» для FREE (id видео или null)
 }
 
-type Snapshot = SubscriptionStatus & { loading: boolean; loaded: boolean };
+type Snapshot = SubscriptionStatus & { loading: boolean; loaded: boolean; failed: boolean };
 
 const EMPTY: SubscriptionStatus = {
   hasPremium: false,
@@ -30,6 +30,7 @@ const EMPTY: SubscriptionStatus = {
 
 let cache: SubscriptionStatus | null = null;
 let inflight: Promise<void> | null = null;
+let loadFailed = false;
 const listeners = new Set<() => void>();
 
 function notify() {
@@ -37,13 +38,17 @@ function notify() {
 }
 
 async function fetchStatus(): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8_000);
   try {
-    const res = await fetch('/api/users/me', { cache: 'no-store', credentials: 'include' });
+    const res = await fetch('/api/users/me', { cache: 'no-store', credentials: 'include', signal: controller.signal });
     if (!res.ok) {
+      loadFailed = true;
       cache = { ...EMPTY }; // не залогинен / ошибка — считаем без paywall, без премиума
       return;
     }
     const d = await res.json();
+    loadFailed = false;
     cache = {
       hasPremium: Boolean(d.hasPremium),
       paywalled: Boolean(d.paywalled),
@@ -54,8 +59,10 @@ async function fetchStatus(): Promise<void> {
       freeLessonVideoId: d.freeLessonVideoId ?? null,
     };
   } catch {
+    loadFailed = true;
     cache = { ...EMPTY };
   } finally {
+    clearTimeout(timer);
     notify();
   }
 }
@@ -73,6 +80,7 @@ function ensureLoaded(): Promise<void> {
 /** Сбросить кэш и перезагрузить (все подписчики перерисуются). */
 export function invalidateSubscription() {
   cache = null;
+  loadFailed = false;
   ensureLoaded();
 }
 
@@ -89,7 +97,7 @@ export function useSubscription(): Snapshot {
   }, []);
 
   if (!cache) {
-    return { ...EMPTY, loading: true, loaded: false };
+    return { ...EMPTY, loading: true, loaded: false, failed: false };
   }
-  return { ...cache, loading: false, loaded: true };
+  return { ...cache, loading: false, loaded: true, failed: loadFailed };
 }
