@@ -1832,7 +1832,9 @@ export default function VideoPage({ params }: VideoPageProps) {
                       </div>
                     </div>
                   )}
-                  <div className={`flex items-center gap-6 ${showControls ? '' : 'pointer-events-none'}`}>
+                  {/* Равные боковые колонки сохраняют Play/Pause по центру,
+                      даже когда перемотка вперёд недоступна. */}
+                  <div className={`grid grid-cols-[3rem_auto_3rem] items-center gap-6 ${showControls ? '' : 'pointer-events-none'}`}>
                     {/* Повторить последние секунды можно в любом режиме. */}
                     <button
                       type="button"
