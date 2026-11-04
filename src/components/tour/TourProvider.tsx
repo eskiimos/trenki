@@ -154,6 +154,13 @@ export default function TourProvider({ children }: { children: React.ReactNode }
     }
 
     (async () => {
+      // On a restored home step the anchor is already mounted, but its cards
+      // are still being prepared behind the preload screen. Give that phase
+      // its own bounded wait before starting the normal target allowance.
+      if (document.querySelector('[data-home-ready="false"]')) {
+        await waitForElement('[data-home-ready="true"]', 16_000);
+        if (cancelled) return;
+      }
       // 16с таймаута: на шаге микроцикла баннер появляется только после
       // генерации (5 тренировок последовательно) + refetch — это может занять
       // 10-15с. На остальных шагах элемент находится мгновенно.

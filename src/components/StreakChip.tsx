@@ -6,6 +6,8 @@
 // пока грузится — не рендерит ничего.
 
 import { useEffect, useState } from 'react';
+import { fetchHomeData } from '@/lib/home-data';
+import { useHomeSectionReady } from '@/components/HomePreloadBoundary';
 import { Flame } from 'lucide-react';
 import { TEMPO_MIN_STREAK } from '@/lib/gamification';
 import { plural } from '@/lib/plural';
@@ -13,15 +15,17 @@ import TempoBadgeButton from '@/components/TempoBadgeButton';
 
 const StreakChip = () => {
   const [streak, setStreak] = useState(0);
+  const [ready, setReady] = useState(false);
+  useHomeSectionReady('streak', ready);
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/gamification/summary')
-      .then((r) => (r.ok ? r.json() : null))
+    fetchHomeData('/api/gamification/summary')
       .then((d) => {
         if (!cancelled && typeof d?.streak === 'number') setStreak(d.streak);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setReady(true); });
     return () => {
       cancelled = true;
     };

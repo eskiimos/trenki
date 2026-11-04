@@ -17,6 +17,7 @@ import { MicrocycleStatus } from '@/generated/prisma';
 import { getEffectiveStatus } from '@/lib/microcycle/status';
 import { goalsFromStoredDays } from '@/lib/microcycle/week-plan';
 import { GOAL_LABELS } from '@/lib/training-algorithm-v3';
+import { ELIGIBLE_MICROCYCLE_WHERE } from '@/lib/microcycle/eligibility';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,7 @@ export async function GET(request: NextRequest) {
       userId: auth.user.id,
       status: { not: MicrocycleStatus.ARCHIVED },
       feedback: null,
+      AND: ELIGIBLE_MICROCYCLE_WHERE,
     },
     orderBy: { cycleNumber: 'desc' },
     include: {

@@ -15,7 +15,14 @@ export function waitForElement(
       return;
     }
 
-    const immediate = document.querySelector<HTMLElement>(selector);
+    const findVisible = () => {
+      const el = document.querySelector<HTMLElement>(selector);
+      if (!el || el.closest('[inert], [aria-hidden="true"]')) return null;
+      const style = window.getComputedStyle(el);
+      if (style.visibility === 'hidden' || style.display === 'none' || el.getClientRects().length === 0) return null;
+      return el;
+    };
+    const immediate = findVisible();
     if (immediate) {
       resolve(immediate);
       return;
@@ -32,15 +39,15 @@ export function waitForElement(
     };
 
     const observer = new MutationObserver(() => {
-      const el = document.querySelector<HTMLElement>(selector);
+      const el = findVisible();
       if (el) finish(el);
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'hidden', 'inert', 'aria-hidden'] });
 
     // Фолбэк-поллинг — ловит случаи, которые MutationObserver может
     // пропустить (например, элемент уже в DOM, но скрыт условием).
     const interval = setInterval(() => {
-      const el = document.querySelector<HTMLElement>(selector);
+      const el = findVisible();
       if (el) finish(el);
     }, 150);
 
