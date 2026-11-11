@@ -120,7 +120,7 @@ model Profile {
   fatigue          Float     @default(0) // усталость (0-100)
 
   // Микроцикл (Sprint 5)
-  autoGenerateMicrocycle Boolean @default(true) // авто-генерация еженедельного цикла
+  autoGenerateMicrocycle Boolean @default(false) // legacy: автоматическая генерация отключена
 
   // Старые характеристики (deprecated, оставляем для совместимости)
   strength  Int @default(0)
@@ -1140,6 +1140,7 @@ model Microcycle {
   status           MicrocycleStatus    @default(ACTIVE)
   feedback         MicrocycleFeedback? // Sprint 3
   adjustmentFactor Float? // коэф. адаптации применённый при генерации (Sprint 4)
+  requestedAt      DateTime? // явная ручная сборка; null у старых циклов без источника
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 

@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { fetchHomeData } from '@/lib/home-data';
+import { useHomeSectionReady } from '@/components/HomePreloadBoundary';
 import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { registerBanner, BANNER_PRIORITY } from '@/lib/bottom-banner-registry';
@@ -35,6 +37,8 @@ export default function WorkoutReminder() {
   const router = useRouter();
   const [workout, setWorkout] = useState<WorkoutData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  useHomeSectionReady('workout', !isLoading, failed);
 
   useEffect(() => {
     // Уже скрыли сегодня — ничего не показываем (и не дёргаем API).
@@ -51,18 +55,14 @@ export default function WorkoutReminder() {
       try {
         // scope=today: только сегодняшняя тренировка (брошенная вчера больше не
         // всплывает — правка «Середина сентября», п.5) и без записей в БД.
-        const response = await fetch('/api/training/current?scope=today');
-        if (response.status === 401) {
-          setIsLoading(false);
-          return;
-        }
-        const data = await response.json();
+        const data = await fetchHomeData('/api/training/current?scope=today');
 
         if (data.workout) {
           setWorkout(data.workout);
         }
       } catch (error) {
         console.error('Ошибка загрузки тренировки:', error);
+        setFailed(true);
       } finally {
         setIsLoading(false);
       }

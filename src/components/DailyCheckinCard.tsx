@@ -18,6 +18,8 @@
 // «дёрганная» смена размеров.
 
 import { useEffect, useRef, useState } from 'react';
+import { fetchHomeData } from '@/lib/home-data';
+import { useHomeSectionReady } from '@/components/HomePreloadBoundary';
 import { CalendarCheck, Check, ChevronDown, Star } from 'lucide-react';
 
 interface WeekDay {
@@ -32,6 +34,9 @@ const WEEKDAY_SHORT = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
 export default function DailyCheckinCard() {
   const [week, setWeek] = useState<WeekDay[] | null>(null);
+  const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
+  useHomeSectionReady('checkin', ready, failed);
   const [checkedToday, setCheckedToday] = useState(false);
   const [todayXp, setTodayXp] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -44,8 +49,7 @@ export default function DailyCheckinCard() {
   useEffect(() => {
     let cancelled = false;
     const load = () => {
-      fetch('/api/checkin')
-        .then((r) => (r.ok ? r.json() : null))
+      fetchHomeData('/api/checkin')
         .then((d) => {
           if (cancelled || !d?.week) return;
           setWeek(d.week);
@@ -57,7 +61,8 @@ export default function DailyCheckinCard() {
             setCollapsed(nowChecked);
           }
         })
-        .catch(() => { });
+        .catch(() => { if (!cancelled) setFailed(true); })
+        .finally(() => { if (!cancelled) setReady(true); });
     };
     load();
     // PWA живёт открытой сутками: без рефетча по возврату видимости наутро
