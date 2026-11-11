@@ -26,19 +26,26 @@ import { useAssessmentAudio } from './useAssessmentAudio';
 type LoadedReference = Awaited<ReturnType<typeof loadAssessmentReference>>;
 type Assessment = ReturnType<typeof evaluateTemporalAssessment>['result'];
 type Phase = 'ready' | 'preparing' | 'running' | 'paused' | 'finished';
+type VideoStartStatus = 'waiting' | 'starting' | 'tap';
 interface Preparation {
   fullBody: boolean;
-  priming: boolean;
   briefing: boolean;
-  starting: boolean;
+  playTimeout: number | null;
   manualOnly: boolean;
   openedCamera: boolean;
-  previousMuted: boolean | null;
   returnPhase: 'ready' | 'paused';
 }
+const VIDEO_START_TIMEOUT_MS = 8000;
+const START_VIDEO_PROMPT = 'Оставайтесь в кадре и нажмите «Начать видео».';
 const emptySummary = () => summarizeAssessment(createAssessmentAccumulator());
 const percent = (value: number | null) => value === null ? '—' : `${Math.round(value)}%`;
 const time = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
+
+function clearPlayTimeout(preparation: Preparation | null) {
+  if (preparation?.playTimeout == null) return;
+  window.clearTimeout(preparation.playTimeout);
+  preparation.playTimeout = null;
+}
 
 export default function LiveAssessment({ videoId }: { videoId: string }) {
   const audio = useAssessmentAudio();
@@ -63,8 +70,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
   const feedbackRef = useRef<LiveFeedback | null>(null);
   const [buffering, setBuffering] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const [primingVideo, setPrimingVideo] = useState(false);
-  const [needsPlayTap, setNeedsPlayTap] = useState(false);
+  const [videoStart, setVideoStart] = useState<VideoStartStatus>('waiting');
   const [positionMs, setPositionMs] = useState(0);
   const [readiness, setReadiness] = useState(initialReadiness);
   const [repeatOffer, setRepeatOffer] = useState<RepeatOffer | null>(null);
@@ -108,12 +114,10 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
     playbackIdRef.current++; captureRevisionRef.current++;
     const preparation = preparationRef.current;
     preparationRef.current = null;
-    setPrimingVideo(false);
-    setNeedsPlayTap(false);
+    clearPlayTimeout(preparation);
+    setVideoStart('waiting');
     setPlaying(false);
-    const video = trainerRef.current;
-    video?.pause();
-    if (video && preparation?.previousMuted != null) video.muted = preparation.previousMuted;
+    trainerRef.current?.pause();
     clockRef.current = null;
     setLive(null);
     clearTracking();
@@ -142,14 +146,14 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
       if (!capture || capture.epoch !== captureRevisionRef.current || document.hidden) return;
       const preparation = preparationRef.current;
       if (phaseRef.current === 'preparing' && preparation) {
-        if (preparation.priming || preparation.briefing || !prepared || !video) return;
+        if (preparation.briefing || !prepared || !video) return;
         const settings = readinessSettings(video.currentTime * 1000);
         const check = preparation.fullBody ? checkFullBodyReadiness(frame) : checkAssessmentReadiness(frame, settings, sideMode);
         const signature = preparation.fullBody ? 'full-body' : JSON.stringify({ settings, sideMode });
         const next = advanceReadiness(readinessRef.current, check, capturedAtMs, signature);
         readinessRef.current = next;
         setReadiness(next);
-        if (next.ready && !preparation.manualOnly) playPrepared(video, preparation);
+        if (next.ready && !preparation.manualOnly) void playPrepared(video, preparation);
         return;
       }
       if (!prepared || !video || phaseRef.current !== 'running' || !capture.running || bufferingRef.current || video.paused || video.seeking || video.readyState < 3) {
@@ -219,51 +223,74 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
     return gate.ready && gate.lastFrameMs !== null && performance.now() - gate.lastFrameMs <= READINESS_MAX_GAP_MS && !document.hidden;
   }
 
-  function playPrepared(video: HTMLVideoElement, preparation: Preparation) {
-    if (preparation.starting || preparationRef.current !== preparation || !hasFreshReadiness()) return;
-    preparation.starting = true;
-    void video.play().then(() => {
-      if (preparationRef.current !== preparation) return;
-      if (!hasFreshReadiness() || video.paused) {
-        video.pause();
-        preparation.starting = false;
-        clearReadiness();
-        return;
+  function handleVideoError() {
+    cancelPreparation();
+    setMessage('Не удалось загрузить видео. Откройте тест заново, чтобы обновить ссылку.');
+  }
+
+  async function playPrepared(video: HTMLVideoElement, preparation: Preparation) {
+    if (preparation.playTimeout !== null || preparationRef.current !== preparation || !hasFreshReadiness()) return;
+    const timeout = window.setTimeout(() => requestTap('Видео загружается дольше обычного.'), VIDEO_START_TIMEOUT_MS);
+    const isCurrent = () => preparationRef.current === preparation && preparation.playTimeout === timeout;
+
+    function requestTap(reason: string) {
+      if (!isCurrent()) return;
+      clearPlayTimeout(preparation);
+      preparation.manualOnly = true;
+      video.pause();
+      setVideoStart('tap');
+      setMessage(reason);
+    }
+
+    preparation.playTimeout = timeout;
+    setVideoStart('starting');
+    setMessage(null);
+    try {
+      await video.play();
+    } catch (error) {
+      if (!isCurrent()) return;
+      if (video.error) {
+        handleVideoError();
+      } else {
+        const blocked = error instanceof Error && error.name === 'NotAllowedError';
+        requestTap(blocked && !preparation.manualOnly ? 'Браузер запросил ручной запуск.' : 'Видео не запустилось.');
       }
-      preparationRef.current = null;
-      captureRevisionRef.current++;
-      clockRef.current = null;
-      setNeedsPlayTap(false);
-      setMessage(null);
-      changePhase('running');
-      setPlaying(true);
-    }).catch((error: unknown) => {
-      if (preparationRef.current !== preparation) return;
-      preparation.starting = false;
-      if (!preparation.manualOnly && error instanceof Error && error.name === 'NotAllowedError') {
-        preparation.manualOnly = true;
-        setNeedsPlayTap(true);
-        setMessage('Браузер запросил ручной запуск. Оставайтесь в кадре и нажмите «Начать видео».');
-        return;
-      }
-      cancelPreparation();
-      setMessage('Не удалось запустить видео. Проверьте соединение и повторите подготовку.');
-    });
+      return;
+    }
+    if (!isCurrent()) return;
+    if (video.paused) {
+      requestTap('Воспроизведение прервалось.');
+      return;
+    }
+    clearPlayTimeout(preparation);
+    if (!hasFreshReadiness()) {
+      video.pause();
+      setVideoStart(preparation.manualOnly ? 'tap' : 'waiting');
+      clearReadiness();
+      return;
+    }
+    preparationRef.current = null;
+    captureRevisionRef.current++;
+    clockRef.current = null;
+    setVideoStart('waiting');
+    changePhase('running');
+    setPlaying(true);
   }
 
   const observeAudio = audio.observe;
+  const needsPlayTap = videoStart === 'tap';
   useEffect(() => {
     if (!hasTrackedSegments) return;
     const video = trainerRef.current;
     const preparation = preparationRef.current;
-    const canCount = phase === 'preparing' && cameraStatus === 'ready' && !primingVideo && !preparation?.briefing;
+    const canCount = phase === 'preparing' && cameraStatus === 'ready' && videoStart !== 'starting' && !preparation?.briefing;
     observeAudio({ phase, playing: playing && !!video && !video.paused && !video.seeking && video.readyState >= 3,
       countdown: canCount && !needsPlayTap && readiness.sinceMs !== null && !readiness.ready ? readiness.secondsLeft : null,
       preparingFullBody: preparation?.fullBody,
-      readinessMessage: canCount ? readiness.message : null, buffering,
+      readinessMessage: canCount ? (needsPlayTap && readiness.ready ? START_VIDEO_PROMPT : readiness.message) : null, buffering,
       interrupted: !!cameraError || !!message?.startsWith('Запуск прерван.'),
       status: live?.status, guidance: feedback?.cameraJoints.length ? feedback.message : null });
-  }, [observeAudio, hasTrackedSegments, phase, playing, primingVideo, needsPlayTap, cameraStatus, readiness, buffering, live?.status, feedback, cameraError, message]);
+  }, [observeAudio, hasTrackedSegments, phase, playing, videoStart, needsPlayTap, cameraStatus, readiness, buffering, live?.status, feedback, cameraError, message]);
 
   useEffect(() => {
     const hide = () => {
@@ -279,7 +306,12 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
     const video = trainerRef.current;
     const playbackId = playbackIdRef;
     const preparation = preparationRef;
-    return () => { playbackId.current++; preparation.current = null; video?.pause(); };
+    return () => {
+      playbackId.current++;
+      clearPlayTimeout(preparation.current);
+      preparation.current = null;
+      video?.pause();
+    };
   }, [loaded]);
 
   useEffect(() => {
@@ -338,8 +370,8 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
           pause(); setMessage('Начинается упражнение с биомеханикой. Включите камеру и нажмите «Продолжить».');
         } else {
           preparationRef.current = {
-            fullBody: false, priming: false, briefing: false, starting: false,
-            manualOnly: false, openedCamera: false, previousMuted: null, returnPhase: 'paused',
+            fullBody: false, briefing: false, playTimeout: null,
+            manualOnly: false, openedCamera: false, returnPhase: 'paused',
           };
           setPlaying(false);
           changePhase('preparing'); video.pause();
@@ -393,7 +425,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
     if (!video || !loaded || document.hidden || phaseRef.current === 'running') return;
     if (phaseRef.current === 'preparing') {
       const preparation = preparationRef.current;
-      if (preparation?.manualOnly) playPrepared(video, preparation);
+      if (preparation?.manualOnly) void playPrepared(video, preparation);
       return;
     }
     if (cameraStatus === 'loading') return;
@@ -419,42 +451,30 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
     clockRef.current = null;
     playbackIdRef.current++; captureRevisionRef.current++;
     const preparation: Preparation = {
-      fullBody: firstStart, priming: true, briefing: firstStart, starting: false,
-      manualOnly: false, openedCamera: cameraStatus === 'off', previousMuted: video.muted, returnPhase,
+      fullBody: firstStart, briefing: firstStart, playTimeout: null,
+      manualOnly: false, openedCamera: cameraStatus === 'off', returnPhase,
     };
     preparationRef.current = preparation;
-    setPrimingVideo(true);
     changePhase('preparing');
-    try {
-      // Prime the same inline video silently. Both play and the camera request
-      // are issued in the button gesture, before awaiting any browser work.
-      video.muted = true;
-      const priming = video.play();
-      if (preparation.fullBody) {
-        observeAudio({
-          phase: 'preparing', playing: false, countdown: null, preparingFullBody: true,
-          readinessMessage: null, buffering: false, interrupted: false, guidance: null,
-        }, () => {
-          if (preparationRef.current !== preparation) return;
-          preparation.briefing = false;
-          captureRevisionRef.current++;
-        });
-      }
-      if (preparation.openedCamera) void startCamera();
-      await priming;
-      if (preparationRef.current !== preparation) return;
-      video.pause();
-      video.muted = preparation.previousMuted ?? false;
-      preparation.previousMuted = null;
-      preparation.priming = false;
-      captureRevisionRef.current++;
-      setPrimingVideo(false);
-      clearReadiness();
-    } catch {
-      if (preparationRef.current !== preparation) return;
-      cancelPreparation();
-      setMessage('Не удалось подготовить видео. Проверьте соединение и нажмите кнопку запуска снова.');
+    // Give the same video the tap and pause it immediately. The pause can
+    // reject this play promise. Camera readiness does not depend on it.
+    const wasMuted = video.muted;
+    video.muted = true;
+    void video.play().catch(() => {});
+    video.pause();
+    video.muted = wasMuted;
+
+    if (preparation.fullBody) {
+      observeAudio({
+        phase: 'preparing', playing: false, countdown: null, preparingFullBody: true,
+        readinessMessage: null, buffering: false, interrupted: false, guidance: null,
+      }, () => {
+        if (preparationRef.current !== preparation) return;
+        preparation.briefing = false;
+        captureRevisionRef.current++;
+      });
     }
+    if (preparation.openedCamera) void startCamera();
   };
 
   const seekTraining = (targetMs: number, repeating = false) => {
@@ -478,13 +498,12 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
   const overallScore = reliability.reliable ? summary.score : null;
   const optionsLocked = phase === 'running' || phase === 'paused' || phase === 'preparing';
   const preparationStatus = cameraStatus === 'loading' ? 'Включаю фронтальную камеру и загружаю распознавание…'
-    : primingVideo ? 'Подготавливаю видео…'
+    : videoStart === 'starting' ? 'Запускаю видео тренера…'
     : readiness.ready && needsPlayTap ? 'Камера готова. Нажмите «Начать видео».'
     : readiness.sinceMs !== null && !readiness.ready && !needsPlayTap ? `Начинаем через ${readiness.secondsLeft}`
     : readiness.message;
   const statusText = phase === 'finished' ? 'Тест завершён'
     : phase === 'paused' ? 'Пауза'
-    : phase === 'preparing' ? preparationStatus
     : buffering && phase === 'running' ? 'Видео загружается — оценка на паузе'
     : phase === 'running' && !trackedSegmentAt(positionMs) ? 'Теория или отдых — биомеханика и оценка отключены'
     : phase === 'running' ? feedback?.message || live?.message || 'Определяю положение тела…'
@@ -530,11 +549,10 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
       <VideoPanel label={`Тренер · ${time(positionMs)} / ${time(loaded.doc?.durationMs ?? loaded.detail.video.duration * 1000)}`}>
         <video ref={trainerRef} src={loaded.detail.playbackUrl} controls={phase !== 'preparing'} playsInline preload="metadata"
           style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-          onError={() => { cancelPreparation(); setMessage('Не удалось загрузить видео. Откройте тест заново, чтобы обновить ссылку'); }}
+          onError={handleVideoError}
           onPlay={() => {
             // Native controls cannot skip the explicitly armed preparation.
-            const preparation = preparationRef.current;
-            if (phaseRef.current !== 'running' && !preparation?.priming && !preparation?.starting) trainerRef.current?.pause();
+            if (phaseRef.current !== 'running' && preparationRef.current?.playTimeout == null) trainerRef.current?.pause();
           }}
           onPause={(event) => {
             if (!event.currentTarget.paused) return;
@@ -553,19 +571,19 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
         <video ref={cameraVideoRef} muted autoPlay playsInline
           style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scaleX(-1)' }} />
         <canvas ref={cameraCanvasRef} style={{ ...overlayStyle, transform: 'scaleX(-1)' }} />
-        {cameraStatus === 'ready' && phase === 'preparing' && <div aria-hidden="true"
+        {cameraStatus === 'ready' && phase === 'preparing' && <div role="status"
           style={{ position: 'absolute', top: 10, left: 10, right: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.7)', color: '#fff', textAlign: 'center', fontSize: 16, fontWeight: 700, pointerEvents: 'none' }}>
           {preparationStatus}
         </div>}
-        {cameraStatus !== 'ready' && <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'var(--color-muted)', padding: 20, textAlign: 'center' }}>
-          {cameraStatus === 'loading' ? 'Включаю камеру и загружаю распознавание…' : 'Камера выключена'}
+        {cameraStatus !== 'ready' && <div role={phase === 'preparing' ? 'status' : undefined} style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'var(--color-muted)', padding: 20, textAlign: 'center' }}>
+          {cameraStatus === 'loading' ? preparationStatus : 'Камера выключена'}
         </div>}
       </VideoPanel>}
     </div>
 
     <div className={styles.focusScore}>
       {hasTrackedSegments && <div className="flex gap-6 items-center"><Metric label={phase === 'finished' ? 'Итог' : 'Сходство'} value={percent(displayedScore)} /><Metric label="Попадание в темп" value={percent(displayedTempo)} /></div>}
-      <p role="status" style={{ fontSize: 13, margin: '8px 0 0' }}>{statusText}</p>
+      {phase !== 'preparing' && <p role="status" style={{ fontSize: 13, margin: '8px 0 0' }}>{statusText}</p>}
     </div>
     {audio.enabled && audio.notice && <p role="status" style={{ color: 'var(--color-muted)', fontSize: 12, margin: 0 }}>{audio.notice}</p>}
     {(cameraError || message) && <AdminCard tone={cameraError ? 'danger' : 'default'} role={cameraError ? 'alert' : 'status'}>
@@ -609,7 +627,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
             : phase === 'running' ? live?.status === 'scored' ? 'Достаточно' : live?.status === 'inactive' ? 'Отдых' : 'Недостаточно' : '—'} />
         </div>
       </div>
-      <p role="status" style={{ fontSize: 14, fontWeight: 600, margin: '16px 0 0' }}>{statusText}</p>
+      {phase !== 'preparing' && <p role="status" style={{ fontSize: 14, fontWeight: 600, margin: '16px 0 0' }}>{statusText}</p>}
       {!!live?.feedback.length && phase === 'running' && <details style={{ marginTop: 12 }}><summary style={{ cursor: 'pointer', fontSize: 13 }}>Оценки по группам суставов</summary><div className="flex flex-wrap gap-3" style={{ marginTop: 8 }}>
         {live.feedback.map((item) => <span key={item.group} style={{ border: '1px solid var(--border-hairline)', borderRadius: 8, padding: '6px 10px', fontSize: 13 }}>
           {item.label}: {percent(item.score)}
