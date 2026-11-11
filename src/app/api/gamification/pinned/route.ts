@@ -11,8 +11,8 @@ import { WorkoutStatus, type TrainingGoal } from '@/generated/prisma';
  * PUT /api/gamification/pinned { keys: string[] }
  *
  * Витрина наград в шапке профиля — до SHOWCASE_SLOTS ключей в порядке показа
- * (правка владельца «Начало сентября»: добавлять и убирать самому). Хранятся
- * только ключи — сами награды выводятся из истории, как XP.
+ * (правка владельца «Начало сентября»: добавлять и убирать самому). В витрине
+ * хранятся ключи наград.
  *
  * В шапку можно поставить ТОЛЬКО полученную награду: иначе в витрине висела
  * бы ачивка, которой у человека нет. Проверяем по тем же расчётам, что отдаёт
@@ -104,8 +104,13 @@ export async function PUT(request: NextRequest) {
     goalCounts[g] = (goalCounts[g] ?? 0) + (count ?? 0);
   }
 
+  const streakAchievements = computeStreakAchievements(
+    trainingDayAts,
+    tz,
+    auth.user.teamPackEarnedAt !== null,
+  );
   const unlocked = new Set(
-    [...computeStreakAchievements(trainingDayAts, tz), ...computeAchievements(goalCounts)]
+    [...streakAchievements, ...computeAchievements(goalCounts)]
       .filter((a) => a.unlocked)
       .map((a) => a.key),
   );

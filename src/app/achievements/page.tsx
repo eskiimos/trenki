@@ -249,7 +249,7 @@ const AchievementsPage = () => {
   const unlockedCount = items?.filter((a) => a.unlocked).length ?? 0;
   const total = items?.length ?? SKILL_TREE.length * 2;
   const streakUnlocked = streaks?.filter((a) => a.unlocked).length ?? 0;
-  const streakTotal = streaks?.length ?? 10;
+  const streakTotal = streaks?.length ?? 0;
   const unlockedNotPinned =
     [...(streaks ?? []), ...(items ?? [])].filter((a) => a.unlocked && !pinned.includes(a.key)).length;
   const loaded = !!items && !!streaks;
