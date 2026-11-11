@@ -6,15 +6,17 @@ import { containRect, drawSkeleton } from './draw';
 import { createCameraDetector, createMainDetector, type CameraDetector } from './camera-detector';
 
 export type PoseCameraStatus = 'off' | 'loading' | 'ready';
+type CameraUnavailable = 'camera' | 'hidden' | 'stale' | 'restarting';
 
 interface Options<T> {
   onFrame: (frame: number[], timestampMs: number, context: T | undefined) => void;
   facingMode?: 'user' | 'environment';
+  requireFacingMode?: boolean;
   trackingEnabled?: boolean;
   visiblePoints?: () => readonly number[] | undefined;
   captureContext?: () => T;
   highlights?: () => number[];
-  onUnavailable?: () => void;
+  onUnavailable?: (reason: CameraUnavailable) => void;
 }
 
 interface CameraSession {
@@ -61,14 +63,14 @@ function disposeSession(session: CameraSession) {
 }
 
 /** Камера и распознавание работают локально; кадров и звука на сервере нет. */
-export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highlights, facingMode = 'user', trackingEnabled = true, visiblePoints }: Options<T>) {
+export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highlights, facingMode = 'user', requireFacingMode = false, trackingEnabled = true, visiblePoints }: Options<T>) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sessionRef = useRef<CameraSession | null>(null);
   const generationRef = useRef(0);
   const mountedRef = useRef(false);
   const pendingRef = useRef<Promise<void> | null>(null);
-  const callbacksRef = useRef({ onFrame, onUnavailable, captureContext, highlights, facingMode, trackingEnabled, visiblePoints });
+  const callbacksRef = useRef({ onFrame, onUnavailable, captureContext, highlights, facingMode, requireFacingMode, trackingEnabled, visiblePoints });
   const trackingRevisionRef = useRef(0);
   const [status, setStatus] = useState<PoseCameraStatus>('off');
   const [error, setError] = useState<string | null>(null);
@@ -78,8 +80,8 @@ export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highl
 
   useEffect(() => {
     if (callbacksRef.current.trackingEnabled !== trackingEnabled) trackingRevisionRef.current++;
-    callbacksRef.current = { onFrame, onUnavailable, captureContext, highlights, facingMode, trackingEnabled, visiblePoints };
-  }, [onFrame, onUnavailable, captureContext, highlights, facingMode, trackingEnabled, visiblePoints]);
+    callbacksRef.current = { onFrame, onUnavailable, captureContext, highlights, facingMode, requireFacingMode, trackingEnabled, visiblePoints };
+  }, [onFrame, onUnavailable, captureContext, highlights, facingMode, requireFacingMode, trackingEnabled, visiblePoints]);
 
   const clearDrawing = useCallback(() => {
     const canvas = canvasRef.current;
@@ -142,7 +144,7 @@ export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highl
       setDelegate(null);
       setExecution(null);
       setError(message);
-      callbacksRef.current.onUnavailable?.();
+      callbacksRef.current.onUnavailable?.('camera');
     };
 
     const setup = async () => {
@@ -152,8 +154,9 @@ export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highl
           fail('Камере нужен HTTPS и браузер с поддержкой getUserMedia. Откройте страницу по защищённому адресу.');
           return;
         }
+        const requestedFacingMode = callbacksRef.current.facingMode;
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: callbacksRef.current.facingMode, width: { ideal: 640 }, height: { ideal: 480 } },
+          video: { facingMode: requestedFacingMode, width: { ideal: 640 }, height: { ideal: 480 } },
           audio: false,
         });
         if (!isCurrent()) {
@@ -162,6 +165,10 @@ export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highl
         }
         session.stream = stream;
         const actualMode = stream.getVideoTracks()[0]?.getSettings?.().facingMode;
+        if (callbacksRef.current.requireFacingMode && (actualMode === 'user' || actualMode === 'environment') && actualMode !== requestedFacingMode) {
+          fail('Браузер включил другую камеру. Проверьте выбор камеры и попробуйте снова.');
+          return;
+        }
         setActualFacingMode(actualMode === 'user' || actualMode === 'environment' ? actualMode : null);
         const video = videoRef.current;
         if (!video) {
@@ -197,18 +204,18 @@ export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highl
         let lastFreshFrameMs = performance.now();
         let unavailable = false;
         let drawingSuspended = false;
-        const notifyUnavailable = () => {
+        const notifyUnavailable = (reason: CameraUnavailable) => {
           clearDrawing();
-          if (!unavailable) callbacksRef.current.onUnavailable?.();
+          if (!unavailable) callbacksRef.current.onUnavailable?.(reason);
           unavailable = true;
         };
         const onVisibility = () => {
-          if (document.hidden) notifyUnavailable();
+          if (document.hidden) notifyUnavailable('hidden');
           else lastFreshFrameMs = performance.now();
         };
         document.addEventListener('visibilitychange', onVisibility);
         session.removeListeners.push(() => document.removeEventListener('visibilitychange', onVisibility));
-        if (document.hidden) notifyUnavailable();
+        if (document.hidden) notifyUnavailable('hidden');
 
         const loop = () => {
           if (!isCurrent()) return;
@@ -226,7 +233,7 @@ export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highl
             const fresh = video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
               video.videoWidth > 0 && video.currentTime !== lastVideoTime;
             if (fresh) lastFreshFrameMs = now;
-            if (now - lastFreshFrameMs > 1000) notifyUnavailable();
+            if (now - lastFreshFrameMs > 1000) notifyUnavailable('stale');
             if (fresh && !busy && now - lastDetectionMs >= intervalMs) {
               const timestampMs = Math.max(now, lastDetectionMs + 1);
               lastDetectionMs = timestampMs;
@@ -239,7 +246,8 @@ export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highl
               void detector.detect(video, timestampMs).then(result => {
                 if (!isCurrent()) return;
                 if (!callbacksRef.current.trackingEnabled || trackingRevision !== trackingRevisionRef.current) return;
-                if (document.hidden || performance.now() - timestampMs > 1000) { notifyUnavailable(); return; }
+                if (document.hidden) { notifyUnavailable('hidden'); return; }
+                if (performance.now() - timestampMs > 1000) { notifyUnavailable('stale'); return; }
                 const frame = encodeFrame(timestampMs, result.landmarks?.[0], result.worldLandmarks?.[0]);
                 callbacksRef.current.onFrame(frame, timestampMs, capture);
                 const canvas = canvasRef.current;
@@ -255,9 +263,11 @@ export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highl
                 if (!isCurrent()) return;
                 if (!callbacksRef.current.trackingEnabled || trackingRevision !== trackingRevisionRef.current) return;
                 if (detector.execution === 'worker') {
-                  // Stop scoring before changing execution mode. No stale result
-                  // may cross this boundary, and the user explicitly resumes.
-                  notifyUnavailable(); detector.close(); setStatus('loading');
+                  // Stop scoring before changing execution mode. Preparation
+                  // can continue after the replacement detector produces fresh frames.
+                  notifyUnavailable('restarting');
+                  if (!isCurrent()) return;
+                  detector.close(); setStatus('loading');
                   try {
                     const fallback = await createMainDetector(session.controller.signal);
                     if (!isCurrent()) { fallback.close(); return; }

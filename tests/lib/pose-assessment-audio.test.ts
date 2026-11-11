@@ -26,6 +26,26 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 describe('browser assessment audio output', () => {
+  it('releases preparation after the briefing or when the speech engine stops responding', () => {
+    vi.useFakeTimers();
+    const player = new AssessmentAudioPlayer(vi.fn());
+    const complete = vi.fn();
+    try {
+      player.unlock();
+      player.play({ text: 'Встаньте целиком в кадр.', tone: 'notice' }, complete);
+      const utterance = synthesis.speak.mock.calls[0]?.[0] as unknown as FakeUtterance;
+      expect(complete).not.toHaveBeenCalled();
+      utterance.onend?.();
+      expect(complete).toHaveBeenCalledOnce();
+      player.play({ text: 'Подготовка к тренировке.', tone: 'notice' }, complete);
+      vi.advanceTimersByTime(12_000);
+      expect(complete).toHaveBeenCalledTimes(2);
+      expect(synthesis.cancel).toHaveBeenCalledOnce();
+    } finally {
+      player.dispose();
+      vi.useRealTimers();
+    }
+  });
   it('uses short Web Audio tones and explicitly selects a Russian voice', () => {
     const player = new AssessmentAudioPlayer(vi.fn()); player.unlock();
     player.play({ text: 'Начинаем.', tone: 'start' });

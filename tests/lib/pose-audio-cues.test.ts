@@ -7,6 +7,13 @@ function frames(state: AudioCueState, snapshot: AudioSnapshot, from: number, to:
   return Array.from({ length: Math.floor((to - from) / 100) + 1 }, (_, i) => nextAudioDecision(state, snapshot, from + i * 100)).flatMap(d => d.cue ? [d.cue] : []);
 }
 describe('audible live assessment cues', () => {
+  it('explains the working area once, then counts down after a slow briefing or camera startup', () => {
+    const state = createAudioCueState();
+    const intro = input({ phase: 'preparing', playing: false, preparingFullBody: true, readinessMessage: null });
+    expect(nextAudioDecision(state, intro, 0).cue?.text).toContain('На отдыхе можно подойти к экрану');
+    expect(nextAudioDecision(state, intro, 3000)).toEqual({ stop: false, cue: null });
+    expect(nextAudioDecision(state, { ...intro, countdown: 3 }, 7000).cue?.text).toBe('Три');
+  });
   it('only counts fresh readiness seconds and never queues a later start', () => {
     const state = createAudioCueState();
     const prep = input({ phase: 'preparing', playing: false });

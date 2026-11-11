@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { encodeFrame, LM, type Landmark } from '@/lib/pose/reference';
 import { assessmentPreset } from '@/lib/pose/assessment-settings';
-import { advanceReadiness, checkAssessmentReadiness, initialReadiness } from '@/lib/pose/readiness';
+import { advanceReadiness, checkAssessmentReadiness, checkFullBodyReadiness, initialReadiness } from '@/lib/pose/readiness';
 
 function camera(hidden: number[] = [], clipped = false) {
   const landmarks: Landmark[] = Array.from({ length: 33 }, (_, id) => ({ x: clipped && id === LM.lAnkle ? 0.99 : 0.5, y: 0.5, visibility: hidden.includes(id) ? 0.1 : 0.95 }));
@@ -17,6 +17,15 @@ function readyGate() {
 }
 
 describe('camera preparation', () => {
+  it('requires full-body framing for the first start even if the exercise scores only arms', () => {
+    const hiddenFeet = camera([31, 32]);
+    expect(checkAssessmentReadiness(hiddenFeet, assessmentPreset('arms'), 'same').good).toBe(true);
+    expect(checkFullBodyReadiness(hiddenFeet)).toMatchObject({ good: false, message: expect.stringContaining('стопы') });
+    expect(checkFullBodyReadiness(camera([LM.nose]))).toMatchObject({ good: false, message: expect.stringContaining('голову') });
+    expect(checkFullBodyReadiness(camera([LM.rWrist]))).toMatchObject({ good: false, message: expect.stringContaining('руки') });
+    expect(checkFullBodyReadiness(camera([], true)).good).toBe(false);
+    expect(checkFullBodyReadiness(camera()).good).toBe(true);
+  });
   it('checks the selected profile, not unrelated limbs or similarity to the trainer', () => {
     const hiddenAnkles = camera([LM.lAnkle, LM.rAnkle]);
     expect(checkAssessmentReadiness(hiddenAnkles, assessmentPreset('legs'), 'same').good).toBe(false);

@@ -1,9 +1,11 @@
 export type AudioPhase = 'ready' | 'preparing' | 'running' | 'paused' | 'finished';
+export const FULL_BODY_BRIEFING = 'Встаньте так, чтобы всё тело было в кадре. Во время упражнений оставайтесь в рабочей зоне. На отдыхе можно подойти к экрану.';
 export interface AudioSnapshot {
   phase: AudioPhase;
   playing: boolean;
   countdown: number | null;
-  readinessMessage: string;
+  readinessMessage: string | null;
+  preparingFullBody?: boolean;
   buffering: boolean;
   interrupted: boolean;
   status?: string;
@@ -25,16 +27,21 @@ export const createAudioCueState = (): AudioCueState => ({ phase: 'ready', condi
 export function nextAudioDecision(state: AudioCueState, input: AudioSnapshot, nowMs: number): { stop: boolean; cue: AudioCue | null } {
   if (!Number.isFinite(nowMs)) return { stop: true, cue: null };
   if (state.lastMs !== null && (nowMs < state.lastMs || nowMs - state.lastMs > 1500)) {
-    Object.assign(state, createAudioCueState());
+    const reset = createAudioCueState();
+    // Loading the camera or speaking the briefing can take several seconds.
+    // Clear stale hints without replaying the briefing when frames arrive.
+    if (state.phase === 'preparing' && input.phase === 'preparing' && input.preparingFullBody) reset.phase = 'preparing';
+    Object.assign(state, reset);
   }
   state.lastMs = nowMs;
+  const readinessCondition = input.readinessMessage ? `ready:${input.readinessMessage}` : '';
   // Never announce a start while play() is pending/rejected or video is buffering.
   if (input.phase === 'running' && !input.playing && (!input.buffering || state.phase !== 'running')) return { stop: true, cue: null };
   if (state.phase !== input.phase) {
     const before = state.phase;
-    state.phase = input.phase; state.condition = input.phase === 'preparing' ? `ready:${input.readinessMessage}` : ''; state.countdown = null; state.sinceMs = nowMs;
+    state.phase = input.phase; state.condition = input.phase === 'preparing' ? readinessCondition : ''; state.countdown = null; state.sinceMs = nowMs;
     state.lastHintMs = nowMs; state.spoken = {};
-    const text = input.phase === 'preparing' ? 'Отойдите в кадр. Ждите отсчёта.'
+    const text = input.phase === 'preparing' ? (input.preparingFullBody ? FULL_BODY_BRIEFING : 'Отойдите в кадр. Ждите отсчёта.')
       : input.phase === 'running' ? input.buffering ? null : 'Начинаем. Повторяйте за тренером.'
       : input.phase === 'paused' ? input.interrupted ? 'Пауза. Проверьте камеру и нажмите продолжить.' : 'Пауза.'
       : input.phase === 'finished' ? 'Тренировка завершена.'
@@ -48,7 +55,7 @@ export function nextAudioDecision(state: AudioCueState, input: AudioSnapshot, no
   }
   const countdownLost = state.countdown !== null;
   state.countdown = null;
-  const condition = input.phase === 'preparing' ? `ready:${input.readinessMessage}`
+  const condition = input.phase === 'preparing' ? readinessCondition
     : input.phase !== 'running' ? ''
     : input.buffering ? 'buffering'
     : input.status === 'no_camera_pose' ? 'missing'
@@ -69,7 +76,7 @@ export function nextAudioDecision(state: AudioCueState, input: AudioSnapshot, no
     return { stop: interrupt, cue: null };
   }
   state.lastHintMs = nowMs; state.spoken[condition] = nowMs;
-  const text = hint ? input.guidance! : preparation ? input.readinessMessage
+  const text = hint ? input.guidance! : preparation ? input.readinessMessage!
     : condition === 'missing' ? 'Камера не видит вас. Вернитесь в кадр.'
     : condition === 'partial' ? 'Часть тела не видна. Отойдите от камеры или измените ракурс.'
     : 'Видео загружается. Оценка на паузе.';

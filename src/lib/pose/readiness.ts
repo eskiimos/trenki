@@ -1,4 +1,4 @@
-import { hasPose, point2d } from './reference';
+import { hasPose, LM, point2d } from './reference';
 import { assessmentAngles, ASSESSMENT_MIN_ANGLES, ASSESSMENT_MIN_COVERAGE, type AssessmentSideMode } from './assessment';
 import { ASSESSMENT_ANGLES, ASSESSMENT_ANGLE_LABELS, OPPOSITE, REQUIRED_POINTS, type AssessmentSettings } from './assessment-settings';
 
@@ -15,6 +15,32 @@ export interface ReadinessGate {
 }
 export function initialReadiness(): ReadinessGate {
   return { sinceMs: null, lastFrameMs: null, signature: '', ready: false, secondsLeft: 3, message: 'Встаньте перед камерой для проверки видимости.' };
+}
+
+const FULL_BODY_VISIBILITY = 0.65;
+const FRAME_MARGIN = 0.04;
+const FULL_BODY_CHECKS = [
+  { points: [LM.nose], hint: 'Покажите голову целиком. Отойдите дальше или наклоните камеру вверх.' },
+  { points: [LM.lKnee, LM.rKnee, LM.lAnkle, LM.rAnkle, 31, 32], hint: 'Покажите ноги и стопы целиком. Отойдите дальше или наклоните камеру вниз.' },
+  { points: [LM.lShoulder, LM.rShoulder, LM.lHip, LM.rHip], hint: 'Покажите корпус целиком. Встаньте лицом к камере и проверьте освещение.' },
+  { points: [LM.lElbow, LM.rElbow, LM.lWrist, LM.rWrist], hint: 'Покажите обе руки. Слегка отведите руки от корпуса.' },
+];
+
+/** Check framing before the first start, independent of the exercise's scoring profile. */
+export function checkFullBodyReadiness(frame: number[]): ReadinessCheck {
+  if (!hasPose(frame)) return { good: false, message: 'Камера не видит человека. Встаньте перед камерой.' };
+  for (const { points, hint } of FULL_BODY_CHECKS) {
+    const visible = points.every((id) => {
+      const { x, y, v } = point2d(frame, id);
+      // The nose is inside the head, so leave more room above it.
+      const top = id === LM.nose ? 0.08 : FRAME_MARGIN;
+      return Number.isFinite(v) && v >= FULL_BODY_VISIBILITY
+        && x >= FRAME_MARGIN && x <= 1 - FRAME_MARGIN
+        && y >= top && y <= 1 - FRAME_MARGIN;
+    });
+    if (!visible) return { good: false, message: hint };
+  }
+  return { good: true, message: 'Всё тело в кадре. Оставайтесь на месте.' };
 }
 
 /** Visibility/position check, not a requirement to match the trainer's current pose. */
