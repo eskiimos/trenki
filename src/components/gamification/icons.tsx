@@ -9,7 +9,7 @@ import {
   Zap, Target, Flame, Rocket, Swords, Medal,
   Crosshair, Bomb, Axe, Wand2, Drama, HeartPulse, Footprints,
   Cat, Wind, ShieldCheck, Bot,
-  Dumbbell, Hand, CalendarCheck, Sunrise, Gem,
+  Dumbbell, Hand, CalendarCheck, Sunrise, Gem, PawPrint,
   type LucideIcon,
 } from 'lucide-react';
 import type { SVGProps } from 'react';
@@ -154,6 +154,7 @@ export const ACHIEVEMENT_ICONS: Record<string, LucideIcon> = {
   streak_14: Rocket,        // Две недели подряд
   early_bird: Sunrise,      // Ранняя пташка
   weekend_warrior: Swords,  // Воин выходных
+  team_pack: PawPrint,      // Стая
 };
 
 // ── Аватары лиги ─────────────────────────────────────────────────────────────

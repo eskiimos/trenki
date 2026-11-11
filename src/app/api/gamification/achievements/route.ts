@@ -1,5 +1,5 @@
-// Ачивки текущего пользователя («Древо навыков»): считаются на лету из истории
-// завершений (в БД ничего не хранится — ретроактивная модель, как XP/уровни).
+// Награды текущего пользователя. Древо навыков считается на лету из истории
+// завершений, а «Стая» — по дате подтверждённого вступления в команду.
 // Для каждой цели берём число ЗАВЕРШЁННЫХ WorkoutSession с этой целью
 // (groupBy по goal), затем чистый расчёт — computeAchievements
 // (tests/lib/achievements.test.ts).
@@ -80,14 +80,16 @@ export async function GET(request: NextRequest) {
   }
 
   // Вторая группа наград — «Ачивки» (поведенческие: серии, ранняя пташка,
-  // воин выходных). Правка владельца: развести награды на две категории.
-  // Считаются из той же истории завершений и в таймзоне игрока — раньше
-  // «до 08:00» означало 08:00 серверного времени.
+  // воин выходных, «Стая»). Тренировочные награды считаются в таймзоне игрока.
   const [{ trainingDayAts }, tz] = await Promise.all([
     fetchCompletionHistory(auth.user.id),
     userTimezone(auth.user.id),
   ]);
-  const streakAchievements = computeStreakAchievements(trainingDayAts, tz);
+  const streakAchievements = computeStreakAchievements(
+    trainingDayAts,
+    tz,
+    auth.user.teamPackEarnedAt !== null,
+  );
 
   const achievements = computeAchievements(goalCounts);
   const unlockedCount = achievements.filter((a) => a.unlocked).length;
@@ -97,7 +99,7 @@ export async function GET(request: NextRequest) {
     achievements,
     unlockedCount,
     total: achievements.length,
-    // «Ачивки» — серии и вехи
+    // «Ачивки» — серии, вехи и вступление в команду
     streakAchievements,
     streakUnlockedCount: streakAchievements.filter((a) => a.unlocked).length,
     streakTotal: streakAchievements.length,

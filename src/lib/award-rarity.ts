@@ -13,6 +13,7 @@
 const RARITY: Record<string, number> = {
   // Группа «Ачивки» (серии, вехи, поведение)
   workouts_1: 1, // первая тренировка — стартовая, почти у всех
+  team_pack: 2, // подтверждённое вступление в команду
   streak_3: 10,
   early_bird: 12,
   weekend_warrior: 14,

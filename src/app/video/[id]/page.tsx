@@ -23,10 +23,20 @@ import { openSubscriptionModal } from '@/lib/subscription-modal';
 // видео продолжают играть офлайн.
 import { isVideoDownloaded, getOfflineVideo } from '@/lib/offlineVideos';
 import { useWorkoutRepeat } from '@/hooks/useWorkoutRepeat';
-import { evaluatePlaybackSeek, getPlaybackPermissions, rewindPlaybackTarget, type PlaybackSeekDecision, type PlaybackSeekIntent } from '@/lib/training/playback-policy';
+import { evaluatePlaybackSeek, getPlaybackPermissions, rewindPlaybackTarget, type PlaybackMode, type PlaybackSeekDecision, type PlaybackSeekIntent } from '@/lib/training/playback-policy';
 import type { PlaybackRepeatSegment } from '@/lib/training/repeat-settings';
 
 const NO_REPEAT_SEGMENTS: PlaybackRepeatSegment[] = [];
+const PLAYBACK_MODES = {
+  view: {
+    label: 'Просмотр',
+    hint: 'Свободная перемотка без зачёта потенциала.',
+  },
+  training: {
+    label: 'Тренировка',
+    hint: 'Перемотка назад и повторы. Досмотр без пропусков идёт в зачёт потенциала.',
+  },
+};
 
 interface VideoPageProps {
   params: Promise<{
@@ -145,9 +155,9 @@ export default function VideoPage({ params }: VideoPageProps) {
 
   // Режим просмотра: «Тренировка» (с возвратом назад, идёт в зачёт потенциала) /
   // «Просмотр» (с перемоткой, БЕЗ начисления потенциала; просмотр всё равно
-  // пишется в историю). Переключается кнопкой «Режим» в плеере.
+  // пишется в историю). Режим выбирается под видео.
   // В тренировке (fromWorkout) — всегда «Тренировка»: повторять можно, пропускать вперёд нельзя.
-  const [watchMode, setWatchMode] = useState<'training' | 'view'>('training');
+  const [watchMode, setWatchMode] = useState<PlaybackMode>('training');
   // Читер-режим админов (решение босса 2026-08-09): в свободном просмотре с
   // перемоткой всё равно начисляем потенциал и XP — для тестирования
   // геймификации. Только для isAdmin; статус по сессии (/api/user/is-admin).
@@ -160,7 +170,7 @@ export default function VideoPage({ params }: VideoPageProps) {
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
-  // Единый шит настроек (Режим + Качество) — вместо двух отдельных меню в панели
+  // Настройки качества в панели плеера.
   const [showSettings, setShowSettings] = useState(false);
   const showSettingsRef = useRef(false); // зеркало для таймера автоскрытия контролов
   // Микроанимация закрытия шита/поповера настроек: на время exit-анимации шит
@@ -1386,89 +1396,36 @@ export default function VideoPage({ params }: VideoPageProps) {
     return `+${totalGain.toFixed(2)}`;
   };
 
-  // Сколько качеств реально доступно — определяет, есть ли секция «Качество»
   const hasQualityChoice = Object.keys(availableQualities).length > 1;
 
-  // Содержимое единого шита настроек: секции «Режим» (не в тренировке) и
-  // «Качество» (если есть выбор). Пояснения режимов сохранены — они объясняют
-  // правила перемотки и начисления потенциала. Рендерится и в нижнем шите
-  // (портрет), и в компактном поповере (ландшафт).
-  const settingsSections = (
-    <>
-      {!fromWorkout && (
-        <div className="py-1">
-          <div
-            className="px-4 pt-2 pb-1 text-[10px] font-bold uppercase text-white/40"
-            style={{ fontFamily: 'Overpass', letterSpacing: '0.5px' }}
+  const qualitySettings = (
+    <div className="py-1">
+      <div
+        className="px-4 pt-2 pb-1 text-[10px] font-bold uppercase text-white/40"
+        style={{ fontFamily: 'Overpass', letterSpacing: '0.5px' }}
+      >
+        Качество
+      </div>
+      {(['1080p', '720p', '480p', '360p'] as const)
+        .filter(q => availableQualities[q])
+        .map((quality) => (
+          <button
+            key={quality}
+            type="button"
+            onClick={() => handleQualityChange(quality)}
+            className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+              selectedQuality === quality
+                ? 'text-[#A1FF4A] bg-white/10 font-semibold'
+                : 'text-white/80 hover:bg-white/10 hover:text-white'
+            }`}
           >
-            Режим
-          </div>
-          {([
-            {
-              key: 'training' as const,
-              title: 'Тренировка',
-              hint: 'Можно возвращаться назад и повторять подходы. Занятие идёт в зачёт роста потенциала.',
-            },
-            {
-              key: 'view' as const,
-              title: 'Просмотр',
-              hint: 'Можно перематывать, но очки потенциала не начисляются.',
-            },
-          ]).map((m) => (
-            <button
-              key={m.key}
-              onClick={() => {
-                setWatchMode(m.key);
-                closeSettings();
-                showControlsTemporarily();
-              }}
-              className={`w-full text-left px-4 py-2.5 transition-colors ${
-                watchMode === m.key ? 'bg-white/10' : 'hover:bg-white/10'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className={`text-sm font-semibold ${watchMode === m.key ? 'text-[#A1FF4A]' : 'text-white'}`}>
-                  {m.title}
-                </span>
-                {watchMode === m.key && (
-                  <Check size={12} className="text-[#A1FF4A]" strokeWidth={2.5} />
-                )}
-              </div>
-              <div className="text-[11px] leading-snug text-white/60 mt-0.5">{m.hint}</div>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {hasQualityChoice && (
-        <div className={`py-1 ${!fromWorkout ? 'border-t border-white/10' : ''}`}>
-          <div
-            className="px-4 pt-2 pb-1 text-[10px] font-bold uppercase text-white/40"
-            style={{ fontFamily: 'Overpass', letterSpacing: '0.5px' }}
-          >
-            Качество
-          </div>
-          {(['1080p', '720p', '480p', '360p'] as const)
-            .filter(q => availableQualities[q])
-            .map((quality) => (
-              <button
-                key={quality}
-                onClick={() => handleQualityChange(quality)}
-                className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors ${
-                  selectedQuality === quality
-                    ? 'text-[#A1FF4A] bg-white/10 font-semibold'
-                    : 'text-white/80 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                <span>{quality}</span>
-                {selectedQuality === quality && (
-                  <Check size={12} className="text-[#A1FF4A]" strokeWidth={2.5} />
-                )}
-              </button>
-            ))}
-        </div>
-      )}
-    </>
+            <span>{quality}</span>
+            {selectedQuality === quality && (
+              <Check size={12} className="text-[#A1FF4A]" strokeWidth={2.5} />
+            )}
+          </button>
+        ))}
+    </div>
   );
 
   return (
@@ -1990,9 +1947,8 @@ export default function VideoPage({ params }: VideoPageProps) {
                 <span className={`text-white font-medium whitespace-nowrap ${isLandscape ? 'text-sm' : 'text-xs'}`}>
                   {formatTime(currentTime)} / {formatTime(duration)}
                 </span>
-                {/* Лаймовая пилюля «Просмотр» — чтобы не-дефолтный режим был
-                    виден с одного взгляда, без открытия настроек */}
-                {!fromWorkout && watchMode === 'view' && (
+                {/* В полноэкранном плеере переключатель под видео скрыт. */}
+                {!fromWorkout && watchMode === 'view' && (isLandscape || isFullscreen) && (
                   <span
                     className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase whitespace-nowrap"
                     style={{
@@ -2019,10 +1975,7 @@ export default function VideoPage({ params }: VideoPageProps) {
                     : <Volume2 size={isLandscape ? 24 : 18} />}
                 </button>
 
-                {/* Единая кнопка настроек (Режим + Качество). Скрыта, когда обе
-                    секции пусты: в тренировке режим не переключается, а качество
-                    без выбора. */}
-                {(!fromWorkout || hasQualityChoice) && (
+                {hasQualityChoice && (
                   <div className="relative" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => {
@@ -2031,8 +1984,8 @@ export default function VideoPage({ params }: VideoPageProps) {
                         showControlsTemporarily();
                       }}
                       className={`transition-opacity hover:opacity-80 p-2 ${showSettings ? 'text-[#A1FF4A]' : 'text-white'}`}
-                      title="Настройки плеера"
-                      aria-label="Настройки плеера"
+                      title="Качество видео"
+                      aria-label="Качество видео"
                     >
                       <Settings2 size={isLandscape ? 24 : 18} />
                     </button>
@@ -2045,7 +1998,7 @@ export default function VideoPage({ params }: VideoPageProps) {
                         }`}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {settingsSections}
+                        {qualitySettings}
                       </div>
                     )}
                   </div>
@@ -2087,7 +2040,7 @@ export default function VideoPage({ params }: VideoPageProps) {
 
               {/* Портрет: настройки открываются нижним шитом (в ландшафте —
                   компактный поповер у кнопки). Клик внутри не закрывает шит. */}
-              {showSettings && !isLandscape && (
+              {hasQualityChoice && showSettings && !isLandscape && (
                 <div
                   className="fixed inset-x-0 bottom-0 z-[60]"
                   onClick={(e) => e.stopPropagation()}
@@ -2100,7 +2053,7 @@ export default function VideoPage({ params }: VideoPageProps) {
                   >
                     {/* Граббер шита */}
                     <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mt-2 mb-1" />
-                    {settingsSections}
+                    {qualitySettings}
                   </div>
                 </div>
               )}
@@ -2225,6 +2178,37 @@ export default function VideoPage({ params }: VideoPageProps) {
       вернуть можно, восстановив кнопки). */}
   {!fromWorkout && (
   <div className={`bg-[#101530] ${isLandscape ? 'hidden' : ''}`}>
+        <div className="px-4 pt-4">
+          <p id="video-mode-label" className="mb-2 text-sm font-overpass font-bold text-ink">
+            Режим просмотра
+          </p>
+          <div
+            role="group"
+            aria-labelledby="video-mode-label"
+            aria-describedby="video-mode-hint"
+            className="grid grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-white/5 p-1"
+          >
+            {(['view', 'training'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={watchMode === mode}
+                onClick={() => {
+                  setWatchMode(mode);
+                  showControlsTemporarily();
+                }}
+                className={`min-h-11 rounded-xl px-2 text-sm font-overpass font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+                  watchMode === mode ? 'bg-brand text-surface' : 'text-ink hover:bg-white/10'
+                }`}
+              >
+                {PLAYBACK_MODES[mode].label}
+              </button>
+            ))}
+          </div>
+          <p id="video-mode-hint" aria-live="polite" className="mt-2 min-h-9 text-xs leading-[18px] text-muted">
+            {PLAYBACK_MODES[watchMode].hint}
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-2 p-4">
             <>
               {/* Like */}

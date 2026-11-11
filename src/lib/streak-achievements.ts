@@ -9,8 +9,9 @@
 // обесценивают награду. «Месяц подряд» не вернули сознательно: месяц без
 // единого дня отдыха — вредный стимул для детского спорта (решение 2026-08-09).
 //
-// Считаются РЕТРОАКТИВНО из истории завершений — в БД ничего не хранится,
-// как XP и древо. Границы дня — по ТАЙМЗОНЕ ИГРОКА: раньше «до 08:00»
+// Награды за тренировки считаются ретроактивно из истории завершений.
+// «Стая» опирается на сохранённую дату первого подтверждённого вступления.
+// Границы дня — по ТАЙМЗОНЕ ИГРОКА: раньше «до 08:00»
 // означало 08:00 серверного времени (= 11:00 МСК), а «выходные» могли
 // сползать на будни.
 //
@@ -66,12 +67,19 @@ const WEEKEND_WARRIOR_DEF: StreakAchievementDef = {
   description: 'Тренировки в субботу и воскресенье одних выходных',
 };
 
+const TEAM_PACK_DEF: StreakAchievementDef = {
+  key: 'team_pack',
+  title: 'Стая',
+  description: 'Вступление в команду после подтверждения тренером',
+};
+
 /** Полный набор — для total в API и стабильного порядка в UI. */
 export const STREAK_ACHIEVEMENT_DEFS: StreakAchievementDef[] = [
   ...WORKOUT_COUNT_DEFS,
   ...STREAK_DEFS,
   EARLY_BIRD_DEF,
   WEEKEND_WARRIOR_DEF,
+  TEAM_PACK_DEF,
 ];
 
 /**
@@ -141,13 +149,14 @@ function booleanState(def: StreakAchievementDef, achieved: boolean): StreakAchie
 }
 
 /**
- * Расчёт поведенческих наград из истории завершённых тренировок.
+ * Расчёт поведенческих наград из истории тренировок и вступления в команду.
  * tz — таймзона игрока (User.timezone, фолбэк Europe/Moscow на вызывающей
  * стороне): от неё зависят и границы суток, и «до 08:00», и выходные.
  */
 export function computeStreakAchievements(
   workoutCompletedAts: Date[],
   tz?: string | null,
+  hasJoinedTeam = false,
 ): StreakAchievementState[] {
   const workouts = workoutCompletedAts.length;
   const bestStreak = maxStreakEver(workoutCompletedAts, tz);
@@ -161,5 +170,6 @@ export function computeStreakAchievements(
     ...STREAK_DEFS.map((def) => counterState(def, bestStreak)),
     booleanState(EARLY_BIRD_DEF, hasEarlyBird),
     booleanState(WEEKEND_WARRIOR_DEF, hasWeekendPair(dayIndexes)),
+    booleanState(TEAM_PACK_DEF, hasJoinedTeam),
   ];
 }
