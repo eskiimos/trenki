@@ -94,12 +94,16 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
   const segments = loaded?.detail.reference?.segments ?? [];
   const trackedSegmentAt = (ms: number) => videoTrackingEnabled ? segments.find((segment) => ms >= segment.startMs && ms < segment.endMs && segment.assessment?.enabled !== false) : undefined;
   const hasTrackedSegments = videoTrackingEnabled && segments.some((segment) => segment.assessment?.enabled !== false);
+  // Keep the camera preview through the unmarked opening of a tracked lesson.
+  const introEndMs = hasTrackedSegments ? (segments[0]?.startMs ?? 0) : 0;
+  const playingIntro = phase === 'running' && positionMs < introEndMs;
+  const currentSegment = trackedSegmentAt(positionMs);
   const readinessSettings = (ms: number) => {
     const segment = segments.find((segment) => segment.endMs > ms && segment.assessment?.enabled !== false)
       ?? segments.find((segment) => segment.assessment?.enabled !== false);
     return segment?.assessment ?? assessmentPreset();
   };
-  const trackingActive = hasTrackedSegments && (phase === 'preparing' || (phase !== 'finished' && !!trackedSegmentAt(positionMs)));
+  const trackingActive = hasTrackedSegments && (phase === 'preparing' || playingIntro || (phase !== 'finished' && !!currentSegment));
   const clearReadiness = useCallback(() => { const next = initialReadiness(); readinessRef.current = next; setReadiness(next); }, []);
 
   const changePhase = useCallback((next: Phase) => { phaseRef.current = next; setPhase(next); }, []);
@@ -136,8 +140,11 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
     facingMode: 'user',
     requireFacingMode: true,
     trackingEnabled: trackingActive,
-    visiblePoints: () => preparationRef.current?.fullBody
-      ? undefined : visibleAssessmentPoints(readinessSettings((trainerRef.current?.currentTime ?? 0) * 1000), sideMode),
+    visiblePoints: () => {
+      const ms = (trainerRef.current?.currentTime ?? 0) * 1000;
+      if (preparationRef.current?.fullBody || (phaseRef.current === 'running' && ms < introEndMs)) return undefined;
+      return visibleAssessmentPoints(readinessSettings(ms), sideMode);
+    },
     captureContext: () => ({ mediaMs: (trainerRef.current?.currentTime ?? 0) * 1000, rate: trainerRef.current?.playbackRate ?? 1,
       epoch: captureRevisionRef.current, running: phaseRef.current === 'running' && !bufferingRef.current }),
     highlights: () => highlightPoints(feedbackRef.current?.cameraJoints ?? []),
@@ -164,7 +171,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
       // before asynchronous Worker processing or a seek/pause can change it.
       const mediaMs = capture.mediaMs;
       const segment = trackedSegmentAt(mediaMs);
-      if (!segment) { clearTracking(); setLive(null); return; }
+      if (!segment) return;
       const frameIndex = frameIndexAt(loaded!.doc!.frames, mediaMs);
       const referenceFrame = loaded!.doc!.frames[frameIndex];
       const guard = evaluateTrainingGuard(guardRef.current, {
@@ -196,12 +203,17 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
       setSummary(summarizeAssessment(accumulatorRef.current));
     },
     onUnavailable: (reason) => {
-      if (phaseRef.current === 'preparing' && (reason === 'stale' || reason === 'restarting')) {
-        captureRevisionRef.current++;
-        const next = { ...initialReadiness(), message: 'Жду свежий кадр с камеры.' };
-        readinessRef.current = next;
-        setReadiness(next);
-        return;
+      if (reason === 'stale' || reason === 'restarting') {
+        if (phaseRef.current === 'preparing') {
+          captureRevisionRef.current++;
+          const next = { ...initialReadiness(), message: 'Жду свежий кадр с камеры.' };
+          readinessRef.current = next;
+          setReadiness(next);
+          return;
+        }
+        // Unscored playback can keep going. The first working frame will
+        // enter preparation and require fresh camera observations.
+        if (phaseRef.current === 'running' && !trackedBeforeRef.current) return;
       }
       if (phaseRef.current === 'finished') { pause(); stopCamera(); clearReadiness(); return; }
       const wasTraining = phaseRef.current === 'running' || phaseRef.current === 'paused' || phaseRef.current === 'preparing';
@@ -285,12 +297,13 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
     const preparation = preparationRef.current;
     const canCount = phase === 'preparing' && cameraStatus === 'ready' && videoStart !== 'starting' && !preparation?.briefing;
     observeAudio({ phase, playing: playing && !!video && !video.paused && !video.seeking && video.readyState >= 3,
+      playingIntro,
       countdown: canCount && !needsPlayTap && readiness.sinceMs !== null && !readiness.ready ? readiness.secondsLeft : null,
       preparingFullBody: preparation?.fullBody,
       readinessMessage: canCount ? (needsPlayTap && readiness.ready ? START_VIDEO_PROMPT : readiness.message) : null, buffering,
       interrupted: !!cameraError || !!message?.startsWith('Запуск прерван.'),
       status: live?.status, guidance: feedback?.cameraJoints.length ? feedback.message : null });
-  }, [observeAudio, hasTrackedSegments, phase, playing, videoStart, needsPlayTap, cameraStatus, readiness, buffering, live?.status, feedback, cameraError, message]);
+  }, [observeAudio, hasTrackedSegments, phase, playing, playingIntro, videoStart, needsPlayTap, cameraStatus, readiness, buffering, live?.status, feedback, cameraError, message]);
 
   useEffect(() => {
     const hide = () => {
@@ -366,7 +379,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
       if (phaseRef.current === 'running' && tracked && !trackedBeforeRef.current) {
         captureRevisionRef.current++;
         clearTracking(); clearReadiness();
-        if (cameraStatus !== 'ready') {
+        if (cameraStatus === 'off') {
           pause(); setMessage('Начинается упражнение с биомеханикой. Включите камеру и нажмите «Продолжить».');
         } else {
           preparationRef.current = {
@@ -505,7 +518,8 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
   const statusText = phase === 'finished' ? 'Тест завершён'
     : phase === 'paused' ? 'Пауза'
     : buffering && phase === 'running' ? 'Видео загружается — оценка на паузе'
-    : phase === 'running' && !trackedSegmentAt(positionMs) ? 'Теория или отдых — биомеханика и оценка отключены'
+    : playingIntro ? 'Вступление. Оценка начнётся на первом рабочем отрезке.'
+    : phase === 'running' && !currentSegment ? 'Теория или отдых — биомеханика и оценка отключены'
     : phase === 'running' ? feedback?.message || live?.message || 'Определяю положение тела…'
     : !hasTrackedSegments ? 'Просмотр без биомеханики: камера и оценка отключены'
     : cameraStatus === 'loading' ? 'Включаю камеру и загружаю распознавание…'
@@ -624,7 +638,7 @@ export default function LiveAssessment({ videoId }: { videoId: string }) {
           <Metric label="Покрытие оценки" value={summary.activeMs ? `${Math.round(summary.coverageRatio * 100)}%` : '—'} />
           <Metric label="Рабочее время" value={time(summary.activeMs)} />
           <Metric label="Достоверность данных" value={phase === 'finished' ? reliability.reliable ? 'Достаточно' : 'Недостаточно'
-            : phase === 'running' ? live?.status === 'scored' ? 'Достаточно' : live?.status === 'inactive' ? 'Отдых' : 'Недостаточно' : '—'} />
+            : phase === 'running' && currentSegment ? live?.status === 'scored' ? 'Достаточно' : live?.status === 'inactive' ? 'Отдых' : 'Недостаточно' : '—'} />
         </div>
       </div>
       {phase !== 'preparing' && <p role="status" style={{ fontSize: 14, fontWeight: 600, margin: '16px 0 0' }}>{statusText}</p>}

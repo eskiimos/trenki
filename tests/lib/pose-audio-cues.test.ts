@@ -38,6 +38,12 @@ describe('audible live assessment cues', () => {
     expect(nextAudioDecision(state, input({ phase: 'paused', playing: false }), 300).cue?.text).toBe('Пауза.');
     expect(nextAudioDecision(state, input(), 400).cue?.tone).toBe('start');
   });
+  it('announces the intro separately from the first scored exercise', () => {
+    const state = createAudioCueState();
+    expect(nextAudioDecision(state, input({ playingIntro: true }), 0).cue?.text).toContain('Началось вступление');
+    nextAudioDecision(state, input({ phase: 'preparing', playing: false }), 1000);
+    expect(nextAudioDecision(state, input(), 1400).cue?.text).toBe('Начинаем. Повторяйте за тренером.');
+  });
   it('distinguishes canceled preparation from camera interruption and announces finish once', () => {
     for (const interrupted of [false, true]) {
       const state = createAudioCueState(); nextAudioDecision(state, input({ phase: 'preparing' }), 0);
