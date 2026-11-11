@@ -202,12 +202,13 @@ export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highl
         let lastDetectionMs = -Infinity;
         let lastVideoTime = -1;
         let lastFreshFrameMs = performance.now();
-        let unavailable = false;
+        let unavailable: CameraUnavailable | null = null;
         let drawingSuspended = false;
         const notifyUnavailable = (reason: CameraUnavailable) => {
           clearDrawing();
-          if (!unavailable) callbacksRef.current.onUnavailable?.(reason);
-          unavailable = true;
+          if (unavailable === reason) return;
+          unavailable = reason;
+          callbacksRef.current.onUnavailable?.(reason);
         };
         const onVisibility = () => {
           if (document.hidden) notifyUnavailable('hidden');
@@ -238,7 +239,7 @@ export function usePoseCamera<T>({ onFrame, onUnavailable, captureContext, highl
               const timestampMs = Math.max(now, lastDetectionMs + 1);
               lastDetectionMs = timestampMs;
               lastVideoTime = video.currentTime;
-              unavailable = false;
+              unavailable = null;
               busy = true;
               const capture = callbacksRef.current.captureContext?.();
               const trackingRevision = trackingRevisionRef.current;

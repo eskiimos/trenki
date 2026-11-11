@@ -3,6 +3,7 @@ export const FULL_BODY_BRIEFING = 'Встаньте так, чтобы всё т
 export interface AudioSnapshot {
   phase: AudioPhase;
   playing: boolean;
+  playingIntro?: boolean;
   countdown: number | null;
   readinessMessage: string | null;
   preparingFullBody?: boolean;
@@ -42,7 +43,8 @@ export function nextAudioDecision(state: AudioCueState, input: AudioSnapshot, no
     state.phase = input.phase; state.condition = input.phase === 'preparing' ? readinessCondition : ''; state.countdown = null; state.sinceMs = nowMs;
     state.lastHintMs = nowMs; state.spoken = {};
     const text = input.phase === 'preparing' ? (input.preparingFullBody ? FULL_BODY_BRIEFING : 'Отойдите в кадр. Ждите отсчёта.')
-      : input.phase === 'running' ? input.buffering ? null : 'Начинаем. Повторяйте за тренером.'
+      : input.phase === 'running' ? input.buffering ? null : input.playingIntro
+        ? 'Началось вступление. Оценка начнётся с первого упражнения.' : 'Начинаем. Повторяйте за тренером.'
       : input.phase === 'paused' ? input.interrupted ? 'Пауза. Проверьте камеру и нажмите продолжить.' : 'Пауза.'
       : input.phase === 'finished' ? 'Тренировка завершена.'
       : before === 'preparing' ? input.interrupted ? 'Подготовка прервана. Проверьте камеру и снова нажмите подготовку.' : 'Подготовка отменена.' : null;
