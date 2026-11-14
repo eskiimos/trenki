@@ -28,6 +28,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 import { useTour } from '@/components/tour/TourProvider';
 import { Banner, Button } from '@/components/ui';
 import { Skeleton } from '@/components/Skeleton';
+import { workoutPath } from '@/lib/training/workout-navigation';
 
 /** localStorage, который может бросить уже на доступе (заблокированные данные сайта). */
 const safeLocalStorage = (): Storage | null => {
@@ -996,6 +997,17 @@ const TrainingsSection = () => {
     // упавшем запросе) сносил готовый план без подтверждения.
     const [cycleChecked, setCycleChecked] = useState(false);
     const { paywalled, freeLessonVideoId } = useSubscription();
+    const [activeQuickId, setActiveQuickId] = useState<string | null>(null);
+    useEffect(() => {
+        const controller = new AbortController();
+        fetch('/api/training/current?scope=quick', { cache: 'no-store', signal: controller.signal })
+            .then((res) => res.ok ? res.json() : null)
+            .then((data) => {
+                if (!controller.signal.aborted) setActiveQuickId(data?.workout?.id ?? null);
+            })
+            .catch(() => {});
+        return () => controller.abort();
+    }, []);
 
     // Одна ситуативная кнопка (п.10 «Середина сентября»): есть активные задания
     // (от тренера; позже и от родителя) — «Мои задания», иначе ИИ-тренер. Он
@@ -1190,18 +1202,19 @@ const TrainingsSection = () => {
         */}
 
         <div className="grid grid-cols-2 gap-2">
-            {/* Быстрая тренировка (ИИ) — при активном paywall ведёт в подписку */}
             <Link
-                href="/training/assessment"
+                href={activeQuickId && !tourActive ? workoutPath(activeQuickId) : '/training/assessment'}
                 data-tour="ai-trainer-card"
                 style={{textDecoration: 'none'}}
-                onClick={(e) => { if (paywalled) { e.preventDefault(); openSubscriptionModal('ai-workout'); } }}
+                onClick={(e) => { if (paywalled && (!activeQuickId || tourActive)) { e.preventDefault(); openSubscriptionModal('ai-workout'); } }}
             >
                 <div style={{position: 'relative', width: '100%', height: 100, paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12, background: 'rgba(68, 92, 255, 0.20)', overflow: 'hidden', borderRadius: 8, flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start', display: 'flex', cursor: 'pointer'}}>
-                    <Image src="/icons/icon-cards.svg" alt="Быстрая тренировка" width={24} height={24} />
-                    {paywalled && <Lock size={16} color="#F9F8FE" style={{ position: 'absolute', top: 8, right: 10 }} aria-hidden />}
+                    <Image src="/icons/icon-cards.svg" alt="" width={24} height={24} />
+                    {paywalled && (!activeQuickId || tourActive) && <Lock size={16} color="#F9F8FE" style={{ position: 'absolute', top: 8, right: 10 }} aria-hidden />}
                     <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50}}>
-                        <span style={{color: '#A1FF4A'}}>быстрая</span> тренировка
+                        {activeQuickId && !tourActive
+                            ? <><span style={{color: '#A1FF4A'}}>Продолжить</span> тренировку</>
+                            : <><span style={{color: '#A1FF4A'}}>быстрая</span> тренировка</>}
                     </div>
                 </div>
             </Link>
@@ -1218,6 +1231,12 @@ const TrainingsSection = () => {
                     <div style={{color: '#F9F8FE', fontSize: 14, fontFamily: 'Overpass', fontWeight: '700', textTransform: 'uppercase', lineHeight: '120%', letterSpacing: 0.50, wordWrap: 'break-word'}}>повышение потенциала</div>
                 </div>
             </Link>
+            {activeQuickId && !tourActive && (
+                <Link href="/training/assessment" className="col-span-2 flex min-h-11 items-center justify-center rounded-lg border border-white/15 px-3 py-2 text-sm font-bold"
+                    onClick={(e) => { if (paywalled) { e.preventDefault(); openSubscriptionModal('ai-workout'); } }}>
+                    Собрать новую тренировку
+                </Link>
+            )}
         </div>
 
         <MicrocyclePreparingOverlay open={generatingCycle} />

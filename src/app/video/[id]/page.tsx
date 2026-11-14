@@ -25,8 +25,11 @@ import { isVideoDownloaded, getOfflineVideo } from '@/lib/offlineVideos';
 import { useWorkoutRepeat } from '@/hooks/useWorkoutRepeat';
 import { evaluatePlaybackSeek, getPlaybackPermissions, rewindPlaybackTarget, type PlaybackMode, type PlaybackSeekDecision, type PlaybackSeekIntent } from '@/lib/training/playback-policy';
 import type { PlaybackRepeatSegment } from '@/lib/training/repeat-settings';
+import { readWorkoutCheckpoint } from '@/lib/training/workout-checkpoint';
+import { workoutPath } from '@/lib/training/workout-navigation';
 
 const NO_REPEAT_SEGMENTS: PlaybackRepeatSegment[] = [];
+const END_EPSILON_SEC = 0.5;
 const PLAYBACK_MODES = {
   view: {
     label: 'Просмотр',
@@ -131,6 +134,7 @@ export default function VideoPage({ params }: VideoPageProps) {
   const searchParams = useSearchParams();
   const fromWorkout = searchParams.get('fromWorkout') === 'true';
   const sessionId = searchParams.get('sessionId');
+  const workoutHref = workoutPath(sessionId, searchParams.get('from'));
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
@@ -194,7 +198,6 @@ export default function VideoPage({ params }: VideoPageProps) {
   // onEnded — основной путь (100%), а near-end порог — страховка для Android, где
   // onEnded в конце часто не приходит (ребуфер/уход в фон). Раньше стоял 90% → видео
   // обрывалось за ~10% до конца (баг «правой отпрыгали, а левая 5 секунд и вылетает»).
-  const END_EPSILON_SEC = 0.5;
   const repeatSegments = videoData?.repeatSegments ?? NO_REPEAT_SEGMENTS;
   const repeatEnabled = fromWorkout || watchMode === 'training';
   const hasWorkoutRepeats = repeatEnabled && repeatSegments.some(segment => segment.repeat?.enabled);
@@ -350,8 +353,12 @@ export default function VideoPage({ params }: VideoPageProps) {
   // (WorkoutSessionVideo.watchedDuration, приходит в ответе action:'start'), а не
   // localStorage: иначе свободный просмотр этого же ролика подарил бы «перемотку»
   // внутри тренировки и ложный зачёт потенциала.
-  const workoutResumeRef = useRef(0);
-  const workoutResumeReadyRef = useRef(false);
+  const [workoutStart, setWorkoutStart] = useState<{ key: string; playbackId: string; resumeAt: number } | null>(null);
+  const [workoutStartError, setWorkoutStartError] = useState<string | null>(null);
+  const [workoutStartAttempt, setWorkoutStartAttempt] = useState(0);
+  const waitingForWorkout = !!(fromWorkout && sessionId && workoutStart?.key !== playbackKey);
+  const positionSequenceRef = useRef(0);
+  const lastCheckpointRef = useRef<number | null>(null);
   
   // Отслеживание достижения 80% для начисления баллов (обычный просмотр)
   const gainsCreditedRef = useRef(false);
@@ -367,32 +374,14 @@ export default function VideoPage({ params }: VideoPageProps) {
     };
   }, [videoId, sessionId]);
 
-  // Ставит видео на сохранённую серверную позицию модуля. Вызывается и из
-  // onCanPlay, и из ответа start-POST (кто успеет позже) — латч resumeAppliedRef
-  // гарантирует однократность. Позицию у самого конца игнорируем: иначе вход в
-  // модуль сразу давал бы повторный зачёт.
-  const applyWorkoutResume = useCallback(() => {
-    if (!fromWorkout) return;
-    if (resumeAppliedRef.current) return;
-    if (!workoutResumeReadyRef.current) return;
-    const video = videoRef.current;
-    if (!video || !video.duration || isNaN(video.duration)) return;
-
-    resumeAppliedRef.current = true;
-    const at = workoutResumeRef.current;
-    if (at >= 5 && at < video.duration - END_EPSILON_SEC && video.currentTime < 5) {
-      restorePlaybackPosition(video, at);
-    }
-  }, [fromWorkout]);
-
   // Отмечаем начало видео в тренировке или записываем просмотр
   useEffect(() => {
-    // Сброс позиции продолжения — ЗДЕСЬ, до отправки start-POST: этот эффект
-    // владеет videoId, поэтому ответ POST-а (который заполнит рефы) не может
-    // прийти раньше сброса и быть затёртым.
-    workoutResumeRef.current = 0;
-    workoutResumeReadyRef.current = false;
+    if (!videoId) return;
+    const controller = new AbortController();
     resumeAppliedRef.current = false;
+    positionSequenceRef.current = 0;
+    lastCheckpointRef.current = null;
+    lastProgressUpdateRef.current = 0;
     stablePositionRef.current = 0;
     seekIntentRef.current = null;
     seekDecisionRef.current = null;
@@ -401,26 +390,33 @@ export default function VideoPage({ params }: VideoPageProps) {
     const notifyVideoStart = async () => {
       const atRevision = playbackRevisionRef.current;
       if (fromWorkout && sessionId && videoId) {
+        const checkpointKey = `trenki:workout-position:${playbackKey}`;
+        const pendingCheckpoint = readWorkoutCheckpoint(checkpointKey);
+        const timeout = window.setTimeout(() => controller.abort(), 15000);
         try {
           const res = await fetch('/api/training/update', {
             method: 'POST',
+            signal: controller.signal,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               sessionId,
               videoId,
               action: 'start',
+              trackPlayback: true,
+              pendingCheckpoint,
             }),
           });
-          // Сервер вернул, сколько уже просмотрено этого модуля — продолжаем с него.
-          const d = await res.json().catch(() => null);
-          if (atRevision !== playbackRevisionRef.current) return;
-          workoutResumeRef.current = typeof d?.resumeAt === 'number' ? d.resumeAt : 0;
-          workoutResumeReadyRef.current = true;
-          // Гонка: canplay мог случиться раньше ответа — тогда применяем позицию тут.
-          applyWorkoutResume();
+          const data = await res.json();
+          if (!res.ok || typeof data.playbackId !== 'string') throw new Error('Не удалось получить позицию');
+          if (controller.signal.aborted || atRevision !== playbackRevisionRef.current) return;
+          const resumeAt = typeof data.resumeAt === 'number' ? data.resumeAt : 0;
+          lastCheckpointRef.current = resumeAt;
+          setWorkoutStart({ key: playbackKey, playbackId: data.playbackId, resumeAt });
+          try { sessionStorage.removeItem(checkpointKey); } catch { /* storage unavailable */ }
         } catch (error) {
-          console.error('Ошибка отметки начала видео:', error);
-          if (atRevision === playbackRevisionRef.current) workoutResumeReadyRef.current = true;
+          if (atRevision === playbackRevisionRef.current) setWorkoutStartError('Не удалось загрузить прогресс тренировки.');
+        } finally {
+          window.clearTimeout(timeout);
         }
       } else if (!fromWorkout && videoId) {
         // Записываем обычный просмотр в историю (userId сервер берёт из сессии)
@@ -436,11 +432,74 @@ export default function VideoPage({ params }: VideoPageProps) {
       }
     };
 
-    if (videoId) {
-      notifyVideoStart();
-      videoCompletedRef.current = false; // Сброс флага при новом видео
-    }
-  }, [videoId, fromWorkout, sessionId]);
+    setWorkoutStartError(null);
+    void notifyVideoStart();
+    videoCompletedRef.current = false;
+    return () => controller.abort();
+  }, [videoId, fromWorkout, sessionId, playbackKey, workoutStartAttempt]);
+
+  const saveWorkoutPosition = useCallback((position: number, duration: number, keepalive = false) => {
+    if (!fromWorkout || !sessionId || !videoId || workoutStart?.key !== playbackKey
+      || !resumeAppliedRef.current || videoCompletedRef.current
+      || !Number.isFinite(position) || !Number.isFinite(duration) || duration <= 0
+      || position < 0 || position >= duration - END_EPSILON_SEC) return;
+    const watchedDuration = Math.floor(position);
+    if (lastCheckpointRef.current === watchedDuration) return;
+    lastCheckpointRef.current = watchedDuration;
+    lastProgressUpdateRef.current = Date.now();
+    const checkpoint = {
+      playbackId: workoutStart.playbackId,
+      positionSequence: ++positionSequenceRef.current,
+      watchedDuration,
+    };
+    const checkpointKey = `trenki:workout-position:${playbackKey}`;
+    const saved = JSON.stringify(checkpoint);
+    try { sessionStorage.setItem(checkpointKey, saved); } catch { /* storage unavailable */ }
+    const revision = playbackRevisionRef.current;
+    const retry = () => {
+      if (revision === playbackRevisionRef.current &&
+        positionSequenceRef.current === checkpoint.positionSequence && lastCheckpointRef.current === watchedDuration) {
+        lastCheckpointRef.current = null;
+      }
+    };
+    void fetch('/api/training/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, videoId, action: 'progress', ...checkpoint }),
+      keepalive,
+    }).then((response) => {
+      if (!response.ok) { retry(); return; }
+      try {
+        if (sessionStorage.getItem(checkpointKey) === saved) sessionStorage.removeItem(checkpointKey);
+      } catch { /* storage unavailable */ }
+    }).catch(retry);
+  }, [fromWorkout, sessionId, videoId, workoutStart, playbackKey]);
+
+  const flushWorkoutPosition = useCallback((video = videoRef.current) => {
+    if (video && !video.ended) saveWorkoutPosition(
+      video.seeking ? stablePositionRef.current : video.currentTime, video.duration, true,
+    );
+  }, [saveWorkoutPosition]);
+
+  const workoutVideoRef = useCallback((video: HTMLVideoElement | null) => {
+    videoRef.current = video;
+    if (video && workoutStart?.key === playbackKey) return () => {
+      flushWorkoutPosition(video);
+      if (videoRef.current === video) videoRef.current = null;
+    };
+  }, [flushWorkoutPosition, playbackKey, workoutStart]);
+
+  useEffect(() => {
+    if (!fromWorkout || !sessionId) return;
+    const flush = () => flushWorkoutPosition();
+    const onVisibility = () => { if (document.hidden) flush(); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [fromWorkout, sessionId, flushWorkoutPosition]);
 
   const repeatPlayback = useWorkoutRepeat({
     videoRef,
@@ -451,32 +510,14 @@ export default function VideoPage({ params }: VideoPageProps) {
   });
 
   // Отслеживание прогресса просмотра видео
-  const handleVideoProgress = useCallback(async (currentTime: number, duration: number) => {
+  const handleVideoProgress = useCallback((currentTime: number, duration: number) => {
     if (!duration) return;
     const atRevision = playbackRevisionRef.current;
 
     // Для тренировки — прогресс каждые 5с + завершение по РЕАЛЬНОМУ концу.
     if (fromWorkout && sessionId && videoId) {
-      // Отправляем обновление прогресса каждые 5 секунд
-      const now = Date.now();
-      if (now - lastProgressUpdateRef.current > 5000) {
-        lastProgressUpdateRef.current = now;
-        
-        try {
-          await fetch('/api/training/update', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sessionId,
-              videoId,
-              action: 'progress',
-              watchedDuration: Math.floor(currentTime),
-            }),
-          });
-        } catch (error) {
-          console.error('Ошибка обновления прогресса:', error);
-        }
-      }
+      if (!resumeAppliedRef.current) return;
+      if (Date.now() - lastProgressUpdateRef.current > 5000) saveWorkoutPosition(currentTime, duration);
 
       // Завершаем/засчитываем ТОЛЬКО когда ролик доигран до конца (зачёт на 100%).
       // onEnded (handleVideoEnded) — основной путь; этот near-end тик — страховка
@@ -495,7 +536,7 @@ export default function VideoPage({ params }: VideoPageProps) {
       const antiCheatOk = isAdminCheat || (watchMode === 'training' && !seekedInPlaythroughRef.current);
       if (!hasWorkoutRepeats && antiCheatOk && currentTime >= duration - END_EPSILON_SEC) repeatPlayback.finishNearEnd();
     }
-  }, [fromWorkout, sessionId, videoId, watchMode, isAdminCheat, hasWorkoutRepeats, repeatPlayback.finishNearEnd]);
+  }, [fromWorkout, sessionId, videoId, watchMode, isAdminCheat, hasWorkoutRepeats, repeatPlayback.finishNearEnd, saveWorkoutPosition]);
 
   // Завершение видео в тренировке. Возвращает true только при успехе —
   // вызывающий код по false снимает videoCompletedRef и повторяет (onEnded/тик).
@@ -523,7 +564,7 @@ export default function VideoPage({ params }: VideoPageProps) {
         if (atRevision !== playbackRevisionRef.current) return true;
         // Возвращаем на страницу тренировки
         completionNavigationRef.current = setTimeout(() => {
-          if (atRevision === playbackRevisionRef.current) router.push(`/training/workout?id=${sessionId}`);
+          if (atRevision === playbackRevisionRef.current) router.replace(workoutHref);
         }, 1000); // Небольшая задержка для плавности
         return true;
       }
@@ -605,10 +646,6 @@ export default function VideoPage({ params }: VideoPageProps) {
     gainsCreditedRef.current = false;
     resumeAppliedRef.current = false; // O-3: для нового видео заново применим resume
     lastPosSaveRef.current = 0;
-    // ВНИМАНИЕ: workoutResumeRef/ReadyRef здесь НЕ сбрасываем. Этот эффект висит
-    // на videoData, а ответ start-POST может прийти раньше — сброс затирал бы уже
-    // полученную позицию, и продолжение с места обрыва терялось. Их сбрасывает
-    // эффект, владеющий videoId (там же, где шлётся start-POST).
     seekedInPlaythroughRef.current = false;
     stablePositionRef.current = 0;
     resumeAfterSeekRef.current = true;
@@ -968,12 +1005,13 @@ export default function VideoPage({ params }: VideoPageProps) {
 
   const togglePlay = () => {
     if (videoRef.current) {
+      if (fromWorkout && sessionId && !resumeAppliedRef.current) return;
       if (isPlaying) {
         resumeAfterSeekRef.current = false;
         videoRef.current.pause();
       } else {
         resumeAfterSeekRef.current = true;
-        videoRef.current.play();
+        void videoRef.current.play().catch(() => setIsPlaying(false));
 
         // Подсказка «поверни телефон» — один раз НА УСТРОЙСТВО (localStorage),
         // а не при каждом запуске видео. Фолбэк при недоступном Fullscreen API
@@ -1436,10 +1474,8 @@ export default function VideoPage({ params }: VideoPageProps) {
           <button
             onClick={() => {
               if (fromWorkout) {
-                // ОБЯЗАТЕЛЬНО с ?id: плеер без id берёт «самую свежую висящую»
-                // сессию, а у активного цикла их 5 — возврат приводил к ДРУГОЙ
-                // тренировке с другой целью и модулями (баг «назад → рандомная»).
-                router.push(sessionId ? `/training/workout?id=${sessionId}` : '/training/workout');
+                flushWorkoutPosition();
+                router.replace(workoutHref);
               } else {
                 router.back();
               }
@@ -1511,7 +1547,15 @@ export default function VideoPage({ params }: VideoPageProps) {
             // контролы «мигали» на каждое касание. Гейтим по pointerType.
             onPointerMove={(e) => { if (e.pointerType === 'mouse') handleVideoInteraction(); }}
           >
-          {isLoading || isKinescopeLoading ? (
+          {waitingForWorkout && workoutStartError ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 bg-black px-4 text-center" role="status">
+              <p>{workoutStartError}</p>
+              <button className="min-h-11 rounded-full bg-brand px-4 font-bold text-night"
+                onClick={() => { setWorkoutStartError(null); setWorkoutStartAttempt(attempt => attempt + 1); }}>
+                Повторить загрузку
+              </button>
+            </div>
+          ) : isLoading || isKinescopeLoading || waitingForWorkout ? (
             // Пока резолвится URL — показываем превью видео, чтобы пользователь
             // сразу видел кадр, а не чёрный экран. Spinner ненавязчивый,
             // в углу — основное место под poster.
@@ -1527,7 +1571,7 @@ export default function VideoPage({ params }: VideoPageProps) {
               )}
               {/* Лёгкое затемнение, чтобы spinner был виден на светлом превью */}
               <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/10 to-black/30 pointer-events-none" />
-              <div className="absolute bottom-4 right-4">
+              <div className="absolute bottom-4 right-4" role="status" aria-label={waitingForWorkout ? 'Загружаю прогресс тренировки' : 'Загружаю видео'}>
                 <Loader2 size={32} className="animate-spin text-white/80" />
               </div>
             </div>
@@ -1536,11 +1580,11 @@ export default function VideoPage({ params }: VideoPageProps) {
             <>
               <video
                 key={playbackKey}
-                ref={videoRef}
+                ref={workoutVideoRef}
                 className={`w-full h-full ${isLandscape ? 'object-contain' : 'object-cover'}`}
                 src={kinescopeDirectUrl || videoData?.videoUrl || '/video/trenka.mp4'}
                 poster={videoData?.thumbnail}
-                autoPlay
+                autoPlay={!fromWorkout || !sessionId}
                 muted={isMuted}
                 playsInline
                 webkit-playsinline="true"
@@ -1548,7 +1592,13 @@ export default function VideoPage({ params }: VideoPageProps) {
                 controlsList="nodownload"
                 preload="auto"
                 onPlay={() => { resumeAfterSeekRef.current = true; setIsPlaying(true); repeatPlayback.onPlay(); }}
-                onPause={() => { if (!videoRef.current?.paused) return; if (!videoRef.current.ended) resumeAfterSeekRef.current = false; cancelBufferingSoon(); setIsPlaying(false); setIsBuffering(false); repeatPlayback.onPause(); }}
+                onPause={(event) => {
+                  const video = event.currentTarget;
+                  if (!video.paused) return;
+                  flushWorkoutPosition(video);
+                  if (!video.ended) resumeAfterSeekRef.current = false;
+                  cancelBufferingSoon(); setIsPlaying(false); setIsBuffering(false); repeatPlayback.onPause();
+                }}
                 onError={() => { cancelBufferingSoon(); setIsBuffering(false); }}
                 onSeeking={(e) => {
                   const video = e.currentTarget;
@@ -1649,10 +1699,14 @@ export default function VideoPage({ params }: VideoPageProps) {
                     }
                   }
 
-                  // В тренировке позицию берём с сервера (watchedDuration). Если
-                  // ответ start-POST ещё не пришёл — применит он сам, когда придёт.
-                  if (fromWorkout) {
-                    applyWorkoutResume();
+                  if (fromWorkout && sessionId && !resumeAppliedRef.current) {
+                    if (!Number.isFinite(video.duration) || video.duration <= 0 || workoutStart?.key !== playbackKey) return;
+                    // Do not play or write progress before restoring the server checkpoint.
+                    resumeAppliedRef.current = true;
+                    const at = workoutStart.resumeAt;
+                    if (at >= 1 && at < video.duration - END_EPSILON_SEC) {
+                      restorePlaybackPosition(video, at);
+                    }
                   }
 
                   // Пытаемся начать воспроизведение когда видео готово.
@@ -2290,7 +2344,7 @@ export default function VideoPage({ params }: VideoPageProps) {
       </div>
 
       {/* Скрываем BottomNavigation в горизонтальном режиме */}
-      {!isLandscape && <BottomNavigation activeTab="video" />}
+      {!isLandscape && <BottomNavigation activeTab="video" onNavigate={() => flushWorkoutPosition()} />}
 
       {/* Модалка прироста характеристик */}
       {showGainsModal && characteristicsGains && newCharacteristics && (

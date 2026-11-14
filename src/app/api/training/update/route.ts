@@ -1,7 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { WorkoutStatus } from '@/generated/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
+import { isWorkoutCheckpoint } from '@/lib/training/workout-checkpoint';
 
 /**
  * POST /api/training/update
@@ -34,39 +36,49 @@ export async function POST(request: NextRequest) {
 
     // Начать видео
     if (action === 'start' && videoId) {
-      const session = await prisma.workoutSession.findUnique({
-        where: { id: sessionId },
-      });
-
-      if (session && session.status === WorkoutStatus.PENDING) {
-        await prisma.workoutSession.update({
-          where: { id: sessionId },
-          data: {
-            status: WorkoutStatus.IN_PROGRESS,
-            startedAt: new Date(),
-          },
+      const playbackId = body.trackPlayback === true ? randomUUID() : null;
+      const startedAt = new Date();
+      const row = await prisma.$transaction(async (tx) => {
+        // A previous page may have left before its keepalive request arrived.
+        const pending = body.pendingCheckpoint;
+        if (playbackId && isWorkoutCheckpoint(pending)) {
+          await tx.workoutSessionVideo.updateMany({
+            where: {
+              sessionId, videoId, completed: false, skipped: false,
+              playbackId: pending.playbackId, positionSequence: { lt: pending.positionSequence },
+              session: { status: { in: [WorkoutStatus.PENDING, WorkoutStatus.IN_PROGRESS] } },
+            },
+            data: { watchedDuration: pending.watchedDuration, positionSequence: pending.positionSequence },
+          });
+        }
+        const module = await tx.workoutSessionVideo.updateMany({
+          where: { sessionId, videoId },
+          data: { startedAt, ...(playbackId ? { playbackId, positionSequence: 0 } : {}) },
         });
-      }
-
-      // Отмечаем начало видео
-      await prisma.workoutSessionVideo.updateMany({
-        where: { sessionId, videoId },
-        data: { startedAt: new Date() },
+        if (!module.count) return null;
+        const started = await tx.workoutSession.updateMany({
+          where: { id: sessionId, status: WorkoutStatus.PENDING },
+          data: { status: WorkoutStatus.IN_PROGRESS, startedAt },
+        });
+        if (!started.count && playbackId) {
+          await tx.workoutSession.updateMany({
+            where: { id: sessionId, status: WorkoutStatus.IN_PROGRESS },
+            data: { updatedAt: startedAt },
+          });
+        }
+        return tx.workoutSessionVideo.findUnique({
+          where: { sessionId_videoId: { sessionId, videoId } },
+          select: { watchedDuration: true, completed: true, skipped: true },
+        });
       });
-
-      // Позиция для продолжения с места обрыва: прогресс пишется сюда каждые 5с
-      // (action:'progress'). Завершённый модуль отдаёт 0 — иначе повторный вход
-      // сразу прыгал бы в конец и давал ложный зачёт.
-      const row = await prisma.workoutSessionVideo.findUnique({
-        where: { sessionId_videoId: { sessionId, videoId } },
-        select: { watchedDuration: true, completed: true },
-      });
-      const resumeAt = row && !row.completed ? row.watchedDuration ?? 0 : 0;
+      if (!row) return NextResponse.json({ error: 'Модуль не найден' }, { status: 404 });
+      const resumeAt = !row.completed && !row.skipped ? row.watchedDuration ?? 0 : 0;
 
       return NextResponse.json({
         success: true,
         message: 'Видео начато',
         resumeAt,
+        ...(playbackId ? { playbackId } : {}),
       });
     }
 
@@ -215,9 +227,21 @@ export async function POST(request: NextRequest) {
 
     // Обновить прогресс просмотра (для отслеживания во время просмотра)
     if (action === 'progress' && videoId && watchedDuration !== undefined) {
+      const { playbackId, positionSequence } = body;
+      const ordered = isWorkoutCheckpoint(body);
+      if (!Number.isSafeInteger(watchedDuration) || watchedDuration < 0 || watchedDuration > 2147483647
+        || ((playbackId !== undefined || positionSequence !== undefined) && !ordered)) {
+        return NextResponse.json({ error: 'Некорректная позиция видео' }, { status: 400 });
+      }
       await prisma.workoutSessionVideo.updateMany({
-        where: { sessionId, videoId },
-        data: { watchedDuration },
+        where: {
+          sessionId, videoId, completed: false, skipped: false,
+          session: { status: { in: [WorkoutStatus.PENDING, WorkoutStatus.IN_PROGRESS] } },
+          ...(ordered
+            ? { playbackId, positionSequence: { lt: positionSequence } }
+            : { playbackId: null, OR: [{ watchedDuration: null }, { watchedDuration: { lt: watchedDuration } }] }),
+        },
+        data: { watchedDuration, ...(ordered ? { positionSequence } : {}) },
       });
 
       return NextResponse.json({

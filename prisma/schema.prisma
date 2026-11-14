@@ -607,6 +607,8 @@ model WorkoutSessionVideo {
   startedAt       DateTime?
   completedAt     DateTime?
   watchedDuration Int?
+  playbackId      String?
+  positionSequence Int           @default(0)
   actualRPE       Int?
   session         WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   video           Video          @relation(fields: [videoId], references: [id])

@@ -6,9 +6,10 @@ import Image from 'next/image';
 
 interface BottomNavigationProps {
   activeTab?: 'home' | 'video' | 'shorts' | 'hockey' | 'calendar' | 'profile';
+  onNavigate?: React.ComponentProps<typeof Link>['onNavigate'];
 }
 
-const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' }) => {
+const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home', onNavigate }) => {
   return (
     <nav
       data-tour="bottom-nav"
@@ -16,7 +17,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' 
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)', paddingTop: 12 }}
     >
       <div className="flex justify-between items-center max-w-md mx-auto">
-        <Link href="/" className="flex items-center justify-center p-2">
+        <Link href="/" onNavigate={onNavigate} className="flex items-center justify-center p-2">
           <Image
             src={activeTab === 'home'
               ? '/icons/tapbar/new_active/Type_home.svg'
@@ -27,7 +28,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' 
           />
         </Link>
 
-        <Link href="/shorts-catalog" className="flex items-center justify-center p-2">
+        <Link href="/shorts-catalog" onNavigate={onNavigate} className="flex items-center justify-center p-2">
           <Image
             src={activeTab === 'shorts'
               ? '/icons/tapbar/new_active/Type_play.svg'
@@ -38,7 +39,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' 
           />
         </Link>
 
-        <Link href="/video" className="flex items-center justify-center p-2">
+        <Link href="/video" onNavigate={onNavigate} className="flex items-center justify-center p-2">
           <Image
             src={activeTab === 'video'
               ? '/icons/tapbar/new_active/Type_hockey.svg'
@@ -49,7 +50,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' 
           />
         </Link>
 
-        <Link href="/calendar" className="flex items-center justify-center p-2">
+        <Link href="/calendar" onNavigate={onNavigate} className="flex items-center justify-center p-2">
           <Image
             src={activeTab === 'calendar'
               ? '/icons/tapbar/new_active/Type_calendar.svg'
@@ -60,7 +61,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ activeTab = 'home' 
           />
         </Link>
 
-        <Link href="/profile" className="flex items-center justify-center p-2">
+        <Link href="/profile" onNavigate={onNavigate} className="flex items-center justify-center p-2">
           <Image
             src={activeTab === 'profile'
               ? '/icons/tapbar/new_active/Type_hockey-mask.svg'

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { workoutPath } from '@/lib/training/workout-navigation';
 import { GoalIcon } from '@/components/training/icons';
 import { goalLabel, relationWords, taskDisplayState } from '@/lib/parent-tasks';
 import { plural } from '@/lib/plural';
@@ -75,7 +76,7 @@ export default function MyAssignmentsPage() {
     });
     if (a.workoutSessionId) {
       // Полноценное 4-модульное задание — открываем сессию в стандартном плеере тренировки
-      router.push(`/training/workout?id=${a.workoutSessionId}`);
+      router.push(workoutPath(a.workoutSessionId, 'assignments'));
     } else if (a.video) {
       router.push(`/video/${a.video.id}`);
     }
