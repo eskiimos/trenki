@@ -22,7 +22,6 @@ import {
   LogOut,
   Megaphone,
   MessageCircle,
-  RefreshCw,
   Shield,
   Users,
 } from 'lucide-react';
@@ -75,14 +74,8 @@ export default function ProfileSettingsPage() {
     unsubscribe,
   } = usePushNotifications();
 
-  // Профиль нужен ровно ради двух полей: авто-генерации и роли (для
-  // переключателя аккаунтов). Источник истины — сессионная cookie, поэтому
-  // никаких telegramId в запросе.
-  const [profileLoaded, setProfileLoaded] = useState(false);
-  const [autoGenerate, setAutoGenerate] = useState(false);
-  const [hasProfile, setHasProfile] = useState(false);
+  // Роль нужна для переключателя аккаунтов. Источник истины — сессионная cookie.
   const [role, setRole] = useState<string | null>(null);
-  const [autoGenError, setAutoGenError] = useState<string | null>(null);
 
   const [isAdmin, setIsAdmin] = useState(false);
   // Членство берём из атлетского /api/teams/my: /api/teams — тренерский
@@ -109,14 +102,9 @@ export default function ProfileSettingsPage() {
         if (cancelled) return;
         if (d?.user) {
           setRole(d.user.role ?? null);
-          setHasProfile(!!d.user.profile);
-          setAutoGenerate(!!d.user.profile?.autoGenerateMicrocycle);
         }
-        setProfileLoaded(true);
       })
-      .catch(() => {
-        if (!cancelled) setProfileLoaded(true);
-      });
+      .catch(() => {});
 
     fetch('/api/user/is-admin')
       .then((r) => (r.ok ? r.json() : null))
@@ -143,22 +131,6 @@ export default function ProfileSettingsPage() {
       cancelled = true;
     };
   }, []);
-
-  const toggleAutoGenerate = async (next: boolean) => {
-    setAutoGenError(null);
-    setAutoGenerate(next); // оптимистично, при ошибке откатываем
-    try {
-      const res = await fetch('/api/profile/microcycle-preferences', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ autoGenerate: next }),
-      });
-      if (!res.ok) throw new Error();
-    } catch {
-      setAutoGenerate(!next);
-      setAutoGenError('Не удалось сохранить. Проверь связь и попробуй ещё раз.');
-    }
-  };
 
   // Работает и для отмены заявки: leave делает deleteMany по членству,
   // независимо от статуса (ACTIVE или PENDING).
@@ -199,40 +171,16 @@ export default function ProfileSettingsPage() {
 
       <div className="px-4 max-w-3xl md:mx-auto md:px-8">
         {/* ─── Тренировки ─── */}
-        {(hasProfile || isSupported || !profileLoaded) && (
-          <SettingsGroup
-            title="Тренировки"
-            hint={autoGenError ?? undefined}
-            hintTone="danger"
-          >
-            {!profileLoaded ? (
-              <div className="py-4 flex items-center gap-3" aria-hidden>
-                <span className="h-5 w-5 rounded bg-white/10 animate-pulse shrink-0" />
-                <span className="h-4 flex-1 rounded bg-white/10 animate-pulse" />
-                <span className="h-6 w-11 rounded-full bg-white/10 animate-pulse shrink-0" />
-              </div>
-            ) : (
-              hasProfile && (
-                <ToggleRow
-                  icon={RefreshCw}
-                  label="Авто-генерация цикла"
-                  hint="Новый недельный цикл собирается сам, без твоего участия"
-                  checked={autoGenerate}
-                  onChange={toggleAutoGenerate}
-                />
-              )
-            )}
-
-            {isSupported && (
-              <ToggleRow
-                icon={Bell}
-                label={pushLoading ? 'Загрузка…' : 'Push-уведомления'}
-                hint="Напоминания о тренировке и о том, что серия вот-вот сгорит"
-                checked={isSubscribed}
-                disabled={pushLoading}
-                onChange={(next) => (next ? subscribe() : unsubscribe())}
-              />
-            )}
+        {isSupported && (
+          <SettingsGroup title="Тренировки">
+            <ToggleRow
+              icon={Bell}
+              label={pushLoading ? 'Загрузка…' : 'Push-уведомления'}
+              hint="Напоминания о тренировке и о том, что серия вот-вот сгорит"
+              checked={isSubscribed}
+              disabled={pushLoading}
+              onChange={(next) => (next ? subscribe() : unsubscribe())}
+            />
           </SettingsGroup>
         )}
         {pushError && (

@@ -30,6 +30,7 @@ import { getMicrocycleStartDate, getMicrocycleDayDate } from '@/lib/microcycle/w
 import { isReminderDueForDay } from '@/lib/microcycle/reminders';
 import { parsePrevDay, labelFor } from '@/lib/microcycle/week-plan';
 import { MicrocycleStatus } from '@/generated/prisma';
+import { ELIGIBLE_MICROCYCLE_WHERE } from '@/lib/microcycle/eligibility';
 import { getReminderSettings } from '@/lib/settings';
 import { buildDailyReminder } from '@/lib/notifications/reminder-texts';
 import { pushTag } from '@/lib/notifications/push-tag';
@@ -75,6 +76,7 @@ export async function GET(request: NextRequest) {
     where: {
       status: MicrocycleStatus.ACTIVE,
       weekStartDate: { gte: rangeStart, lte: rangeEnd },
+      AND: ELIGIBLE_MICROCYCLE_WHERE,
     },
     include: {
       user: { select: { id: true, firstName: true, timezone: true, lastReminderOn: true } },

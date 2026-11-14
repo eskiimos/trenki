@@ -2,10 +2,27 @@
 
 import { useEffect, useState } from 'react';
 
-export default function AppLoader() {
+// A page can keep its data-dependent content mounted behind this screen until
+// its initial requests settle. The animation duration is only a minimum; it
+// must not reveal a partially loaded page on a slow connection.
+export default function AppLoader({ ready = true }: { ready?: boolean }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isActive, setIsActive] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
+  const [minimumElapsed, setMinimumElapsed] = useState(false);
+  const [fontsReady, setFontsReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    // next/font preloads the local font. Wait for its metrics before revealing
+    // text; a failed font load also settles FontFaceSet.ready.
+    Promise.resolve(document.fonts?.ready).then(() => {
+      if (!cancelled) setFontsReady(true);
+    }, () => {
+      if (!cancelled) setFontsReady(true);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     // Запускаем анимацию через небольшую задержку
@@ -13,22 +30,25 @@ export default function AppLoader() {
       setIsActive(true);
     }, 100);
 
-    // Начинаем fade-out через 1.2 секунды
-    const fadeTimer = setTimeout(() => {
-      setIsFadingOut(true);
+    const minimumTimer = setTimeout(() => {
+      setMinimumElapsed(true);
     }, 1200);
-
-    // Полностью скрываем через 1.7 секунды
-    const hideTimer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1700);
 
     return () => {
       clearTimeout(activateTimer);
-      clearTimeout(fadeTimer);
-      clearTimeout(hideTimer);
+      clearTimeout(minimumTimer);
     };
   }, []);
+
+  useEffect(() => {
+    if (!ready || !minimumElapsed || !fontsReady) return;
+    const frame = requestAnimationFrame(() => setIsFadingOut(true));
+    const hideTimer = setTimeout(() => setIsLoading(false), 500);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(hideTimer);
+    };
+  }, [ready, minimumElapsed, fontsReady]);
 
   if (!isLoading) return null;
 
@@ -49,6 +69,8 @@ export default function AppLoader() {
       }} />
       
       <div 
+        role="status"
+        aria-label="Загружаем страницу"
         className={`fixed inset-0 z-[9999] flex items-center justify-center bg-[#101530] transition-opacity duration-500 ${
           isFadingOut ? 'opacity-0' : 'opacity-100'
         }`}

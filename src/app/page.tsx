@@ -7,8 +7,9 @@ import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTelegram } from '../hooks/useTelegram';
-import { apiCache } from '../lib/cache';
-import { getTelegramId } from '@/lib/auth';
+import { getAuth, saveAuth, type AuthData } from '@/lib/auth';
+import { fetchHomeData } from '@/lib/home-data';
+import HomePreloadBoundary, { useHomeSectionReady } from '@/components/HomePreloadBoundary';
 import BottomNavigation from '@/components/BottomNavigation';
 import AddToHomeScreen from '@/components/AddToHomeScreen';
 import WorkoutReminder from '@/components/WorkoutReminder';
@@ -46,9 +47,12 @@ const safeLocalStorage = (): Storage | null => {
 const GuideBanner = ({ onGuideChange }: { onGuideChange: () => void }) => {
   const { startTour, isActive } = useTour();
   const [show, setShow] = useState(false);
+  const [ready, setReady] = useState(false);
+  useHomeSectionReady('guide', ready);
   useEffect(() => {
     const flags = readGuideFlags(safeLocalStorage());
     if (!flags.tourCompleted && !flags.guideDismissed) setShow(true);
+    setReady(true);
   }, []);
   // Во время тура (в т.ч. восстановленного после рефреша) плашка не нужна
   if (!show || isActive) return null;
@@ -122,6 +126,9 @@ const HomePage = () => {
     { id: string; cycleNumber: number; completedCount: number } | null
   >(null);
   const [feedbackModalDismissed, setFeedbackModalDismissed] = useState(false);
+  const [cycleStatus, setCycleStatus] = useState<{ active: boolean; checked: boolean } | null>(null);
+  const [cycleFailed, setCycleFailed] = useState(false);
+  useHomeSectionReady('cycle', cycleStatus !== null, cycleFailed);
 
   // Не при первом заходе (п.3 «Середина сентября»): чек-ин, баннер пушей и
   // «На экран Домой» ждут, пока новичок разберётся с гидом. Правило целиком —
@@ -138,19 +145,25 @@ const HomePage = () => {
   // newcomer приходит в ответе /api/users/me — его и так ждёт проверка
   // авторизации ниже, отдельного запроса на каждый заход нет.
   const showHomeExtras = canShowHomeExtras({ tourActive, flags: guideFlags, newcomer });
+  const policyReady = guideFlags !== null && newcomer !== null;
+  const { loading: subscriptionLoading, failed: subscriptionFailed } = useSubscription();
+  useHomeSectionReady('auth', !isCheckingAuth);
+  useHomeSectionReady('policy', policyReady);
+  useHomeSectionReady('subscription', !subscriptionLoading, subscriptionFailed);
+  useHomeSectionReady('checkin', policyReady && !showHomeExtras);
+  useHomeSectionReady('push', policyReady && !showHomeExtras);
 
   // Инициализируем Telegram WebApp
   useTelegram();
 
   // Проверка наличия активного цикла, ждущего фидбэк
   useEffect(() => {
-    if (isCheckingAuth) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/microcycle/current', { cache: 'no-store' });
-        if (!res.ok || cancelled) return;
-        const data = await res.json();
+        const data = await fetchHomeData('/api/microcycle/current', { cache: 'no-store' });
+        if (cancelled) return;
+        setCycleStatus({ active: data?.microcycle?.effectiveStatus === 'ACTIVE', checked: true });
         if (data?.microcycle?.awaitingFeedback) {
           setPendingFeedbackCycle({
             id: data.microcycle.id,
@@ -159,11 +172,14 @@ const HomePage = () => {
           });
         }
       } catch {
-        // тихо игнорируем — модалка не критична
+        if (!cancelled) {
+          setCycleStatus({ active: false, checked: false });
+          setCycleFailed(true);
+        }
       }
     })();
     return () => { cancelled = true; };
-  }, [isCheckingAuth]);
+  }, []);
 
   // Синхронизируем таймзону устройства (Intl) — для напоминаний в локальное
   // время. Шлём только при изменении (кэш в localStorage), после авторизации.
@@ -202,8 +218,10 @@ const HomePage = () => {
       let isNewcomerUser = false;
       // Источник истины — серверная сессия. localStorage может быть устаревшим:
       // полагаясь на него мы попадали в loop /login ↔ /.
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8_000);
       try {
-        const res = await fetch('/api/users/me', { cache: 'no-store', credentials: 'include' });
+        const res = await fetch('/api/users/me', { cache: 'no-store', credentials: 'include', signal: controller.signal });
         if (res.status === 401) {
           // на всякий случай чистим устаревший кеш, чтобы LoginPage не дёргался
           try { localStorage.removeItem('trenki_auth'); } catch {}
@@ -224,6 +242,8 @@ const HomePage = () => {
         }
       } catch {
         // сетевая ошибка — пробуем показать страницу, чтобы не блокировать UI
+      } finally {
+        clearTimeout(timer);
       }
       setNewcomer(isNewcomerUser);
       setIsCheckingAuth(false);
@@ -232,15 +252,6 @@ const HomePage = () => {
     checkAuth();
   }, [router]);
 
-  // Показываем загрузку во время проверки авторизации
-  if (isCheckingAuth) {
-    return (
-      <div className="min-h-screen bg-[#060919] flex items-center justify-center">
-        <div className="text-white text-xl">Загрузка...</div>
-      </div>
-    );
-  }
-  
   return (
     <div className="bg-[#060919] min-h-screen text-white pb-nav">
       <Header />
@@ -279,7 +290,7 @@ const HomePage = () => {
         <ScheduledWorkoutSection />
 
         {/* Каталог тренировок */}
-        <TrainingsSection />
+        <TrainingsSection cycleStatus={cycleStatus} />
 
         {/* Список тренеров */}
         <TrainersSection />
@@ -313,25 +324,15 @@ const ScheduledWorkoutSection = () => {
   const router = useRouter();
   const [nextWorkout, setNextWorkout] = useState<any | null>(null);
   const [timeLeftMs, setTimeLeftMs] = useState<number | null>(null);
+  const [scheduleReady, setScheduleReady] = useState(false);
+  useHomeSectionReady('schedule', scheduleReady && (!nextWorkout || timeLeftMs !== null));
 
   useEffect(() => {
     let isMounted = true;
 
     const fetchNextWorkout = async () => {
       try {
-        const telegramId = getTelegramId();
-
-        if (!telegramId) return;
-
-        const response = await fetch('/api/schedule', {
-          headers: {
-            'x-telegram-id': telegramId,
-          },
-        });
-
-        if (!response.ok) return;
-
-        const data = await response.json();
+        const data = await fetchHomeData('/api/schedule');
         const now = Date.now();
         const oneHourFromNow = now + 60 * 60 * 1000;
         const upcoming = (data || [])
@@ -351,6 +352,8 @@ const ScheduledWorkoutSection = () => {
         }
       } catch (error) {
         console.error('Ошибка загрузки расписания:', error);
+      } finally {
+        if (isMounted) setScheduleReady(true);
       }
     };
 
@@ -426,182 +429,43 @@ const Header = () => {
   const { user } = useTelegram();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [authData, setAuthData] = useState<any>(null);
-
-  // Загружаем данные авторизации из localStorage
-  useEffect(() => {
-    const { getAuth } = require('@/lib/auth');
-    const auth = getAuth();
-    console.log('📦 Header: loaded authData from localStorage:', auth);
-    setAuthData(auth);
-  }, []);
+  const [failed, setFailed] = useState(false);
+  const [authData, setAuthData] = useState<AuthData | null>(null);
+  useHomeSectionReady('header', !isLoading, failed);
 
   useEffect(() => {
     let cancelled = false;
-    
-    const fetchUserProfile = async () => {
-      // Используем user.id из Telegram WebApp или telegramId из authData
-      const userId = user?.id || authData?.telegramId;
-      
-      if (!userId || cancelled) {
-        setIsLoading(false);
-        return;
-      }
-
-      console.log('Header: attempting to fetch user status for', userId);
-
-      // Проверяем кеш перед запросом
-      const cacheKey = `user-status-${userId}`;
-      const cachedData = apiCache.get(cacheKey);
-      
-      if (cachedData && !cancelled) {
-        console.log('Header: using cached data for user status');
-        
-        // ВСЕГДА устанавливаем данные пользователя (имя и фамилию)
-        if (cachedData.user) {
-          const profileData: any = {
-            firstName: cachedData.user.firstName,
-            lastName: cachedData.user.lastName,
-          };
-          
-          // Если профиль полностью заполнен, добавляем дополнительные данные
-          if (cachedData.hasCompleteProfile && cachedData.user.profile) {
-            
-            profileData.overall = cachedData.user.profile.overall;
-            profileData.number = cachedData.user.profile.number;
-            profileData.position = positionShort(cachedData.user.profile.position) || cachedData.user.profile.position;
-            profileData.potential = 'высокий';
-            profileData.clubLogoUrl = cachedData.user.profile.clubLogoUrl;
-          } else if (cachedData.user.profile) {
-            profileData.clubLogoUrl = cachedData.user.profile.clubLogoUrl;
-          }
-          
-          setUserProfile(profileData);
-          
-          // Обновляем authData если данные из базы отличаются — без reload
-          if (authData && (authData.firstName !== cachedData.user.firstName || authData.lastName !== cachedData.user.lastName)) {
-            const { saveAuth } = require('@/lib/auth');
-            saveAuth({
-              telegramId: cachedData.user.telegramId,
-              firstName: cachedData.user.firstName,
-              lastName: cachedData.user.lastName,
-              username: cachedData.user.username,
-            });
-          }
-        } else {
-          setUserProfile(null);
-        }
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        console.log('Header: making API request to /api/user/status');
-        // Запрос к API для проверки статуса профиля
-        const response = await fetch(`/api/user/status?telegramId=${userId}`);
-        
-        if (!response.ok || cancelled) {
-          throw new Error('Ошибка загрузки профиля');
-        }
-
-        const data = await response.json();
-        
-        if (cancelled) return;
-        
-        // Сохраняем в кеш
-        apiCache.set(cacheKey, data);
-        console.log('Header: cached user status data');
-        
-        // ВСЕГДА устанавливаем данные пользователя (имя и фамилию)
-        if (data.user) {
-          const profileData: any = {
-            firstName: data.user.firstName,
-            lastName: data.user.lastName,
-          };
-          
-          // Если профиль полностью заполнен, добавляем дополнительные данные
-          if (data.hasCompleteProfile && data.user.profile) {
-            
-            profileData.overall = data.user.profile.overall;
-            profileData.number = data.user.profile.number;
-            profileData.position = positionShort(data.user.profile.position) || data.user.profile.position;
-            profileData.potential = 'высокий';
-            profileData.clubLogoUrl = data.user.profile.clubLogoUrl;
-            console.log('🏢 Club logo URL from API:', data.user.profile.clubLogoUrl);
-          } else if (data.user.profile) {
-            profileData.clubLogoUrl = data.user.profile.clubLogoUrl;
-          }
-          
-          setUserProfile(profileData);
-          console.log('👤 Final userProfile set:', profileData);
-          
-          // Обновляем authData если данные из базы отличаются — без reload
-          if (authData && (authData.firstName !== data.user.firstName || authData.lastName !== data.user.lastName)) {
-            const { saveAuth } = require('@/lib/auth');
-            saveAuth({
-              telegramId: data.user.telegramId,
-              firstName: data.user.firstName,
-              lastName: data.user.lastName,
-              username: data.user.username,
-            });
-          }
-        } else {
-          setUserProfile(null);
-        }
-      } catch (error) {
+    const cachedAuth = getAuth();
+    fetchHomeData('/api/user/status', { cache: 'no-store', credentials: 'include' })
+      .then((data) => {
+        if (cancelled || !data.user) return;
+        const profile = data.user.profile;
+        setUserProfile({
+          firstName: data.user.firstName,
+          lastName: data.user.lastName,
+          clubLogoUrl: profile?.clubLogoUrl,
+          ...(data.hasCompleteProfile && profile ? {
+            overall: profile.overall,
+            number: profile.number,
+            position: positionShort(profile.position) || profile.position,
+          } : {}),
+        });
+        try {
+          saveAuth({ telegramId: data.user.telegramId, firstName: data.user.firstName, lastName: data.user.lastName, username: data.user.username });
+        } catch { /* Storage can be unavailable in private mode. */ }
+      })
+      .catch(() => { if (!cancelled) setFailed(true); })
+      .finally(() => {
         if (!cancelled) {
-          console.error('Header: error loading profile:', error);
-          setUserProfile(null);
-        }
-      } finally {
-        if (!cancelled) {
+          setAuthData(cachedAuth);
           setIsLoading(false);
         }
-      }
-    };
+      });
+    return () => { cancelled = true; };
+  }, []);
 
-    // Загружаем данные только если их еще нет
-    const userId = user?.id || authData?.telegramId;
-    if (userId && !userProfile) {
-      fetchUserProfile();
-    } else if (userId && userProfile) {
-      setIsLoading(false);
-    }
-    
-    // Cleanup функция
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id, authData?.telegramId]); // Зависимость от обоих источников ID
-
-  // Логика отображения имени (приоритет):
-  // 1. Из профиля базы данных (САМЫЙ НАДЁЖНЫЙ - заполнен через онбординг)
-  // 2. Из localStorage (authData) - может быть неправильным если в Telegram неправильное имя
-  // 3. Из Telegram WebApp (может быть неправильным)
-  // 4. Заглушка "ТРЕНЬКИ"
-  console.log('🎨 Header display name sources:', {
-    userProfile: { firstName: userProfile?.firstName, lastName: userProfile?.lastName },
-    authData: { firstName: authData?.firstName, lastName: authData?.lastName },
-    user: { first_name: user?.first_name, last_name: user?.last_name }
-  });
-  
-  const displayName = userProfile?.firstName 
-    || authData?.firstName 
-    || user?.first_name 
-    || 'ТРЕНЬКИ';
-  
-  const displayLastName = userProfile?.lastName 
-    || authData?.lastName 
-    || user?.last_name 
-    || 'ТРЕНЬКИ';
-
-  console.log('👤 Header display name sources:', {
-    'userProfile?.firstName': userProfile?.firstName,
-    'authData?.firstName': authData?.firstName,
-    'user?.first_name': user?.first_name,
-    'final displayName': displayName,
-    'final displayLastName': displayLastName
-  });
+  const displayName = userProfile?.firstName || authData?.firstName || user?.first_name || 'ТРЕНЬКИ';
+  const displayLastName = userProfile?.lastName || authData?.lastName || user?.last_name || '';
 
   return (
     <header data-tour="header" style={{
@@ -795,6 +659,8 @@ const TrenkiSection = () => {
   const router = useRouter();
   const [shorts, setShorts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  useHomeSectionReady('shorts', !isLoading, failed);
   // «Потяни за край — попадёшь в каталог» (правка владельца): переход не по
   // докрутке, а когда лента уже упёрлась в конец и палец продолжает тянуть.
   // Пока тянут — лента едет за пальцем, а карточка «Все видео» СЖИМАЕТСЯ и
@@ -903,11 +769,11 @@ const TrenkiSection = () => {
   useEffect(() => {
     const fetchShorts = async () => {
       try {
-        const response = await fetch(`/api/shorts?limit=${HOME_SHORTS_LIMIT}`);
-        const data = await response.json();
+        const data = await fetchHomeData(`/api/shorts?limit=${HOME_SHORTS_LIMIT}`);
         setShorts(data.shorts || []);
       } catch (error) {
         console.error('Error loading shorts:', error);
+        setFailed(true);
       } finally {
         setIsLoading(false);
       }
@@ -986,16 +852,17 @@ const TrenkiSection = () => {
   );
 };
 
-const TrainingsSection = () => {
+const TrainingsSection = ({ cycleStatus }: { cycleStatus: { active: boolean; checked: boolean } | null }) => {
     const router = useRouter();
     const [generatingCycle, setGeneratingCycle] = useState(false);
     const [cycleError, setCycleError] = useState<string | null>(null);
-    const [hasActiveCycle, setHasActiveCycle] = useState(false);
+    const [recheckedCycle, setRecheckedCycle] = useState<{ active: boolean; checked: boolean } | null>(null);
+    const hasActiveCycle = recheckedCycle?.active ?? cycleStatus?.active ?? false;
     // Проверка «есть ли активный цикл» УСПЕШНО завершилась. Пока false, слепо
     // генерить нельзя: POST /api/microcycle/generate при активном цикле молча
     // УДАЛЯЕТ его и собирает новую неделю — тап до резолва проверки (или при
     // упавшем запросе) сносил готовый план без подтверждения.
-    const [cycleChecked, setCycleChecked] = useState(false);
+    const cycleChecked = recheckedCycle?.checked ?? cycleStatus?.checked ?? false;
     const { paywalled, freeLessonVideoId } = useSubscription();
     const [activeQuickId, setActiveQuickId] = useState<string | null>(null);
     useEffect(() => {
@@ -1016,14 +883,14 @@ const TrainingsSection = () => {
     // всегда ИИ-тренер: шаг тура просит нажать именно его.
     const { isActive: tourActive } = useTour();
     const [activeTasks, setActiveTasks] = useState<number | null>(null);
+    useHomeSectionReady('tasks', activeTasks !== null);
     // Одно задание от родителя — показываем его прямо на кнопке
     const [singleTask, setSingleTask] = useState<{ caption: string; title: string } | null>(null);
     useEffect(() => {
         let cancelled = false;
         (async () => {
             try {
-                const res = await fetch('/api/assignments/summary', { cache: 'no-store' });
-                const data = res.ok ? await res.json() : null;
+                const data = await fetchHomeData('/api/assignments/summary', { cache: 'no-store' });
                 if (!cancelled) {
                     setActiveTasks(Number(data?.active) || 0);
                     setSingleTask(data?.single ?? null);
@@ -1031,26 +898,6 @@ const TrainingsSection = () => {
             } catch {
                 if (!cancelled) setActiveTasks(0);
             }
-        })();
-        return () => { cancelled = true; };
-    }, []);
-
-    // Узнаём, есть ли уже собранный активный цикл. Если есть — кнопка НЕ
-    // пересобирает неделю при каждом тапе (правка владельца), а ведёт в
-    // календарь к готовому плану.
-    useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            try {
-                const res = await fetch('/api/microcycle/current');
-                if (!res.ok) return;
-                const data = await res.json();
-                if (cancelled) return;
-                if (data?.microcycle?.effectiveStatus === 'ACTIVE') {
-                    setHasActiveCycle(true);
-                }
-                setCycleChecked(true);
-            } catch {}
         })();
         return () => { cancelled = true; };
     }, []);
@@ -1070,8 +917,7 @@ const TrainingsSection = () => {
                     const data = await res.json();
                     active = data?.microcycle?.effectiveStatus === 'ACTIVE';
                     checked = true;
-                    setHasActiveCycle(active);
-                    setCycleChecked(true);
+                    setRecheckedCycle({ active, checked: true });
                 }
             } catch {}
         }
@@ -1247,13 +1093,14 @@ const TrainingsSection = () => {
 const TrainersSection = () => {
   const [trainers, setTrainers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  useHomeSectionReady('trainers', !isLoading, failed);
   const [hasMore, setHasMore] = useState(false);
 
   useEffect(() => {
     const fetchTrainers = async () => {
       try {
-        const response = await fetch('/api/trainers');
-        const data = await response.json();
+        const data = await fetchHomeData('/api/trainers');
         let allTrainers = data.trainers || [];
         // Перемешиваем тренеров рандомно
         allTrainers = allTrainers.sort(() => Math.random() - 0.5);
@@ -1263,6 +1110,7 @@ const TrainersSection = () => {
         setHasMore(allTrainers.length > 5);
       } catch (error) {
         console.error('Error loading trainers:', error);
+        setFailed(true);
       } finally {
         setIsLoading(false);
       }
@@ -1677,14 +1525,15 @@ const VideoCardSkeleton = () => (
 const AllVideosSection = () => {
   const [videos, setVideos] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  useHomeSectionReady('videos', !isLoading, failed);
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchVideos = async () => {
       try {
-        const response = await fetch('/api/videos');
-        const data = await response.json();
+        const data = await fetchHomeData('/api/videos');
         let allVideos = data.videos || [];
         
         if (allVideos.length > 0) {
@@ -1699,6 +1548,7 @@ const AllVideosSection = () => {
         }
       } catch (error) {
         console.error('Error loading videos:', error);
+        setFailed(true);
       } finally {
         setIsLoading(false);
       }
@@ -1813,4 +1663,6 @@ const AllVideosSection = () => {
 };
 
 
-export default HomePage;
+export default function Home() {
+  return <HomePreloadBoundary><HomePage /></HomePreloadBoundary>;
+}

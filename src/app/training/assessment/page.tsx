@@ -8,6 +8,7 @@ import { GOAL_LABELS, ENERGY_STATE_LABELS } from '@/lib/training-algorithm-v3';
 import { pickCycleDayToOffer, todayCycleDayIndex } from '@/lib/microcycle/offer';
 import { openSubscriptionModal } from '@/lib/subscription-modal';
 import { useTour } from '@/components/tour/TourProvider';
+import AppLoader from '@/components/AppLoader';
 
 const trainingGoals = Object.values(TrainingGoal) as TrainingGoal[];
 
@@ -36,7 +37,7 @@ const energyStates: EnergyStateValue[] = ['TIRED', 'IN_TONE', 'FULLY_CHARGED'];
 
 export default function TrainingAssessmentPage() {
   const router = useRouter();
-  const { user, webApp, isLoading: userLoading } = useTelegram();
+  const { webApp, isLoading: userLoading } = useTelegram();
   // Во время обучающего тура попап «У тебя активен цикл» не показываем —
   // он полноэкранный (fixed inset-0) и перехватывает тап по подсвеченным
   // турами кнопкам (баг с циклом при обучалке).
@@ -65,29 +66,41 @@ export default function TrainingAssessmentPage() {
   }, []);
 
   // C-4: предложение сделать тренировку из активного цикла вместо быстрой.
-  // const [cycleOffer, setCycleOffer] = useState<{ sessionId: string; label: string; } | null>(null);
   // Если отказался от цикла — день закроем, только когда быстрая реально создана
   // (в handleSubmit), а не на сам отказ, иначе уход без тренировки закрыл бы день.
   const declinedCycleSessionRef = useRef<string | null>(null);
+  const formStartedRef = useRef(false);
 
   // Стейты
   const [cycleOffer, setCycleOffer] = useState<{ sessionId: string; label: string; } | null>(null);
   const [isCycleModalVisible, setIsCycleModalVisible] = useState(false);
   const [triggerStep1Anim, setTriggerStep1Anim] = useState(false);
+  const [cycleCheckPending, setCycleCheckPending] = useState(true);
 
   // Боевой запрос к API
   useEffect(() => {
-    if (tourActive) return;
-
+    let skipCycleOffer = tourActive;
     try {
-      if (new URLSearchParams(window.location.search).has('goal')) return;
+      skipCycleOffer ||= new URLSearchParams(window.location.search).has('goal');
     } catch { }
+    // Тур и назначенная родителем цель сразу открывают обычную форму.
+    // Раньше ранний return оставлял карточки энергии прозрачными навсегда.
+    if (skipCycleOffer) {
+      setCycleOffer(null);
+      setIsCycleModalVisible(false);
+      setTriggerStep1Anim(true);
+      setCycleCheckPending(false);
+      return;
+    }
 
     let cancelled = false;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10_000);
+    let revealTimer: ReturnType<typeof setTimeout> | undefined;
 
     (async () => {
       try {
-        const res = await fetch('/api/microcycle/current');
+        const res = await fetch('/api/microcycle/current', { cache: 'no-store', signal: controller.signal });
         if (!res.ok) {
           if (!cancelled) setTriggerStep1Anim(true);
           return;
@@ -104,13 +117,13 @@ export default function TrainingAssessmentPage() {
         const todayIdx = todayCycleDayIndex(mc.weekStartDate, new Date());
         const day = pickCycleDayToOffer(mc.days || [], todayIdx);
 
-        if (!cancelled && day && day.workoutSession) {
+        if (!cancelled && !formStartedRef.current && day && day.workoutSession) {
           setCycleOffer({
             sessionId: day.workoutSession.id,
             label: INTENT_LABELS[day.intent] || 'тренировка',
           });
           // Даем React отрендерить элемент с translate-y-full, затем запускаем выезд наверх
-          setTimeout(() => {
+          revealTimer = setTimeout(() => {
             if (!cancelled) setIsCycleModalVisible(true);
           }, 50);
         } else {
@@ -119,11 +132,17 @@ export default function TrainingAssessmentPage() {
         }
       } catch {
         if (!cancelled) setTriggerStep1Anim(true);
+      } finally {
+        clearTimeout(timeout);
+        if (!cancelled) setCycleCheckPending(false);
       }
     })();
 
     return () => {
       cancelled = true;
+      controller.abort();
+      clearTimeout(timeout);
+      clearTimeout(revealTimer);
     };
   }, [tourActive]);
 
@@ -163,11 +182,13 @@ export default function TrainingAssessmentPage() {
     // Даем 150мс на то, чтобы кнопка успела визуально "прожаться"
     setTimeout(() => {
       if (!cycleOffer) return;
+      formStartedRef.current = true;
       declinedCycleSessionRef.current = cycleOffer.sessionId;
       setIsCycleModalVisible(false);
 
       // Ждем пока модалка уедет вниз, затем анимируем карточки
       setTimeout(() => {
+        setCycleOffer(null);
         setTriggerStep1Anim(true);
       }, 350);
     }, 150);
@@ -186,11 +207,6 @@ export default function TrainingAssessmentPage() {
     setStep(2);
   };
 
-
-  // Логирование состояния пользователя
-  useEffect(() => {
-    console.log('👤 User state changed:', { user, userLoading });
-  }, [user, userLoading]);
 
   const handleSubmit = async () => {
     if (!formData.energyState) {
@@ -265,8 +281,12 @@ export default function TrainingAssessmentPage() {
   const isReady = !isSubmitting && !userLoading && !!formData.goal;
   const isRageMode = isReady && formData.energyState === 'FULLY_CHARGED';
 
+  const initialLoading = cycleCheckPending || userLoading;
+
   return (
-    <div className="w-full overflow-hidden relative">
+    <>
+    <AppLoader ready={!initialLoading} />
+    <div className="w-full overflow-hidden relative" style={{ visibility: initialLoading ? 'hidden' : 'visible' }} inert={initialLoading}>
 
       {/* C-4: предложение сделать тренировку из активного цикла вместо быстрой.
           В обучающем туре не показываем — перекрывает подсвеченные кнопки. */}
@@ -386,6 +406,7 @@ export default function TrainingAssessmentPage() {
                 <button
                   key={state}
                   onClick={() => {
+                    formStartedRef.current = true;
                     setFormData({ ...formData, energyState: state });
                     setTimeout(goToStep2, 250);
                   }}
@@ -467,7 +488,6 @@ export default function TrainingAssessmentPage() {
                     else if (formData.energyState === 'IN_TONE') animationClass = 'anim-pop-normal';
                     else if (formData.energyState === 'TIRED') animationClass = 'anim-sluggish';
                   }
-                  console.log(animationClass);
                   return (
                     <button
                       key={goal}
@@ -544,5 +564,6 @@ export default function TrainingAssessmentPage() {
 
       </div>
     </div >
+    </>
   );
 }
