@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTelegram } from '@/hooks/useTelegram';
 import CharacteristicsGainModal from '@/components/CharacteristicsGainModal';
@@ -8,6 +8,7 @@ import Toast from '@/components/Toast';
 import ModuleSelectionModal from '@/components/ModuleSelectionModal';
 import { Check, Play, Lightbulb, PartyPopper, RefreshCw, Search, SkipForward, Star, Zap } from 'lucide-react';
 import { CharacteristicIcon } from '@/components/training/icons';
+import { workoutModulePath, workoutReturnPath } from '@/lib/training/workout-navigation';
 
 interface WorkoutModule {
   id: string;
@@ -137,17 +138,19 @@ export default function WorkoutPage() {
   // Выбранное направление растяжки для заминки (подсветка в панели действий:
   // раньше активного состояния не было вовсе — не понять, что уже выбрано)
   const [stretchDir, setStretchDir] = useState<'FULL' | 'UPPER' | 'LOWER' | null>(null);
+  const goBack = useCallback(() => router.replace(workoutReturnPath(new URLSearchParams(window.location.search).get('from'))), [router]);
 
   useEffect(() => {
     if (webApp) {
       webApp.BackButton.show();
-      webApp.BackButton.onClick(() => router.back());
+      webApp.BackButton.onClick(goBack);
       
       return () => {
+        webApp.BackButton.offClick(goBack);
         webApp.BackButton.hide();
       };
     }
-  }, [webApp, router]);
+  }, [webApp, goBack]);
 
   // Загружаем тренировку сразу при монтировании — auth идёт через httpOnly
   // cookie на сервере (requireAuthUser). Раньше гейт `if (user?.id)` зависел
@@ -335,7 +338,13 @@ export default function WorkoutPage() {
     const targetIndex = firstIncompleteIndex === -1 ? 0 : firstIncompleteIndex;
     const targetModule = workout.modules[targetIndex];
 
-    router.push(`/video/${targetModule.id}?fromWorkout=true&sessionId=${workout.id}`);
+    openModule(targetModule.id);
+  };
+
+  const openModule = (videoId: string) => {
+    if (!workout) return;
+    const from = new URLSearchParams(window.location.search).get('from');
+    router.replace(workoutModulePath(videoId, workout.id, from));
   };
 
   // Функция замены модуля на другой подходящий
@@ -637,7 +646,7 @@ export default function WorkoutPage() {
     >
       {/* Заголовок с кнопкой назад */}
       <div className="mb-6 flex items-center gap-3">
-        <button onClick={() => router.back()} className="flex-shrink-0">
+        <button onClick={goBack} className="flex-shrink-0">
           <img src="/icons/icon-action-back.svg" alt="Назад" width={24} height={24} />
         </button>
         <h1 style={{
@@ -794,7 +803,7 @@ export default function WorkoutPage() {
 
           // Незавершённый модуль, который уже начинали — покажем, с какого места
           // продолжим (сервер помнит watchedDuration, плеер туда и перемотает).
-          const resumeAt = !isCompleted && module.watchedDuration && module.watchedDuration >= 5
+          const resumeAt = !isCompleted && module.watchedDuration && module.watchedDuration >= 1
             ? module.watchedDuration
             : 0;
 
@@ -835,7 +844,7 @@ export default function WorkoutPage() {
               return;
             }
             // Переходим к видео
-            router.push(`/video/${module.id}?fromWorkout=true&sessionId=${workout.id}`);
+            openModule(module.id);
           };
           
           return (
@@ -1288,7 +1297,7 @@ export default function WorkoutPage() {
         >
           {allCompleted
             ? 'Завершить тренировку'
-            : workout && workout.modules.some(m => m.completed)
+            : workout.status === 'IN_PROGRESS' || workout.modules.some(m => m.completed)
               ? 'Продолжить тренировку'
               : 'Начать тренировку'}
         </button>

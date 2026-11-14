@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { workoutModulePath, workoutPath } from '@/lib/training/workout-navigation';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
@@ -129,7 +130,7 @@ export default function CalendarPage() {
         return;
       }
       setStretchRebuilding(false);
-      router.push(`/training/workout?id=${sessionId}`);
+      router.push(workoutPath(sessionId, 'calendar'));
     } catch {
       setStretchError('Ошибка сети');
       setStretchRebuilding(false);
@@ -774,7 +775,7 @@ export default function CalendarPage() {
             return (
               <>
               <Link
-                href={`/training/workout?id=${ws.id}`}
+                href={workoutPath(ws.id, 'calendar')}
                 className="block rounded-2xl overflow-hidden"
                 style={{
                   background:
@@ -841,7 +842,7 @@ export default function CalendarPage() {
                         // «Тренировка»: без перемотки, переключатель режима скрыт,
                         // прогресс идёт в зачёт сессии (тот же флоу, что на
                         // /training/workout).
-                        href={`/video/${m.id}?fromWorkout=true&sessionId=${ws.id}`}
+                        href={workoutModulePath(m.id, ws.id, 'calendar')}
                         className="flex items-center gap-3 rounded-2xl p-2 transition-transform active:scale-[0.99]"
                         style={{ background: 'rgba(174,171,187,0.06)' }}
                       >
@@ -930,7 +931,7 @@ export default function CalendarPage() {
             const coachName = `${a.coach.firstName ?? ''} ${a.coach.lastName ?? ''}`.trim() || 'Тренер';
             const isFull = !!a.workoutSessionId;
             const href = isFull
-              ? `/training/workout?id=${a.workoutSessionId}`
+              ? workoutPath(a.workoutSessionId, 'calendar')
               : `/video/${a.video?.id ?? ''}`;
             const title = isFull
               ? 'Полноценное занятие · 4 модуля'

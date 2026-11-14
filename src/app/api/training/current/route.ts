@@ -88,7 +88,7 @@ async function findTodayReminderSessionId(userId: string, tz: string | null): Pr
 }
 
 /**
- * GET /api/training/current[?workoutId=xxx][?scope=today]
+ * GET /api/training/current[?workoutId=xxx][?scope=today|quick]
  * Получает активную тренировку текущего пользователя (или конкретную по workoutId).
  * scope=today — для напоминания на главной: только сегодняшняя, без записей в БД.
  * Auth: httpOnly session cookie.
@@ -102,12 +102,28 @@ export async function GET(request: NextRequest) {
     const workoutId = request.nextUrl.searchParams.get('workoutId');
     const scope = request.nextUrl.searchParams.get('scope');
 
+    if (!workoutId && scope === 'quick') {
+      const workout = await prisma.workoutSession.findFirst({
+        where: {
+          userId,
+          status: WorkoutStatus.IN_PROGRESS,
+          coachId: null,
+          assignment: { is: null },
+          microcycleDay: { is: null },
+          synthetic: false,
+        },
+        orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+        select: { id: true },
+      });
+      return NextResponse.json({ workout });
+    }
+
     let workout = workoutId
       ? await prisma.workoutSession.findUnique({ where: { id: workoutId }, include: WORKOUT_INCLUDE })
       : null;
 
-    // Запросили чужую тренировку по workoutId — закрываем
-    if (workoutId && workout && workout.userId !== userId) {
+    // Явный ID никогда не подменяем другой тренировкой.
+    if (workoutId && workout?.userId !== userId) {
       return NextResponse.json({ workout: null }, { status: 404 });
     }
 
@@ -147,44 +163,6 @@ export async function GET(request: NextRequest) {
               (await prisma.workoutSession.findUnique({ where: { id: todaysId }, include })) ?? freshest;
           }
         }
-      }
-
-      if (workout) {
-        // Сессии, входящие в активный микроцикл, НЕ помечаем SKIPPED — иначе
-        // открытие /training/workout без ?id (через «продолжить» / нижнее меню)
-        // «пропустит» 4 из 5 дней недели. Микроцикл намеренно держит несколько
-        // PENDING-сессий одновременно.
-        const microcycleDays = await prisma.microcycleDay.findMany({
-          where: {
-            workoutSessionId: { not: null },
-            microcycle: { userId, status: { not: MicrocycleStatus.ARCHIVED } },
-          },
-          select: { workoutSessionId: true },
-        });
-        // И сессии невыполненных заданий тренера: задание живо, пока его не
-        // выполнили, — гасить его тренировку нельзя.
-        const assignmentSessions = await prisma.trainingAssignment.findMany({
-          where: { athleteId: userId, workoutSessionId: { not: null }, status: { not: 'COMPLETED' } },
-          select: { workoutSessionId: true },
-        });
-        const protectedIds = [...microcycleDays, ...assignmentSessions]
-          .map((d) => d.workoutSessionId)
-          .filter((id): id is string => id !== null);
-
-        // Гасим только хвосты СТРОГО СТАРШЕ выбранной: cleanup писался под
-        // инвариант «выбрана самая свежая», а теперь выбранной может оказаться
-        // IN_PROGRESS/сегодняшний день цикла — без неравенства свежесозданная
-        // быстрая (в т.ч. замена дня) помечалась бы SKIPPED при заходе на
-        // главную.
-        await prisma.workoutSession.updateMany({
-          where: {
-            userId,
-            status: { in: [WorkoutStatus.PENDING, WorkoutStatus.IN_PROGRESS] },
-            id: { not: workout.id, notIn: protectedIds },
-            createdAt: { lt: workout.createdAt },
-          },
-          data: { status: WorkoutStatus.SKIPPED },
-        });
       }
     }
 
