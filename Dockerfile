@@ -82,6 +82,11 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Одноразовый перенос старых видео Kinescope. Запускается вручную внутри
+# контейнера, использует его серверные env и уже включённые Prisma/S3/ffprobe.
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate-kinescope.mjs ./scripts/migrate-kinescope.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/lib/kinescope-migration.mjs ./scripts/lib/kinescope-migration.mjs
+
 USER nextjs
 
 EXPOSE 3000
