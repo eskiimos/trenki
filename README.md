@@ -122,7 +122,7 @@ instrumentation.ts проверка обязательных env при стар
 ### Тренировки
 
 - Быстрая: `/training/assessment` → `POST /api/training/generate-v3` → `/training/workout`. Алгоритм в `src/lib/training-algorithm-v3.ts`: матрицы целей и типов нагрузки, ступени сложности по потенциалу, RPE, возрастные модификаторы. Завершение начисляет прирост характеристик (`CharacteristicHistory`).
-- Микроцикл: `src/lib/microcycle/*`. Неделя из 5 дней с намерением (`MicrocycleIntent`), цель дня восстанавливается из намерения и номера цикла, быстрая тренировка может закрыть день цикла. Автосборка — крон по воскресеньям для профилей с `autoGenerateMicrocycle`.
+- Микроцикл: `src/lib/microcycle/*`. Неделя из 5 дней с намерением (`MicrocycleIntent`), цель дня восстанавливается из намерения и номера цикла, быстрая тренировка может закрыть день цикла. По умолчанию план создаётся по кнопке. Воскреснюю автосборку спортсмен может включить в «Профиль → Настройки → Тренировки».
 - Pose-сессии: `PoseTracker` пишет кадры скелета (3 fps, до 2 минут) → `POST /api/pose-sessions` → gzip-JSON в S3 (`pose/sessions/…`), тренер смотрит через `/api/pose-sessions/[id]/frames`. В атлетском плеере кнопка камеры сейчас скрыта.
 - Эталоны движений тренеров: `/admin/pose` — фоновая очередь MediaPipe Pose (heavy), кадры в закрытом S3 (`pose/references/…`), просмотр со скелетом и графиками углов. Ручной анализ в браузере доступен как дополнительный способ.
 
@@ -211,7 +211,7 @@ docker-compose -f docker-compose.production.yml --env-file .env.production resta
 | `engagement-nudges` | ежедневно (устарело) | то же, что вечерние пуши из `microcycle-reminders`; оставлен для старой строки crontab и ручного запуска |
 | `pose-storage-migrate` | вручную, разово | перенос pose-кадров (сессии, эталоны) из Cloudinary/JSONB в S3; `?deleteSource=1` удаляет исходники в Cloudinary |
 | `inactivity-email` | ежедневно | письмо неактивным; за рубильником `emailCampaigns.enabled` |
-| `microcycle-autogenerate` | воскресенье | сборка микроцикла на неделю |
+| `microcycle-autogenerate` | воскресенье | сборка плана на следующую неделю для спортсменов с включённой автосборкой |
 | `parent-digest` | воскресенье 18:00 | дайджест родителям |
 
 Тексты пушей по сценариям редактируются в `/admin/push-texts` (хранятся в `app_settings.push.templates`, стандартные — `src/lib/notifications/templates.ts`).

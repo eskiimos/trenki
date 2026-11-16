@@ -120,7 +120,7 @@ model Profile {
   fatigue          Float     @default(0) // усталость (0-100)
 
   // Микроцикл (Sprint 5)
-  autoGenerateMicrocycle Boolean @default(true) // авто-генерация еженедельного цикла
+  autoGenerateMicrocycle Boolean @default(false) // включается спортсменом в настройках
 
   // Старые характеристики (deprecated, оставляем для совместимости)
   strength  Int @default(0)

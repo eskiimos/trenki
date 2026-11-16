@@ -4,7 +4,7 @@
  * Атлет включает/выключает авто-генерацию микроциклов.
  *
  * Body: { autoGenerate: boolean }
- * Auth: httpOnly session cookie.
+ * Auth: httpOnly session cookie спортсмена.
  *
  * Response 200: { autoGenerateMicrocycle: boolean }
  * Response 400: невалидный body
@@ -13,12 +13,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAuthUser } from '@/lib/coach/guards';
+import { requireAthlete } from '@/lib/coach/guards';
 
 export const dynamic = 'force-dynamic';
 
 export async function PATCH(request: NextRequest) {
-  const auth = await requireAuthUser(request);
+  const auth = await requireAthlete(request);
   if ('response' in auth) return auth.response;
 
   const body = await request.json().catch(() => ({}));
