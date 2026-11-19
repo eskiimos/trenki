@@ -24,7 +24,7 @@ import {
 } from '@/lib/microcycle/week-plan';
 import { getMicrocycleStartDate, getMicrocycleWeekStart } from '@/lib/microcycle/week-start';
 
-export type GenerateStatus = 'CREATED' | 'EXISTING' | 'NO_PROFILE';
+export type GenerateStatus = 'CREATED' | 'EXISTING' | 'NO_PROFILE' | 'AUTO_GENERATE_DISABLED';
 
 export interface GeneratedDay {
   dayOfWeek: number;
@@ -47,6 +47,7 @@ interface Options {
   now?: Date;
   /** Явная стартовая дата (00:00 UTC). По умолчанию — сегодня. Cron шлёт Пн. */
   startDate?: Date;
+  onlyIfAutoGenerateEnabled?: boolean;
 }
 
 export async function generateMicrocycleForUser(
@@ -64,6 +65,9 @@ export async function generateMicrocycleForUser(
   }
 
   const profile = user.profile;
+  if (opts.onlyIfAutoGenerateEnabled && !profile.autoGenerateMicrocycle) {
+    return { status: 'AUTO_GENERATE_DISABLED' };
+  }
 
   // ── Прошлый цикл (нужен и для адаптации, и для выбора даты старта) ──
   const lastCycle = await prisma.microcycle.findFirst({
@@ -170,9 +174,19 @@ export async function generateMicrocycleForUser(
   }
 
   // ── Сохраняем в одной транзакции ───────────────────────────────────
-  let cycleId: string;
+  let cycleId: string | null;
   try {
     cycleId = await prisma.$transaction(async (tx) => {
+    if (opts.onlyIfAutoGenerateEnabled) {
+      // The athlete may have turned it off while the week's modules were being selected.
+      // Keep the preference stable until this transaction finishes creating the plan.
+      const [preference] = await tx.$queryRaw<{ enabled: boolean }[]>`
+        SELECT "autoGenerateMicrocycle" AS enabled FROM "profiles"
+        WHERE "userId" = ${userId} FOR SHARE
+      `;
+      if (!preference?.enabled) return null;
+    }
+
     const cycle = await tx.microcycle.create({
       data: {
         userId,
@@ -248,6 +262,8 @@ export async function generateMicrocycleForUser(
     }
     throw e;
   }
+
+  if (cycleId === null) return { status: 'AUTO_GENERATE_DISABLED' };
 
   return {
     status: 'CREATED',

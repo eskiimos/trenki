@@ -8,7 +8,7 @@
  *     http://localhost:3000/api/cron/microcycle-autogenerate
  *
  * Логика:
- *   1. Берём всех атлетов с профилем и autoGenerateMicrocycle=true.
+ *   1. Берём атлетов, включивших автосборку в настройках профиля.
  *   2. Для каждого вызываем generateMicrocycleForUser. Она идемпотентна —
  *      если цикл на эту weekStartDate уже создан, вернётся EXISTING.
  *   3. После CREATED — шлём web-push «новый микроцикл готов».
@@ -40,9 +40,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Только атлеты, у которых есть профиль и опция включена, — и с доступом:
-  // микроцикл целиком платный (ручной generate отвечает 402), а крон раньше
-  // собирал его и бесплатным атлетам, если опция когда-то была включена.
+  // Для автосборки нужны и согласие спортсмена, и действующий доступ к микроциклу.
   const mode = await getPaywallMode();
   const candidates = await prisma.user.findMany({
     where: {
@@ -63,11 +61,12 @@ export async function GET(request: NextRequest) {
   let created = 0;
   let existing = 0;
   let noProfile = 0;
+  let optedOut = 0;
   let errored = 0;
 
   for (const u of eligible) {
     try {
-      const result = await generateMicrocycleForUser(u.id, { startDate });
+      const result = await generateMicrocycleForUser(u.id, { startDate, onlyIfAutoGenerateEnabled: true });
       if (result.status === 'CREATED') {
         created++;
         // Push (web-only, Telegram отключён). Не блокируем цикл.
@@ -79,6 +78,8 @@ export async function GET(request: NextRequest) {
         existing++;
       } else if (result.status === 'NO_PROFILE') {
         noProfile++;
+      } else if (result.status === 'AUTO_GENERATE_DISABLED') {
+        optedOut++;
       }
     } catch (err) {
       errored++;
@@ -93,6 +94,7 @@ export async function GET(request: NextRequest) {
     created,
     existing,
     noProfile,
+    optedOut,
     errored,
     durationMs,
   });

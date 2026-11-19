@@ -80,9 +80,11 @@ export default function ProfileSettingsPage() {
   // никаких telegramId в запросе.
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [autoGenerate, setAutoGenerate] = useState(false);
+  const [autoGenSaving, setAutoGenSaving] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
   const [role, setRole] = useState<string | null>(null);
   const [autoGenError, setAutoGenError] = useState<string | null>(null);
+  const canManageCycle = role === 'ATHLETE' && hasProfile;
 
   const [isAdmin, setIsAdmin] = useState(false);
   // Членство берём из атлетского /api/teams/my: /api/teams — тренерский
@@ -146,7 +148,7 @@ export default function ProfileSettingsPage() {
 
   const toggleAutoGenerate = async (next: boolean) => {
     setAutoGenError(null);
-    setAutoGenerate(next); // оптимистично, при ошибке откатываем
+    setAutoGenSaving(true);
     try {
       const res = await fetch('/api/profile/microcycle-preferences', {
         method: 'PATCH',
@@ -154,9 +156,12 @@ export default function ProfileSettingsPage() {
         body: JSON.stringify({ autoGenerate: next }),
       });
       if (!res.ok) throw new Error();
+      const saved = await res.json();
+      setAutoGenerate(saved.autoGenerateMicrocycle === true);
     } catch {
-      setAutoGenerate(!next);
       setAutoGenError('Не удалось сохранить. Проверь связь и попробуй ещё раз.');
+    } finally {
+      setAutoGenSaving(false);
     }
   };
 
@@ -199,7 +204,7 @@ export default function ProfileSettingsPage() {
 
       <div className="px-4 max-w-3xl md:mx-auto md:px-8">
         {/* ─── Тренировки ─── */}
-        {(hasProfile || isSupported || !profileLoaded) && (
+        {(canManageCycle || isSupported || !profileLoaded) && (
           <SettingsGroup
             title="Тренировки"
             hint={autoGenError ?? undefined}
@@ -212,12 +217,15 @@ export default function ProfileSettingsPage() {
                 <span className="h-6 w-11 rounded-full bg-white/10 animate-pulse shrink-0" />
               </div>
             ) : (
-              hasProfile && (
+              canManageCycle && (
                 <ToggleRow
                   icon={RefreshCw}
-                  label="Авто-генерация цикла"
-                  hint="Новый недельный цикл собирается сам, без твоего участия"
+                  label="Автосборка недельного плана"
+                  hint={autoGenerate
+                    ? 'По воскресеньям ИИ-тренер собирает план на следующую неделю'
+                    : 'Новый план появится после нажатия «Собрать микроцикл»'}
                   checked={autoGenerate}
+                  disabled={autoGenSaving}
                   onChange={toggleAutoGenerate}
                 />
               )
