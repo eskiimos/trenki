@@ -21,6 +21,8 @@ import {
   createSearchCriteria,
 } from '@/lib/module-selection-v3';
 import { requireAuthUser } from '@/lib/coach/guards';
+import { loadMacrocycleEdit, lockMacrocycleEdit, replacementCandidates } from '@/lib/microcycle/macrocycle-edit';
+import type { Prisma } from '@/generated/prisma';
 import { resolveVideoUrl } from '@/lib/s3';
 
 // C-8: направление растяжки → группы мышц для подбора заминки (cooldown).
@@ -36,6 +38,31 @@ function stretchMuscleGroups(direction: unknown): MuscleGroup[] | null {
     default:
       return null;
   }
+}
+
+type ReplacementVideo = Prisma.VideoGetPayload<{
+  include: { trainer: { select: { id: true; name: true; lastName: true; avatar: true } } };
+}>;
+async function replacementResponse(newModule: ReplacementVideo) {
+  return NextResponse.json({
+    success: true,
+    newModule: {
+      id: newModule.id,
+      title: newModule.title,
+      description: newModule.description,
+      duration: newModule.duration,
+      // s3://-видео → presigned GET (auth уже проверен requireAuthUser выше)
+      videoUrl: await resolveVideoUrl(newModule.videoUrl),
+      thumbnail: newModule.thumbnail,
+      moduleType: newModule.moduleType,
+      trainer: newModule.trainer ? {
+        id: newModule.trainer.id,
+        name: newModule.trainer.name,
+        lastName: newModule.trainer.lastName,
+        avatar: newModule.trainer.avatar,
+      } : null,
+    },
+  });
 }
 
 /**
@@ -65,6 +92,7 @@ export async function POST(request: NextRequest) {
     const workoutSession = await prisma.workoutSession.findUnique({
       where: { id: workoutSessionId },
       include: {
+        microcycleDay: { select: { microcycle: { select: { macrocycleWeek: true } } } },
         videos: {
           include: {
             video: {
@@ -98,6 +126,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Получаем индекс модуля (если он вне границ)
+    if (moduleIndex < 0 || moduleIndex >= workoutSession.videos.length) {
+      return NextResponse.json(
+        { error: 'Неправильный индекс модуля' },
+        { status: 400 }
+      );
+    }
+
+    const currentVideo = workoutSession.videos[moduleIndex];
+    if (workoutSession.microcycleDay?.microcycle.macrocycleWeek != null) {
+      const result = await prisma.$transaction(async tx => {
+        await lockMacrocycleEdit(tx, user.id);
+        const edit = await loadMacrocycleEdit(tx, user.id, workoutSessionId);
+        const current = edit?.videos[moduleIndex];
+        if (!edit || !current || current.id !== currentVideo.id) {
+          return { error: 'План уже изменился. Обнови тренировку.', status: 409 } as const;
+        }
+        const candidates = replacementCandidates(edit, current, !!videoId, stretchMuscleGroups(stretchDirection));
+        const chosen = videoId ? candidates.find(v => v.id === videoId) : candidates[0];
+        if (!chosen) {
+          return { error: 'Нет подходящей замены для этого модуля.', status: 422 } as const;
+        }
+        const video = await tx.video.findUniqueOrThrow({ where: { id: chosen.id }, include: { trainer: true } });
+        if (video.id !== current.videoId) {
+          await tx.workoutSessionVideo.delete({ where: { id: current.id } });
+          await tx.workoutSessionVideo.create({ data: {
+            sessionId: workoutSessionId, order: current.order, videoId: video.id,
+          } });
+          const seconds = edit.videos.reduce((sum, v) => sum + v.video.duration, 0)
+            - current.video.duration + video.duration;
+          await tx.workoutSession.update({
+            where: { id: workoutSessionId }, data: { targetDuration: Math.round(seconds / 60) },
+          });
+        }
+        return { video } as const;
+      });
+      if (result.video) return replacementResponse(result.video);
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+
     // Получаем профиль пользователя для подбора модуля
     const userProfile = await prisma.profile.findUnique({
       where: { userId: user.id },
@@ -110,15 +178,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Получаем индекс модуля (если он вне границ)
-    if (moduleIndex < 0 || moduleIndex >= workoutSession.videos.length) {
-      return NextResponse.json(
-        { error: 'Неправильный индекс модуля' },
-        { status: 400 }
-      );
-    }
-
-    const currentVideo = workoutSession.videos[moduleIndex];
     const profile = userProfile;
     const currentModuleType = currentVideo.video.moduleType;
 
@@ -134,7 +193,7 @@ export async function POST(request: NextRequest) {
     const energyState = EnergyState.IN_TONE; // По умолчанию используем IN_TONE
 
 
-    let newModule: any = null;
+    let newModule: ReplacementVideo | null = null;
 
     // Ручной выбор: пользователь сам подобрал видео через поиск/фильтр модуля.
     // Берём только опубликованное; тип модуля не навязываем жёстко (модалка и так
@@ -314,30 +373,12 @@ export async function POST(request: NextRequest) {
       ]);
 
 
-      return NextResponse.json({
-        success: true,
-        newModule: {
-          id: newModule.id,
-          title: newModule.title,
-          description: newModule.description,
-          duration: newModule.duration,
-          // s3://-видео → presigned GET (auth уже проверен requireAuthUser выше)
-          videoUrl: await resolveVideoUrl(newModule.videoUrl),
-          thumbnail: newModule.thumbnail,
-          moduleType: newModule.moduleType,
-          trainer: newModule.trainer ? {
-            id: newModule.trainer.id,
-            name: newModule.trainer.name,
-            lastName: newModule.trainer.lastName,
-            avatar: newModule.trainer.avatar,
-          } : null,
-        },
-      });
-    } catch (dbError: any) {
-      console.error('❌ Ошибка при обновлении БД:', dbError.message);
+      return replacementResponse(newModule);
+    } catch (dbError) {
+      console.error('❌ Ошибка при обновлении БД:', dbError);
       throw dbError;
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Ошибка при замене модуля:', error);
     return NextResponse.json(
       {

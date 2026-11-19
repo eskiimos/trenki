@@ -13,9 +13,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
-import { MicrocycleStatus } from '@/generated/prisma';
 import { getEffectiveStatus } from '@/lib/microcycle/status';
-import { goalsFromStoredDays } from '@/lib/microcycle/week-plan';
+import { macrocycleWeekLabel, missingMacrocycleModules, storedDayPlans } from '@/lib/microcycle/stored-plan';
 import { GOAL_LABELS } from '@/lib/training-algorithm-v3';
 
 export const dynamic = 'force-dynamic';
@@ -24,15 +23,9 @@ export async function GET(request: NextRequest) {
   const auth = await requireAuthUser(request);
   if ('response' in auth) return auth.response;
 
-  // Берём последний цикл юзера, который ещё не закрыт фидбэком. То есть он
-  // может быть либо ACTIVE (неделя идёт), либо COMPLETED по дате но без
-  // фидбэка — для второго случая UI покажет модалку «Как перенёс?».
+  // Only the newest cycle may prompt for feedback, even after a newer week is archived.
   const microcycle = await prisma.microcycle.findFirst({
-    where: {
-      userId: auth.user.id,
-      status: { not: MicrocycleStatus.ARCHIVED },
-      feedback: null,
-    },
+    where: { userId: auth.user.id },
     orderBy: { cycleNumber: 'desc' },
     include: {
       days: {
@@ -47,7 +40,7 @@ export async function GET(request: NextRequest) {
               currentVideoIndex: true,
               videos: {
                 orderBy: { order: 'asc' },
-                select: { video: { select: { id: true, title: true, thumbnail: true, duration: true } } },
+                select: { video: { select: { id: true, title: true, thumbnail: true, duration: true, moduleType: true } } },
               },
             },
           },
@@ -70,59 +63,55 @@ export async function GET(request: NextRequest) {
     new Date(),
   );
 
-  // Короткая вводная неделя Пт-Вс закрывается БЕЗ опроса (effectiveStatus
-  // ARCHIVED), но в БД остаётся status=ACTIVE/feedback=null. Не отдаём её как
-  // актуальный цикл — иначе календарь рисует баннер завершённой недели.
   if (effectiveStatus === 'ARCHIVED') {
     return NextResponse.json({ microcycle: null });
   }
 
-  // Цель (направленность) каждого дня — та же ротация, что при генерации.
-  const plans = goalsFromStoredDays(
-    microcycle.days.map((d) => ({ dayOfWeek: d.dayOfWeek, intent: d.intent })),
-    microcycle.cycleNumber,
-  );
-  const goalByDay = new Map(plans.map((p) => [p.dayOfWeek, GOAL_LABELS[p.goal]?.label ?? null]));
-  // Ключ цели (POWERFUL_SHOT, AGILITY, …) — чтобы клиент рисовал СВОЮ иконку на
-  // каждую цель (GOAL_ICONS в @/components/training/icons). Раньше отдавалась
-  // только подпись, и календарь был вынужден ставить одну иконку на все цели.
-  const goalKeyByDay = new Map(plans.map((p) => [p.dayOfWeek, p.goal ?? null]));
+  const goals = new Map(storedDayPlans(microcycle).map((p) => [p.dayOfWeek, p.goal]));
 
   return NextResponse.json({
     microcycle: {
       id: microcycle.id,
       weekStartDate: microcycle.weekStartDate,
       cycleNumber: microcycle.cycleNumber,
+      macrocycleWeek: microcycle.macrocycleWeek,
+      weekLabel: macrocycleWeekLabel(microcycle.macrocycleWeek),
       status: microcycle.status,
       effectiveStatus,
       awaitingFeedback: effectiveStatus === 'AWAITING_FEEDBACK',
       // Сколько тренировок недели реально выполнено. Ноль → вместо опроса
       // «как перенёс неделю» показываем поддерживающий экран (нечего оценивать).
       completedCount: microcycle.days.filter((d) => d.workoutSession?.status === 'COMPLETED').length,
-      days: microcycle.days.map((d) => ({
-        dayOfWeek: d.dayOfWeek,
-        intent: d.intent,
-        goal: goalByDay.get(d.dayOfWeek) ?? null, // направленность/цель дня (подпись)
-        goalKey: goalKeyByDay.get(d.dayOfWeek) ?? null, // ключ цели — для иконки
-        // Модули тренировки дня с превью (id/название/картинка/длительность) —
-        // чтобы календарь рисовал карточки, как в /video, а не голый список.
-        modules:
-          d.workoutSession?.videos.map((v) => ({
-            id: v.video.id,
-            title: v.video.title,
-            thumbnail: v.video.thumbnail,
-            duration: v.video.duration,
-          })) ?? [],
-        workoutSession: d.workoutSession
-          ? {
-              id: d.workoutSession.id,
-              status: d.workoutSession.status,
-              targetDuration: d.workoutSession.targetDuration,
-              totalVideos: d.workoutSession.totalVideos,
-              currentVideoIndex: d.workoutSession.currentVideoIndex,
-            }
-          : null,
-      })),
+      days: microcycle.days.map((d) => {
+        const goal = goals.get(d.dayOfWeek);
+        return {
+          dayOfWeek: d.dayOfWeek,
+          intent: d.intent,
+          goal: goal ? GOAL_LABELS[goal]?.label ?? null : null,
+          goalKey: goal ?? null,
+          missingModules: missingMacrocycleModules(
+            microcycle.macrocycleWeek,
+            d.intent,
+            d.workoutSession?.videos.map((v) => v.video.moduleType) ?? [],
+          ),
+          modules:
+            d.workoutSession?.videos.map((v) => ({
+              id: v.video.id,
+              title: v.video.title,
+              thumbnail: v.video.thumbnail,
+              duration: v.video.duration,
+            })) ?? [],
+          workoutSession: d.workoutSession
+            ? {
+                id: d.workoutSession.id,
+                status: d.workoutSession.status,
+                targetDuration: d.workoutSession.targetDuration,
+                totalVideos: d.workoutSession.totalVideos,
+                currentVideoIndex: d.workoutSession.currentVideoIndex,
+              }
+            : null,
+        };
+      }),
     },
   });
 }

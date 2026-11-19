@@ -62,6 +62,8 @@ export async function GET(request: NextRequest) {
   let existing = 0;
   let noProfile = 0;
   let optedOut = 0;
+  let missingAge = 0;
+  let noMatchingVideos = 0;
   let errored = 0;
 
   for (const u of eligible) {
@@ -78,6 +80,10 @@ export async function GET(request: NextRequest) {
         existing++;
       } else if (result.status === 'NO_PROFILE') {
         noProfile++;
+      } else if (result.status === 'AGE_REQUIRED') {
+        missingAge++;
+      } else if (result.status === 'NO_MATCHING_VIDEOS') {
+        noMatchingVideos++;
       } else if (result.status === 'AUTO_GENERATE_DISABLED') {
         optedOut++;
       }
@@ -95,6 +101,8 @@ export async function GET(request: NextRequest) {
     existing,
     noProfile,
     optedOut,
+    missingAge,
+    noMatchingVideos,
     errored,
     durationMs,
   });

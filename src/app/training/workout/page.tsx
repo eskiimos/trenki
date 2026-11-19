@@ -54,6 +54,7 @@ interface Workout {
   equipment?: string[];
   trainingGoal?: string | null;
   dayLabel?: string | null;
+  weekLabel?: string | null;
 }
 
 const GOAL_LABELS: Record<string, string> = {
@@ -737,6 +738,8 @@ export default function WorkoutPage() {
           </div>
         </div>
       )}
+
+      {workout.weekLabel && <p className="mb-2 text-sm font-semibold text-white">{workout.weekLabel}</p>}
 
       {/* Название дня цикла (нагрузка/характер дня) — для цикловых тренировок */}
       {workout.dayLabel && (

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
 import { workoutTitle } from '@/lib/training/workout-title';
-import { goalsFromStoredDays } from '@/lib/microcycle/week-plan';
+import { macrocycleWeekLabel, storedDayPlans } from '@/lib/microcycle/stored-plan';
 
 /**
  * Избранные тренировки целиком (составленные ИИ).
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
         select: {
           dayOfWeek: true,
           microcycle: {
-            select: { cycleNumber: true, days: { select: { dayOfWeek: true, intent: true } } },
+            select: { cycleNumber: true, macrocycleWeek: true, days: { select: { dayOfWeek: true, intent: true } } },
           },
         },
       },
@@ -93,16 +93,11 @@ export async function POST(request: NextRequest) {
   let goal = session.goal;
   const mday = session.microcycleDay;
   if (mday?.microcycle && !session.goal) {
-    const plans = goalsFromStoredDays(
-      mday.microcycle.days.map((d) => ({ dayOfWeek: d.dayOfWeek, intent: d.intent })),
-      mday.microcycle.cycleNumber,
-    );
-    const plan = plans.find((p) => p.dayOfWeek === mday.dayOfWeek);
+    const plan = storedDayPlans(mday.microcycle).find((p) => p.dayOfWeek === mday.dayOfWeek);
     if (plan) {
-      // Цель дня цикла восстанавливается из intent + номера цикла (как в
-      // ачивках) — правка владельца «в избранном для трени из цикла добавить цель».
       goal = plan.goal;
-      title = `${workoutTitle(plan.goal, null)} · ${plan.label} · Цикл №${mday.microcycle.cycleNumber}`;
+      const weekLabel = macrocycleWeekLabel(mday.microcycle.macrocycleWeek) ?? `Цикл №${mday.microcycle.cycleNumber}`;
+      title = [plan.goal ? workoutTitle(plan.goal, null) : null, plan.label, weekLabel].filter(Boolean).join(' · ');
     }
   } else if (!mday && session.coachId) {
     title = 'Задание от тренера';

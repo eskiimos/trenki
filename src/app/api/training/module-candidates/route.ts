@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { loadMacrocycleEdit, replacementCandidates } from '@/lib/microcycle/macrocycle-edit';
 import { requireAuthUser } from '@/lib/coach/guards';
 
 // GET /api/training/module-candidates?sessionId=&moduleIndex=&q=
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
   const moduleIndex = Number(url.searchParams.get('moduleIndex'));
   const q = (url.searchParams.get('q') || '').trim();
 
-  if (!sessionId || Number.isNaN(moduleIndex)) {
+  if (!sessionId || !Number.isInteger(moduleIndex)) {
     return NextResponse.json({ error: 'sessionId и moduleIndex обязательны' }, { status: 400 });
   }
 
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
     where: { id: sessionId },
     select: {
       userId: true,
+      microcycleDay: { select: { microcycle: { select: { macrocycleWeek: true } } } },
       videos: { orderBy: { order: 'asc' }, select: { videoId: true, video: { select: { moduleType: true } } } },
     },
   });
@@ -42,15 +44,20 @@ export async function GET(request: NextRequest) {
   // (нарушился бы @@unique([sessionId, videoId])). Текущий слот оставляем.
   const otherSlotIds = usedIds.filter((id) => id !== slot.videoId);
 
+  let rankedIds: string[] | undefined;
+  if (session.microcycleDay?.microcycle.macrocycleWeek != null) {
+    const edit = await loadMacrocycleEdit(prisma, auth.user.id, sessionId);
+    rankedIds = edit ? replacementCandidates(edit, slot, true).map(v => v.id) : [];
+  }
   const videos = await prisma.video.findMany({
     where: {
       isPublished: true,
       moduleType,
-      id: { notIn: otherSlotIds },
+      id: rankedIds ? { in: rankedIds } : { notIn: otherSlotIds },
       ...(q ? { title: { contains: q, mode: 'insensitive' } } : {}),
     },
     orderBy: { createdAt: 'desc' },
-    take: 100,
+    take: rankedIds ? undefined : 100,
     select: {
       id: true, title: true, thumbnail: true, duration: true,
       loadType: true, muscleGroup: true, complexity: true,
@@ -58,10 +65,12 @@ export async function GET(request: NextRequest) {
     },
   });
 
+  const byId = new Map(videos.map(v => [v.id, v]));
+  const ordered = rankedIds ? rankedIds.flatMap(id => byId.get(id) ?? []).slice(0, 100) : videos;
   return NextResponse.json({
     moduleType,
     currentVideoId: slot.videoId,
-    videos: videos.map((v) => ({
+    videos: ordered.map((v) => ({
       id: v.id,
       title: v.title,
       thumbnail: v.thumbnail,

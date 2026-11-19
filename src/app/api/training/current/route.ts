@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { WorkoutStatus, MicrocycleStatus } from '@/generated/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
-import { goalsFromStoredDays } from '@/lib/microcycle/week-plan';
+import { macrocycleWeekLabel, storedDayPlans } from '@/lib/microcycle/stored-plan';
 import { resolveVideoUrl } from '@/lib/s3';
 import { pickTodayReminder } from '@/lib/training/today-reminder';
 
@@ -170,28 +170,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ workout: null });
     }
 
-    const ownerProfile = await prisma.profile.findUnique({
-      where: { userId: workout.userId },
-      select: { lastGoals: true },
-    });
-    let trainingGoal: string | null = ownerProfile?.lastGoals?.[0] || null;
+    let trainingGoal: string | null = null;
     let dayLabel: string | null = null;
-
-    // Для тренировки из недельного цикла берём ЦЕЛЬ и подпись именно этого дня
-    // (а не последнюю быструю цель из lastGoals). Цель восстанавливаем из
-    // сохранённых intent + cycleNumber той же ротацией, что при генерации —
-    // без отдельного хранения цели (миграция не нужна).
+    let weekLabel: string | null = null;
     const mday = workout.microcycleDay;
-    if (mday?.microcycle) {
-      const plans = goalsFromStoredDays(
-        mday.microcycle.days.map((d) => ({ dayOfWeek: d.dayOfWeek, intent: d.intent })),
-        mday.microcycle.cycleNumber,
-      );
-      const plan = plans.find((p) => p.dayOfWeek === mday.dayOfWeek);
-      if (plan) {
-        trainingGoal = plan.goal;
-        dayLabel = plan.label;
-      }
+    if (mday) {
+      const plan = storedDayPlans(mday.microcycle).find((p) => p.dayOfWeek === mday.dayOfWeek);
+      trainingGoal = plan?.goal ?? null;
+      dayLabel = plan?.label ?? null;
+      weekLabel = macrocycleWeekLabel(mday.microcycle.macrocycleWeek);
+    } else {
+      const profile = await prisma.profile.findUnique({
+        where: { userId: workout.userId },
+        select: { lastGoals: true },
+      });
+      trainingGoal = profile?.lastGoals?.[0] ?? null;
     }
 
     const totalVideos = workout.totalVideos;
@@ -213,6 +206,7 @@ export async function GET(request: NextRequest) {
         createdAt: workout.createdAt,
         trainingGoal,
         dayLabel,
+        weekLabel,
         // s3://-видео резолвим в presigned GET (auth уже проверен requireAuthUser
         // + ownership выше); Kinescope и прочие URL проходят как есть.
         modules: await Promise.all(workout.videos.map(async (wsVideo) => ({

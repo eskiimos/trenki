@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
-import { computeAchievements, countCycleGoalCredits } from '@/lib/achievements';
+import { computeAchievements, countCycleGoalCredits, cycleCreditQuery } from '@/lib/achievements';
 import { computeStreakAchievements } from '@/lib/streak-achievements';
 import { fetchCompletionHistory, userTimezone } from '@/lib/gamification-server';
 import { SHOWCASE_SLOTS } from '@/lib/award-tier';
@@ -59,46 +59,14 @@ export async function PUT(request: NextRequest) {
       where: { userId: auth.user.id, status: WorkoutStatus.COMPLETED, goal: { not: null } },
       _count: { _all: true },
     }),
-    prisma.microcycle.findMany({
-      where: { userId: auth.user.id },
-      select: {
-        cycleNumber: true,
-        days: {
-          select: {
-            dayOfWeek: true,
-            intent: true,
-            workoutSession: {
-              select: { status: true, goal: true, videos: { select: { completed: true } } },
-            },
-          },
-        },
-      },
-    }),
+    prisma.microcycle.findMany(cycleCreditQuery(auth.user.id)),
   ]);
 
   const goalCounts: Partial<Record<TrainingGoal, number>> = {};
   for (const row of rows) {
     if (row.goal) goalCounts[row.goal] = row._count._all;
   }
-  const cycleCounts = countCycleGoalCredits(
-    cycles.map((c) => ({
-      cycleNumber: c.cycleNumber,
-      days: c.days.map((d) => ({
-        dayOfWeek: d.dayOfWeek,
-        intent: d.intent,
-        session: d.workoutSession
-          ? {
-              status: d.workoutSession.status,
-              goal: d.workoutSession.goal,
-              hasWork: d.workoutSession.videos.some((v) => v.completed),
-              allDone:
-                d.workoutSession.videos.length > 0 &&
-                d.workoutSession.videos.every((v) => v.completed),
-            }
-          : null,
-      })),
-    })),
-  );
+  const cycleCounts = countCycleGoalCredits(cycles);
   for (const [goal, count] of Object.entries(cycleCounts)) {
     const g = goal as TrainingGoal;
     goalCounts[g] = (goalCounts[g] ?? 0) + (count ?? 0);

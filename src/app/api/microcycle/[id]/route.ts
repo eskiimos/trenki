@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
 import { WorkoutStatus } from '@/generated/prisma';
+import { macrocycleWeekLabel } from '@/lib/microcycle/stored-plan';
 import { getEffectiveStatus, isIntroWeekNoSurvey } from '@/lib/microcycle/status';
 
 export const dynamic = 'force-dynamic';
@@ -151,6 +152,7 @@ export async function GET(
       id: cycle.id,
       weekStartDate: cycle.weekStartDate,
       cycleNumber: cycle.cycleNumber,
+      weekLabel: macrocycleWeekLabel(cycle.macrocycleWeek),
       status: cycle.status,
       effectiveStatus,
       feedback: cycle.feedback,
