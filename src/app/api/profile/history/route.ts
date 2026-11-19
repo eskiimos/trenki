@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuthUser } from '@/lib/coach/guards';
 import { workoutTitle } from '@/lib/training/workout-title';
-import { goalsFromStoredDays } from '@/lib/microcycle/week-plan';
+import { macrocycleWeekLabel, storedDayPlans } from '@/lib/microcycle/stored-plan';
 import { WorkoutStatus } from '@/generated/prisma';
 
 /**
@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
               microcycle: {
                 select: {
                   cycleNumber: true,
+                  macrocycleWeek: true,
                   days: { select: { dayOfWeek: true, intent: true } },
                 },
               },
@@ -100,19 +101,15 @@ export async function GET(request: NextRequest) {
 
     const workoutItems = sessions.map((s) => {
       // Название: быстрая — «цель · состояние»; цикловая — подпись дня из плана
-      // недели (цель восстанавливается той же ротацией, что при генерации);
+      // недели и её фокус;
       // тренерская (coachId, создаётся в /api/assignments без goal) — честная
       // подпись «Задание от тренера», а не фолбэк «Тренировка от ИИ-тренера».
       let title = workoutTitle(s.goal, s.energyState);
       let cycleLabel: string | null = null;
       const mday = s.microcycleDay;
       if (mday?.microcycle) {
-        const plans = goalsFromStoredDays(
-          mday.microcycle.days.map((d) => ({ dayOfWeek: d.dayOfWeek, intent: d.intent })),
-          mday.microcycle.cycleNumber,
-        );
-        const plan = plans.find((p) => p.dayOfWeek === mday.dayOfWeek);
-        cycleLabel = `Цикл №${mday.microcycle.cycleNumber}`;
+        const plan = storedDayPlans(mday.microcycle).find((p) => p.dayOfWeek === mday.dayOfWeek);
+        cycleLabel = macrocycleWeekLabel(mday.microcycle.macrocycleWeek) ?? `Цикл №${mday.microcycle.cycleNumber}`;
         if (plan && !s.goal) title = plan.label;
       } else if (s.coachId) {
         title = 'Задание от тренера';

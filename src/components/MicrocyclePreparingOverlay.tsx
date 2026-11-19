@@ -59,7 +59,7 @@ export default function MicrocyclePreparingOverlay({ open }: Props) {
           maxWidth: 320,
         }}
       >
-        Подбираем 5 тренировок под твои характеристики
+        Подбираем упражнения под твой возраст и фокус недели
       </p>
 
       {/* Волна недельной нагрузки */}

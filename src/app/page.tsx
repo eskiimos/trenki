@@ -991,10 +991,7 @@ const TrainingsSection = () => {
     const [generatingCycle, setGeneratingCycle] = useState(false);
     const [cycleError, setCycleError] = useState<string | null>(null);
     const [hasActiveCycle, setHasActiveCycle] = useState(false);
-    // Проверка «есть ли активный цикл» УСПЕШНО завершилась. Пока false, слепо
-    // генерить нельзя: POST /api/microcycle/generate при активном цикле молча
-    // УДАЛЯЕТ его и собирает новую неделю — тап до резолва проверки (или при
-    // упавшем запросе) сносил готовый план без подтверждения.
+    // Состояние цикла определяет действие кнопки на главной.
     const [cycleChecked, setCycleChecked] = useState(false);
     const { paywalled, freeLessonVideoId } = useSubscription();
     const [activeQuickId, setActiveQuickId] = useState<string | null>(null);
@@ -1077,8 +1074,6 @@ const TrainingsSection = () => {
         }
         if (active) { router.push('/calendar'); return; }
         if (!checked) {
-            // Обе проверки провалились (сеть/500). Генерить вслепую НЕЛЬЗЯ:
-            // generate при активном цикле молча сносит неделю с прогрессом.
             setCycleError('Не удалось проверить текущий цикл. Проверь связь и попробуй ещё раз.');
             return;
         }

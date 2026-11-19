@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { workoutModulePath, workoutPath } from '@/lib/training/workout-navigation';
+import { MODULE_TYPE_LABELS } from '@/lib/videoLabels';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
@@ -49,6 +50,7 @@ type MicrocycleIntent = 'IN_TONE' | 'WARMUP' | 'CHARGED' | 'STRETCH' | 'TIRED';
 interface MicrocycleDay {
   dayOfWeek: number; // порядковый день цикла 1..N от weekStartDate (НЕ календарный)
   intent: MicrocycleIntent;
+  missingModules?: string[];
   goal: string | null; // направленность/цель дня (подпись)
   goalKey?: string | null; // ключ цели (POWERFUL_SHOT, AGILITY, …) — для иконки
   modules: {
@@ -70,6 +72,8 @@ interface ActiveMicrocycle {
   id: string;
   weekStartDate: string; // ISO date (YYYY-MM-DD)
   cycleNumber: number;
+  weekLabel: string | null;
+  effectiveStatus: 'ACTIVE' | 'AWAITING_FEEDBACK';
   status: string;
   days: MicrocycleDay[];
 }
@@ -148,10 +152,10 @@ export default function CalendarPage() {
   const MIN_OVERLAY_MS = 5000;
   const handleGenerateMicrocycle = async () => {
     if (generatingCycle) return;
-    // Пересборка существующего цикла — предупреждаем (план заменится, старт с сегодня).
+    const rebuildId = microcycle?.effectiveStatus === 'ACTIVE' ? microcycle.id : undefined;
     if (
-      microcycle &&
-      !confirm('У тебя уже есть активный цикл на эту неделю. Пересобрать его заново?\n\nТекущий план заменится и стартует с сегодня.')
+      rebuildId &&
+      !confirm('Пересобрать этот микроцикл? Текущий план заменится, а прогресс по его тренировкам сбросится.')
     ) {
       return;
     }
@@ -166,7 +170,7 @@ export default function CalendarPage() {
       const res = await fetch('/api/microcycle/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ localDate }),
+        body: JSON.stringify({ localDate, rebuildId }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -214,8 +218,7 @@ export default function CalendarPage() {
         setMicrocycle(data.microcycle);
         setCycleLoaded(true);
       } else {
-        // Не выставляем cycleLoaded: иначе покажем «Собрать неделю» и юзер
-        // случайно перезапишет существующий план.
+        // Без ответа сервера ещё неизвестно, какая кнопка нужна в календаре.
         setLoadError('Не удалось загрузить недельный план');
       }
     } catch (error) {
@@ -595,7 +598,7 @@ export default function CalendarPage() {
                 ИИ-тренер
               </div>
               <div className="text-white text-sm font-semibold leading-tight">
-                {generatingCycle ? 'Собираю неделю…' : 'Собрать неделю — 5 тренировок'}
+                {generatingCycle ? 'Собираю неделю…' : 'Собрать микроцикл'}
               </div>
             </div>
             <ChevronRight size={20} className="text-[#A1FF4A] shrink-0" />
@@ -629,7 +632,7 @@ export default function CalendarPage() {
                       letterSpacing: 0.5,
                     }}
                   >
-                    {microcycle.cycleNumber === 1 ? 'Первый микроцикл' : `Микроцикл №${microcycle.cycleNumber}`}
+                    {microcycle.weekLabel ?? (microcycle.cycleNumber === 1 ? 'Первый микроцикл' : `Микроцикл №${microcycle.cycleNumber}`)}
                   </span>
                   {getCycleRangeLabel() && (
                     <span className="text-[#AEABBB] text-[11px]"> · {getCycleRangeLabel()}</span>
@@ -655,7 +658,7 @@ export default function CalendarPage() {
                   }}
                 >
                   <RefreshCw size={16} />
-                  пересобрать
+                  {microcycle.effectiveStatus === 'ACTIVE' ? 'Пересобрать' : 'Собрать неделю'}
                 </button>
               </div>
             )}
@@ -871,6 +874,11 @@ export default function CalendarPage() {
                     ))}
                   </div>
                 </div>
+              )}
+              {!!d.missingModules?.length && (
+                <p className="text-[#AEABBB] text-xs mt-2">
+                  В каталоге пока нет подходящих видео для модулей «{d.missingModules.map((type) => MODULE_TYPE_LABELS[type]).join('», «')}».
+                </p>
               )}
               {d.intent === 'STRETCH' && (
                 <div className="mt-2 rounded-2xl p-3" style={{ background: 'rgba(174,171,187,0.08)' }}>

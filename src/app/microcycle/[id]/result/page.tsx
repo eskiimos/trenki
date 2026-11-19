@@ -43,6 +43,7 @@ interface MicrocycleResponse {
   microcycle: {
     id: string;
     cycleNumber: number;
+    weekLabel: string | null;
     feedback: 'EASY' | 'NORMAL' | 'HARD' | null;
     weekStartDate: string;
     effectiveStatus: 'ACTIVE' | 'AWAITING_FEEDBACK' | 'ARCHIVED';
@@ -142,7 +143,7 @@ export default function MicrocycleResultPage() {
             letterSpacing: '0.5px',
           }}
         >
-          Микроцикл №{microcycle.cycleNumber}
+          {microcycle.weekLabel ?? `Микроцикл №${microcycle.cycleNumber}`}
         </h1>
       </header>
 

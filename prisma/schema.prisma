@@ -1139,6 +1139,7 @@ model Microcycle {
   userId           String
   weekStartDate    DateTime            @db.Date // понедельник недели цикла
   cycleNumber      Int // 1, 2, 3... у конкретного юзера
+  macrocycleWeek   Int? // Цикл 2.0: фокус недели (1..4). NULL у планов по прежней методике.
   status           MicrocycleStatus    @default(ACTIVE)
   feedback         MicrocycleFeedback? // Sprint 3
   adjustmentFactor Float? // коэф. адаптации применённый при генерации (Sprint 4)
@@ -1158,6 +1159,7 @@ model MicrocycleDay {
   microcycleId     String
   dayOfWeek        Int // 1=Пн, 2=Вт, ..., 5=Пт (CHECK 1..5 в SQL)
   intent           MicrocycleIntent
+  stretchBodyPart  String? // Явный выбор спортсмена для дня раскисления в Цикле 2.0
   workoutSessionId String?          @unique // nullable: если AI не нашёл модулей
   createdAt        DateTime         @default(now())
 

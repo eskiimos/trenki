@@ -81,8 +81,7 @@ export async function PATCH(
   const updated = await prisma.microcycle.update({
     where: { id },
     data: {
-      // acknowledge → закрываем неделю без оценки (feedback остаётся null:
-      // адаптация следующей недели пойдёт по дефолту, как при отсутствии ответа).
+      // acknowledge → закрываем неделю без оценки (feedback остаётся null).
       ...(acknowledgeOnly ? {} : { feedback }),
       status: MicrocycleStatus.ARCHIVED,
     },

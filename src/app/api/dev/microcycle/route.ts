@@ -20,7 +20,7 @@ import { getEffectiveStatus } from '@/lib/microcycle/status';
 //  - run { cycles, feedback } — прогнать насквозь N циклов (1..10) с одним
 //                     ответом-фидбэком (EASY/NORMAL/HARD): чистый старт →
 //                     генерим неделю → начисляем прирост → ставим фидбэк →
-//                     генерим следующую (с адаптацией методички) → … Возвращает
+//                     генерим неделю со следующим фокусом → … Возвращает
 //                     таймлайн структуры недель и рост потенциала.
 
 const WD = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
@@ -181,6 +181,7 @@ export async function POST(request: NextRequest) {
 
     type CycleSnap = {
       cycleNumber: number;
+      macrocycleWeek: number | null;
       weekStart: string;
       days: { d: string; label: string }[];
       feedback: MicrocycleFeedback | null;
@@ -190,7 +191,7 @@ export async function POST(request: NextRequest) {
     const timeline: CycleSnap[] = [];
 
     // Старт — ближайший понедельник (полная неделя Пн-Пт для чистого демо),
-    // дальше +7 дней за цикл (адаптация методички видна по неделям).
+    // дальше +7 дней за цикл.
     let startDate = getMicrocycleWeekStart(new Date());
 
     const snapDays = (weekStart: Date, days: { dayOfWeek: number; intent: MicrocycleIntent }[]) =>
@@ -201,13 +202,13 @@ export async function POST(request: NextRequest) {
 
     for (let i = 0; i < cycles; i++) {
       const gen = await generateMicrocycleForUser(userId, { startDate });
-      if (gen.status === 'NO_PROFILE') {
-        return NextResponse.json({ error: 'Профиль не найден' }, { status: 404 });
+      if (!gen.microcycleId) {
+        return NextResponse.json({ error: 'Не удалось собрать неделю.', reason: gen.status }, { status: 422 });
       }
       const cyc = await prisma.microcycle.findUnique({
-        where: { id: gen.microcycleId! },
+        where: { id: gen.microcycleId },
         select: {
-          id: true, cycleNumber: true, weekStartDate: true,
+          id: true, cycleNumber: true, macrocycleWeek: true, weekStartDate: true,
           days: { select: { dayOfWeek: true, intent: true, workoutSessionId: true } },
         },
       });
@@ -228,6 +229,7 @@ export async function POST(request: NextRequest) {
 
       timeline.push({
         cycleNumber: cyc.cycleNumber,
+        macrocycleWeek: cyc.macrocycleWeek,
         weekStart: cyc.weekStartDate.toISOString().slice(0, 10),
         days: snapDays(cyc.weekStartDate, cyc.days),
         feedback,
@@ -238,27 +240,29 @@ export async function POST(request: NextRequest) {
       startDate = addDaysUTC(cyc.weekStartDate, 7);
     }
 
-    // Финальный адаптированный цикл — генерим и оставляем активным для просмотра.
+    // Следующий цикл — генерим и оставляем активным для просмотра.
     let finalCycle: CycleSnap | null = null;
     const finalGen = await generateMicrocycleForUser(userId, { startDate });
-    if (finalGen.microcycleId) {
-      const fc = await prisma.microcycle.findUnique({
-        where: { id: finalGen.microcycleId },
-        select: {
-          cycleNumber: true, weekStartDate: true,
-          days: { select: { dayOfWeek: true, intent: true } },
-        },
-      });
-      if (fc) {
-        finalCycle = {
-          cycleNumber: fc.cycleNumber,
-          weekStart: fc.weekStartDate.toISOString().slice(0, 10),
-          days: snapDays(fc.weekStartDate, fc.days),
-          feedback: null,
-          creditedSessions: 0,
-          potentialAfter: null,
-        };
-      }
+    if (!finalGen.microcycleId) {
+      return NextResponse.json({ error: 'Не удалось собрать следующую неделю.', reason: finalGen.status }, { status: 422 });
+    }
+    const fc = await prisma.microcycle.findUnique({
+      where: { id: finalGen.microcycleId },
+      select: {
+        cycleNumber: true, macrocycleWeek: true, weekStartDate: true,
+        days: { select: { dayOfWeek: true, intent: true } },
+      },
+    });
+    if (fc) {
+      finalCycle = {
+        cycleNumber: fc.cycleNumber,
+        macrocycleWeek: fc.macrocycleWeek,
+        weekStart: fc.weekStartDate.toISOString().slice(0, 10),
+        days: snapDays(fc.weekStartDate, fc.days),
+        feedback: null,
+        creditedSessions: 0,
+        potentialAfter: null,
+      };
     }
 
     const profEnd = await prisma.profile.findUnique({ where: { userId }, select: { potential: true } });

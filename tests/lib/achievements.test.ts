@@ -6,6 +6,7 @@ import {
   EVO2_TARGET,
   computeAchievements,
   countCycleGoalCredits,
+  type CycleForAchievements,
 } from '../../src/lib/achievements';
 import type { TrainingGoal } from '../../src/generated/prisma';
 
@@ -108,17 +109,20 @@ describe('цель без завершений и лишние ключи', () =
 // SPORT_LONGEVITY — но зарядка/раскисление ачивок НЕ дают (решение владельца).
 
 describe('countCycleGoalCredits', () => {
-  type TestSession = { status: string; goal: TrainingGoal | null; hasWork: boolean; allDone: boolean };
-  const okSession: TestSession = { status: 'COMPLETED', goal: null, hasWork: true, allDone: true };
-  const week = (sessions: Record<number, typeof okSession | null>) => [
+  type TestSession = NonNullable<CycleForAchievements['days'][number]['workoutSession']>;
+  const watched = (moduleType: 'TECHNIQUE' | 'FITNESS' | 'WARMUP', ...trainingGoals: TrainingGoal[]) => ({
+    completed: true, video: { moduleType, trainingGoals },
+  });
+  const okSession: TestSession = { status: 'COMPLETED', goal: null, videos: [watched('FITNESS')] };
+  const week = (sessions: Record<number, TestSession | null>, macrocycleWeek: number | null = null): CycleForAchievements[] => [
     {
-      cycleNumber: 1,
+      cycleNumber: 1, macrocycleWeek,
       days: [
-        { dayOfWeek: 1, intent: 'IN_TONE', session: sessions[1] ?? null },
-        { dayOfWeek: 2, intent: 'WARMUP', session: sessions[2] ?? null },
-        { dayOfWeek: 3, intent: 'CHARGED', session: sessions[3] ?? null },
-        { dayOfWeek: 4, intent: 'STRETCH', session: sessions[4] ?? null },
-        { dayOfWeek: 5, intent: 'TIRED', session: sessions[5] ?? null },
+        { dayOfWeek: 1, intent: 'IN_TONE', workoutSession: sessions[1] ?? null },
+        { dayOfWeek: 2, intent: 'WARMUP', workoutSession: sessions[2] ?? null },
+        { dayOfWeek: 3, intent: 'CHARGED', workoutSession: sessions[3] ?? null },
+        { dayOfWeek: 4, intent: 'STRETCH', workoutSession: sessions[4] ?? null },
+        { dayOfWeek: 5, intent: 'TIRED', workoutSession: sessions[5] ?? null },
       ],
     },
   ];
@@ -136,7 +140,7 @@ describe('countCycleGoalCredits', () => {
 
   it('фантом close-day (0 пройденных видео) не зачитывается', () => {
     const counts = countCycleGoalCredits(
-      week({ 3: { ...okSession, hasWork: false, allDone: false } }),
+      week({ 3: { ...okSession, videos: [] } }),
     );
     expect(Object.keys(counts).length).toBe(0);
   });
@@ -158,5 +162,30 @@ describe('countCycleGoalCredits', () => {
     expect(counts.POWERFUL_SHOT).toBe(1);
     expect(counts.OUTRUN_OPPONENT).toBe(1);
     expect(counts.STRENGTH_STABILITY).toBe(1);
+  });
+
+  it('Цикл 2.0 даёт один зачёт первой общей цели техники и ОФП в порядке меток техники', () => {
+    const session = { ...okSession, videos: [
+      watched('WARMUP', 'POWERFUL_SHOT'),
+      watched('FITNESS', 'SOFT_HANDS', 'STRENGTH_STABILITY'),
+      watched('TECHNIQUE', 'AGILITY', 'STRENGTH_STABILITY', 'SOFT_HANDS'),
+    ] };
+    expect(countCycleGoalCredits(week({ 1: session }, 2))).toEqual({ STRENGTH_STABILITY: 1 });
+  });
+
+  it('Цикл 2.0 берёт первую цель техники, затем ОФП, и пропускает дни без их меток', () => {
+    const technique = { ...okSession, videos: [watched('FITNESS', 'AGILITY'), watched('TECHNIQUE', 'SOFT_HANDS', 'POWERFUL_SHOT')] };
+    const fitness = { ...okSession, videos: [watched('TECHNIQUE'), watched('FITNESS', 'AGILITY', 'SPORT_LONGEVITY')] };
+    const untagged = { ...okSession, videos: [watched('WARMUP', 'POWERFUL_SHOT'), watched('TECHNIQUE')] };
+    expect(countCycleGoalCredits(week({ 1: technique, 3: fitness, 5: untagged }, 4))).toEqual({ SOFT_HANDS: 1, AGILITY: 1 });
+  });
+
+  it('Цикл 2.0 проверяет факт выполнения и исключает пропуски, лёгкие дни и двойной зачёт', () => {
+    const done = { ...okSession, videos: [watched('TECHNIQUE', 'SOFT_HANDS')] };
+    const skipped = { ...done, videos: [...done.videos, { ...watched('FITNESS'), completed: false }] };
+    expect(countCycleGoalCredits([
+      ...week({ 1: skipped, 2: done, 3: { ...done, goal: 'SOFT_HANDS' }, 4: done, 5: { ...done, videos: [] } }, 3),
+      ...week({ 1: { ...done, status: 'PARTIAL' } }, 1),
+    ])).toEqual({});
   });
 });
